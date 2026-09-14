@@ -1,0 +1,214 @@
+package agent
+
+import (
+	"context"
+	"crypto/ed25519"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"log/slog"
+	"math/rand/v2"
+	"net/http"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
+
+	"github.com/fadymondy/cloudy/internal/agentproto"
+)
+
+// Agent is one enrolled agent's connection loop.
+type Agent struct {
+	State          *State
+	Version        string
+	Log            *slog.Logger
+	HeartbeatEvery time.Duration
+	Exec           *Executor
+
+	priv    ed25519.PrivateKey
+	sampler *Sampler
+	// live carries events to whichever connection is up. It is only a fast path: every event is
+	// also in the executor's journal, and the server's resume list after a reconnect replays
+	// whatever did not arrive.
+	live chan agentproto.Event
+}
+
+// New builds an agent from its enrolled state.
+func New(st *State, version string, log *slog.Logger) (*Agent, error) {
+	priv, cpPub, err := st.Keys()
+	if err != nil {
+		return nil, err
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	a := &Agent{
+		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second,
+		priv: priv, sampler: NewSampler(), live: make(chan agentproto.Event, 4096),
+	}
+	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
+	a.Exec.emit = a.enqueue
+	a.Exec.Restart = a.restart
+	return a, nil
+}
+
+func (a *Agent) enqueue(ev agentproto.Event) {
+	select {
+	case a.live <- ev:
+	default:
+		// Full (a long disconnect with a chatty operation): the journal still holds the event and
+		// the next resume replays it.
+	}
+}
+
+// Run connects, and reconnects with capped, jittered backoff, until ctx ends. Operations keep
+// running while disconnected; their events are replayed on reconnect.
+func (a *Agent) Run(ctx context.Context) error {
+	go a.Exec.Work(ctx)
+	backoff := time.Second
+	for {
+		started := time.Now()
+		err := a.session(ctx)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if time.Since(started) > 30*time.Second {
+			backoff = time.Second // it was a healthy session; start the backoff over
+		}
+		wait := backoff/2 + time.Duration(rand.Int64N(int64(backoff)))
+		a.Log.Warn("disconnected from the control plane", "err", err, "retry_in", wait.Round(time.Millisecond))
+		t := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return ctx.Err()
+		case <-t.C:
+		}
+		if backoff *= 2; backoff > 30*time.Second {
+			backoff = 30 * time.Second
+		}
+	}
+}
+
+// session is one connection: handshake, then a reader and a writer until either fails.
+func (a *Agent) session(parent context.Context) error {
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	dctx, dcancel := context.WithTimeout(ctx, 20*time.Second)
+	conn, _, err := websocket.Dial(dctx, a.State.WebSocketURL, &websocket.DialOptions{
+		HTTPHeader: http.Header{"User-Agent": {"cloudy-agent/" + a.Version}},
+	})
+	dcancel()
+	if err != nil {
+		return err
+	}
+	defer conn.CloseNow() //nolint:errcheck
+	conn.SetReadLimit(4 << 20)
+
+	if err := a.handshake(ctx, conn); err != nil {
+		return err
+	}
+	a.Log.Info("connected to the control plane", "server", a.State.ServerName, "server_id", a.State.ServerID)
+
+	errc := make(chan error, 2)
+	go func() { errc <- a.writer(ctx, conn) }()
+	go func() { errc <- a.reader(ctx, conn) }()
+	err = <-errc
+	cancel()
+	return err
+}
+
+func (a *Agent) handshake(ctx context.Context, conn *websocket.Conn) error {
+	hctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	var ch agentproto.Frame
+	if err := wsjson.Read(hctx, conn, &ch); err != nil {
+		return fmt.Errorf("read challenge: %w", err)
+	}
+	if ch.Type != agentproto.TypeChallenge || ch.Nonce == "" {
+		return errors.New("the control plane did not send a challenge")
+	}
+	sig := ed25519.Sign(a.priv, agentproto.AuthSigningBytes(ch.Nonce, a.State.ServerID))
+	if err := wsjson.Write(hctx, conn, agentproto.Frame{
+		Type: agentproto.TypeAuth, ServerID: a.State.ServerID, Signature: base64.StdEncoding.EncodeToString(sig),
+		AgentVersion: a.Version, Protocol: agentproto.ProtocolVersion,
+	}); err != nil {
+		return err
+	}
+	var w agentproto.Frame
+	if err := wsjson.Read(hctx, conn, &w); err != nil {
+		return fmt.Errorf("read welcome: %w", err)
+	}
+	switch w.Type {
+	case agentproto.TypeWelcome:
+		return nil
+	case agentproto.TypeError:
+		return fmt.Errorf("the control plane refused this agent: %s", w.Error)
+	default:
+		return fmt.Errorf("unexpected %q frame during the handshake", w.Type)
+	}
+}
+
+func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
+	hb := time.NewTicker(a.HeartbeatEvery)
+	defer hb.Stop()
+	send := func(f agentproto.Frame) error {
+		wctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		return wsjson.Write(wctx, conn, f)
+	}
+	heartbeat := func() error {
+		m := a.sampler.Sample()
+		return send(agentproto.Frame{Type: agentproto.TypeHeartbeat, Metrics: &m, AgentVersion: a.Version})
+	}
+	if err := heartbeat(); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-hb.C:
+			if err := heartbeat(); err != nil {
+				return err
+			}
+		case ev := <-a.live:
+			if err := send(agentproto.Frame{Type: agentproto.TypeEvent, Event: &ev}); err != nil {
+				return err // the event is in the journal; the resume after reconnecting replays it
+			}
+		}
+	}
+}
+
+func (a *Agent) reader(ctx context.Context, conn *websocket.Conn) error {
+	for {
+		var f agentproto.Frame
+		if err := wsjson.Read(ctx, conn, &f); err != nil {
+			return err
+		}
+		switch f.Type {
+		case agentproto.TypeOp:
+			a.Exec.Submit(f.Op)
+		case agentproto.TypeResume:
+			a.Exec.Resume(f.Resume)
+		case agentproto.TypeError:
+			return fmt.Errorf("control plane: %s", f.Error)
+		}
+	}
+}
+
+// restart re-executes the (just replaced) binary once the final status of the update operation
+// has had a chance to reach the control plane. If it has not, the next session's resume reports
+// the op as unknown, the server re-queues it, and the new binary answers "already at version".
+func (a *Agent) restart() {
+	deadline := time.Now().Add(5 * time.Second)
+	for len(a.live) > 0 && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond)
+	a.Log.Info("restarting into the updated binary")
+	if err := reexec(); err != nil {
+		a.Log.Error("restart failed; the new binary takes over at the next service restart", "err", err)
+	}
+}
