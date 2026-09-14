@@ -20,6 +20,13 @@ import (
 
 const invitationTTL = 7 * 24 * time.Hour
 
+// acceptedOut is POST /api/invitations/{token}/accept's answer: {"team": {...}}.
+type acceptedOut struct {
+	Body struct {
+		Team TeamSummary `json:"team"`
+	}
+}
+
 type InvitationOut struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
@@ -173,12 +180,12 @@ func (d *deps) registerInvitations(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "accept-invitation", Method: http.MethodPost, Path: "/api/invitations/{token}/accept",
 		Summary: "Join the team an invitation is for", Tags: []string{"Invitations"},
-	}, func(ctx context.Context, in *tokenPath) (*struct{ Body TeamSummary }, error) {
+	}, func(ctx context.Context, in *tokenPath) (*acceptedOut, error) {
 		id, err := current(ctx)
 		if err != nil {
 			return nil, err
 		}
-		out := &struct{ Body TeamSummary }{}
+		out := &acceptedOut{}
 		hash := tokens.Hash(in.Token)
 		err = d.tx(ctx, tenancy.Scope{UserID: id.ID, TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
 			inv, err := q.InvitationByTokenHash(ctx, hash)
@@ -219,7 +226,7 @@ func (d *deps) registerInvitations(api huma.API) {
 			if err != nil {
 				return errNotFound
 			}
-			out.Body = TeamSummary{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: inv.Role, CreatedAt: t.CreatedAt}
+			out.Body.Team = TeamSummary{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: inv.Role, CreatedAt: t.CreatedAt}
 			return nil
 		})
 		return out, err
