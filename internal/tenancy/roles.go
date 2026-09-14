@@ -30,6 +30,9 @@ const (
 	AbilityManageMembers = "manage_members" // invite, change roles, remove
 	AbilityManageTokens  = "manage_tokens"  // mint and revoke team MCP tokens
 	AbilityViewAudit     = "view_audit"     // read the team's audit log
+	AbilityOperate       = "operate"        // run read-only server operations (system.info, docker.check)
+	AbilityManageServers = "manage_servers" // add/remove servers, provisioning steps, agent updates, provider credentials
+	AbilityRevealSecrets = "reveal_secrets" // reveal a sealed secret such as a provider credential (audited)
 )
 
 func roleIn(roles ...string) authz.PolicyFunc {
@@ -55,6 +58,9 @@ func init() {
 		AbilityManageMembers: roleIn(RoleOwner, RoleAdmin),
 		AbilityManageTokens:  roleIn(RoleOwner, RoleAdmin),
 		AbilityViewAudit:     roleIn(RoleOwner, RoleAdmin),
+		AbilityOperate:       roleIn(RoleOwner, RoleAdmin, RoleDeployer),
+		AbilityManageServers: roleIn(RoleOwner, RoleAdmin),
+		AbilityRevealSecrets: roleIn(RoleOwner, RoleAdmin),
 	})
 }
 

@@ -24,8 +24,8 @@ import (
 // Service fields are nil unless the matching feature/provider plugin is installed.
 type App struct {
 	Kernel   *togo.Kernel
-	DB       *db.Queries // sqlc typed queries (for complex/typed SQL)
-	SQLDB    *sql.DB     // raw handle used by the ORM
+	DB       *db.Queries  // sqlc typed queries (for complex/typed SQL)
+	SQLDB    *sql.DB      // raw handle used by the ORM
 	Dialect  togo.Dialect // driver-specific SQL dialect (from DB_DRIVER)
 	Hooks    *togo.Hooks
 	Log      *slog.Logger
@@ -37,15 +37,22 @@ type App struct {
 	// Keys is the envelope-encryption keyring (CLOUDY_KEK). Set by server.Boot,
 	// which refuses to start without it.
 	Keys *crypto.Keyring
+
+	// Stop ends Cloudy's own background workers (the agent hub, the operations dispatcher and
+	// sweeper). The togo kernel has no shutdown hooks, so server.Boot sets this and whoever
+	// owns the process calls it before Kernel.Close.
+	Stop func()
+	// Ops is the *ops.Service (typed any: package ops imports app).
+	Ops any
 }
 
 // New builds the container from the kernel, opening the DB if configured.
 func New(ctx context.Context, k *togo.Kernel) *App {
 	a := &App{
-		Kernel:  k,
-		Hooks:   k.Hooks,
-		Log:     k.Log,
-		Dialect: k.Dialect(),
+		Kernel:   k,
+		Hooks:    k.Hooks,
+		Log:      k.Log,
+		Dialect:  k.Dialect(),
 		Cache:    k.Cache,
 		Queue:    k.Queue,
 		Storage:  k.Storage,
@@ -77,4 +84,3 @@ func (a *App) Emit(ctx context.Context, event string, payload any) {
 	}
 	a.Realtime.Publish(event, string(data))
 }
-

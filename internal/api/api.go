@@ -25,14 +25,21 @@ import (
 
 	"github.com/fadymondy/cloudy/internal/app"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/cloudy/internal/ops"
 	"github.com/fadymondy/cloudy/internal/tenancy"
 )
 
-type deps struct{ a *app.App }
+type deps struct {
+	a   *app.App
+	ops *ops.Service
+}
 
-// Register mounts every Cloudy route. a may be nil (OpenAPI export only).
-func Register(api huma.API, a *app.App) {
-	d := &deps{a: a}
+// Register mounts every Cloudy route. a and svc may be nil (OpenAPI export only).
+func Register(api huma.API, a *app.App, svc *ops.Service) {
+	d := &deps{a: a, ops: svc}
+	d.registerServers(api)
+	d.registerOperations(api)
+	d.registerCredentials(api)
 	d.registerMe(api)
 	d.registerTeams(api)
 	d.registerMembers(api)

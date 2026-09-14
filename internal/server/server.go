@@ -19,7 +19,9 @@ import (
 	"github.com/fadymondy/cloudy/internal/config"
 	"github.com/fadymondy/cloudy/internal/crypto"
 	"github.com/fadymondy/cloudy/internal/mcp"
+	"github.com/fadymondy/cloudy/internal/ops"
 	_ "github.com/fadymondy/cloudy/internal/plugins" // blank-imports installed plugins (togo install)
+	"github.com/fadymondy/cloudy/internal/provisioning"
 	"github.com/fadymondy/cloudy/internal/tenancy"
 )
 
@@ -55,8 +57,18 @@ func Boot() *app.App {
 	k.UseMiddleware(requireSecondFactor(a))
 	requireAuthorization(k)
 
+	svc, err := ops.New(a, ops.ConfigFromEnv())
+	if err != nil {
+		panic("cloudy: " + err.Error())
+	}
+	svc.RegisterRunner(ops.KindProviderCreate, provisioning.Runner(a, svc))
+	svc.Mount(k.Router) // /install, /agent/* — outside /api, authenticated by token or signature
+	svc.Start()
+	a.Stop = svc.Stop
+	a.Ops = svc
+
 	humaAPI := humachi.New(k.Router, humaConfig())
-	api.Register(humaAPI, a)
+	api.Register(humaAPI, a, svc)
 
 	k.Router.Post("/api/mcp", mcp.UserServer().Handler(a))
 	k.Router.Get("/api/mcp", mcp.UserServer().Handler(a)) // 405: no server-initiated stream
@@ -65,7 +77,7 @@ func Boot() *app.App {
 
 	k.Router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P0","togo":%q}`, togoVersion())
+		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P1","togo":%q}`, togoVersion())
 	})
 	return a
 }
@@ -109,6 +121,6 @@ func togoVersion() string {
 func OpenAPI() ([]byte, error) {
 	router := chi.NewMux()
 	humaAPI := humachi.New(router, humaConfig())
-	api.Register(humaAPI, nil)
+	api.Register(humaAPI, nil, nil)
 	return humaAPI.OpenAPI().YAML()
 }

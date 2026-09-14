@@ -22,9 +22,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"crypto/ed25519"
+	"encoding/base64"
+
+	"github.com/fadymondy/cloudy/internal/agentproto"
 	"github.com/fadymondy/cloudy/internal/api"
 	"github.com/fadymondy/cloudy/internal/config"
 	"github.com/fadymondy/cloudy/internal/migrate"
+	"github.com/fadymondy/cloudy/internal/ops"
 )
 
 /*
@@ -63,7 +68,7 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams", map[string]any{"name": "Alpha " + suffix}, 201, &teamA)
 	var inv1 struct {
 		Invitation struct{ ID string } `json:"invitation"`
-		AcceptURL  string             `json:"accept_url"`
+		AcceptURL  string              `json:"accept_url"`
 	}
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/invitations", map[string]any{"email": ua2Email, "role": "deployer"}, 201, &inv1)
 	token1 := inv1.AcceptURL[strings.LastIndex(inv1.AcceptURL, "/")+1:]
@@ -90,6 +95,14 @@ func TestIsolationSweep(t *testing.T) {
 	var tokA struct{ ID, Token string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/mcp-tokens", map[string]any{"name": "a-read", "scopes": []string{"read"}, "expires_in_days": 30}, 201, &tokA)
 
+	// P1: a bring-your-own server that enrolled through the real endpoint, an operation on it, and a
+	// provider credential (saved unvalidated: no provider is ever contacted by the tests).
+	srvA, opA := enrolledServerWithOp(t, ua, ts.URL, teamA.ID, "alpha-"+suffix)
+	var credA struct{ ID string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/credentials", map[string]any{"provider": "proxmox", "name": "pve-a",
+		"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "cloudy@pve!ctl", "node": "pve", "storage": "local-lvm"},
+		"secret": "a-secret-" + suffix, "skip_validation": true}, 201, &credA)
+
 	// Team B: B's own, unrelated team.
 	var teamB struct{ ID, Slug string }
 	ub.mustJSON("POST", "/api/teams", map[string]any{"name": "Bravo " + suffix}, 201, &teamB)
@@ -97,9 +110,12 @@ func TestIsolationSweep(t *testing.T) {
 	// ---- REST sweep -------------------------------------------------------------------------
 	oapi := openAPIDoc()
 	fillers := map[string]func(path string) []string{
-		"team":   func(string) []string { return []string{teamA.ID, teamA.Slug} },
-		"member": func(string) []string { return []string{memberA} },
-		"token":  func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
+		"team":       func(string) []string { return []string{teamA.ID, teamA.Slug} },
+		"member":     func(string) []string { return []string{memberA} },
+		"server":     func(string) []string { return []string{srvA, "alpha-" + suffix} }, // an id, and a name (must not resolve either)
+		"op":         func(string) []string { return []string{opA} },
+		"credential": func(string) []string { return []string{credA.ID} },
+		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
 		"id": func(path string) []string {
 			switch {
 			case strings.Contains(path, "/invitations/"):
@@ -323,7 +339,47 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 		t.Fatalf("boot: %v", err)
 	}
 	ts := httptest.NewServer(a.Kernel.Handler())
-	return ts, func() { ts.Close(); a.Kernel.Close() }
+	a.Ops.(*ops.Service).SetPublicURL(ts.URL)
+	lastService = a.Ops.(*ops.Service)
+	return ts, func() { a.Stop(); ts.Close(); a.Kernel.Close() }
+}
+
+// lastService is the ops service of the most recent bootTestServer (tests in this package run
+// sequentially).
+var lastService *ops.Service
+
+func svcOf(t *testing.T) *ops.Service {
+	t.Helper()
+	if lastService == nil {
+		t.Fatal("no test server booted")
+	}
+	return lastService
+}
+
+// enrolledServerWithOp adds a BYO server to a team, enrols it through POST /agent/enroll with the
+// token from its install command (as the agent would), and queues a system.info on it.
+func enrolledServerWithOp(t *testing.T, c *client, base, teamID, name string) (serverID, opID string) {
+	t.Helper()
+	var created struct {
+		Server  struct{ ID string }
+		Install struct{ URL string }
+	}
+	c.mustJSON("POST", "/api/teams/"+teamID+"/servers", map[string]any{"name": name, "provider": "byo"}, 201, &created)
+	token := created.Install.URL[strings.LastIndex(created.Install.URL, "/")+1:]
+	pub, _, _ := ed25519.GenerateKey(nil)
+	body, _ := json.Marshal(agentproto.EnrollRequest{Token: token, PublicKey: base64.StdEncoding.EncodeToString(pub), AgentVersion: "test",
+		Facts: agentproto.Facts{Hostname: name, OSID: "ubuntu", OSVersion: "24.04", Arch: "amd64", CPUs: 2, MemTotalBytes: 2 << 30, Systemd: true}})
+	resp, err := http.Post(base+"/agent/enroll", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 201 {
+		t.Fatalf("enrol %s: %d", name, resp.StatusCode)
+	}
+	var op struct{ ID string }
+	c.mustJSON("POST", "/api/teams/"+teamID+"/servers/"+created.Server.ID+"/operations", map[string]any{"kind": "system.info"}, 201, &op)
+	return created.Server.ID, op.ID
 }
 
 type client struct {
@@ -460,7 +516,7 @@ type operation struct {
 
 func openAPIDoc() *huma.OpenAPI {
 	h := humachi.New(chi.NewMux(), humaConfig())
-	api.Register(h, nil)
+	api.Register(h, nil, nil)
 	return h.OpenAPI()
 }
 

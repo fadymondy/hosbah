@@ -116,13 +116,13 @@ func isTokenAuthed(r *http.Request) bool {
 // memberPrefixes are reachable by any signed-in account. Each entry's handlers take identity
 // from the session only and scope every row by team membership (handlers + RLS).
 var memberPrefixes = []string{
-	"/api/me",                 // your own account, teams, 2FA state, reports
-	"/api/teams",              // create a team; /api/teams/{team}/... is membership-checked
-	"/api/invitations",        // view / accept an invitation by its token
-	"/api/feedback",           // "Report a problem" — files as you
-	"/api/auth/me",            // plugin: who am I
+	"/api/me",          // your own account, teams, 2FA state, reports
+	"/api/teams",       // create a team; /api/teams/{team}/... is membership-checked
+	"/api/invitations", // view / accept an invitation by its token
+	"/api/feedback",    // "Report a problem" — files as you
+	"/api/auth/me",     // plugin: who am I
 	"/api/auth/change-password",
-	"/api/auth/2fa",           // plugin: TOTP enroll / verify for the session's own user
+	"/api/auth/2fa", // plugin: TOTP enroll / verify for the session's own user
 }
 
 func isMemberAllowed(r *http.Request) bool {

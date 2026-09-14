@@ -97,7 +97,7 @@ func TestRowLevelSecurity(t *testing.T) {
 	t.Run("team A's context cannot read team B", func(t *testing.T) {
 		a := Scope{UserID: ua, TeamID: ta}
 		for q, want := range map[string]int{
-			"SELECT count(*) FROM teams WHERE id = $1":          0,
+			"SELECT count(*) FROM teams WHERE id = $1":             0,
 			"SELECT count(*) FROM team_members WHERE team_id = $1": 0,
 			"SELECT count(*) FROM mcp_tokens WHERE team_id = $1":   0,
 			"SELECT count(*) FROM activity_log WHERE team_id = $1": 0,

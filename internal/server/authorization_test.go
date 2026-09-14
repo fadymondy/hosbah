@@ -43,13 +43,13 @@ func TestEveryAPIRouteHasTheIntendedTier(t *testing.T) {
 func TestFrameworkAndGeneratedRoutes(t *testing.T) {
 	for path, want := range map[string]tier{
 		// togo PATs, OTP, PIN, dev login, auth-mfa: never.
-		"/api/auth/tokens":            "blocked",
-		"/api/auth/tokens/abc":        "blocked",
-		"/api/auth/otp":               "blocked",
-		"/api/auth/pin/verify":        "blocked",
-		"/api/auth/dev/login":         "blocked",
+		"/api/auth/tokens":              "blocked",
+		"/api/auth/tokens/abc":          "blocked",
+		"/api/auth/otp":                 "blocked",
+		"/api/auth/pin/verify":          "blocked",
+		"/api/auth/dev/login":           "blocked",
 		"/api/auth/mfa/magic-link/send": "blocked",
-		"/graphql":                    "blocked",
+		"/graphql":                      "blocked",
 		// The public sign-in surface.
 		"/api/health":        "public",
 		"/api/auth/login":    "public",

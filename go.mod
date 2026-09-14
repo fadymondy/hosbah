@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/togo-framework/audit v0.1.1
 	github.com/togo-framework/auth v0.8.0
@@ -28,6 +29,7 @@ require (
 	github.com/togo-framework/storage v0.2.0
 	github.com/togo-framework/validation v0.1.0
 	github.com/vektah/gqlparser/v2 v2.5.22
+	golang.org/x/crypto v0.28.0
 )
 
 require (
@@ -50,7 +52,6 @@ require (
 	github.com/togo-framework/settings v0.1.1 // indirect
 	github.com/urfave/cli/v2 v2.27.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
