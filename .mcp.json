@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "togo": {
+      "command": "togo",
+      "args": ["mcp:serve", "--role", "admin"],
+      "env": {
+        "TOGO_PROJECT": "cloudy"
+      }
+    },
+    "togo-web": {
+      "type": "http",
+      "url": "https://mcp.to-go.dev/mcp"
+    }
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "common": {
+    "loading": "Loading",
+    "retry": "Try again",
+    "working": "Working…",
+    "back": "Back",
+    "cancel": "Cancel",
+    "copy": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "save": "Save",
+    "actions": "Actions",
+    "readOnly": "You can view this, but your role cannot change it.",
+    "home": "Go home"
+  },
+  "prefs": {
+    "switchLanguage": "Switch language",
+    "toggleTheme": "Toggle light and dark theme",
+    "light": "Light theme",
+    "dark": "Dark theme"
+  },
+  "errors": {
+    "apiUnavailable": "Cloudy's API is not answering.",
+    "forbidden": "Your role does not allow this.",
+    "forbiddenTitle": "Not allowed",
+    "notFound": "That no longer exists.",
+    "rateLimited": "Too many attempts. Wait a moment and try again.",
+    "server": "Something went wrong on our side. Try again.",
+    "generic": "That did not work",
+    "network": "Could not reach Cloudy. Check your connection.",
+    "teamNotFound": "Team not found",
+    "teamNotFoundHint": "It does not exist, or you are not a member of it.",
+    "api": {
+      "invalid_credentials": "That email and password do not match.",
+      "totp_required": "Enter the code from your authenticator app."
+    }
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "code": "6-digit code",
+    "devNotice": "Cloudy is in development",
+    "login": {
+      "title": "Sign in",
+      "description": "Sign in to your Cloudy account.",
+      "codeTitle": "Two-factor code",
+      "codeDescription": "Open your authenticator app and enter the 6-digit code for Cloudy.",
+      "noAccount": "No account yet?",
+      "submit": "Sign in",
+      "verify": "Verify and sign in",
+      "badCode": "That code did not work. Codes change every 30 seconds — try the current one."
+    },
+    "register": {
+      "title": "Create account",
+      "description": "Create a Cloudy account with your email.",
+      "haveAccount": "Already have an account?",
+      "submit": "Create account",
+      "passwordShort": "The password needs at least 8 characters.",
+      "passwordHint": "At least 8 characters."
+    }
+  },
+  "onboarding": {
+    "title": "Create your first team",
+    "newTitle": "Create a team",
+    "description": "Everything in Cloudy belongs to a team. You can invite people once it exists.",
+    "newDescription": "A new team, with you as its owner.",
+    "teamName": "Team name",
+    "teamHint": "You can rename it later.",
+    "submit": "Create team"
+  },
+  "invite": {
+    "title": "Team invitation",
+    "description": "You have been invited to join a team on Cloudy.",
+    "signInFirst": "Sign in or create an account to accept this invitation. You will come straight back here.",
+    "invalid": "This invitation link is not valid. Ask for a new one.",
+    "team": "Team",
+    "for": "Invited",
+    "role": "Role",
+    "accept": "Accept and join",
+    "notPending": "This invitation can no longer be accepted (status: {status})."
+  },
+  "roles": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "deployer": "Deployer",
+    "viewer": "Viewer"
+  },
+  "shell": {
+    "devBanner": "Cloudy is in development — servers and deploys are not available yet.",
+    "switchTeam": "Switch team",
+    "toggleSidebar": "Show or hide the sidebar",
+    "noTeam": "No team selected",
+    "teams": "Teams",
+    "current": "Current team",
+    "createTeam": "Create team",
+    "account": "Account",
+    "accountAnd2fa": "Account and 2FA",
+    "signOut": "Sign out"
+  },
+  "nav": {
+    "team": "Team",
+    "platform": "Platform",
+    "overview": "Overview",
+    "members": "Members",
+    "invitations": "Invitations",
+    "tokens": "MCP tokens",
+    "audit": "Audit log",
+    "settings": "Settings",
+    "admin": "Admin"
+  },
+  "feedback": {
+    "launcher": "Report a problem",
+    "filed": "Report filed as {key}. Thank you.",
+    "capturesDropped": "The API did not accept the screenshot and logs, so the report was filed without them.",
+    "types": {
+      "bug": "Bug",
+      "feature": "Feature request"
+    }
+  },
+  "overview": {
+    "description": "Your team at a glance.",
+    "yourRole": "Your role",
+    "members": "Members",
+    "slug": "Team slug",
+    "serversTitle": "No servers or apps yet",
+    "serversHint": "Server management arrives in the next phase. For now you can set up your team, invite people and create MCP tokens."
+  },
+  "members": {
+    "description": "Everyone in this team and what they can do.",
+    "email": "Email",
+    "role": "Role",
+    "joined": "Joined",
+    "you": "You",
+    "remove": "Remove",
+    "removeTitle": "Remove member?",
+    "removeHint": "{email} will lose access to this team straight away."
+  },
+  "invitations": {
+    "description": "Invite people by email. Each invitation is a one-time link.",
+    "invite": "Invite someone",
+    "inviteHint": "Choose the role they will have when they join.",
+    "send": "Create invitation",
+    "createdTitle": "Invitation created",
+    "createdHint": "Copy this link now — it is shown only once.",
+    "noEmailTitle": "No email is sent",
+    "noEmailHint": "Cloudy does not deliver email in local development. Send this link to the person yourself.",
+    "emptyTitle": "No invitations",
+    "emptyHint": "Invitations you create appear here until they are accepted, revoked or expire.",
+    "statusLabel": "Status",
+    "expires": "Expires",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke invitation?",
+    "revokeHint": "The link sent to {email} will stop working.",
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    }
+  },
+  "tokens": {
+    "description": "Tokens let AI agents and MCP clients act on this team.",
+    "endpoint": "MCP endpoint",
+    "endpointHint": "Point your MCP client at this URL with a token as the bearer.",
+    "snippetHint": "Example client configuration:",
+    "listTitle": "Tokens",
+    "create": "Create token",
+    "createHint": "Grant only the scopes the client needs.",
+    "createdTitle": "Your new token",
+    "createdOnce": "Copy it now — it is shown only once and cannot be recovered.",
+    "dismiss": "I have copied it",
+    "emptyTitle": "No tokens",
+    "emptyHint": "Create a token to connect an MCP client.",
+    "name": "Name",
+    "scopes": "Scopes",
+    "status": "Status",
+    "lastUsed": "Last used",
+    "expires": "Expires",
+    "never": "Never",
+    "active": "Active",
+    "revoked": "Revoked",
+    "expired": "Expired",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke token?",
+    "revokeHint": "Clients using “{name}” will be refused from now on.",
+    "dangerous": "Dangerous",
+    "expiry": "Expires after",
+    "days": "{n} days",
+    "expiryHint": "The token stops working after this.",
+    "scopeHelp": {
+      "read": "See the team and its resources",
+      "deploy": "Trigger deploys",
+      "write": "Create and change resources",
+      "secrets_read": "Read secret values",
+      "destructive": "Delete resources and data"
+    }
+  },
+  "audit": {
+    "description": "Every change made in this team, newest first.",
+    "emptyTitle": "Nothing recorded yet",
+    "emptyHint": "Changes to the team, members, invitations and tokens are recorded here.",
+    "when": "When",
+    "action": "Action",
+    "subject": "Subject",
+    "by": "By",
+    "ip": "IP",
+    "changes": "Changes",
+    "system": "System",
+    "show": "Show"
+  },
+  "settings": {
+    "description": "Team details.",
+    "general": "General",
+    "renameHint": "The name everyone in the team sees.",
+    "viewerNote": "Only owners and admins can rename the team.",
+    "saved": "Team updated"
+  },
+  "account": {
+    "title": "Account",
+    "twofa": {
+      "title": "Two-factor authentication",
+      "on": "On",
+      "off": "Off",
+      "description": "Ask for a code from an authenticator app every time you sign in.",
+      "enable": "Set up two-factor",
+      "secret": "Secret key",
+      "secretHint": "Add it to your authenticator app (Google Authenticator, 1Password, Authy…).",
+      "otpauth": "Setup link",
+      "otpauthHint": "Or open this link on the device with your authenticator app.",
+      "verify": "Verify and turn on",
+      "disable": "Turn off two-factor",
+      "disableHint": "Enter a current code to turn two-factor off.",
+      "enabledToast": "Two-factor authentication is on",
+      "disabledToast": "Two-factor authentication is off"
+    },
+    "reports": {
+      "title": "My reports",
+      "emptyTitle": "No reports yet",
+      "emptyHint": "Problems you report with “Report a problem” appear here with their status.",
+      "key": "Key",
+      "titleCol": "Title",
+      "status": "Status",
+      "filed": "Filed",
+      "statuses": {
+        "open": "Open",
+        "new": "New",
+        "triage": "Triage",
+        "backlog": "Backlog",
+        "todo": "To do",
+        "in_progress": "In progress",
+        "in_review": "In review",
+        "done": "Done",
+        "closed": "Closed"
+      }
+    }
+  },
+  "admin": {
+    "title": "Platform admin",
+    "description": "Platform-wide MCP tokens. They act across every team — keep them few and short-lived.",
+    "forbidden": "This area is for Cloudy platform administrators."
+  }
+}

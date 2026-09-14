@@ -1,0 +1,21 @@
+/* Repo-owned (NOT generated). Cloudy's brand block, in exactly the pattern of the product blocks in
+   grid-tokens.css. Delete this file once fadymondy.com-v2's web/lib/brand/marks.ts carries `cloudy`
+   and a re-sync puts the block into grid-tokens.css.
+
+   Contrast (WCAG): light action #2E6F9E with #ffffff text = 5.4:1;
+                    dark  action #7FB0D6 with #0e1a3c text = 7.4:1. */
+
+[data-brand="cloudy"] {
+  --grid-brand: #2e6f9e;
+  --grid-brand-accent: #c9a227;
+  --grid-action: #2e6f9e;
+  --grid-on-action: #ffffff;
+}
+.dark[data-brand="cloudy"],
+.dark [data-brand="cloudy"],
+[data-theme="dark"][data-brand="cloudy"],
+[data-theme="dark"] [data-brand="cloudy"] {
+  --grid-brand: #7fb0d6;
+  --grid-action: #7fb0d6;
+  --grid-on-action: #0e1a3c;
+}

@@ -1,0 +1,17 @@
+api:
+    docs: /docs
+    graphql: /graphql
+    rest: /api
+auth:
+    provider: base
+database:
+    driver: pgx
+    url: ${DATABASE_URL}
+frontend:
+    dir: web
+module: github.com/fadymondy/cloudy
+name: cloudy
+plugins:
+    - github.com/togo-framework/auth
+    - github.com/togo-framework/audit
+    - github.com/togo-framework/authz

@@ -1,0 +1,400 @@
+# Managed by togo. Source of truth for generated registries.
+resources:
+    - name: AdminMcpToken
+      table: admin_mcp_tokens
+      fields:
+        - name: user_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: expires_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: last_used_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: revoked_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
+    - name: Invitation
+      table: invitations
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: email
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: role
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: invited_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: expires_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: accepted_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: accepted_by
+          go: string
+          gql: String
+          pg: text
+          "null": true
+      controller: true
+    - name: McpToken
+      table: mcp_tokens
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: user_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: scopes
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: allowlist
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: expires_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: last_used_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: revoked_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
+    - name: Report
+      table: reports
+      fields:
+        - name: team_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: number
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: key
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: title
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: body
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: issue_type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: state
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: resolution
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: priority
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: labels
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: assignee_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: reporter_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: parent_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: milestone
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: external_source
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: external_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: external_key
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: external_url
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: page_url
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: route
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: selector
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: screenshot
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: console_log
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: network_log
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: user_agent
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: viewport
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: closed_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: sort_order
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: started_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: finished_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: agent_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: agent_session
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: human_only
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: ai_model
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: ai_effort
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: agent
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: skill
+          go: string
+          gql: String
+          pg: text
+          "null": true
+      controller: true
+    - name: ReportComment
+      table: report_comments
+      fields:
+        - name: report_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: author_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: author_kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: body
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: mentions
+          go: string
+          gql: String
+          pg: text
+          "null": true
+      controller: true
+    - name: Team
+      table: teams
+      fields:
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: slug
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: owner_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: dek_wrapped
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: TeamMember
+      table: team_members
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: user_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: role
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true

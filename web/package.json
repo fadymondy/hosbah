@@ -1,0 +1,41 @@
+{
+  "name": "cloudy-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3710",
+    "build": "next build",
+    "start": "next start -p 3710",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "grid:sync": "node ../../fadymondy.com-v2/packages/sync-grid.mjs web app/grid",
+    "grid:check": "node ../../fadymondy.com-v2/packages/sync-grid.mjs web app/grid --check",
+    "feedback:sync": "node ../../fadymondy.com-v2/packages/sync-feedback.mjs lib/feedback",
+    "feedback:check": "node ../../fadymondy.com-v2/packages/sync-feedback.mjs lib/feedback --check"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^0.462.0",
+    "next": "^16.2.0",
+    "next-themes": "^0.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^1.7.4",
+    "tailwind-merge": "^2.6.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "postcss": "^8.4.0",
+    "prettier": "^3.3.0",
+    "shadcn": "^4.21.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.0"
+  }
+}

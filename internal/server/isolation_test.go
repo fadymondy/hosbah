@@ -1,0 +1,547 @@
+package server
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/fadymondy/cloudy/internal/api"
+	"github.com/fadymondy/cloudy/internal/config"
+	"github.com/fadymondy/cloudy/internal/migrate"
+)
+
+/*
+The isolation sweep — P0's exit criterion, run as a test so CI keeps it true.
+
+Team A is built up through the real API (a team, a second member who joined by invitation, a
+pending invitation, an MCP token). Then user B, who owns an unrelated team, calls EVERY
+operation in the OpenAPI document that takes a path parameter, with team A's ids substituted
+in — by id and by slug — and a body that passes validation, so the 404 is the handler's answer
+and not a 422 masking it. Every team-scoped call must be 404; platform-admin routes must be
+403. New routes are covered automatically: an operation whose path parameter the sweep does
+not know how to fill fails the test instead of being skipped.
+
+Afterwards team A must be exactly as it was. The same sweep runs over the user MCP with B's
+all-scopes token.
+
+Needs TEST_DATABASE_URL (a Postgres the app role owns; it is migrated here).
+*/
+func TestIsolationSweep(t *testing.T) {
+	ts, cleanup := bootTestServer(t)
+	defer cleanup()
+	ctx := context.Background()
+	_ = ctx
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	ua := newClient(t, ts.URL)
+	ua.register("owner-a-" + suffix + "@example.test")
+	ub := newClient(t, ts.URL)
+	ub.register("owner-b-" + suffix + "@example.test")
+	ua2Email := "member-a-" + suffix + "@example.test"
+	ua2 := newClient(t, ts.URL)
+	ua2.register(ua2Email)
+
+	// Team A: created by A, joined by A2 through an invitation.
+	var teamA struct{ ID, Slug, Name string }
+	ua.mustJSON("POST", "/api/teams", map[string]any{"name": "Alpha " + suffix}, 201, &teamA)
+	var inv1 struct {
+		Invitation struct{ ID string } `json:"invitation"`
+		AcceptURL  string             `json:"accept_url"`
+	}
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/invitations", map[string]any{"email": ua2Email, "role": "deployer"}, 201, &inv1)
+	token1 := inv1.AcceptURL[strings.LastIndex(inv1.AcceptURL, "/")+1:]
+	ua2.mustJSON("POST", "/api/invitations/"+token1+"/accept", nil, 200, nil)
+
+	var members struct {
+		Members []struct{ ID, Email, Role string } `json:"members"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/members", nil, 200, &members)
+	memberA := ""
+	for _, m := range members.Members {
+		if m.Email == ua2Email {
+			memberA = m.ID
+		}
+	}
+	if memberA == "" || len(members.Members) != 2 {
+		t.Fatalf("team A should have 2 members including %s: %+v", ua2Email, members)
+	}
+
+	var inv2 struct {
+		Invitation struct{ ID string } `json:"invitation"`
+	}
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/invitations", map[string]any{"email": "pending-" + suffix + "@example.test", "role": "viewer"}, 201, &inv2)
+	var tokA struct{ ID, Token string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/mcp-tokens", map[string]any{"name": "a-read", "scopes": []string{"read"}, "expires_in_days": 30}, 201, &tokA)
+
+	// Team B: B's own, unrelated team.
+	var teamB struct{ ID, Slug string }
+	ub.mustJSON("POST", "/api/teams", map[string]any{"name": "Bravo " + suffix}, 201, &teamB)
+
+	// ---- REST sweep -------------------------------------------------------------------------
+	oapi := openAPIDoc()
+	fillers := map[string]func(path string) []string{
+		"team":   func(string) []string { return []string{teamA.ID, teamA.Slug} },
+		"member": func(string) []string { return []string{memberA} },
+		"token":  func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
+		"id": func(path string) []string {
+			switch {
+			case strings.Contains(path, "/invitations/"):
+				return []string{inv2.Invitation.ID}
+			case strings.Contains(path, "/mcp-tokens/"):
+				return []string{tokA.ID}
+			}
+			return []string{inv2.Invitation.ID, tokA.ID}
+		},
+	}
+
+	checked := 0
+	for _, op := range operations(oapi) {
+		params := pathParams(op.Path)
+		if len(params) == 0 {
+			continue // covered by the no-path-parameter checks below
+		}
+		for _, p := range params {
+			if fillers[p] == nil {
+				t.Fatalf("%s %s: the sweep does not know how to fill {%s} — teach it before shipping the route", op.Method, op.Path, p)
+			}
+		}
+		for _, path := range expand(op.Path, params, fillers) {
+			body := sampleBody(oapi, op.Op)
+			status, text := ub.do(op.Method, path, body)
+			want := http.StatusNotFound
+			if strings.HasPrefix(op.Path, "/api/admin/") {
+				want = http.StatusForbidden // platform administration, not a team route
+			}
+			if status != want {
+				t.Errorf("as team B: %s %s -> %d (want %d): %s", op.Method, path, status, want, text)
+			}
+			checked++
+		}
+	}
+	if checked < 15 {
+		t.Fatalf("the sweep only made %d calls — did the OpenAPI document shrink?", checked)
+	}
+	t.Logf("REST sweep: %d cross-team calls, all refused", checked)
+
+	// ---- routes without path parameters ----------------------------------------------------
+	// /api/me lists only B's own team.
+	var meB struct {
+		Teams []struct{ ID string } `json:"teams"`
+	}
+	ub.mustJSON("GET", "/api/me", nil, 200, &meB)
+	for _, tm := range meB.Teams {
+		if tm.ID == teamA.ID {
+			t.Errorf("GET /api/me as B lists team A")
+		}
+	}
+	// A report cannot claim a team the reporter is not in.
+	if status, text := ub.do("POST", "/api/feedback", map[string]any{"title": "x", "team_id": teamA.ID}); status != 404 {
+		t.Errorf("POST /api/feedback with team A's id as B -> %d (want 404): %s", status, text)
+	}
+	// B cannot mint in A by guessing: POST /api/teams always creates B's own team (covered by
+	// the RLS insert policy test in internal/tenancy).
+
+	// ---- user MCP sweep ---------------------------------------------------------------------
+	var tokB struct{ Token string }
+	ub.mustJSON("POST", "/api/teams/"+teamB.ID+"/mcp-tokens", map[string]any{"name": "b-all", "scopes": []string{"read", "deploy", "write", "secrets:read", "destructive"}, "expires_in_days": 30}, 201, &tokB)
+	who := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "whoami", nil)
+	if who.IsError || !strings.Contains(who.Text, teamB.ID) || strings.Contains(who.Text, teamA.ID) {
+		t.Errorf("whoami with B's token should name team B only: %+v", who)
+	}
+	for name, args := range map[string]map[string]any{
+		"revoke_invitation": {"id": inv2.Invitation.ID, "confirm": "pending-" + suffix + "@example.test"},
+		"remove_member":     {"member_id": memberA, "confirm": ua2Email},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError || !strings.Contains(res.Text, "not found") {
+			t.Errorf("MCP %s as team B on team A's id should be not found: %+v", name, res)
+		}
+	}
+	for _, name := range []string{"list_members", "list_invitations", "list_audit", "list_mcp_tokens"} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, nil)
+		if strings.Contains(res.Text, ua2Email) || strings.Contains(res.Text, "a-read") || strings.Contains(res.Text, "pending-"+suffix) {
+			t.Errorf("MCP %s as team B leaked team A data: %s", name, res.Text)
+		}
+	}
+
+	// A's read-only token: whoami works, an out-of-scope call fails in-band.
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "whoami", nil); res.IsError || !strings.Contains(res.Text, teamA.ID) {
+		t.Errorf("whoami with A's token: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "invite_member", map[string]any{"email": "x@example.test", "role": "viewer"}); !res.IsError || !strings.Contains(res.Text, `"write" scope`) {
+		t.Errorf("invite_member with a read-only token should fail in-band naming the write scope: %+v", res)
+	}
+	// A deployer's token cannot manage members even with the scope (role still applies).
+	// A bad token is a transport-level 401.
+	if code := mcpStatus(ts.URL, "/api/mcp", "cld_notavalidtoken"); code != 401 {
+		t.Errorf("an invalid MCP token should be 401, got %d", code)
+	}
+	if code := mcpStatus(ts.URL, "/api/admin/mcp", tokB.Token); code != 401 {
+		t.Errorf("a team token on the admin MCP should be 401, got %d", code)
+	}
+
+	// ---- team A is untouched ------------------------------------------------------------------
+	var after struct {
+		Name        string
+		MemberCount int64 `json:"member_count"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID, nil, 200, &after)
+	if after.Name != "Alpha "+suffix || after.MemberCount != 2 {
+		t.Errorf("team A changed during the sweep: %+v", after)
+	}
+	var invs struct {
+		Invitations []struct{ ID, Status string } `json:"invitations"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/invitations", nil, 200, &invs)
+	for _, i := range invs.Invitations {
+		if i.ID == inv2.Invitation.ID && i.Status != "pending" {
+			t.Errorf("team A's pending invitation became %s during the sweep", i.Status)
+		}
+	}
+	var toks struct {
+		Tokens []struct {
+			ID        string
+			RevokedAt *string `json:"revoked_at"`
+		} `json:"tokens"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/mcp-tokens", nil, 200, &toks)
+	for _, tk := range toks.Tokens {
+		if tk.ID == tokA.ID && tk.RevokedAt != nil {
+			t.Errorf("team A's token was revoked during the sweep")
+		}
+	}
+}
+
+// A report filed through the UI's endpoint lands in Cloudy's own tracker and the admin MCP
+// lists it; a team token is refused there, and a non-admin cannot mint an admin token.
+func TestFeedbackReachesAdminMCP(t *testing.T) {
+	ts, cleanup := bootTestServer(t)
+	defer cleanup()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	reporter := newClient(t, ts.URL)
+	reporter.register("reporter-" + suffix + "@example.test")
+	var filed struct{ Key string }
+	reporter.mustJSON("POST", "/api/feedback", map[string]any{"title": "Button does nothing " + suffix, "issue_type": "bug", "route": "/t/x/members", "viewport": "1440x900"}, 201, &filed)
+	if !strings.HasPrefix(filed.Key, "CLD-") {
+		t.Fatalf("expected a CLD- key, got %q", filed.Key)
+	}
+
+	if status, _ := reporter.do("POST", "/api/admin/mcp-tokens", map[string]any{"name": "x", "expires_in_days": 1}); status != 403 {
+		t.Errorf("a non-admin minting an admin token -> %d (want 403)", status)
+	}
+
+	adminEmail := "admin-" + suffix + "@example.test"
+	admin := newClient(t, ts.URL)
+	admin.register(adminEmail)
+	db := testDB(t)
+	if _, err := db.Exec(`UPDATE users SET roles = 'admin' WHERE email = $1`, adminEmail); err != nil {
+		t.Fatal(err)
+	}
+	admin.login(adminEmail) // the session carries roles from sign-in
+	var at struct{ Token string }
+	admin.mustJSON("POST", "/api/admin/mcp-tokens", map[string]any{"name": "triage", "expires_in_days": 1}, 201, &at)
+
+	res := mcpCall(t, ts.URL, "/api/admin/mcp", at.Token, "list_issues", map[string]any{"q": suffix})
+	if res.IsError || !strings.Contains(res.Text, filed.Key) {
+		t.Fatalf("admin list_issues should include %s: %+v", filed.Key, res)
+	}
+	res = mcpCall(t, ts.URL, "/api/admin/mcp", at.Token, "get_issue", map[string]any{"key": filed.Key})
+	if res.IsError || !strings.Contains(res.Text, "reporter-"+suffix) {
+		t.Fatalf("admin get_issue should show the reporter: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/admin/mcp", at.Token, "start_issue", map[string]any{"key": filed.Key}); res.IsError {
+		t.Fatalf("start_issue: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/admin/mcp", at.Token, "comment_issue", map[string]any{"key": filed.Key, "body": "Looking."}); res.IsError {
+		t.Fatalf("comment_issue: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/admin/mcp", at.Token, "finish_issue", map[string]any{"key": filed.Key, "resolution": "fixed"}); res.IsError {
+		t.Fatalf("finish_issue: %+v", res)
+	}
+	// The reporter sees their own report's new status; nobody else's.
+	var mine struct {
+		Reports []struct{ Key, Status string } `json:"reports"`
+	}
+	reporter.mustJSON("GET", "/api/me/reports", nil, 200, &mine)
+	if len(mine.Reports) != 1 || mine.Reports[0].Status != "done" {
+		t.Fatalf("reporter should see exactly their one report, now done: %+v", mine)
+	}
+	// Demoting the admin kills their admin token at once.
+	if _, err := db.Exec(`UPDATE users SET roles = '' WHERE email = $1`, adminEmail); err != nil {
+		t.Fatal(err)
+	}
+	if code := mcpStatus(ts.URL, "/api/admin/mcp", at.Token); code != 401 {
+		t.Errorf("an admin token of a demoted account should be 401, got %d", code)
+	}
+}
+
+// ---- harness ------------------------------------------------------------------------------
+
+func testDB(t *testing.T) *sql.DB {
+	t.Helper()
+	config.LoadDotEnv()
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set TEST_DATABASE_URL to run the isolation sweep")
+	}
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func bootTestServer(t *testing.T) (*httptest.Server, func()) {
+	t.Helper()
+	db := testDB(t)
+	if err := migrate.Run(context.Background(), db, migrate.RepoDir(migrate.Dir), false, io.Discard); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	t.Setenv("DATABASE_URL", os.Getenv("TEST_DATABASE_URL"))
+	t.Setenv("APP_ENV", "development")
+	a := Boot()
+	if err := a.Kernel.Boot(context.Background()); err != nil {
+		t.Fatalf("boot: %v", err)
+	}
+	ts := httptest.NewServer(a.Kernel.Handler())
+	return ts, func() { ts.Close(); a.Kernel.Close() }
+}
+
+type client struct {
+	t    *testing.T
+	base string
+	http *http.Client
+	pw   string
+}
+
+func newClient(t *testing.T, base string) *client {
+	jar, _ := cookiejar.New(nil)
+	return &client{t: t, base: base, http: &http.Client{Jar: jar, Timeout: 20 * time.Second}, pw: "correct horse battery"}
+}
+
+func (c *client) csrf() string {
+	u, _ := url.Parse(c.base)
+	for _, ck := range c.http.Jar.Cookies(u) {
+		if ck.Name == "togo_csrf" {
+			return ck.Value
+		}
+	}
+	resp, err := c.http.Get(c.base + "/api/auth/csrf")
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	resp.Body.Close()
+	for _, ck := range c.http.Jar.Cookies(u) {
+		if ck.Name == "togo_csrf" {
+			return ck.Value
+		}
+	}
+	c.t.Fatal("no csrf cookie")
+	return ""
+}
+
+func (c *client) do(method, path string, body any) (int, string) {
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	}
+	req, _ := http.NewRequest(method, c.base+path, rd)
+	req.Header.Set("Content-Type", "application/json")
+	if method != "GET" {
+		req.Header.Set("X-CSRF-Token", c.csrf())
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+func (c *client) mustJSON(method, path string, body any, want int, out any) {
+	c.t.Helper()
+	status, text := c.do(method, path, body)
+	if status != want {
+		c.t.Fatalf("%s %s -> %d (want %d): %s", method, path, status, want, text)
+	}
+	if out != nil && text != "" {
+		if err := json.Unmarshal([]byte(text), out); err != nil {
+			c.t.Fatalf("%s %s: decode %v: %s", method, path, err, text)
+		}
+	}
+}
+
+func (c *client) register(email string) {
+	c.t.Helper()
+	c.mustJSON("POST", "/api/auth/register", map[string]any{"email": email, "password": c.pw}, 201, nil)
+}
+
+func (c *client) login(email string) {
+	c.t.Helper()
+	c.mustJSON("POST", "/api/auth/login", map[string]any{"email": email, "password": c.pw}, 200, nil)
+}
+
+type mcpResult struct {
+	IsError bool
+	Text    string
+}
+
+func mcpCall(t *testing.T, base, path, token, tool string, args map[string]any) mcpResult {
+	t.Helper()
+	if args == nil {
+		args = map[string]any{}
+	}
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": tool, "arguments": args}})
+	req, _ := http.NewRequest("POST", base+path, bytes.NewReader(b))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Result struct {
+			Content []struct{ Text string } `json:"content"`
+			IsError bool                    `json:"isError"`
+		} `json:"result"`
+		Error *struct{ Message string } `json:"error"`
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	_ = json.Unmarshal(raw, &out)
+	if out.Error != nil {
+		return mcpResult{IsError: true, Text: "rpc error: " + out.Error.Message + " (http " + resp.Status + ")"}
+	}
+	text := ""
+	for _, c := range out.Result.Content {
+		text += c.Text
+	}
+	return mcpResult{IsError: out.Result.IsError, Text: text}
+}
+
+func mcpStatus(base, path, token string) int {
+	req, _ := http.NewRequest("POST", base+path, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+// ---- OpenAPI walking ----------------------------------------------------------------------
+
+type operation struct {
+	Method, Path string
+	Op           *huma.Operation
+}
+
+func openAPIDoc() *huma.OpenAPI {
+	h := humachi.New(chi.NewMux(), humaConfig())
+	api.Register(h, nil)
+	return h.OpenAPI()
+}
+
+func operations(o *huma.OpenAPI) []operation {
+	var out []operation
+	for path, item := range o.Paths {
+		for method, op := range map[string]*huma.Operation{"GET": item.Get, "POST": item.Post, "PUT": item.Put, "PATCH": item.Patch, "DELETE": item.Delete} {
+			if op != nil {
+				out = append(out, operation{Method: method, Path: path, Op: op})
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Path+out[i].Method < out[j].Path+out[j].Method })
+	return out
+}
+
+func pathParams(path string) []string {
+	var out []string
+	for _, seg := range strings.Split(path, "/") {
+		if strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}") {
+			out = append(out, strings.Trim(seg, "{}"))
+		}
+	}
+	return out
+}
+
+// expand returns every concrete path for the combinations of filler values.
+func expand(path string, params []string, fillers map[string]func(string) []string) []string {
+	paths := []string{path}
+	for _, p := range params {
+		var next []string
+		for _, cur := range paths {
+			for _, v := range fillers[p](path) {
+				next = append(next, strings.Replace(cur, "{"+p+"}", url.PathEscape(v), 1))
+			}
+		}
+		paths = next
+	}
+	return paths
+}
+
+// sampleBody builds a body that passes the operation's schema, so a 422 cannot mask the 404.
+func sampleBody(o *huma.OpenAPI, op *huma.Operation) any {
+	if op.RequestBody == nil || op.RequestBody.Content["application/json"] == nil {
+		return nil
+	}
+	return sample(o, op.RequestBody.Content["application/json"].Schema)
+}
+
+func sample(o *huma.OpenAPI, s *huma.Schema) any {
+	if s == nil {
+		return nil
+	}
+	if s.Ref != "" {
+		s = o.Components.Schemas.SchemaFromRef(s.Ref)
+	}
+	if len(s.Enum) > 0 {
+		return s.Enum[0]
+	}
+	switch s.Type {
+	case "object":
+		out := map[string]any{}
+		for _, name := range s.Required {
+			if prop := s.Properties[name]; prop != nil {
+				out[name] = sample(o, prop)
+			}
+		}
+		return out
+	case "array":
+		return []any{sample(o, s.Items)}
+	case "integer", "number":
+		if s.Minimum != nil {
+			return *s.Minimum
+		}
+		return 1
+	case "boolean":
+		return false
+	default:
+		if s.Format == "email" {
+			return "sweep@example.test"
+		}
+		return "sweep12"
+	}
+}

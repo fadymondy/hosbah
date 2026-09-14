@@ -1,0 +1,228 @@
+"use client"
+
+import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { MailPlusIcon, PlusIcon } from "lucide-react"
+
+import { PageBody } from "@/components/app-shell"
+import { ConfirmButton } from "@/components/confirm-button"
+import { CopyField } from "@/components/copy-field"
+import { FormError, useErrorText } from "@/components/form-error"
+import { RoleSelect } from "@/components/role-select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { apiFetch, type Invitation, type Role } from "@/lib/api"
+import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
+import { useTeam } from "@/lib/team"
+
+export default function InvitationsPage() {
+  const { t } = useI18n()
+  const { team, manage } = useTeam()
+  useDocumentTitle(`${t("nav.invitations")} — ${team.name}`)
+  const fmt = useFormatDate()
+  const errorText = useErrorText()
+  const [items, setItems] = useState<Invitation[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ invitations: Invitation[] }>(`/api/teams/${team.slug}/invitations`)
+      setItems(res.invitations ?? [])
+    } catch (err) {
+      setError(errorText(err))
+      setItems([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team.slug])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  return (
+    <PageBody
+      title={t("nav.invitations")}
+      description={manage ? t("invitations.description") : t("common.readOnly")}
+      actions={manage ? <InviteDialog slug={team.slug} onInvited={load} /> : null}
+    >
+      <FormError message={error} />
+      {items === null ? (
+        <Skeleton className="h-8 w-full" />
+      ) : items.length === 0 && !error ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MailPlusIcon />
+            </EmptyMedia>
+            <EmptyTitle>{t("invitations.emptyTitle")}</EmptyTitle>
+            <EmptyDescription>{t("invitations.emptyHint")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : items.length ? (
+        <div className="border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("members.email")}</TableHead>
+                <TableHead>{t("members.role")}</TableHead>
+                <TableHead>{t("invitations.statusLabel")}</TableHead>
+                <TableHead>{t("invitations.expires")}</TableHead>
+                <TableHead className="text-end">{manage ? t("common.actions") : null}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell dir="ltr" className="text-start">
+                    {inv.email}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{t(`roles.${inv.role}`)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{t(`invitations.status.${inv.status}`, undefined, inv.status)}</Badge>
+                  </TableCell>
+                  <TableCell dir="ltr" className="text-start">
+                    {fmt(inv.expires_at)}
+                  </TableCell>
+                  <TableCell className="text-end">
+                    {manage && inv.status === "pending" ? (
+                      <ConfirmButton
+                        label={t("invitations.revoke")}
+                        title={t("invitations.revokeTitle")}
+                        description={t("invitations.revokeHint", { email: inv.email })}
+                        confirmLabel={t("invitations.revoke")}
+                        onConfirm={async () => {
+                          try {
+                            await apiFetch(`/api/teams/${team.slug}/invitations/${inv.id}`, { method: "DELETE" })
+                          } catch (err) {
+                            throw new Error(errorText(err))
+                          }
+                          await load()
+                        }}
+                      />
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+    </PageBody>
+  )
+}
+
+function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void }) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState("")
+  const [role, setRole] = useState<Role>("viewer")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [acceptUrl, setAcceptUrl] = useState<string | null>(null)
+
+  function reset() {
+    setEmail("")
+    setRole("viewer")
+    setError(null)
+    setAcceptUrl(null)
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await apiFetch<{ accept_url: string }>(`/api/teams/${slug}/invitations`, {
+        method: "POST",
+        body: { email: email.trim(), role },
+      })
+      // The API may answer with a path; make it a link someone can open.
+      setAcceptUrl(new URL(res.accept_url, window.location.origin).toString())
+      onInvited()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (!o) reset()
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" />}>
+        <PlusIcon />
+        {t("invitations.invite")}
+      </DialogTrigger>
+      <DialogContent>
+        {acceptUrl ? (
+          <div className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>{t("invitations.createdTitle")}</DialogTitle>
+              <DialogDescription>{t("invitations.createdHint")}</DialogDescription>
+            </DialogHeader>
+            <Alert>
+              <AlertTitle>{t("invitations.noEmailTitle")}</AlertTitle>
+              <AlertDescription>{t("invitations.noEmailHint")}</AlertDescription>
+            </Alert>
+            <CopyField value={acceptUrl} />
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>{t("invitations.invite")}</DialogTitle>
+              <DialogDescription>{t("invitations.inviteHint")}</DialogDescription>
+            </DialogHeader>
+            <FieldGroup>
+              <FormError message={error} />
+              <Field>
+                <FieldLabel htmlFor="invite-email">{t("members.email")}</FieldLabel>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  dir="ltr"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="invite-role">{t("members.role")}</FieldLabel>
+                <RoleSelect id="invite-role" value={role} onChange={setRole} className="w-full" />
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <Button type="submit" disabled={busy || !email.trim()}>
+                {busy ? t("common.working") : t("invitations.send")}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}

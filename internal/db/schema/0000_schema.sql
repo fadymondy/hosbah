@@ -1,0 +1,3 @@
+-- togo schema. Tables are added per-resource by `togo make:resource`
+-- (each writes internal/db/schema/<name>.sql). This placeholder keeps the
+-- directory present so `sqlc`/`togo generate` work on a fresh project.
