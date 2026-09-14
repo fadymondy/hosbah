@@ -40,6 +40,15 @@
     "password": "Password",
     "code": "6-digit code",
     "devNotice": "Cloudy is in development",
+    "eyebrow": "Cloudy control plane",
+    "nav": "Account",
+    "footerTagline": "Servers and apps, managed.",
+    "footerStatus": "Status",
+    "footerBy": "Built by",
+    "footerProduct": "Product",
+    "footerProductValue": "Proxmox, Docker and bring-your-own servers",
+    "notFoundTitle": "Page not found",
+    "notFoundHint": "That address does not exist in Cloudy.",
     "login": {
       "title": "Sign in",
       "description": "Sign in to your Cloudy account.",
@@ -193,7 +202,11 @@
       "waiting": "Waiting for the agent to enrol…",
       "enrolledTitle": "The agent enrolled",
       "enrolledHint": "{name} is connected. The enrolment checks are below.",
-      "open": "Open server"
+      "open": "Open server",
+      "howTitle": "How it works",
+      "how1": "Cloudy gives you a one-time install command. It works once and expires after 15 minutes.",
+      "how2": "The installer checks the agent download against its SHA-256, runs the enrolment checks and starts the agent under systemd.",
+      "how3": "The agent dials out to Cloudy, proves who it is with its own key, and only runs operations Cloudy has signed."
     },
     "detail": {
       "facts": "Server",

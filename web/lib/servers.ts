@@ -170,25 +170,40 @@ export function useEventStream(url: string | null, handlers: Record<string, (dat
 
   useEffect(() => {
     if (!url) return
-    const es = new EventSource(url, { withCredentials: true })
-    es.onopen = () => setConnected(true)
-    es.onerror = () => setConnected(false)
-    const names = Object.keys(ref.current)
-    const listeners = names.map((name) => {
-      const fn = (e: MessageEvent) => {
-        try {
-          ref.current[name]?.(JSON.parse(e.data))
-        } catch {
-          // A malformed frame is skipped; the next one carries the full state again.
+    let es: EventSource | null = null
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let finished = false
+    const connect = () => {
+      const src = new EventSource(url, { withCredentials: true })
+      es = src
+      src.onopen = () => setConnected(true)
+      src.onerror = () => {
+        setConnected(false)
+        // The browser retries a dropped stream by itself, but a non-200 answer (the API was down and
+        // the proxy said 502/500) closes it for good. Reconnect ourselves; handlers de-duplicate.
+        if (src.readyState === EventSource.CLOSED && !finished) {
+          timer = setTimeout(connect, 3000)
         }
-        if (name === "done" || name === "gone") es.close()
       }
-      es.addEventListener(name, fn as EventListener)
-      return [name, fn] as const
-    })
+      for (const name of Object.keys(ref.current)) {
+        src.addEventListener(name, ((e: MessageEvent) => {
+          try {
+            ref.current[name]?.(JSON.parse(e.data))
+          } catch {
+            // A malformed frame is skipped; the next one carries the full state again.
+          }
+          if (name === "done" || name === "gone") {
+            finished = true
+            src.close()
+          }
+        }) as EventListener)
+      }
+    }
+    connect()
     return () => {
-      for (const [name, fn] of listeners) es.removeEventListener(name, fn as EventListener)
-      es.close()
+      finished = true
+      clearTimeout(timer)
+      es?.close()
       setConnected(false)
     }
     // Handler names are fixed per call site.
