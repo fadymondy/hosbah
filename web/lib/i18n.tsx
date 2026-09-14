@@ -69,10 +69,14 @@ export function useFormatDate() {
       if (!value) return "—"
       const d = new Date(value)
       if (Number.isNaN(d.getTime())) return value
-      return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG-u-nu-latn" : "en-GB", {
+      const out = new Intl.DateTimeFormat(locale === "ar" ? "ar-EG-u-nu-latn" : "en-GB", {
         dateStyle: "medium",
         timeStyle: "short",
       }).format(d)
+      // Callers put dates in dir="ltr" cells (they sit beside LTR data). An Arabic date inside one
+      // was reordered by the bidi algorithm ("14م 5:19 .2026/09/"); a right-to-left isolate
+      // (RLI … PDI) keeps it in its own reading order wherever it lands.
+      return locale === "ar" ? `⁧${out}⁩` : out
     },
     [locale],
   )
