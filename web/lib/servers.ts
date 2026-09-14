@@ -1,0 +1,204 @@
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+
+import type { Role } from "@/lib/api"
+
+/** Contract types for servers, operations and credentials (internal/api servers.go, operations.go, credentials.go). */
+
+export type CheckStatus = "pass" | "warn" | "fail"
+export type Check = { name: string; status: CheckStatus; detail: string }
+
+export type Metrics = {
+  cpu_percent: number
+  mem_used_bytes: number
+  mem_total_bytes: number
+  disk_used_bytes: number
+  disk_total_bytes: number
+  uptime_seconds: number
+  load1: number
+  at: string
+}
+
+export type DockerFacts = {
+  installed: boolean
+  running: boolean
+  version?: string
+  storage_driver?: string
+  backing_fs?: string
+  error?: string
+}
+
+export type Facts = {
+  hostname: string
+  os_id: string
+  os_version: string
+  os_pretty: string
+  arch: string
+  kernel: string
+  cpus: number
+  mem_total_bytes: number
+  systemd: boolean
+  virtualization: string
+  docker: DockerFacts
+}
+
+export type ServerStatus = "pending" | "provisioning" | "enrolled" | "failed"
+
+export type Server = {
+  id: string
+  name: string
+  provider: "byo" | "proxmox"
+  kind: "byo" | "vm" | "lxc"
+  status: ServerStatus
+  online: boolean
+  hostname: string | null
+  ip_address: string | null
+  os: string | null
+  os_version: string | null
+  arch: string | null
+  kernel: string | null
+  agent_version: string | null
+  error: string | null
+  metrics: Metrics | null
+  checks: Check[]
+  facts?: Facts
+  last_seen_at: string | null
+  enrolled_at: string | null
+  created_at: string
+  enrollment?: { expires_at: string }
+}
+
+export type Install = { url: string; command: string; command_root: string; expires_at: string }
+
+export type OperationStatus = "pending" | "sent" | "running" | "ok" | "failed" | "timeout"
+
+export type Operation = {
+  id: string
+  server_id: string
+  kind: string
+  executor: "agent" | "control_plane"
+  status: OperationStatus
+  params: Record<string, unknown>
+  result?: unknown
+  error: string | null
+  exit_code: number | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+}
+
+export type LogLine = {
+  seq: number
+  event: "log" | "progress" | "status"
+  stream?: string
+  line?: string
+  step?: number
+  total?: number
+  status?: string
+  exit_code?: number
+  error?: string
+  at: string
+}
+
+export type ProviderOption = {
+  key: "byo" | "proxmox"
+  available: boolean
+  reason?: string
+  credentials: { id: string; name: string }[]
+}
+
+export type Credential = {
+  id: string
+  provider: "proxmox"
+  name: string
+  config: Record<string, string>
+  last_validated_at: string | null
+  created_at: string
+}
+
+export const PROVISION_STEPS = ["packages.base", "docker.install", "swap.ensure"] as const
+
+/** Owners and admins manage servers; deployers may also run read-only operations. */
+export function canOperate(role: Role | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "deployer"
+}
+
+export type Presence = "online" | "offline" | ServerStatus
+
+export function presenceOf(s: Pick<Server, "status" | "online">): Presence {
+  if (s.status !== "enrolled") return s.status
+  return s.online ? "online" : "offline"
+}
+
+export function isTerminal(status: OperationStatus): boolean {
+  return status === "ok" || status === "failed" || status === "timeout"
+}
+
+export function formatBytes(n: number | null | undefined): string {
+  if (!n) return "0 B"
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"]
+  let i = 0
+  let v = n
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
+export function formatUptime(seconds: number | null | undefined): string {
+  if (!seconds) return "—"
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+export function percent(used: number, total: number): number {
+  return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
+}
+
+/**
+ * A Server-Sent Events subscription (same-origin, so the session cookie travels). Handlers are
+ * read through a ref, so re-renders do not reconnect; changing `url` does. `null` url = off.
+ */
+export function useEventStream(url: string | null, handlers: Record<string, (data: unknown) => void>) {
+  const ref = useRef(handlers)
+  ref.current = handlers
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    if (!url) return
+    const es = new EventSource(url, { withCredentials: true })
+    es.onopen = () => setConnected(true)
+    es.onerror = () => setConnected(false)
+    const names = Object.keys(ref.current)
+    const listeners = names.map((name) => {
+      const fn = (e: MessageEvent) => {
+        try {
+          ref.current[name]?.(JSON.parse(e.data))
+        } catch {
+          // A malformed frame is skipped; the next one carries the full state again.
+        }
+        if (name === "done" || name === "gone") es.close()
+      }
+      es.addEventListener(name, fn as EventListener)
+      return [name, fn] as const
+    })
+    return () => {
+      for (const [name, fn] of listeners) es.removeEventListener(name, fn as EventListener)
+      es.close()
+      setConnected(false)
+    }
+    // Handler names are fixed per call site.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url])
+
+  return connected
+}
+
+/** i18n keys are dot-paths, so a kind or step ("docker.install") is looked up as "docker_install". */
+export function opKey(k: string): string {
+  return k.replace(/\./g, "_")
+}

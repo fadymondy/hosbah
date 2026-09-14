@@ -1,12 +1,76 @@
 # Cloudy
 
 Server management and app hosting on Proxmox, Docker and the major clouds — one-click Go, Python,
-Node and PHP deploys. **Phase P0: in development, local only.** Plan:
+Node and PHP deploys. **Phase P1: in development, local only.** Plan:
 `fadymondy.com-v2/.setup/plans/cloudy.md`. Clean-room: no code or templates from Eddy (AGPL).
 
 P0 is the multi-tenant foundation: teams, members, invitations, default-deny authorization,
 row-level security, envelope encryption, audit, sign-in with TOTP 2FA, the user and admin MCP
-servers, and Cloudy's own issue tracker fed by "Report a problem". No servers or deploys yet (P1+).
+servers, and Cloudy's own issue tracker fed by "Report a problem".
+
+P1 adds servers: the `cloudy-agent`, bring-your-own install with a one-liner, signed typed
+operations with live logs, and the Proxmox driver (tested against a fake PVE API only). No deploys
+yet (P2).
+
+## Servers and the agent (P1)
+
+- **Agent** (`cmd/agent`, `internal/agent`): static Go binary under systemd. It enrols once with a
+  one-time token that lasts 15 minutes and is stored hashed, generating its own ed25519 key. After
+  that it **dials out** to `/agent/ws` and answers a signed challenge. It sends heartbeats with
+  CPU, memory, disk, load and uptime every 15 s.
+- **Operations** (`internal/agentproto`, `internal/ops`): typed only. The kinds are `system.info`,
+  `docker.check`, `provision.step` (`packages.base`, `docker.install`, `swap.ensure`, all
+  idempotent) and `agent.update`.
+  - The control plane signs `op_id, server_id, kind, params hash, exp, timeout` with ed25519. The
+    key is derived from the KEK with HKDF.
+  - The agent verifies against the key it pinned at enrolment. It refuses tampered, unsigned,
+    expired, misaddressed or unknown-kind operations.
+  - The queue is the `operations` table: pending → sent → running → ok/failed/timeout. Dispatch
+    uses `FOR UPDATE SKIP LOCKED`, and operations are idempotent by `op_id`.
+  - Every event carries a per-operation `seq`. After a reconnect the server sends the last `seq`
+    it stored, and the agent replays the rest.
+- **Logs**: `operation_logs` are sealed with the team key and append-only. The browser gets them
+  through team-scoped SSE: `/api/teams/{team}/servers/{server}/operations/{op}/stream` and
+  `/servers/{server}/stream`. Never through the global `/events`.
+- **Self-update**: `agent.update` puts the version, URL and SHA-256 inside the signed params. The
+  agent downloads the binary, verifies it, swaps it in and re-execs. The only release channel so
+  far is this control plane's `bin/agent`.
+- **RLS**: there are two new contexts. `app.server_id` is set once an agent has authenticated, and
+  it only sees its own server. `app.system` is used only by the dispatcher, the timeout sweeper and
+  the provisioning worker.
+
+### Try the bring-your-own path locally
+
+```sh
+# build the agent the control plane serves (make agent, or without make:)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=dev" -o bin/agent/cloudy-agent-linux-amd64 ./cmd/agent
+echo dev > bin/agent/VERSION
+# in .env: CLOUDY_AGENT_URL=http://host.docker.internal:8710   (then start the API)
+
+docker build -t cloudy-dev-target deploy/dev-target      # Ubuntu 24.04 with systemd
+docker run -d --name cloudy-target --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw --add-host=host.docker.internal:host-gateway cloudy-dev-target
+# Servers → Add server → "A server I already have" → copy the root command, then:
+docker exec cloudy-target sh -c 'curl -fsSL http://host.docker.internal:8710/install/cle_… | sh'
+```
+
+### Proxmox
+
+`internal/providers/proxmox` implements the plan's Provider interface. It can clone a VM from a
+cloud-init template (full clone) or create an unprivileged LXC with `nesting=1,keyctl=1`. The
+agent is delivered by cloud-init user-data when a snippets directory is mounted
+(`snippets_storage` + `snippets_dir`), because the PVE API cannot upload snippets. Otherwise
+Cloudy bootstraps it over SSH with a per-server ed25519 key, sealed with the team key.
+
+Tests use an in-process fake of the PVE endpoints listed in `internal/providers/proxmox/doc.go`.
+The live test only runs when you ask for it:
+
+```sh
+CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE_TOKEN_SECRET=… \
+  PVE_NODE=pve-3x1 PVE_STORAGE=local PVE_BRIDGE=vmbr1 PVE_POOL=cloudy PVE_TLS_FINGERPRINT=… \
+  go test -count=1 -run TestLive -v ./internal/providers/proxmox/   # read-only
+# add CLOUDY_PROXMOX_LIVE_CREATE=1 (+ PVE_LXC_TEMPLATE / PVE_TEMPLATE_VMID) to create and delete a guest
+```
 
 ## Ports (local)
 
@@ -67,7 +131,7 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 
 | Endpoint | Tokens | Tools |
 |---|---|---|
-| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens` (read) · `invite_member` (write) · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
+| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations` (read) · `invite_member` (write) · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
 | `POST /api/admin/mcp` | platform-admin `cla_…` | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
 
 Every tool declares a scope (`internal/mcp/scopes_test.go` fails otherwise); a token without it gets

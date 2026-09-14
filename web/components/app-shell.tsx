@@ -9,6 +9,8 @@ import {
   ConstructionIcon,
   KeyRoundIcon,
   LanguagesIcon,
+  LockKeyholeIcon,
+  ServerIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   MailPlusIcon,
@@ -105,9 +107,12 @@ function AppSidebar({ side }: { side: "left" | "right" }) {
   const nav = base
     ? [
         { href: base, label: t("nav.overview"), icon: <LayoutDashboardIcon />, exact: true },
+        { href: `${base}/servers`, label: t("nav.servers"), icon: <ServerIcon /> },
         { href: `${base}/members`, label: t("nav.members"), icon: <UsersIcon /> },
         { href: `${base}/invitations`, label: t("nav.invitations"), icon: <MailPlusIcon /> },
         { href: `${base}/tokens`, label: t("nav.tokens"), icon: <KeyRoundIcon /> },
+        // Credentials are owner/admin only (the API answers 403 to anyone else).
+        ...(teamCtx?.manage ? [{ href: `${base}/credentials`, label: t("nav.credentials"), icon: <LockKeyholeIcon /> }] : []),
         { href: `${base}/audit`, label: t("nav.audit"), icon: <ScrollTextIcon /> },
         { href: `${base}/settings`, label: t("nav.settings"), icon: <SettingsIcon /> },
       ]

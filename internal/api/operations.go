@@ -341,7 +341,9 @@ type sseWriter struct {
 
 func newSSE(hctx huma.Context) *sseWriter {
 	hctx.SetHeader("Content-Type", "text/event-stream")
-	hctx.SetHeader("Cache-Control", "no-store")
+	// no-transform: a compressing proxy (Next's dev server proxying /api, the `compression`
+	// middleware, some CDNs) otherwise gzips — and therefore buffers — the whole stream.
+	hctx.SetHeader("Cache-Control", "no-cache, no-store, no-transform")
 	hctx.SetHeader("X-Accel-Buffering", "no") // no proxy buffering (nginx/NPM)
 	w, _ := hctx.BodyWriter().(http.ResponseWriter)
 	s := &sseWriter{ctx: hctx.Context(), w: w, rc: http.NewResponseController(w), keep: time.NewTicker(15 * time.Second)}
