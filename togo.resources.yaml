@@ -34,6 +34,79 @@ resources:
           pg: timestamptz
           "null": true
       controller: true
+    - name: AgentEnrollment
+      table: agent_enrollments
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: expires_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: used_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: Credential
+      table: credentials
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: provider
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: config
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: secret_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: last_validated_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
     - name: Invitation
       table: invitations
       fields:
@@ -131,6 +204,134 @@ resources:
           gql: String
           pg: timestamptz
           "null": true
+      controller: true
+    - name: Operation
+      table: operations
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: executor
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: params
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: params_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: result
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: exit_code
+          go: int64
+          gql: Int
+          pg: bigint
+          "null": true
+        - name: attempts
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: last_seq
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: timeout_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: expires_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: sent_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: started_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: finished_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
+    - name: OperationLog
+      table: operation_logs
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: operation_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: seq
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: stream
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: line_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
       controller: true
     - name: Report
       table: reports
@@ -353,6 +554,135 @@ resources:
           go: string
           gql: String
           pg: text
+          "null": true
+      controller: true
+    - name: Server
+      table: servers
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: provider
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: credential_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: provider_ref
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: hostname
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: ip_address
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: os
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: os_version
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: arch
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: kernel
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: agent_version
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: agent_public_key
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: ssh_public_key
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: ssh_private_key_sealed
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: facts
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: checks
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: metrics
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: spec
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: last_seen_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: enrolled_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
           "null": true
       controller: true
     - name: Team

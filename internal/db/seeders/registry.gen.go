@@ -12,16 +12,31 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAdminMcpToken(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAgentEnrollment(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedCredential(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedInvitation(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedMcpToken(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedOperation(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedOperationLog(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedReport(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedReportComment(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedServer(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedTeam(ctx, a); err != nil {

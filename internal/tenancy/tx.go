@@ -29,8 +29,14 @@ import (
 type Scope struct {
 	UserID        string
 	TeamID        string
-	TokenHash     string // SHA-256 of a presented token (MCP bearer, invitation link)
+	TokenHash     string // SHA-256 of a presented token (MCP bearer, invitation link, enrolment token)
 	PlatformAdmin bool
+	// ServerID is an authenticated agent's own server: set only after its challenge signature
+	// verified against its enrolled key. It sees that server's rows and nothing else.
+	ServerID string
+	// System is the control plane's own background workers (dispatcher, timeout sweeper,
+	// provisioning). Never set from anything a request carries.
+	System bool
 }
 
 // Tx runs fn in a transaction scoped to s. fn's error rolls it back.
@@ -61,16 +67,27 @@ func SetTeam(ctx context.Context, tx *sql.Tx, teamID string) error {
 	return err
 }
 
+// SetServer re-points an open transaction at a server — used by enrolment, once the token has
+// resolved to exactly one server.
+func SetServer(ctx context.Context, tx *sql.Tx, serverID string) error {
+	_, err := tx.ExecContext(ctx, `SELECT set_config('app.server_id', $1, true)`, serverID)
+	return err
+}
+
 func apply(ctx context.Context, tx *sql.Tx, s Scope) error {
-	admin := ""
-	if s.PlatformAdmin {
-		admin = "on"
+	on := func(b bool) string {
+		if b {
+			return "on"
+		}
+		return ""
 	}
 	_, err := tx.ExecContext(ctx, `SELECT
 		set_config('app.user_id', $1, true),
 		set_config('app.team_id', $2, true),
 		set_config('app.token_hash', $3, true),
-		set_config('app.platform_admin', $4, true)`,
-		s.UserID, s.TeamID, s.TokenHash, admin)
+		set_config('app.platform_admin', $4, true),
+		set_config('app.server_id', $5, true),
+		set_config('app.system', $6, true)`,
+		s.UserID, s.TeamID, s.TokenHash, on(s.PlatformAdmin), s.ServerID, on(s.System))
 	return err
 }

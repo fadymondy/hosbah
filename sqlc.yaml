@@ -33,3 +33,9 @@ sql:
           - db_type: "bigint"
             nullable: true
             go_type: { type: "int64", pointer: true }
+          # sqlc resolves a nullable bigint COLUMN as pg_catalog.int8, which the "bigint" entry above
+          # does not match (operations.exit_code came out as sql.NullInt64 and the generated
+          # resources/operation.go, which expects *int64, did not compile).
+          - db_type: "pg_catalog.int8"
+            nullable: true
+            go_type: { type: "int64", pointer: true }
