@@ -147,6 +147,139 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: Backup
+      table: backups
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: data_service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: schedule_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: target
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: snapshot_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: size_bytes
+          go: int64
+          gql: Int
+          pg: bigint
+          "null": true
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: restore_status
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: restore_error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: started_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: taken_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: restore_tested_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: BackupSchedule
+      table: backup_schedules
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: data_service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: cron
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: retention
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: target
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: restore_test
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: paused
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: last_run_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: next_run_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: Credential
       table: credentials
       fields:
@@ -185,6 +318,158 @@ resources:
           gql: String
           pg: timestamptz
           "null": true
+      controller: true
+    - name: DataService
+      table: data_services
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: version
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: container
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: volume
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: host
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: port
+          go: int64
+          gql: Int
+          pg: bigint
+          "null": true
+        - name: root_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: Database
+      table: databases
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: data_service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: DatabaseUser
+      table: database_users
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: data_service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: database_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: grants
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: password_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
       controller: true
     - name: Deployment
       table: deployments

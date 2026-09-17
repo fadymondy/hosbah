@@ -18,7 +18,22 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedApp(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedBackup(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedBackupSchedule(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedCredential(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDataService(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDatabase(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDatabaseUser(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedDeployment(ctx, a); err != nil {
