@@ -40,6 +40,37 @@ All of section 1–4 was run end-to-end on 2026-09-17: a UI deploy of sample-go 
 17s, zero-downtime) then rollback to v2, with a 100 ms probe through Caddy showing **600/600
 requests answered 200 — zero failed requests**; and an MCP deploy+rollback of sample-node.
 
+## 5. Databases and backups (P3)
+
+The **Databases** section is new. Open it from the sidebar.
+
+1. **Provision a service** → **New data service** → name it (e.g. `demo-pg`), pick **postgres**,
+   pick server **target-1**, leave the version blank → **Provision**. The row shows
+   **Provisioning**, then **Running** with a private endpoint (`172.17.0.1:5432`) once its
+   container is up on the target. Provision a **redis** service the same way.
+2. **Create a database + user** → open the postgres service → **Databases & users** →
+   **Add database** (name `app`, user `app`, grants `all`). Both go **ready**.
+3. **Connection string + attach** → in the service's **Connection & attach** panel,
+   **Reveal connection string** (shown once, audited), then choose **sample-node** and **Attach**:
+   it injects a sealed `DATABASE_URL`. Redeploy sample-node (Apps → sample-node → Deploy) and it
+   picks the variable up.
+4. **Back up** → open the service → **Back up now**. The backup goes **succeeded** with a size and
+   a restic snapshot. Then **Restore-test** it: it restores into a throwaway container and shows
+   **Passed** (and stamps *restore-tested*).
+5. **Schedule** → set a cron (e.g. `0 3 * * *`), retention, and tick **restore-test each scheduled
+   backup**. The scheduler runs it and, on success, a restore-test.
+6. **From the user MCP** (a token with `read`+`write`, plus `destructive` for the restore):
+   `create_database`, `backup_now`, then `restore_backup` (`confirm` = the service's name).
+   `reveal_db_url` needs `secrets:read`; a call missing its scope is refused in-band.
+
+Everything binds to the server's **private** interface; the **S3** backup target is disabled and
+labelled *"S3 — not configured"* until real credentials are set (`CLOUDY_S3_*`) — the demo uses a
+local restic repository on the target.
+
+> The P3 code is merged and verified offline (build, vet, `go test -count=1 ./...` incl. the
+> isolation sweep, `togo generate`, web typecheck + `next build`). The live click-through above is
+> owner-gated on your `info@3x1.io` sign-in, exactly like the P2 steps.
+
 ## What is still owner-gated (cannot be demoed without your input)
 - **Your login credential** — only you can sign in as `info@3x1.io`; the automated run
   cannot (password/PIN not held, and it must not be changed).
