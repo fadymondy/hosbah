@@ -18,6 +18,7 @@ import (
 	"github.com/fadymondy/cloudy/internal/app"
 	"github.com/fadymondy/cloudy/internal/config"
 	"github.com/fadymondy/cloudy/internal/crypto"
+	"github.com/fadymondy/cloudy/internal/dbsvc"
 	"github.com/fadymondy/cloudy/internal/deploy"
 	"github.com/fadymondy/cloudy/internal/mcp"
 	"github.com/fadymondy/cloudy/internal/ops"
@@ -71,7 +72,11 @@ func Boot() *app.App {
 	deploys.MountPublic(k.Router) // /hooks/*, /internal/tls/allow — outside /api, token / HMAC / yes-no
 	deploys.Start()
 	a.Deploy = deploys
-	a.Stop = func() { deploys.Stop(); svc.Stop() }
+
+	databases := dbsvc.New(a, svc, deploys)
+	databases.StartScheduler()
+	a.DBSvc = databases
+	a.Stop = func() { databases.StopScheduler(); deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)

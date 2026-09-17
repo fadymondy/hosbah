@@ -58,7 +58,8 @@ const (
 // AgentKinds is what an agent will execute. Anything else is refused before it runs.
 var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, KindAgentUpdate,
 	KindAppDetect, KindAppBuild, KindAppRelease, KindAppStart, KindRouteSet, KindAppDrain,
-	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel}
+	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel,
+	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.
