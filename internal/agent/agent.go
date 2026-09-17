@@ -47,6 +47,7 @@ func New(st *State, version string, log *slog.Logger) (*Agent, error) {
 		priv: priv, sampler: NewSampler(), live: make(chan agentproto.Event, 4096),
 	}
 	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
+	a.Exec.SetKey(priv)
 	a.Exec.emit = a.enqueue
 	a.Exec.Restart = a.restart
 	return a, nil

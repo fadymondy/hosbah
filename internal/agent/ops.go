@@ -90,16 +90,12 @@ func dockerCheck(oc *OpContext) (any, int, error) {
 
 // ---- provision.step ----------------------------------------------------------------------------
 
-type provisionParams struct {
-	Step   string `json:"step"`
-	SwapMB int    `json:"swap_mb,omitempty"`
-}
-
 // provisionStep runs one idempotent step: each first checks whether the host is already in the
 // wanted state and says so instead of re-applying. Commands are fixed argv lists — no shell, and
-// nothing from params reaches a command line except the validated swap size.
+// nothing from params reaches a command line except the validated swap size (tool downloads are
+// fetched by the agent itself and checked against the signed hash).
 func provisionStep(oc *OpContext) (any, int, error) {
-	var p provisionParams
+	var p agentproto.ProvisionParams
 	if err := json.Unmarshal(oc.Params, &p); err != nil {
 		return nil, 2, fmt.Errorf("bad params: %w", err)
 	}
@@ -113,6 +109,12 @@ func provisionStep(oc *OpContext) (any, int, error) {
 		return stepDockerInstall(oc)
 	case agentproto.StepSwap:
 		return stepSwap(oc, p.SwapMB)
+	case agentproto.StepBuildTools:
+		return stepBuildTools(oc)
+	case agentproto.StepCaddy:
+		return stepCaddy(oc, p)
+	case agentproto.StepRailpack:
+		return stepRailpack(oc, p)
 	}
 	return nil, 2, fmt.Errorf("unknown provisioning step %q", p.Step)
 }

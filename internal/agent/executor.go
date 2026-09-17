@@ -19,12 +19,18 @@ import (
 // Handler runs one kind of operation. It logs through oc and returns a JSON-able result.
 type Handler func(oc *OpContext) (result any, exitCode int, err error)
 
-// Executor verifies, de-duplicates, queues and runs operations, one at a time, and keeps a
-// journal of every event each one emitted so a reconnect can resume exactly where the control
-// plane's copy stops.
+// Executor verifies, de-duplicates, queues and runs operations, and keeps a journal of every event
+// each one emitted so a reconnect can resume exactly where the control plane's copy stops.
+//
+// Operations run in lanes (P2): the host lane runs system.info, docker.check, provisioning steps
+// and agent updates one at a time (they share apt and dpkg locks); each app has its own lane, so
+// one app's deploy steps never interleave while two apps build side by side; app.logs and
+// app.detect run on their own, so a long build never holds up a log relay. op.cancel is handled
+// the moment it arrives.
 type Executor struct {
 	serverID     string
 	cpPub        ed25519.PublicKey
+	priv         ed25519.PrivateKey // this agent's own key: opens env boxes sealed to it
 	version      string
 	controlPlane string
 	now          func() time.Time
@@ -38,18 +44,24 @@ type Executor struct {
 	journal map[string]*record
 	order   []string
 	queue   chan *record
+	running map[string]context.CancelFunc
+
+	lanesMu sync.Mutex
+	lanes   map[string]chan *record
 }
 
 type record struct {
-	op      agentproto.SignedOp
-	events  []agentproto.Event
-	restart bool
+	op        agentproto.SignedOp
+	events    []agentproto.Event
+	restart   bool
+	cancelled bool
 }
 
 // journalSize bounds memory: the last N operations are remembered for de-duplication and resume.
 // The journal is in memory only — after an agent restart, the control plane's resume list gets
 // "unknown" for in-flight ops and re-queues them; every kind is safe to re-run (provision steps
-// are idempotent, agent.update checks the running version first).
+// are idempotent, agent.update checks the running version first, app.start replaces a container
+// of the same name, route.set renders the whole route table).
 const journalSize = 256
 
 // NewExecutor builds an executor for one server, trusting one control-plane key.
@@ -58,15 +70,28 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		serverID: serverID, cpPub: cpPub, version: version, controlPlane: controlPlane,
 		now: time.Now, emit: func(agentproto.Event) {},
 		journal: map[string]*record{}, queue: make(chan *record, 64),
+		running: map[string]context.CancelFunc{}, lanes: map[string]chan *record{},
 	}
 	e.handlers = map[string]Handler{
 		agentproto.KindSystemInfo:    systemInfo,
 		agentproto.KindDockerCheck:   dockerCheck,
 		agentproto.KindProvisionStep: provisionStep,
 		agentproto.KindAgentUpdate:   e.agentUpdate,
+		agentproto.KindAppDetect:     appDetect,
+		agentproto.KindAppBuild:      appBuild,
+		agentproto.KindAppRelease:    appRelease,
+		agentproto.KindAppStart:      appStart,
+		agentproto.KindRouteSet:      routeSet,
+		agentproto.KindAppDrain:      appDrain,
+		agentproto.KindAppRollback:   appRollback,
+		agentproto.KindAppLogs:       appLogs,
+		agentproto.KindAppRemove:     appRemove,
 	}
 	return e
 }
+
+// SetKey gives the executor this agent's private key (to open env boxes sealed to it).
+func (e *Executor) SetKey(priv ed25519.PrivateKey) { e.priv = priv }
 
 // Submit is where every operation from the network enters. Nothing runs unless VerifyOp accepts
 // it: a tampered, unsigned, expired, misaddressed or unknown-kind operation is refused and the
@@ -94,12 +119,40 @@ func (e *Executor) Submit(op *agentproto.SignedOp) {
 	e.remember(rec)
 	e.mu.Unlock()
 
+	if op.Kind == agentproto.KindOpCancel {
+		go e.cancel(rec)
+		return
+	}
 	select {
 	case e.queue <- rec:
 	default:
 		e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusFailed,
 			Error: "the agent's operation queue is full; try again shortly"})
 	}
+}
+
+// cancel handles op.cancel at once: the target's context is cancelled (its handler sees ctx.Done,
+// its commands are killed) and it reports "failed: cancelled". Cancelling something that is not
+// running is not an error — it may have just finished.
+func (e *Executor) cancel(rec *record) {
+	e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusRunning})
+	var p agentproto.CancelParams
+	_ = json.Unmarshal(rec.op.Params, &p)
+	e.mu.Lock()
+	stop, ok := e.running[p.OpID]
+	if target := e.journal[p.OpID]; ok && target != nil {
+		target.cancelled = true
+	}
+	e.mu.Unlock()
+	if ok {
+		stop()
+		e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: "info", Line: "cancelled operation " + p.OpID})
+	} else {
+		e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: "info", Line: "operation " + p.OpID + " is not running here — nothing to cancel"})
+	}
+	code := 0
+	raw, _ := json.Marshal(map[string]any{"cancelled": ok, "op_id": p.OpID})
+	e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusOK, ExitCode: &code, Result: raw})
 }
 
 // Resume answers the control plane's resume list after a reconnect: the events it has not seen,
@@ -127,15 +180,68 @@ func (e *Executor) Resume(entries []agentproto.ResumeEntry) {
 	}
 }
 
-// Work runs queued operations one at a time (provisioning steps share apt and dpkg locks).
+// Work hands queued operations to their lanes until ctx ends.
 func (e *Executor) Work(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case rec := <-e.queue:
-			e.run(ctx, rec)
+			e.dispatch(ctx, rec)
 		}
+	}
+}
+
+// laneOf: "" runs concurrently; anything else runs one at a time within its lane.
+func laneOf(op agentproto.SignedOp) string {
+	switch op.Kind {
+	case agentproto.KindAppLogs:
+		return ""
+	case agentproto.KindAppDetect:
+		// Host lane: it needs git and Railpack, which the provisioning steps queued just before it
+		// (same lane, so in order) install on a fresh server.
+		return "host"
+	case agentproto.KindAppBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
+		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove:
+		var p struct {
+			AppID string `json:"app_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.AppID != "" {
+			return "app:" + p.AppID
+		}
+		return "app:?"
+	}
+	return "host"
+}
+
+func (e *Executor) dispatch(ctx context.Context, rec *record) {
+	lane := laneOf(rec.op)
+	if lane == "" {
+		go e.run(ctx, rec)
+		return
+	}
+	e.lanesMu.Lock()
+	ch, ok := e.lanes[lane]
+	if !ok {
+		ch = make(chan *record, 64)
+		e.lanes[lane] = ch
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case r := <-ch:
+					e.run(ctx, r)
+				}
+			}
+		}()
+	}
+	e.lanesMu.Unlock()
+	select {
+	case ch <- rec:
+	default:
+		e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusFailed,
+			Error: "too many operations are waiting for this app; try again shortly"})
 	}
 }
 
@@ -147,10 +253,18 @@ func (e *Executor) run(ctx context.Context, rec *record) {
 	}
 	octx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	e.mu.Lock()
+	e.running[rec.op.OpID] = cancel
+	e.mu.Unlock()
+	defer func() {
+		e.mu.Lock()
+		delete(e.running, rec.op.OpID)
+		e.mu.Unlock()
+	}()
 
 	e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusRunning})
 	oc := &OpContext{
-		Ctx: octx, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane,
+		Ctx: octx, OpID: rec.op.OpID, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane, priv: e.priv,
 		log: func(stream, line string) {
 			e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: stream, Line: line})
 		},
@@ -176,7 +290,13 @@ func (e *Executor) run(ctx context.Context, rec *record) {
 			result, code, err = h(oc)
 		}()
 	}
-	if err != nil && errors.Is(octx.Err(), context.DeadlineExceeded) {
+	e.mu.Lock()
+	cancelled := rec.cancelled
+	e.mu.Unlock()
+	switch {
+	case err != nil && cancelled:
+		err, code = errors.New("cancelled"), 130
+	case err != nil && errors.Is(octx.Err(), context.DeadlineExceeded):
 		err, code = fmt.Errorf("timed out after %s", timeout), 124
 	}
 	final := agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusOK, ExitCode: &code}
@@ -222,9 +342,11 @@ func (e *Executor) remember(rec *record) {
 // OpContext is what a handler gets: its params, a deadline, and ways to report.
 type OpContext struct {
 	Ctx          context.Context
+	OpID         string
 	Params       json.RawMessage
 	Version      string
 	ControlPlane string
+	priv         ed25519.PrivateKey
 	log          func(stream, line string)
 	progress     func(step, total int)
 	restart      bool
@@ -239,14 +361,36 @@ func (o *OpContext) Progress(step, total int) { o.progress(step, total) }
 // RequestRestart asks the agent to re-exec itself after this operation reports success.
 func (o *OpContext) RequestRestart() { o.restart = true }
 
+// OpenEnv opens an env box sealed to this agent for context, into NAME → value.
+func (o *OpContext) OpenEnv(context, box string) (map[string]string, error) {
+	if box == "" {
+		return map[string]string{}, nil
+	}
+	pt, err := agentproto.OpenBox(o.priv, context, box)
+	if err != nil {
+		return nil, errors.New("the environment could not be opened with this server's key")
+	}
+	env := map[string]string{}
+	if err := json.Unmarshal(pt, &env); err != nil {
+		return nil, errors.New("the environment is malformed")
+	}
+	return env, nil
+}
+
 const maxLine = 4096
 
 // Run executes a fixed argv (never a shell), streaming stdout and stderr line by line, and
 // returns the exit code.
 func (o *OpContext) Run(name string, args ...string) (int, error) {
+	return o.RunEnv(nil, name, args...)
+}
+
+// RunEnv is Run with extra environment variables for the child (never logged). Docker's `-e NAME`
+// (no value) takes the value from here, so a secret never appears in an argv or a file.
+func (o *OpContext) RunEnv(extra []string, name string, args ...string) (int, error) {
 	o.Info("$ %s", shellQuote(append([]string{name}, args...)))
 	cmd := exec.CommandContext(o.Ctx, name, args...)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C")
+	cmd.Env = append(append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C"), extra...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return 127, err

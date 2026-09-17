@@ -56,7 +56,9 @@ const (
 )
 
 // AgentKinds is what an agent will execute. Anything else is refused before it runs.
-var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, KindAgentUpdate}
+var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, KindAgentUpdate,
+	KindAppDetect, KindAppBuild, KindAppRelease, KindAppStart, KindRouteSet, KindAppDrain,
+	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.
@@ -67,7 +69,7 @@ const (
 )
 
 // ProvisionSteps is the allowlist, in the order a fresh server runs them.
-var ProvisionSteps = []string{StepBasePackages, StepDockerInstall, StepSwap}
+var ProvisionSteps = []string{StepBasePackages, StepDockerInstall, StepSwap, StepBuildTools, StepCaddy, StepRailpack}
 
 // Event kinds and statuses.
 const (
