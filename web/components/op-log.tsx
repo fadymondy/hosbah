@@ -69,18 +69,18 @@ export function OperationLog({ team, serverId, op }: { team: string; serverId: s
   )
 }
 
-function clock(at: string): string {
+export function clock(at: string): string {
   const d = new Date(at)
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(11, 19)
 }
 
-function render(l: LogLine): string {
+export function render(l: LogLine): string {
   if (l.event === "progress") return `[${l.step}/${l.total}]`
   if (l.event === "status") return l.status === "running" ? "▶ started" : (l.line ?? `finished: ${l.status}`)
   return l.line ?? ""
 }
 
-function lineTone(l: LogLine): string {
+export function lineTone(l: LogLine): string {
   if (l.event === "status") return l.status === "ok" || l.status === "running" ? "font-medium" : "font-medium text-destructive"
   if (l.stream === "stderr" || l.stream === "error") return "text-destructive"
   if (l.stream === "info" || l.event === "progress") return "text-muted-foreground"

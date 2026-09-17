@@ -3,8 +3,10 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { useState, type ReactNode } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import {
+  BellIcon,
+  BoxesIcon,
   ChevronsUpDownIcon,
   ConstructionIcon,
   KeyRoundIcon,
@@ -55,7 +57,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { apiFetch } from "@/lib/api"
-import { useI18n } from "@/lib/i18n"
+import type { Notification } from "@/lib/apps"
+import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 import { useOptionalTeam } from "@/lib/team"
 
@@ -74,12 +77,107 @@ export function AppShell({ children, title }: { children: ReactNode; title?: Rea
           <SidebarTrigger className="-ms-1" label={t("shell.toggleSidebar")} />
           <Separator orientation="vertical" className="data-vertical:h-4 data-vertical:self-center" />
           <div className="min-w-0 flex-1 truncate text-sm font-medium">{title}</div>
+          <NotificationsBell />
         </header>
         <DevBanner />
         <div className="grid-hatch h-4 grid-rule-bottom" aria-hidden />
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+/** Team notifications (failed deploys…): a bell with the unread count; opening it marks them read. */
+function NotificationsBell() {
+  const { t, locale } = useI18n()
+  const teamCtx = useOptionalTeam()
+  const router = useRouter()
+  const fmt = useFormatDate()
+  const slug = teamCtx?.team.slug
+  const [items, setItems] = useState<Notification[]>([])
+  const [unread, setUnread] = useState(0)
+
+  const load = useCallback(async () => {
+    if (!slug) return
+    try {
+      const r = await apiFetch<{ notifications: Notification[]; unread: number }>(`/api/teams/${slug}/notifications`)
+      setItems(r.notifications ?? [])
+      setUnread(r.unread ?? 0)
+    } catch {
+      // The bell stays quiet if notifications cannot be read.
+    }
+  }, [slug])
+
+  useEffect(() => {
+    void load()
+    const id = setInterval(load, 30_000)
+    return () => clearInterval(id)
+  }, [load])
+
+  if (!slug) return null
+
+  async function markRead() {
+    if (unread === 0) return
+    try {
+      await apiFetch(`/api/teams/${slug}/notifications/read`, { method: "POST" })
+      setUnread(0)
+    } catch {
+      // Stays unread; the next poll shows the truth.
+    }
+  }
+
+  function open(n: Notification) {
+    if (n.subject_type === "app" && n.subject_id) router.push(`/${locale}/t/${slug}/apps/${n.subject_id}`)
+  }
+
+  return (
+    <DropdownMenu onOpenChange={(o) => (o ? void markRead() : void load())}>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            className="relative inline-flex size-8 items-center justify-center hover:bg-muted aria-expanded:bg-muted"
+            aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
+            data-testid="notifications"
+            data-unread={unread}
+          />
+        }
+      >
+        <BellIcon className="size-4" />
+        {unread > 0 ? (
+          <span className="absolute -end-0.5 -top-0.5 min-w-4 bg-primary px-1 text-center font-mono text-[10px] leading-4 text-primary-foreground tabular-nums">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        ) : null}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="w-80">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">{t("notifications.title")}</DropdownMenuLabel>
+          {items.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">{t("notifications.empty")}</p>
+          ) : (
+            items.slice(0, 20).map((n) => (
+              <DropdownMenuItem key={n.id} onClick={() => open(n)} className="flex-col items-start gap-0.5">
+                <span className="flex w-full items-center gap-2">
+                  {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
+                  <span className="truncate font-medium" dir="auto">
+                    {n.title}
+                  </span>
+                </span>
+                {n.body ? (
+                  <span className="line-clamp-2 text-xs text-muted-foreground" dir="auto">
+                    {n.body}
+                  </span>
+                ) : null}
+                <span className="text-xs text-muted-foreground" dir="ltr">
+                  {fmt(n.created_at)}
+                </span>
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -107,6 +205,7 @@ function AppSidebar({ side }: { side: "left" | "right" }) {
   const nav = base
     ? [
         { href: base, label: t("nav.overview"), icon: <LayoutDashboardIcon />, exact: true },
+        { href: `${base}/apps`, label: t("nav.apps"), icon: <BoxesIcon /> },
         { href: `${base}/servers`, label: t("nav.servers"), icon: <ServerIcon /> },
         { href: `${base}/members`, label: t("nav.members"), icon: <UsersIcon /> },
         { href: `${base}/invitations`, label: t("nav.invitations"), icon: <MailPlusIcon /> },

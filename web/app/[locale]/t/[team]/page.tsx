@@ -11,6 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Skeleton } from "@/components/ui/skeleton"
 import { apiFetch, type Member } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
+import type { App } from "@/lib/apps"
 import type { Server } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 
@@ -20,6 +21,7 @@ export default function OverviewPage() {
   useDocumentTitle(`${t("nav.overview")} — ${team.name}`)
   const [count, setCount] = useState<number | null | "error">(null)
   const [servers, setServers] = useState<Server[] | null | "error">(null)
+  const [apps, setApps] = useState<App[] | null | "error">(null)
 
   useEffect(() => {
     apiFetch<{ members: Member[] }>(`/api/teams/${team.slug}/members`)
@@ -28,6 +30,9 @@ export default function OverviewPage() {
     apiFetch<{ servers: Server[] }>(`/api/teams/${team.slug}/servers`)
       .then((r) => setServers(r.servers ?? []))
       .catch(() => setServers("error"))
+    apiFetch<{ apps: App[] }>(`/api/teams/${team.slug}/apps`)
+      .then((r) => setApps(r.apps ?? []))
+      .catch(() => setApps("error"))
   }, [team.slug])
 
   const base = `/${locale}/t/${team.slug}`
@@ -35,7 +40,7 @@ export default function OverviewPage() {
 
   return (
     <PageBody title={team.name} description={t("overview.description")}>
-      <dl className="grid-cells grid sm:grid-cols-4">
+      <dl className="grid-cells grid sm:grid-cols-2 lg:grid-cols-5">
         <div className="flex flex-col gap-1 p-4">
           <dt className="grid-micro">{t("overview.yourRole")}</dt>
           <dd>
@@ -60,6 +65,23 @@ export default function OverviewPage() {
                 {servers.length}
                 <span className="ms-2 text-sm text-muted-foreground">
                   {online} {t("overview.online")}
+                </span>
+              </>
+            )}
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1 p-4">
+          <dt className="grid-micro">{t("overview.apps")}</dt>
+          <dd className="font-mono text-2xl">
+            {apps === null ? (
+              <Skeleton className="h-7 w-10" />
+            ) : apps === "error" ? (
+              "—"
+            ) : (
+              <>
+                {apps.length}
+                <span className="ms-2 text-sm text-muted-foreground">
+                  {apps.filter((a) => a.status === "running").length} {t("overview.running")}
                 </span>
               </>
             )}
@@ -92,6 +114,9 @@ export default function OverviewPage() {
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/apps`} />}>
+          {t("nav.apps")}
+        </Button>
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/servers`} />}>
           {t("nav.servers")}
         </Button>

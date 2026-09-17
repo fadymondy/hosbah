@@ -95,7 +95,7 @@
     "viewer": "Viewer"
   },
   "shell": {
-    "devBanner": "Cloudy is in development — you can add servers and run checks on them; deploys are not available yet.",
+    "devBanner": "Cloudy is in development — servers and app deploys work, but expect rough edges.",
     "switchTeam": "Switch team",
     "toggleSidebar": "Show or hide the sidebar",
     "noTeam": "No team selected",
@@ -117,7 +117,8 @@
     "credentials": "Credentials",
     "audit": "Audit log",
     "settings": "Settings",
-    "admin": "Admin"
+    "admin": "Admin",
+    "apps": "Apps"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -136,7 +137,9 @@
     "serversTitle": "No servers yet",
     "serversHint": "Add a server you already have with a one-line install command, or create one on Proxmox.",
     "servers": "Servers",
-    "online": "Online"
+    "online": "Online",
+    "apps": "Apps",
+    "running": "Running"
   },
   "servers": {
     "description": "Servers this team manages through the Cloudy agent.",
@@ -274,7 +277,9 @@
         "docker_check": "Docker check",
         "provision_step": "Provisioning step",
         "agent_update": "Agent update",
-        "provider_create": "Create machine"
+        "provider_create": "Create machine",
+        "app_detect": "Runtime detection",
+        "app_logs": "Runtime logs"
       },
       "steps": {
         "packages_base": "Base packages",
@@ -289,6 +294,210 @@
         "failed": "Failed",
         "timeout": "Timed out"
       }
+    }
+  },
+  "apps": {
+    "description": "Apps this team deploys from a Git repository to its servers.",
+    "add": "New app",
+    "emptyTitle": "No apps yet",
+    "emptyHint": "Point Cloudy at a Git repository and a server; it builds the image there and serves it through Caddy.",
+    "name": "Name",
+    "status": "Status",
+    "server": "Server",
+    "runtime": "Runtime",
+    "runtimeUnknown": "Detected on first deploy",
+    "latestDeploy": "Latest deploy",
+    "neverDeployed": "Not deployed yet",
+    "domains": {
+      "empty": "No domains yet.",
+      "noAppsDomain": "Cloudy has no shared apps domain yet, so an app is reached through its own domains.",
+      "hostname": "Hostname",
+      "tlsLabel": "TLS",
+      "tls": {
+        "auto": "Automatic",
+        "internal": "Internal CA",
+        "off": "Off"
+      },
+      "tlsHint": {
+        "auto": "a public certificate, issued once the domain is verified.",
+        "internal": "a certificate from Caddy's local CA (browsers will not trust it).",
+        "off": "plain HTTP."
+      },
+      "verified": "Verified",
+      "unverified": "Not verified",
+      "verifiedAt": "Verified",
+      "verify": "Verify",
+      "txtHint": "Add this TXT record at your DNS provider, point the hostname at the server, then verify.",
+      "txtName": "TXT name",
+      "txtValue": "TXT value",
+      "addTitle": "Add a domain",
+      "add": "Add domain",
+      "remove": "Remove",
+      "removeTitle": "Remove this domain?",
+      "removeHint": "{host} stops routing to this app."
+    },
+    "repo": "Repository URL",
+    "branch": "Branch",
+    "commit": "Commit",
+    "port": "Port",
+    "healthPath": "Health check path",
+    "healthTimeout": "Health check timeout (s)",
+    "liveRelease": "Live release",
+    "noLive": "Nothing live yet",
+    "processes": "Processes",
+    "viewerHint": "Your role can view this app but not deploy or change it.",
+    "statuses": {
+      "new": "New",
+      "deploying": "Deploying",
+      "running": "Running",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    },
+    "tabs": {
+      "deployments": "Deployments",
+      "logs": "Runtime logs",
+      "env": "Environment",
+      "domains": "Domains",
+      "releases": "Releases",
+      "settings": "Settings"
+    },
+    "actions": {
+      "deploy": "Deploy",
+      "rollback": "Roll back",
+      "rollbackTo": "Roll back to v{version}",
+      "rollbackTitle": "Roll back to v{version}?",
+      "rollbackHint": "{name} switches to release v{version}. Its image is kept on the server, so nothing is rebuilt.",
+      "noPrevious": "Rollback needs an earlier release on the server; there is none yet.",
+      "restart": "Restart",
+      "noLive": "Restart needs a live release."
+    },
+    "deploy": {
+      "empty": "No deployments yet. Deploy to start one.",
+      "select": "Select a deployment to see its log.",
+      "logWaiting": "Waiting for the server to start…",
+      "logEmpty": "This deployment wrote no log.",
+      "following": "The newest deployment is followed live.",
+      "cancel": "Cancel",
+      "cancelRequested": "Cancelling…",
+      "statuses": {
+        "queued": "Queued",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "kinds": {
+        "deploy": "Deploy",
+        "rollback": "Rollback",
+        "restart": "Restart"
+      },
+      "triggers": {
+        "manual": "Manual",
+        "hook": "Deploy hook",
+        "mcp": "MCP",
+        "github": "GitHub"
+      },
+      "steps": {
+        "provision": "Preparing the server",
+        "build": "Building",
+        "release": "Release command",
+        "start": "Starting",
+        "switch": "Switching traffic",
+        "drain": "Draining the old release",
+        "rollback": "Rolling back",
+        "restart": "Restarting"
+      }
+    },
+    "new": {
+      "title": "New app",
+      "description": "Cloudy clones the repository on your server, builds it with its Dockerfile or Railpack, and serves it behind Caddy.",
+      "nameHint": "Lowercase letters, digits and dashes. Unique in this team.",
+      "repoHint": "A public https or git URL.",
+      "chooseServer": "Choose a server",
+      "noServersTitle": "No enrolled server",
+      "noServersHint": "Apps run on a server with the Cloudy agent. Add one first.",
+      "detectTitle": "Runtime",
+      "detectHint": "Optional: check how the repository would build before creating the app.",
+      "detect": "Detect runtime",
+      "detectFailed": "Detection failed.",
+      "startCommand": "Start command",
+      "tomlFound": "Found — its settings win",
+      "tomlMissing": "Not present",
+      "advanced": "Port and health check",
+      "advancedHint": "Leave empty for the defaults (port 8080). A cloudy.toml in the repository overrides these.",
+      "create": "Create and deploy",
+      "createdTitle": "{name} was created",
+      "createdDeploying": "The first deploy is queued. Follow it on the app page.",
+      "createdHint": "Deploy it from the app page.",
+      "open": "Open app",
+      "howTitle": "How it works",
+      "how1": "The server's agent clones the repository at the branch you choose.",
+      "how2": "It builds an image with the Dockerfile, or with Railpack when there is none.",
+      "how3": "The new release starts next to the old one and must pass its health check.",
+      "how4": "Caddy switches traffic to it; the previous image is kept for a one-click rollback."
+    },
+    "hook": {
+      "title": "Deploy hook",
+      "hint": "A POST to this URL deploys the app's branch — use it from CI.",
+      "once": "Copy it now. It is shown only once; Cloudy keeps only its hash.",
+      "rotate": "Rotate deploy hook",
+      "rotateHint": "The current URL stops working immediately."
+    },
+    "logs": {
+      "hint": "Relays the app's container logs from the server: the last lines, then follows for a while.",
+      "notLive": "No release is live, so there may be no container to read.",
+      "process": "Process",
+      "tail": "Lines",
+      "follow": "Follow (s)",
+      "fetch": "Fetch logs",
+      "empty": "Fetch logs to see them here.",
+      "readOnly": "Your role cannot read runtime logs."
+    },
+    "env": {
+      "applies": "Changes apply on the next deploy or restart.",
+      "empty": "No variables yet.",
+      "name": "Name",
+      "value": "Value",
+      "updated": "Updated",
+      "reveal": "Reveal",
+      "revealHint": "Revealing a value is recorded in the audit log.",
+      "edit": "Replace",
+      "remove": "Remove",
+      "removeTitle": "Remove {name}?",
+      "removeHint": "The variable is removed on the next deploy or restart.",
+      "setTitle": "Add or replace a variable",
+      "nameHint": "Letters, digits and underscores; not starting with a digit.",
+      "overwrite": "This replaces the current value."
+    },
+    "releases": {
+      "hint": "Each successful deploy is a release. Standby releases are kept on the server for instant rollback.",
+      "empty": "No releases yet.",
+      "version": "Version",
+      "image": "Image",
+      "activated": "Activated",
+      "rollbackTo": "Roll back to this",
+      "rollbackHint": "Traffic switches to v{version} after its health check passes.",
+      "prunedHint": "Image removed",
+      "statuses": {
+        "live": "Live",
+        "standby": "Standby",
+        "pruned": "Pruned"
+      }
+    },
+    "settings": {
+      "title": "Build and health",
+      "pause": "Pause automatic deploys",
+      "pauseHint": "Deploy hook and GitHub pushes are ignored while paused; manual deploys still work.",
+      "saved": "Saved.",
+      "github": "GitHub",
+      "githubConfigured": "The GitHub App is configured.",
+      "githubInstall": "Install it on a repository",
+      "githubMissing": "GitHub App not configured",
+      "githubMissingHint": "Push-to-deploy through GitHub is not available on this Cloudy yet. Use the deploy hook from CI.",
+      "deleteTitle": "Delete this app",
+      "deleteHint": "Removes its route, containers and images from the server, and its history from Cloudy.",
+      "delete": "Delete app",
+      "deleteConfirm": "Type {name} to confirm."
     }
   },
   "credentials": {
@@ -458,5 +667,10 @@
     "title": "Platform admin",
     "description": "Platform-wide MCP tokens. They act across every team — keep them few and short-lived.",
     "forbidden": "This area is for Cloudy platform administrators."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "titleUnread": "Notifications ({count} unread)",
+    "empty": "Nothing new."
   }
 }
