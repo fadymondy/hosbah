@@ -437,7 +437,7 @@ export function PageBody({
           <h1 className="grid-title">{title}</h1>
           {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
         </div>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
       <div className="flex flex-col gap-6 px-6 py-6">{children}</div>
     </div>

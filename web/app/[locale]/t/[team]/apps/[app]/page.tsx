@@ -228,7 +228,7 @@ export default function AppPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
         <div className="overflow-x-auto">
-          <TabsList variant="line">
+          <TabsList variant="line" className="max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="deployments">{t("apps.tabs.deployments")}</TabsTrigger>
             <TabsTrigger value="logs">{t("apps.tabs.logs")}</TabsTrigger>
             <TabsTrigger value="env">{t("apps.tabs.env")}</TabsTrigger>

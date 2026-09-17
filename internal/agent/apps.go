@@ -623,7 +623,7 @@ func drain(oc *OpContext, p agentproto.DrainParams) ([]string, int, error) {
 			continue
 		}
 		oc.Info("draining %s (SIGTERM, %ds grace)", n, grace)
-		_, _ = oc.Run("docker", "stop", "--time", strconv.Itoa(grace), n)
+		_, _ = oc.Run("docker", "stop", "-t", strconv.Itoa(grace), n)
 		if _, err := oc.Run("docker", "rm", "-f", n); err == nil {
 			stopped = append(stopped, n)
 		}
@@ -712,7 +712,7 @@ func appRollback(oc *OpContext) (any, int, error) {
 			}
 		}
 		if !kept {
-			_, _ = oc.Run("docker", "stop", "--time", strconv.Itoa(max(p.GraceSeconds, 1)), n)
+			_, _ = oc.Run("docker", "stop", "-t", strconv.Itoa(max(p.GraceSeconds, 1)), n)
 			_, _ = oc.Run("docker", "rm", "-f", n)
 		}
 	}

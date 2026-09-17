@@ -8,7 +8,7 @@ P0 is the multi-tenant foundation: teams, members, invitations, default-deny aut
 row-level security, envelope encryption, audit, sign-in with TOTP 2FA, the user and admin MCP
 servers, and Cloudy's own issue tracker fed by "Report a problem".
 
-P1 adds servers: the `cloudy-agent`, bring-your-own install with a one-liner, signed typed
+P2 adds one-click app deploys (below). P1 added servers: the `cloudy-agent`, bring-your-own install with a one-liner, signed typed
 operations with live logs, and the Proxmox driver (tested against a fake PVE API only). No deploys
 yet (P2).
 
@@ -71,6 +71,53 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
   go test -count=1 -run TestLive -v ./internal/providers/proxmox/   # read-only
 # add CLOUDY_PROXMOX_LIVE_CREATE=1 (+ PVE_LXC_TEMPLATE / PVE_TEMPLATE_VMID) to create and delete a guest
 ```
+
+## Apps and deploys (P2)
+
+- **An app** is a public git URL, a branch and one of the team's servers. It builds with the
+  repository's `Dockerfile` when there is one, otherwise with **Railpack** (MIT; version pinned in
+  `internal/deploy/toolchain.go`) through its BuildKit frontend image. Images are
+  `cloudy/<app>:<deployment_id>`; the newest 5 are kept, so a rollback needs no rebuild.
+- **`cloudy.toml`** (optional, repository root) sets `port`, `release`, `[healthcheck]` and
+  `[processes]`, and wins over the app's settings in Cloudy. Examples: `deploy/samples/*`.
+- **Zero-downtime pipeline**: provision → build → release (a one-off container) → start `web` on an
+  ephemeral `127.0.0.1` port → **health gate** (2xx within N seconds) → start workers → switch the
+  Caddy upstream → drain the old containers. Any failure before the switch leaves the previous
+  release serving, a failed switch puts the route back, and either files an in-app notification.
+  Workers start *before* the switch — a deliberate change from the plan, so a failing worker cannot
+  leave an app half-switched.
+- **Rollback and restart** skip the build entirely: one `app.rollback` operation starts a kept image,
+  gates it, switches the route and drains the rest (about a second on the dev target).
+- **Routing** is Caddy on the server through its admin API on `localhost:2019`. The agent owns the
+  whole configuration (`/var/lib/cloudy/routes.json`, rendered and POSTed to `/load`, which is
+  graceful and atomic): `tls = off` hosts on :80, `internal` (Caddy's own CA) and `auto` on :443.
+  `auto` uses on-demand TLS whose `ask` endpoint is the control plane's `/internal/tls/allow`, and
+  that answers yes only for a **verified** domain (TXT `_cloudy-verify.<host>`).
+- **Env values** are sealed with the team DEK, and re-sealed for a deploy to the target agent's own
+  key (ed25519 → X25519, bound to app, deployment and process), so `operations.params` never holds a
+  plaintext secret. They reach `docker run` as `-e NAME`, with the value in the CLI's environment.
+- **Logs**: an agent's events for a deployment are sealed into `deployment_logs` and streamed to the
+  browser over team-scoped SSE. Runtime logs are relayed on demand (`docker logs --follow`, bounded
+  in lines and time).
+- **Deploy hook**: `POST /hooks/deploy/<token>` — only the token's SHA-256 is stored, and it is shown
+  once (rotate it in Settings). A push payload for another branch is acknowledged and skipped; an app
+  with auto-deploy paused answers 409.
+- **GitHub App**: written behind an interface but **not configured**. Set `CLOUDY_GITHUB_APP_ID`,
+  `CLOUDY_GITHUB_APP_SLUG`, `CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE` and `CLOUDY_GITHUB_WEBHOOK_SECRET`
+  to enable it; until then `/hooks/github` answers 503 and the UI says "GitHub App not configured".
+- **Tenant apps domain**: still an owner decision, so apps are reached through their own domains only.
+
+The team MCP adds `list_apps`, `get_app`, `list_deployments`, `get_deployment`, `deploy_logs`,
+`list_env`, `list_domains` (read), `deploy_app` (with `wait`), `cancel_deployment`, `rollback_app`,
+`restart_app`, `pause_autodeploy` (deploy), `create_app`, `set_env`, `unset_env`, `add_domain`,
+`verify_domain` (write), `reveal_env` (secrets:read, audited) and `delete_app` (destructive).
+
+### Try a deploy locally
+
+`deploy/samples/{go,node,python,php}` are four tiny apps (Go with a Dockerfile; the rest detected by
+Railpack; Node also has a release command and a worker). Serve them over http from bare clones, or
+point an app at any public repository, then: **Apps → New app** → repository URL, branch, server →
+*Detect runtime* → *Create and deploy*.
 
 ## Ports (local)
 
