@@ -225,6 +225,16 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)
 	}
+	// P3 data-service MCP tools: a service ref team B may not see is not found; nothing acts.
+	for name, args := range map[string]map[string]any{
+		"get_database": {"database": "svc-x"}, "list_backups": {"database": "svc-x"}, "backup_now": {"database": "svc-x"},
+		"reveal_db_url": {"database": "svc-x"}, "restore_backup": {"database": "svc-x", "confirm": "svc-x"},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError {
+			t.Errorf("MCP %s as team B on an unknown data service should error: %+v", name, res)
+		}
+	}
 	// A deploy-hook token is not a session: hooks of unknown tokens are 404, the TLS ask says no.
 	if code := httpStatus(t, "POST", ts.URL+"/hooks/deploy/cdh_nope", ""); code != 404 {
 		t.Errorf("unknown deploy hook -> %d", code)
