@@ -16,8 +16,8 @@ DELETE FROM operations WHERE id = $1;
 -- Cloudy: the queue. Team-scoped reads name team_id; agent-scoped ones name server_id.
 -- name: InsertOperation :one
 -- Idempotent by op_id: a repeated enqueue with the same id inserts nothing (the caller then reads it).
-INSERT INTO operations (id, team_id, server_id, kind, executor, params, params_hash, status, created_by, timeout_seconds, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10)
+INSERT INTO operations (id, team_id, server_id, kind, executor, params, params_hash, status, created_by, timeout_seconds, expires_at, deployment_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, sqlc.narg('deployment_id'))
 ON CONFLICT (id) DO NOTHING
 RETURNING *;
 

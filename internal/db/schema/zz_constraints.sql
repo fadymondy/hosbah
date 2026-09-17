@@ -17,3 +17,21 @@ ALTER TABLE agent_enrollments ADD CONSTRAINT agent_enrollments_server_fk FOREIGN
 ALTER TABLE operations ADD CONSTRAINT operations_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 ALTER TABLE operation_logs ADD CONSTRAINT operation_logs_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 ALTER TABLE operation_logs ADD CONSTRAINT operation_logs_operation_fk FOREIGN KEY (operation_id) REFERENCES operations (id) ON DELETE CASCADE;
+
+-- P2: apps and deploys. Same composite (x_id, team_id) pattern: nothing an app owns can name a
+-- team other than the app's. A server that still has apps cannot be deleted (RESTRICT) — the API
+-- says so instead of letting a cascade take the apps with it.
+ALTER TABLE apps ADD CONSTRAINT apps_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
+ALTER TABLE apps ADD CONSTRAINT apps_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE RESTRICT;
+ALTER TABLE process_types ADD CONSTRAINT process_types_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE env_vars ADD CONSTRAINT env_vars_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE domains ADD CONSTRAINT domains_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE deployments ADD CONSTRAINT deployments_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE deployments ADD CONSTRAINT deployments_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+ALTER TABLE deployment_logs ADD CONSTRAINT deployment_logs_deployment_fk FOREIGN KEY (deployment_id, team_id) REFERENCES deployments (id, team_id) ON DELETE CASCADE;
+ALTER TABLE deployment_logs ADD CONSTRAINT deployment_logs_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+ALTER TABLE releases ADD CONSTRAINT releases_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE releases ADD CONSTRAINT releases_deployment_fk FOREIGN KEY (deployment_id, team_id) REFERENCES deployments (id, team_id) ON DELETE CASCADE;
+ALTER TABLE notifications ADD CONSTRAINT notifications_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
+ALTER TABLE operations ADD CONSTRAINT operations_deployment_fk FOREIGN KEY (deployment_id) REFERENCES deployments (id) ON DELETE SET NULL;
+CREATE INDEX operations_deployment_idx ON operations (deployment_id) WHERE deployment_id IS NOT NULL;

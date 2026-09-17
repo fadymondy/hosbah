@@ -14,6 +14,7 @@ sql:
         rename:
           page_url: PageURL
           external_url: ExternalURL
+          repo_url: RepoURL
         # togo 0.2.31 writes emit_pointers_for_null_types, which sqlc honours only with
         # sql_package pgx/v5. With the postgresql engine on database/sql, nullable
         # columns came out as sql.NullString/NullTime and the generated resources/*.go

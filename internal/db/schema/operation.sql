@@ -19,6 +19,7 @@ CREATE TABLE operations (
     sent_at timestamptz,
     started_at timestamptz,
     finished_at timestamptz,
+    deployment_id text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );

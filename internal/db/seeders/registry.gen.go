@@ -15,7 +15,22 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAgentEnrollment(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedApp(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedCredential(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDeployment(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDeploymentLog(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedDomain(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedEnvVar(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedInvitation(ctx, a); err != nil {
@@ -24,10 +39,19 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedMcpToken(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedNotification(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedOperation(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedOperationLog(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedProcessType(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedRelease(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedReport(ctx, a); err != nil {
