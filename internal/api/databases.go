@@ -1,0 +1,447 @@
+package api
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"net/http"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/togo-framework/auth"
+
+	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/cloudy/internal/dbsvc"
+	"github.com/fadymondy/cloudy/internal/tenancy"
+)
+
+// ---- contract ------------------------------------------------------------------------------------
+
+// DataServiceOut is a managed data service. Never the sealed root credential.
+type DataServiceOut struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	Kind      string     `json:"kind" enum:"postgres,mysql,redis"`
+	Version   string     `json:"version"`
+	Status    string     `json:"status" enum:"new,provisioning,running,failed,stopped"`
+	ServerID  string     `json:"server_id"`
+	Host      *string    `json:"host"`
+	Port      *int64     `json:"port"`
+	Error     *string    `json:"error"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// DatabaseOut / DatabaseUserOut / BackupOut / ScheduleOut are the detail page's rows.
+type DatabaseOut struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Error  *string `json:"error"`
+}
+type DatabaseUserOut struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Grants string  `json:"grants" enum:"all,readwrite,readonly"`
+	Status string  `json:"status"`
+	Error  *string `json:"error"`
+}
+type BackupOut struct {
+	ID              string     `json:"id"`
+	Kind            string     `json:"kind" enum:"manual,scheduled"`
+	Status          string     `json:"status" enum:"pending,running,succeeded,failed"`
+	Target          string     `json:"target" enum:"local,minio,s3"`
+	SizeBytes       *int64     `json:"size_bytes"`
+	SnapshotID      *string    `json:"snapshot_id"`
+	RestoreStatus   *string    `json:"restore_status"`
+	RestoreError    *string    `json:"restore_error"`
+	Error           *string    `json:"error"`
+	TakenAt         *time.Time `json:"taken_at"`
+	RestoreTestedAt *time.Time `json:"restore_tested_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+type ScheduleOut struct {
+	Cron        string     `json:"cron"`
+	Retention   int64      `json:"retention"`
+	Target      string     `json:"target" enum:"local,minio,s3"`
+	RestoreTest bool       `json:"restore_test"`
+	Paused      bool       `json:"paused"`
+	NextRunAt   *time.Time `json:"next_run_at"`
+	LastRunAt   *time.Time `json:"last_run_at"`
+}
+
+// DataServiceDetailOut is the service page.
+type DataServiceDetailOut struct {
+	Service         DataServiceOut    `json:"service"`
+	Databases       []DatabaseOut     `json:"databases"`
+	Users           []DatabaseUserOut `json:"users"`
+	Backups         []BackupOut       `json:"backups"`
+	Schedule        *ScheduleOut      `json:"schedule"`
+	RemoteAvailable bool              `json:"remote_available" doc:"Whether an S3/MinIO backup target is configured; when false the UI offers only the local target."`
+}
+
+func toDataServiceOut(s db.DataService) DataServiceOut {
+	return DataServiceOut{ID: s.ID, Name: s.Name, Kind: s.Kind, Version: s.Version, Status: s.Status,
+		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt}
+}
+func toBackupOut(b db.Backup) BackupOut {
+	return BackupOut{ID: b.ID, Kind: b.Kind, Status: b.Status, Target: b.Target, SizeBytes: b.SizeBytes,
+		SnapshotID: b.SnapshotID, RestoreStatus: b.RestoreStatus, RestoreError: b.RestoreError, Error: b.Error,
+		TakenAt: b.TakenAt, RestoreTestedAt: b.RestoreTestedAt, CreatedAt: b.CreatedAt}
+}
+
+// ServicePath and BackupPath address a service (and a backup) under a team.
+type ServicePath struct {
+	TeamPath
+	Service string `path:"service" maxLength:"64"`
+}
+type BackupPath struct {
+	ServicePath
+	Backup string `path:"backup" maxLength:"64"`
+}
+
+// ---- plumbing ------------------------------------------------------------------------------------
+
+func (d *deps) dbs() *dbsvc.Service {
+	if d.a == nil {
+		return nil
+	}
+	s, _ := d.a.DBSvc.(*dbsvc.Service)
+	return s
+}
+
+// dbErr maps a dbsvc.Error to its HTTP status.
+func dbErr(err error, fallback string) error {
+	if err == nil {
+		return nil
+	}
+	var de *dbsvc.Error
+	if errors.As(err, &de) {
+		switch de.Status {
+		case http.StatusNotFound:
+			return huma.Error404NotFound(de.Message)
+		case http.StatusConflict:
+			return huma.Error409Conflict(de.Message)
+		case http.StatusUnprocessableEntity:
+			return huma.Error422UnprocessableEntity(de.Message)
+		}
+	}
+	var se huma.StatusError
+	if errors.As(err, &se) {
+		return err
+	}
+	return huma.Error500InternalServerError(fallback)
+}
+
+func serviceIn(ctx context.Context, q *db.Queries, m *tenancy.Membership, ref string) (db.DataService, error) {
+	svc, err := dbsvc.ServiceByRef(ctx, q, m.TeamID, ref)
+	if err != nil {
+		return db.DataService{}, errNotFound
+	}
+	return svc, nil
+}
+
+// ---- routes --------------------------------------------------------------------------------------
+
+func (d *deps) registerDatabases(api huma.API) {
+	tags := []string{"Databases"}
+
+	type dsListOut struct {
+		Body struct {
+			Services []DataServiceOut `json:"services"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-data-services", Method: http.MethodGet, Path: "/api/teams/{team}/data-services",
+		Summary: "The team's managed data services", Tags: tags,
+	}, func(ctx context.Context, in *TeamPath) (*dsListOut, error) {
+		out := &dsListOut{}
+		out.Body.Services = []DataServiceOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			rows, err := q.ListDataServicesOfTeam(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list data services")
+			}
+			for _, r := range rows {
+				out.Body.Services = append(out.Body.Services, toDataServiceOut(r))
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	type dsCreateOut struct{ Body DataServiceOut }
+	huma.Register(api, huma.Operation{OperationID: "create-data-service", Method: http.MethodPost, Path: "/api/teams/{team}/data-services",
+		DefaultStatus: http.StatusCreated, Tags: tags,
+		Summary: "Provision a Postgres, MySQL or Redis service on one of the team's servers (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		TeamPath
+		Body struct {
+			Name    string `json:"name" minLength:"1" maxLength:"40" doc:"Lowercase letters, digits and dashes; unique in the team."`
+			Server  string `json:"server" minLength:"1" maxLength:"64" doc:"Server id or name."`
+			Kind    string `json:"kind" enum:"postgres,mysql,redis"`
+			Version string `json:"version,omitempty" maxLength:"32" doc:"Image tag; defaults to a current version."`
+		}
+	}) (*dsCreateOut, error) {
+		out := &dsCreateOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := d.dbs().CreateService(ctx, q, m.TeamID, webActor(id), dbsvc.CreateInput{Name: in.Body.Name, Server: in.Body.Server, Kind: in.Body.Kind, Version: in.Body.Version})
+			if err != nil {
+				return dbErr(err, "could not create the data service")
+			}
+			out.Body = toDataServiceOut(svc)
+			return nil
+		})
+		return out, err
+	})
+
+	type dsDetailOut struct{ Body DataServiceDetailOut }
+	huma.Register(api, huma.Operation{OperationID: "get-data-service", Method: http.MethodGet, Path: "/api/teams/{team}/data-services/{service}",
+		Summary: "One data service: its databases, users, backups and schedule", Tags: tags,
+	}, func(ctx context.Context, in *ServicePath) (*dsDetailOut, error) {
+		out := &dsDetailOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			out.Body = d.dataServiceDetail(ctx, q, m, svc)
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "delete-data-service", Method: http.MethodDelete, Path: "/api/teams/{team}/data-services/{service}",
+		DefaultStatus: http.StatusNoContent, Tags: tags,
+		Summary: "Delete a data service, removing its container and volume from the server (owner or admin)",
+	}, func(ctx context.Context, in *ServicePath) (*struct{}, error) {
+		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			return dbErr(d.dbs().DeleteService(ctx, q, m.TeamID, webActor(id), svc), "could not delete the data service")
+		})
+	})
+
+	type dsDbCreatedOut struct {
+		Body struct {
+			Database DatabaseOut     `json:"database"`
+			User     DatabaseUserOut `json:"user"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "create-database", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/databases",
+		DefaultStatus: http.StatusCreated, Tags: tags,
+		Summary: "Create a database and a user with grants on a Postgres/MySQL service (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			Name   string `json:"name" minLength:"1" maxLength:"63" doc:"Lower snake_case."`
+			User   string `json:"user,omitempty" maxLength:"63" doc:"Defaults to the database name."`
+			Grants string `json:"grants,omitempty" enum:"all,readwrite,readonly"`
+		}
+	}) (*dsDbCreatedOut, error) {
+		out := &dsDbCreatedOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			dbRow, userRow, err := d.dbs().CreateDatabaseAndUser(ctx, q, m.TeamID, webActor(id), svc, in.Body.Name, in.Body.User, in.Body.Grants)
+			if err != nil {
+				return dbErr(err, "could not create the database")
+			}
+			out.Body.Database = DatabaseOut{ID: dbRow.ID, Name: dbRow.Name, Status: dbRow.Status, Error: dbRow.Error}
+			out.Body.User = DatabaseUserOut{ID: userRow.ID, Name: userRow.Name, Grants: userRow.Grants, Status: userRow.Status, Error: userRow.Error}
+			return nil
+		})
+		return out, err
+	})
+
+	type dsAttachOut struct {
+		Body struct {
+			Variable string `json:"variable" doc:"The env var injected (DATABASE_URL or REDIS_URL). Its value is sealed and applies on the next deploy or restart."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "attach-data-service", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/attach",
+		Tags: tags, Summary: "Attach a data service to an app, injecting a sealed DATABASE_URL/REDIS_URL (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			App  string `json:"app" minLength:"1" maxLength:"64" doc:"App id or name."`
+			User string `json:"user,omitempty" maxLength:"64" doc:"Database user id or name (Postgres/MySQL); the first user by default."`
+		}
+	}) (*dsAttachOut, error) {
+		out := &dsAttachOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			a, err := appIn(ctx, q, m, in.Body.App)
+			if err != nil {
+				return err
+			}
+			name, err := d.dbs().Attach(ctx, q, m.TeamID, webActor(id), svc, a, in.Body.User)
+			if err != nil {
+				return dbErr(err, "could not attach the data service")
+			}
+			out.Body.Variable = name
+			return nil
+		})
+		return out, err
+	})
+
+	type dsRevealOut struct {
+		Body struct {
+			URL string `json:"url"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "reveal-data-service-url", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/reveal-url",
+		Tags: tags, Summary: "Reveal a data service's connection string (audited; owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			User string `json:"user,omitempty" maxLength:"64"`
+		}
+	}) (*dsRevealOut, error) {
+		out := &dsRevealOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			url, err := d.dbs().RevealURL(ctx, q, m.TeamID, webActor(id), svc, in.Body.User)
+			if err != nil {
+				return dbErr(err, "could not reveal the connection string")
+			}
+			out.Body.URL = url
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- backups ----
+	type dsBackupsOut struct {
+		Body struct {
+			Backups []BackupOut `json:"backups"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-backups", Method: http.MethodGet, Path: "/api/teams/{team}/data-services/{service}/backups",
+		Summary: "A data service's backups, newest first", Tags: tags,
+	}, func(ctx context.Context, in *ServicePath) (*dsBackupsOut, error) {
+		out := &dsBackupsOut{}
+		out.Body.Backups = []BackupOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			rows, err := q.ListBackupsOfService(ctx, db.ListBackupsOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID, Limit: 100})
+			if err != nil {
+				return huma.Error500InternalServerError("could not list backups")
+			}
+			for _, r := range rows {
+				out.Body.Backups = append(out.Body.Backups, toBackupOut(r))
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	type dsBackupOut struct{ Body BackupOut }
+	huma.Register(api, huma.Operation{OperationID: "backup-now", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/backups",
+		DefaultStatus: http.StatusCreated, Tags: tags, Summary: "Back up a data service now (owner or admin)",
+	}, func(ctx context.Context, in *struct{ ServicePath }) (*dsBackupOut, error) {
+		out := &dsBackupOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			b, err := d.dbs().Backup(ctx, q, m.TeamID, webActor(id), svc, "manual")
+			if err != nil {
+				return dbErr(err, "could not start the backup")
+			}
+			out.Body = toBackupOut(b)
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "restore-test-backup", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/backups/{backup}/restore-test",
+		Tags: tags, Summary: "Restore a backup into a throwaway container and verify it (owner or admin)",
+	}, func(ctx context.Context, in *BackupPath) (*struct{}, error) {
+		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			b, err := q.BackupInTeam(ctx, db.BackupInTeamParams{ID: in.Backup, TeamID: m.TeamID})
+			if err != nil || b.DataServiceID != svc.ID {
+				return errNotFound
+			}
+			return dbErr(d.dbs().RestoreTest(ctx, q, m.TeamID, webActor(id), svc, b), "could not start the restore-test")
+		})
+	})
+
+	type dsScheduleOut struct{ Body ScheduleOut }
+	huma.Register(api, huma.Operation{OperationID: "set-backup-schedule", Method: http.MethodPut, Path: "/api/teams/{team}/data-services/{service}/schedule",
+		Tags: tags, Summary: "Create or update a data service's backup schedule (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			Cron        string `json:"cron" minLength:"1" maxLength:"100" doc:"Five-field cron, e.g. 0 3 * * *."`
+			Retention   int    `json:"retention,omitempty" minimum:"1" maximum:"3650"`
+			Target      string `json:"target,omitempty" enum:"local,minio,s3"`
+			RestoreTest bool   `json:"restore_test,omitempty"`
+			Paused      bool   `json:"paused,omitempty"`
+		}
+	}) (*dsScheduleOut, error) {
+		out := &dsScheduleOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			row, err := d.dbs().SetSchedule(ctx, q, m.TeamID, webActor(id), svc, dbsvc.ScheduleInput{
+				Cron: in.Body.Cron, Retention: in.Body.Retention, Target: in.Body.Target, RestoreTest: in.Body.RestoreTest, Paused: in.Body.Paused})
+			if err != nil {
+				return dbErr(err, "could not set the schedule")
+			}
+			out.Body = toScheduleOut(row)
+			return nil
+		})
+		return out, err
+	})
+}
+
+func toScheduleOut(s db.BackupSchedule) ScheduleOut {
+	return ScheduleOut{Cron: s.Cron, Retention: s.Retention, Target: s.Target, RestoreTest: s.RestoreTest,
+		Paused: s.Paused, NextRunAt: s.NextRunAt, LastRunAt: s.LastRunAt}
+}
+
+func (d *deps) dataServiceDetail(ctx context.Context, q *db.Queries, m *tenancy.Membership, svc db.DataService) DataServiceDetailOut {
+	out := DataServiceDetailOut{Service: toDataServiceOut(svc), Databases: []DatabaseOut{}, Users: []DatabaseUserOut{}, Backups: []BackupOut{}}
+	if dbrows, err := q.ListDatabasesOfService(ctx, db.ListDatabasesOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID}); err == nil {
+		for _, r := range dbrows {
+			out.Databases = append(out.Databases, DatabaseOut{ID: r.ID, Name: r.Name, Status: r.Status, Error: r.Error})
+		}
+	}
+	if urows, err := q.ListDatabaseUsersOfService(ctx, db.ListDatabaseUsersOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID}); err == nil {
+		for _, r := range urows {
+			out.Users = append(out.Users, DatabaseUserOut{ID: r.ID, Name: r.Name, Grants: r.Grants, Status: r.Status, Error: r.Error})
+		}
+	}
+	if brows, err := q.ListBackupsOfService(ctx, db.ListBackupsOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID, Limit: 50}); err == nil {
+		for _, r := range brows {
+			out.Backups = append(out.Backups, toBackupOut(r))
+		}
+	}
+	if sch, err := q.BackupScheduleOfService(ctx, db.BackupScheduleOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID}); err == nil {
+		so := toScheduleOut(sch)
+		out.Schedule = &so
+	}
+	if s := d.dbs(); s != nil {
+		out.RemoteAvailable = s.RemoteConfigured("s3") || s.RemoteConfigured("minio")
+	}
+	return out
+}

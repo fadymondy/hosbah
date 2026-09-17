@@ -131,6 +131,8 @@ func TestIsolationSweep(t *testing.T) {
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
+		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x"} }, // a service B may not see
+		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		"id": func(path string) []string {
 			switch {
 			case strings.Contains(path, "/invitations/"):
