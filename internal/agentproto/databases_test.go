@@ -1,0 +1,91 @@
+package agentproto
+
+import "testing"
+
+const testSvcID = "00000000-0000-4000-8000-0000000000d1"
+const testBkID = "00000000-0000-4000-8000-0000000000b1"
+
+func TestDBImageAndPort(t *testing.T) {
+	if DBImage("postgres", "16") != "postgres:16" || DBInternalPort("postgres") != 5432 {
+		t.Fatal("postgres image/port")
+	}
+	if DBImage("redis", "7.2-alpine") != "redis:7.2-alpine" || DBInternalPort("redis") != 6379 {
+		t.Fatal("redis image/port")
+	}
+	if DBImage("nope", "1") != "" {
+		t.Fatal("unknown kind should have no image")
+	}
+}
+
+func TestValidDBName(t *testing.T) {
+	for _, ok := range []string{"app", "my_db", "_x", "a1_2"} {
+		if !ValidDBName(ok) {
+			t.Errorf("%q should be valid", ok)
+		}
+	}
+	for _, bad := range []string{"", "1db", "Up", "a-b", "drop table", "a;b"} {
+		if ValidDBName(bad) {
+			t.Errorf("%q should be invalid", bad)
+		}
+	}
+}
+
+func TestProvisionValidate(t *testing.T) {
+	base := DBProvisionParams{
+		ServiceID: testSvcID, Name: "pg1", Kind: "postgres", Version: "16",
+		Image: "postgres:16", Container: "cloudy-db-pg1", Volume: "cloudy-dbdata-pg1",
+		Bind: "10.0.0.5", Port: 5432, RootSecret: "cab1:abc",
+	}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid provision rejected: %v", err)
+	}
+	pub := base
+	pub.Bind = "0.0.0.0"
+	if pub.Validate() == nil {
+		t.Fatal("binding to 0.0.0.0 must be refused")
+	}
+	wrong := base
+	wrong.Image = "postgres:15"
+	if wrong.Validate() == nil {
+		t.Fatal("image must match kind:version")
+	}
+	noSecret := base
+	noSecret.RootSecret = ""
+	if noSecret.Validate() == nil {
+		t.Fatal("postgres needs a root secret")
+	}
+}
+
+func TestCreateValidateRefusesRedis(t *testing.T) {
+	p := DBCreateParams{ServiceID: testSvcID, Kind: "redis", Database: "app", User: "app", Grants: "all", RootSecret: "x", UserSecret: "y"}
+	if p.Validate() == nil {
+		t.Fatal("db.create must be refused for redis")
+	}
+}
+
+func TestRepoValidate(t *testing.T) {
+	if (RepoSpec{Target: "local", Repo: "/var/lib/cloudy/restic/x"}).Validate() != nil {
+		t.Fatal("valid local repo rejected")
+	}
+	if (RepoSpec{Target: "local", Repo: "/etc/passwd"}).Validate() == nil {
+		t.Fatal("local repo outside /var/lib/cloudy must be refused")
+	}
+	if (RepoSpec{Target: "s3", Repo: "http://x"}).Validate() == nil {
+		t.Fatal("s3 repo must start with s3:")
+	}
+}
+
+func TestRestoreValidateThrowaway(t *testing.T) {
+	p := DBRestoreParams{
+		ServiceID: testSvcID, Kind: "postgres", Version: "16", Image: "postgres:16",
+		BackupID: testBkID, SnapshotID: "deadbeef", Container: DBThrowawayName(testBkID),
+		Volume: "v", Repo: RepoSpec{Target: "local", Repo: "/var/lib/cloudy/restic/x"}, RootSecret: "x",
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("valid restore rejected: %v", err)
+	}
+	p.Container = "cloudy-db-live"
+	if p.Validate() == nil {
+		t.Fatal("restore must only write its throwaway container")
+	}
+}
