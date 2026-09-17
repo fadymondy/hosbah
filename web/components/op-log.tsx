@@ -37,7 +37,7 @@ export function OperationLog({ team, serverId, op }: { team: string; serverId: s
   })
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "nearest" })
+    scrollToEnd(bottom.current)
   }, [lines.length])
 
   if (!op) {
@@ -85,4 +85,10 @@ export function lineTone(l: LogLine): string {
   if (l.stream === "stderr" || l.stream === "error") return "text-destructive"
   if (l.stream === "info" || l.event === "progress") return "text-muted-foreground"
   return ""
+}
+
+/** Keeps a log pinned to its end by scrolling only its own viewport — never the page. */
+export function scrollToEnd(marker: HTMLElement | null) {
+  const viewport = marker?.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')
+  if (viewport) viewport.scrollTop = viewport.scrollHeight
 }

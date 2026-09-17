@@ -498,7 +498,8 @@
       "deleteHint": "Removes its route, containers and images from the server, and its history from Cloudy.",
       "delete": "Delete app",
       "deleteConfirm": "Type {name} to confirm."
-    }
+    },
+    "domainsLabel": "Domains"
   },
   "credentials": {
     "description": "Provider accounts Cloudy uses to create machines. Secrets are encrypted with the team key and never shown in lists.",

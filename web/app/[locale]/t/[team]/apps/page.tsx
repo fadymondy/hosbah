@@ -80,7 +80,7 @@ export default function AppsPage() {
                 <TableHead>{t("apps.server")}</TableHead>
                 <TableHead>{t("apps.runtime")}</TableHead>
                 <TableHead>{t("apps.latestDeploy")}</TableHead>
-                <TableHead>{t("apps.domains")}</TableHead>
+                <TableHead>{t("apps.domainsLabel")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

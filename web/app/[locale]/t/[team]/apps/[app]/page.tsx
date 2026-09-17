@@ -195,7 +195,7 @@ export default function AppPage() {
             {runtimeLabel(app.runtime) ?? t("apps.runtimeUnknown")}
           </span>
         </Stat>
-        <Stat label={t("apps.domains")}>
+        <Stat label={t("apps.domainsLabel")}>
           {detail.domains.length ? (
             detail.domains.map((d) => (
               <a

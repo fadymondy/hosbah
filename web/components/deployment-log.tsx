@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { LoaderIcon } from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
-import { clock, lineTone, render } from "@/components/op-log"
+import { clock, lineTone, render, scrollToEnd } from "@/components/op-log"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { isActive, type Deployment, type DeployLogLine } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -63,7 +63,7 @@ export function DeploymentLog({
   })
 
   useEffect(() => {
-    if (follow.current) bottom.current?.scrollIntoView({ block: "nearest" })
+    if (follow.current) scrollToEnd(bottom.current)
   }, [lines.length])
 
   const active = isActive(live)
