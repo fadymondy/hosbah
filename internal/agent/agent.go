@@ -159,8 +159,16 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 		defer cancel()
 		return wsjson.Write(wctx, conn, f)
 	}
+	// The first (immediate) beat skips the Docker probe so a reconnect is fast; later beats carry
+	// a fresh reading at a slower cadence, which the control plane merges into facts.docker.
+	nextDocker := time.Now().Add(a.HeartbeatEvery)
 	heartbeat := func() error {
 		m := a.sampler.Sample()
+		if now := time.Now(); !now.Before(nextDocker) {
+			d := DockerInfo(ctx)
+			m.Docker = &d
+			nextDocker = now.Add(2 * time.Minute)
+		}
 		return send(agentproto.Frame{Type: agentproto.TypeHeartbeat, Metrics: &m, AgentVersion: a.Version})
 	}
 	if err := heartbeat(); err != nil {

@@ -178,7 +178,16 @@ func (s *Service) heartbeat(ctx context.Context, ac *agentConn, f agentproto.Fra
 	}
 	b, _ := json.Marshal(f.Metrics)
 	err := s.agentTx(ctx, ac, func(q *db.Queries) error {
-		return q.ServerHeartbeat(ctx, db.ServerHeartbeatParams{Metrics: string(b), ID: ac.serverID})
+		if err := q.ServerHeartbeat(ctx, db.ServerHeartbeatParams{Metrics: string(b), ID: ac.serverID}); err != nil {
+			return err
+		}
+		// A heartbeat carries a fresh Docker reading only on its slower cadence; merge it into
+		// facts.docker so the server card stops showing enrolment's stale "not installed".
+		if f.Metrics.Docker != nil {
+			db2, _ := json.Marshal(f.Metrics.Docker)
+			return q.RefreshServerDocker(ctx, db.RefreshServerDockerParams{Docker: string(db2), ID: ac.serverID})
+		}
+		return nil
 	})
 	if err != nil {
 		s.log.Warn("heartbeat not stored", "server", ac.serverID, "err", err)

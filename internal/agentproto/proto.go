@@ -143,6 +143,10 @@ type Metrics struct {
 	UptimeSeconds  uint64    `json:"uptime_seconds"`
 	Load1          float64   `json:"load1"`
 	At             time.Time `json:"at"`
+	// Docker, when present, is a fresh reading of the engine that the control plane merges into
+	// the server's facts.docker so it does not go stale after enrolment. Sampled at a slower
+	// cadence than the rest of the heartbeat, so it is nil on most beats.
+	Docker *DockerFacts `json:"docker,omitempty"`
 }
 
 // ---- signing ---------------------------------------------------------------------------------

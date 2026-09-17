@@ -62,6 +62,12 @@ WHERE id = sqlc.arg('id')::text;
 -- name: ServerHeartbeat :exec
 UPDATE servers SET metrics = sqlc.arg('metrics')::jsonb, last_seen_at = now() WHERE id = sqlc.arg('id')::text;
 
+-- name: RefreshServerDocker :exec
+-- Merge a fresh Docker reading from a heartbeat into facts.docker so it does not stay stale at the
+-- value enrolment first saw (e.g. "not installed" long after the engine is up and serving deploys).
+UPDATE servers SET facts = jsonb_set(coalesce(facts, '{}'::jsonb), '{docker}', sqlc.arg('docker')::jsonb, true), updated_at = now()
+WHERE id = sqlc.arg('id')::text;
+
 -- name: SetServerStatus :exec
 UPDATE servers SET status = $2, error = $3, updated_at = now() WHERE id = $1;
 
