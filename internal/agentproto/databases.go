@@ -191,6 +191,12 @@ func (p DBCreateParams) Validate() error {
 	return nil
 }
 
+// DBCreateResult: the database and user created.
+type DBCreateResult struct {
+	Database string `json:"database"`
+	User     string `json:"user"`
+}
+
 // DBBackupParams: db.backup. Database "" means the whole cluster (pg_dumpall / all databases /
 // the Redis RDB). BackupID names the restic snapshot's file so a restore can find it.
 type DBBackupParams struct {
@@ -200,6 +206,7 @@ type DBBackupParams struct {
 	BackupID   string   `json:"backup_id"`
 	Database   string   `json:"database,omitempty"`
 	Repo       RepoSpec `json:"repo"`
+	Retention  int      `json:"retention,omitempty"` // keep the newest N snapshots of this service (0 = keep all)
 	RootSecret string   `json:"root_secret"`
 }
 

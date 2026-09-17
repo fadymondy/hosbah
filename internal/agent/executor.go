@@ -86,6 +86,11 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppRollback:   appRollback,
 		agentproto.KindAppLogs:       appLogs,
 		agentproto.KindAppRemove:     appRemove,
+		agentproto.KindDBProvision:   dbProvision,
+		agentproto.KindDBCreate:      dbCreate,
+		agentproto.KindDBBackup:      dbBackup,
+		agentproto.KindDBRestore:     dbRestore,
+		agentproto.KindDBRemove:      dbRemove,
 	}
 	return e
 }
@@ -210,6 +215,15 @@ func laneOf(op agentproto.SignedOp) string {
 			return "app:" + p.AppID
 		}
 		return "app:?"
+	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBBackup,
+		agentproto.KindDBRestore, agentproto.KindDBRemove:
+		var p struct {
+			ServiceID string `json:"service_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.ServiceID != "" {
+			return "db:" + p.ServiceID
+		}
+		return "db:?"
 	}
 	return "host"
 }

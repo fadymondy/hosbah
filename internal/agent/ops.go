@@ -115,6 +115,8 @@ func provisionStep(oc *OpContext) (any, int, error) {
 		return stepCaddy(oc, p)
 	case agentproto.StepRailpack:
 		return stepRailpack(oc, p)
+	case agentproto.StepRestic:
+		return stepRestic(oc)
 	}
 	return nil, 2, fmt.Errorf("unknown provisioning step %q", p.Step)
 }
