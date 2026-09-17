@@ -1,0 +1,9 @@
+port = 3000
+release = "echo release step for $npm_package_name; node -e 'console.log(\"migrations would run here\")'"
+
+[healthcheck]
+path = "/health"
+timeout = 60
+
+[processes]
+"worker:ticker" = "node worker.js"
