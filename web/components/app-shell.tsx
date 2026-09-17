@@ -8,6 +8,7 @@ import {
   BellIcon,
   BoxesIcon,
   ChevronsUpDownIcon,
+  DatabaseIcon,
   ConstructionIcon,
   KeyRoundIcon,
   LanguagesIcon,
@@ -206,6 +207,7 @@ function AppSidebar({ side }: { side: "left" | "right" }) {
     ? [
         { href: base, label: t("nav.overview"), icon: <LayoutDashboardIcon />, exact: true },
         { href: `${base}/apps`, label: t("nav.apps"), icon: <BoxesIcon /> },
+        { href: `${base}/databases`, label: t("nav.databases"), icon: <DatabaseIcon /> },
         { href: `${base}/servers`, label: t("nav.servers"), icon: <ServerIcon /> },
         { href: `${base}/members`, label: t("nav.members"), icon: <UsersIcon /> },
         { href: `${base}/invitations`, label: t("nav.invitations"), icon: <MailPlusIcon /> },
