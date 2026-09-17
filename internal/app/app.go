@@ -44,6 +44,8 @@ type App struct {
 	Stop func()
 	// Ops is the *ops.Service (typed any: package ops imports app).
 	Ops any
+	// Deploy is the *deploy.Service (typed any for the same reason).
+	Deploy any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

@@ -18,6 +18,7 @@ import (
 	"github.com/fadymondy/cloudy/internal/app"
 	"github.com/fadymondy/cloudy/internal/config"
 	"github.com/fadymondy/cloudy/internal/crypto"
+	"github.com/fadymondy/cloudy/internal/deploy"
 	"github.com/fadymondy/cloudy/internal/mcp"
 	"github.com/fadymondy/cloudy/internal/ops"
 	_ "github.com/fadymondy/cloudy/internal/plugins" // blank-imports installed plugins (togo install)
@@ -64,8 +65,13 @@ func Boot() *app.App {
 	svc.RegisterRunner(ops.KindProviderCreate, provisioning.Runner(a, svc))
 	svc.Mount(k.Router) // /install, /agent/* — outside /api, authenticated by token or signature
 	svc.Start()
-	a.Stop = svc.Stop
 	a.Ops = svc
+
+	deploys := deploy.New(a, svc)
+	deploys.MountPublic(k.Router) // /hooks/*, /internal/tls/allow — outside /api, token / HMAC / yes-no
+	deploys.Start()
+	a.Deploy = deploys
+	a.Stop = func() { deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)
@@ -77,7 +83,7 @@ func Boot() *app.App {
 
 	k.Router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P1","togo":%q}`, togoVersion())
+		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P2","togo":%q}`, togoVersion())
 	})
 	return a
 }

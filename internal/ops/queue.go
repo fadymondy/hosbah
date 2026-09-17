@@ -34,6 +34,16 @@ func Timeout(kind string) time.Duration {
 		return 5 * time.Minute
 	case agentproto.KindProvisionStep, KindProviderCreate:
 		return 30 * time.Minute
+	case agentproto.KindAppBuild:
+		return 45 * time.Minute
+	case agentproto.KindAppRelease:
+		return 20 * time.Minute
+	case agentproto.KindAppStart, agentproto.KindAppRollback:
+		return 15 * time.Minute // a 600 s health gate plus an image start
+	case agentproto.KindRouteSet, agentproto.KindOpCancel:
+		return 2 * time.Minute
+	case agentproto.KindAppLogs:
+		return 6 * time.Minute
 	}
 	return 10 * time.Minute
 }
@@ -61,6 +71,9 @@ type EnqueueSpec struct {
 	Params    json.RawMessage
 	CreatedBy string
 	Executor  string // default agent
+	// DeploymentID ties an agent operation to a deployment: its events are also appended to the
+	// deployment's own log.
+	DeploymentID string
 }
 
 // Enqueue inserts an operation in the caller's team transaction. It is idempotent by op_id: the
@@ -88,6 +101,7 @@ func (s *Service) Enqueue(ctx context.Context, q *db.Queries, sp EnqueueSpec) (o
 		ID: sp.OpID, TeamID: sp.TeamID, ServerID: sp.ServerID, Kind: sp.Kind, Executor: sp.Executor,
 		Params: string(canon), ParamsHash: hash, CreatedBy: sp.CreatedBy,
 		TimeoutSeconds: int64(Timeout(sp.Kind) / time.Second), ExpiresAt: s.now().Add(QueueTTL).UTC(),
+		DeploymentID: optional(sp.DeploymentID),
 	})
 	if errors.Is(err, sql.ErrNoRows) { // ON CONFLICT DO NOTHING: the op_id exists
 		existing, gErr := q.OperationInTeam(ctx, db.OperationInTeamParams{ID: sp.OpID, TeamID: sp.TeamID})
@@ -102,6 +116,37 @@ func (s *Service) Enqueue(ctx context.Context, q *db.Queries, sp EnqueueSpec) (o
 	s.Wake()
 	s.broker.Publish(ServerTopic(sp.ServerID))
 	return op, true, nil
+}
+
+// Await blocks until an operation has finished (ok, failed or timeout) or ctx ends. between runs
+// on every poll while it is still going (the deploy pipeline checks for a cancel request there).
+// System scope: only the control plane's own workers call it.
+func (s *Service) Await(ctx context.Context, opID, serverID string, between func()) (db.Operation, error) {
+	wake, unsub := s.broker.Subscribe(OpTopic(opID))
+	defer unsub()
+	for {
+		var op db.Operation
+		err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
+			var err error
+			op, err = q.OperationForServer(ctx, db.OperationForServerParams{ID: opID, ServerID: serverID})
+			return err
+		})
+		if err != nil {
+			return op, err
+		}
+		if op.Status == "ok" || op.Status == "failed" || op.Status == "timeout" {
+			return op, nil
+		}
+		if between != nil {
+			between()
+		}
+		select {
+		case <-ctx.Done():
+			return op, ctx.Err()
+		case <-wake:
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func isAgentKind(k string) bool {

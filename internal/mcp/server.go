@@ -54,6 +54,12 @@ type Env struct {
 	Caller Caller
 	Q      *db.Queries
 	Tx     *sql.Tx
+	// Scope is the caller's tenancy scope, for reads a tool makes after its transaction.
+	Scope tenancy.Scope
+	// Then, when a tool sets it, runs AFTER the tool's transaction has committed and its output is
+	// appended — for work that must see the committed change or must not hold a transaction open
+	// (deploy_app's `wait`). An error from it is reported in-band like any tool error.
+	Then func(ctx context.Context) (string, error)
 }
 
 // Tool is one callable. Scope is mandatory; Destructive tools must take `confirm`.
@@ -203,12 +209,22 @@ func (s *Server) call(ctx context.Context, a *app.App, c Caller, t Tool, args Ar
 		return "", fmt.Errorf("%s is destructive: pass confirm set to the exact name of the resource it acts on", t.Name)
 	}
 	var out string
-	err := tenancy.Tx(ctx, a.SQLDB, s.TxScope(c), func(q *db.Queries, tx *sql.Tx) error {
+	var env *Env
+	scope := s.TxScope(c)
+	err := tenancy.Tx(ctx, a.SQLDB, scope, func(q *db.Queries, tx *sql.Tx) error {
 		var err error
-		out, err = t.Run(ctx, &Env{App: a, Caller: c, Q: q, Tx: tx}, args)
+		env = &Env{App: a, Caller: c, Q: q, Tx: tx, Scope: scope}
+		out, err = t.Run(ctx, env, args)
 		return err
 	})
-	return out, err
+	if err != nil || env == nil || env.Then == nil {
+		return out, err
+	}
+	more, err := env.Then(ctx)
+	if err != nil {
+		return "", fmt.Errorf("%s%w", out, err)
+	}
+	return out + more, nil
 }
 
 // RequireConfirm is the destructive gate's second half: the confirm argument must equal the

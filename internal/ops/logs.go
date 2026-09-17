@@ -25,6 +25,56 @@ type LogLine struct {
 	ExitCode *int      `json:"exit_code,omitempty"`
 	Error    string    `json:"error,omitempty"`
 	At       time.Time `json:"at"`
+	// Op names the step a deployment-log line came from (app.build, route.set…, or "pipeline" for
+	// the control plane's own lines). Empty in operation logs.
+	Op string `json:"op,omitempty"`
+}
+
+// Deployment logs are sealed like operation logs, bound to the deployment.
+func deployLogContext(deploymentID string) string { return "deploylog:" + deploymentID }
+
+// SealDeployLog seals one deployment-log line.
+func SealDeployLog(dek []byte, teamID, deploymentID string, l LogLine) (string, error) {
+	b, err := json.Marshal(l)
+	if err != nil {
+		return "", err
+	}
+	return crypto.Seal(dek, teamID, deployLogContext(deploymentID), b)
+}
+
+// OpenDeployLog opens a stored deployment-log line.
+func OpenDeployLog(dek []byte, teamID string, row db.DeploymentLog) (LogLine, error) {
+	pt, err := crypto.Open(dek, teamID, deployLogContext(row.DeploymentID), row.LineSealed)
+	if err != nil {
+		return LogLine{}, err
+	}
+	var l LogLine
+	if err := json.Unmarshal(pt, &l); err != nil {
+		return LogLine{}, err
+	}
+	l.Seq = row.Seq
+	return l, nil
+}
+
+// AppendDeployLog writes the next line of a deployment's log in the caller's transaction. The seq
+// comes from the deployment row (UPDATE … RETURNING under its row lock), so an agent's events and
+// the pipeline's own lines interleave in one order. opID/opSeq identify an agent's line, so its
+// replay after a reconnect is refused by the unique index instead of landing twice.
+func AppendDeployLog(ctx context.Context, q *db.Queries, dek []byte, teamID, serverID, deploymentID string, opID *string, opSeq *int64, l LogLine) error {
+	row, err := q.NextDeploymentLogSeq(ctx, deploymentID)
+	if err != nil {
+		return err
+	}
+	l.Seq = row.LastSeq
+	if l.At.IsZero() {
+		l.At = time.Now().UTC()
+	}
+	sealed, err := SealDeployLog(dek, teamID, deploymentID, l)
+	if err != nil {
+		return err
+	}
+	return q.InsertDeploymentLog(ctx, db.InsertDeploymentLogParams{TeamID: teamID, ServerID: serverID, AppID: row.AppID,
+		DeploymentID: deploymentID, OperationID: opID, OpSeq: opSeq, Seq: l.Seq, Stream: streamOf(l), LineSealed: sealed})
 }
 
 // Operation log lines are sealed with the team's DEK, bound to the team and to the operation, so a

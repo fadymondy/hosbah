@@ -33,6 +33,7 @@ const (
 	AbilityOperate       = "operate"        // run read-only server operations (system.info, docker.check)
 	AbilityManageServers = "manage_servers" // add/remove servers, provisioning steps, agent updates, provider credentials
 	AbilityRevealSecrets = "reveal_secrets" // reveal a sealed secret such as a provider credential (audited)
+	AbilityManageApps    = "manage_apps"    // create/delete apps, their settings, env vars and domains
 )
 
 func roleIn(roles ...string) authz.PolicyFunc {
@@ -61,6 +62,7 @@ func init() {
 		AbilityOperate:       roleIn(RoleOwner, RoleAdmin, RoleDeployer),
 		AbilityManageServers: roleIn(RoleOwner, RoleAdmin),
 		AbilityRevealSecrets: roleIn(RoleOwner, RoleAdmin),
+		AbilityManageApps:    roleIn(RoleOwner, RoleAdmin),
 	})
 }
 

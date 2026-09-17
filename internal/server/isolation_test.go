@@ -103,6 +103,17 @@ func TestIsolationSweep(t *testing.T) {
 		"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "cloudy@pve!ctl", "node": "pve", "storage": "local-lvm"},
 		"secret": "a-secret-" + suffix, "skip_validation": true}, 201, &credA)
 
+	// P2: an app on that server with a deployment, a variable and a domain.
+	var appA struct {
+		App struct{ ID, Name string } `json:"app"`
+		Deployment struct{ ID string } `json:"deployment"`
+	}
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps", map[string]any{"name": "alpha-app-" + suffix[len(suffix)-6:], "server": srvA,
+		"repo_url": "https://github.com/example/app", "deploy": true}, 201, &appA)
+	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/env/SECRET_A", map[string]any{"value": "a-env-" + suffix}, 204, nil)
+	var domA struct{ ID, Hostname string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
+
 	// Team B: B's own, unrelated team.
 	var teamB struct{ ID, Slug string }
 	ub.mustJSON("POST", "/api/teams", map[string]any{"name": "Bravo " + suffix}, 201, &teamB)
@@ -116,6 +127,10 @@ func TestIsolationSweep(t *testing.T) {
 		"op":         func(string) []string { return []string{opA} },
 		"credential": func(string) []string { return []string{credA.ID} },
 		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
+		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name} },
+		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
+		"name":       func(string) []string { return []string{"SECRET_A"} },
+		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"id": func(path string) []string {
 			switch {
 			case strings.Contains(path, "/invitations/"):
@@ -190,6 +205,35 @@ func TestIsolationSweep(t *testing.T) {
 			t.Errorf("MCP %s as team B on team A's id should be not found: %+v", name, res)
 		}
 	}
+	// P2 MCP tools with team A's app: every one must say not found and change nothing.
+	for name, args := range map[string]map[string]any{
+		"get_app": {"app": appA.App.ID}, "list_deployments": {"app": appA.App.Name}, "get_deployment": {"app": appA.App.ID, "deployment": "1"},
+		"deploy_logs": {"app": appA.App.ID, "deployment": appA.Deployment.ID}, "list_env": {"app": appA.App.ID},
+		"list_domains": {"app": appA.App.ID}, "deploy_app": {"app": appA.App.ID}, "cancel_deployment": {"app": appA.App.ID, "deployment": "1"},
+		"rollback_app": {"app": appA.App.ID}, "restart_app": {"app": appA.App.ID}, "pause_autodeploy": {"app": appA.App.ID},
+		"set_env": {"app": appA.App.ID, "name": "X", "value": "y"}, "unset_env": {"app": appA.App.ID, "name": "SECRET_A"},
+		"add_domain": {"app": appA.App.ID, "hostname": "b.example.test"}, "verify_domain": {"app": appA.App.ID, "domain": domA.ID},
+		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
+			t.Errorf("MCP %s as team B on team A's app should be not found: %+v", name, res)
+		}
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) {
+		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)
+	}
+	// A deploy-hook token is not a session: hooks of unknown tokens are 404, the TLS ask says no.
+	if code := httpStatus(t, "POST", ts.URL+"/hooks/deploy/cdh_nope", ""); code != 404 {
+		t.Errorf("unknown deploy hook -> %d", code)
+	}
+	if code := httpStatus(t, "GET", ts.URL+"/internal/tls/allow?domain="+domA.Hostname, ""); code != 404 {
+		t.Errorf("TLS ask for an unverified tls=off domain -> %d (want 404)", code)
+	}
+	if code := httpStatus(t, "POST", ts.URL+"/hooks/github", "{}"); code != 503 {
+		t.Errorf("GitHub webhook without the App configured -> %d (want 503)", code)
+	}
+
 	for _, name := range []string{"list_members", "list_invitations", "list_audit", "list_mcp_tokens"} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, nil)
 		if strings.Contains(res.Text, ua2Email) || strings.Contains(res.Text, "a-read") || strings.Contains(res.Text, "pending-"+suffix) {
@@ -214,6 +258,19 @@ func TestIsolationSweep(t *testing.T) {
 	}
 
 	// ---- team A is untouched ------------------------------------------------------------------
+	var envAfter struct {
+		Variables []struct{ Name string } `json:"variables"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/env", nil, 200, &envAfter)
+	if len(envAfter.Variables) != 1 {
+		t.Errorf("team A's env changed during the sweep: %+v", envAfter)
+	}
+	var revealed struct{ Value string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/env/SECRET_A/reveal", nil, 200, &revealed)
+	if revealed.Value != "a-env-"+suffix {
+		t.Errorf("reveal as owner: %q", revealed.Value)
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID, nil, 200, nil)
 	var after struct {
 		Name        string
 		MemberCount int64 `json:"member_count"`
@@ -494,6 +551,17 @@ func mcpCall(t *testing.T, base, path, token, tool string, args map[string]any) 
 		text += c.Text
 	}
 	return mcpResult{IsError: out.Result.IsError, Text: text}
+}
+
+func httpStatus(t *testing.T, method, url, body string) int {
+	t.Helper()
+	req, _ := http.NewRequest(method, url, strings.NewReader(body))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
 }
 
 func mcpStatus(base, path, token string) int {

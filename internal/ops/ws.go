@@ -190,6 +190,7 @@ func (s *Service) heartbeat(ctx context.Context, ac *agentConn, f agentproto.Fra
 // runs in its ServerID scope: an agent naming another server's op_id finds nothing.
 func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.Event) {
 	requeued := false
+	deployment := ""
 	err := s.agentTx(ctx, ac, func(q *db.Queries) error {
 		op, err := q.OperationForServer(ctx, db.OperationForServerParams{ID: ev.OpID, ServerID: ac.serverID})
 		if errors.Is(err, sql.ErrNoRows) {
@@ -229,9 +230,20 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 		if err != nil {
 			return err
 		}
-		if _, err := q.InsertOperationLog(ctx, db.InsertOperationLogParams{TeamID: ac.teamID, ServerID: ac.serverID,
-			OperationID: op.ID, Seq: ev.Seq, Stream: streamOf(l), LineSealed: sealed}); err != nil {
+		n, err := q.InsertOperationLog(ctx, db.InsertOperationLogParams{TeamID: ac.teamID, ServerID: ac.serverID,
+			OperationID: op.ID, Seq: ev.Seq, Stream: streamOf(l), LineSealed: sealed})
+		if err != nil {
 			return err
+		}
+		// A deployment's operation: the line joins the deployment's log too — only when it is new
+		// here (n == 1), so a replay after a reconnect never duplicates it there either.
+		if n == 1 && op.DeploymentID != nil {
+			deployment = *op.DeploymentID
+			dl := l
+			dl.Op = op.Kind
+			if err := AppendDeployLog(ctx, q, ac.dek, ac.teamID, ac.serverID, deployment, &op.ID, ptr(ev.Seq), dl); err != nil {
+				return err
+			}
 		}
 		if err := q.AdvanceOperationSeq(ctx, db.AdvanceOperationSeqParams{Seq: ev.Seq, ID: op.ID, ServerID: ac.serverID}); err != nil {
 			return err
@@ -266,6 +278,9 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 		s.Wake()
 	}
 	s.broker.Publish(OpTopic(ev.OpID), ServerTopic(ac.serverID))
+	if deployment != "" {
+		s.broker.Publish(DeployTopic(deployment))
+	}
 }
 
 func remoteIP(r *http.Request) string {

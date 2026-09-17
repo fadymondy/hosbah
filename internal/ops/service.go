@@ -177,6 +177,10 @@ func (s *Service) Connected(serverID string) bool { return s.hub.get(serverID) !
 func ServerTopic(serverID string) string { return "server:" + serverID }
 func OpTopic(opID string) string         { return "op:" + opID }
 
+// DeployTopic / AppTopic: a deployment's log and status; an app's page (status, deployments).
+func DeployTopic(deploymentID string) string { return "deploy:" + deploymentID }
+func AppTopic(appID string) string           { return "app:" + appID }
+
 func newUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)

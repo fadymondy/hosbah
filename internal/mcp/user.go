@@ -25,7 +25,7 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "cloudy",
 		Version:       "0.1.0",
-		Tools:         append(UserTools(), ServerTools()...),
+		Tools:         append(append(UserTools(), ServerTools()...), AppTools()...),
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {

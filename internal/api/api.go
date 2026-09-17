@@ -39,6 +39,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d := &deps{a: a, ops: svc}
 	d.registerServers(api)
 	d.registerOperations(api)
+	d.registerApps(api)
 	d.registerCredentials(api)
 	d.registerMe(api)
 	d.registerTeams(api)

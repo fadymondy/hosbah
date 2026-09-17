@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -304,6 +305,9 @@ func (d *deps) registerServers(api huma.API) {
 			s, err := serverIn(ctx, q, m, in.Server)
 			if err != nil {
 				return err
+			}
+			if n, err := q.CountAppsOnServer(ctx, db.CountAppsOnServerParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil && n > 0 {
+				return huma.Error409Conflict(fmt.Sprintf("%d app(s) run on this server — delete them first", n))
 			}
 			if s.Provider == "proxmox" && s.ProviderRef != nil && s.CredentialID != nil {
 				if err := provisioning.DeleteMachine(ctx, d.a.Keys, q, s); err != nil {
