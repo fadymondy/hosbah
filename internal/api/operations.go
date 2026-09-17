@@ -110,7 +110,7 @@ func (d *deps) registerOperations(api huma.API) {
 		ServerPath
 		Body struct {
 			Kind   string `json:"kind" enum:"system.info,docker.check,provision.step,agent.update"`
-			Step   string `json:"step,omitempty" enum:"packages.base,docker.install,swap.ensure" doc:"provision.step: which step."`
+			Step   string `json:"step,omitempty" enum:"packages.base,docker.install,swap.ensure,restic.install" doc:"provision.step: which step."`
 			SwapMB int    `json:"swap_mb,omitempty" minimum:"256" maximum:"16384" doc:"provision.step swap.ensure: size (default 1024)."`
 			OpID   string `json:"op_id,omitempty" pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" doc:"Optional idempotency key (a lowercase uuid)."`
 		}

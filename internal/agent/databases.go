@@ -24,19 +24,34 @@ import (
 // stepRestic installs restic from the distribution package (like docker.io / git in P1/P2 — no
 // third-party apt repository).
 func stepRestic(oc *OpContext) (any, int, error) {
-	if _, err := exec.LookPath("restic"); err == nil {
+	changed, code, err := ensureRestic(oc)
+	if err != nil {
+		return nil, code, err
+	}
+	if !changed {
 		oc.Info("restic is already installed (%s) — nothing to do", toolVersion(oc.Ctx, "restic", "version"))
 		return map[string]any{"changed": false}, 0, nil
 	}
+	return map[string]any{"changed": true, "version": toolVersion(oc.Ctx, "restic", "version")}, 0, nil
+}
+
+// ensureRestic installs restic from the distribution package if it is not already present. It is
+// idempotent, so both the explicit restic.install step and the first backup/restore can call it — a
+// backup no longer fails just because the step was never run by hand.
+func ensureRestic(oc *OpContext) (changed bool, code int, err error) {
+	if _, err := exec.LookPath("restic"); err == nil {
+		return false, 0, nil
+	}
+	oc.Info("restic is not installed — installing it now")
 	oc.Progress(1, 2)
 	if code, err := oc.Run("apt-get", "update"); err != nil {
-		return nil, code, err
+		return false, code, err
 	}
 	oc.Progress(2, 2)
 	if code, err := oc.Run("apt-get", "install", "-y", "--no-install-recommends", "restic"); err != nil {
-		return nil, code, err
+		return false, code, err
 	}
-	return map[string]any{"changed": true, "version": toolVersion(oc.Ctx, "restic", "version")}, 0, nil
+	return true, 0, nil
 }
 
 // ---- helpers -------------------------------------------------------------------------------------
@@ -137,26 +152,19 @@ func dbProvision(oc *OpContext) (any, int, error) {
 		"--label", "cloudy.dataservice=" + p.ServiceID, "--label", "cloudy.kind=" + p.Kind,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
 		"-v", p.Volume + ":" + dataDirOf(p.Kind), "-p", publish}
+	// The image goes after the run options and before any container command, so redis'
+	// server flags stay a command and don't get parsed as run options.
 	var pairs []string
 	switch p.Kind {
 	case "postgres":
-		args = append(args, "-e", "POSTGRES_PASSWORD")
+		args = append(args, "-e", "POSTGRES_PASSWORD", p.Image)
 		pairs = append(pairs, "POSTGRES_PASSWORD="+root["password"])
 	case "mysql":
-		args = append(args, "-e", "MYSQL_ROOT_PASSWORD")
+		args = append(args, "-e", "MYSQL_ROOT_PASSWORD", p.Image)
 		pairs = append(pairs, "MYSQL_ROOT_PASSWORD="+root["password"])
 	case "redis":
 		// No auth: the service is published on the private interface only.
-		args = append(args, "--", "redis-server", "--save", "60", "1", "--appendonly", "no")
-	}
-	if p.Kind != "redis" {
-		args = append(args, p.Image)
-	} else {
-		// insert image before the trailing redis-server args
-		args2 := append([]string{}, args[:len(args)-4]...)
-		args2 = append(args2, p.Image)
-		args2 = append(args2, args[len(args)-4:]...)
-		args = args2
+		args = append(args, p.Image, "redis-server", "--save", "60", "1", "--appendonly", "no")
 	}
 	oc.Info("starting %s %s on %s:%d", p.Kind, p.Version, p.Bind, p.Port)
 	if code, err := oc.RunEnv(pairs, "docker", args...); err != nil {
@@ -371,8 +379,8 @@ func dbBackup(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	if _, err := exec.LookPath("restic"); err != nil {
-		return nil, 1, errors.New("restic is not installed — run the restic.install provisioning step")
+	if _, code, err := ensureRestic(oc); err != nil {
+		return nil, code, err
 	}
 	if !containerRunning(oc, p.Container) {
 		return nil, 1, errors.New("the data service is not running")
@@ -513,6 +521,9 @@ func dbRestore(oc *OpContext) (any, int, error) {
 	}
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
+	}
+	if _, code, err := ensureRestic(oc); err != nil {
+		return nil, code, err
 	}
 	if code, err := dbDockerReady(oc); err != nil {
 		return nil, code, err

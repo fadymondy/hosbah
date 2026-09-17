@@ -52,8 +52,8 @@ The **Databases** section is new. Open it from the sidebar.
    **Add database** (name `app`, user `app`, grants `all`). Both go **ready**.
 3. **Connection string + attach** → in the service's **Connection & attach** panel,
    **Reveal connection string** (shown once, audited), then choose **sample-node** and **Attach**:
-   it injects a sealed `DATABASE_URL`. Redeploy sample-node (Apps → sample-node → Deploy) and it
-   picks the variable up.
+   it injects a sealed `DATABASE_URL`. Redeploy **or restart** sample-node (Apps → sample-node) and
+   it picks the variable up — its container then reaches Postgres on the private `172.18.0.1:5432`.
 4. **Back up** → open the service → **Back up now**. The backup goes **succeeded** with a size and
    a restic snapshot. Then **Restore-test** it: it restores into a throwaway container and shows
    **Passed** (and stamps *restore-tested*).
@@ -67,9 +67,14 @@ Everything binds to the server's **private** interface; the **S3** backup target
 labelled *"S3 — not configured"* until real credentials are set (`CLOUDY_S3_*`) — the demo uses a
 local restic repository on the target.
 
-> The P3 code is merged and verified offline (build, vet, `go test -count=1 ./...` incl. the
-> isolation sweep, `togo generate`, web typecheck + `next build`). The live click-through above is
-> owner-gated on your `info@3x1.io` sign-in, exactly like the P2 steps.
+> **This whole flow was run live on `cloudy-target`** (2026-09-18): target-1 rolled to the P3
+> agent; `demo-pg` (postgres 16) and `demo-redis` (7.2) provisioned as real containers on the
+> private `172.18.0.1`; the `app`/`app` database + user created; the connection string revealed
+> (audited); attached to sample-node and confirmed reachable after a restart; a manual **and** a
+> scheduled backup succeeded and **restore-tested Passed**; and `backup_now` + `restore_backup` were
+> driven from the user MCP, with an out-of-scope token refused in-band. Screenshots (en/ar ×
+> light/dark × 1440/390) are in `storage/shots/p3/`. Verified offline too: `go build`/`vet`,
+> `go test -count=1 ./...` (incl. the isolation sweep), the OpenAPI export, web typecheck + `next build`.
 
 ## What is still owner-gated (cannot be demoed without your input)
 - **Your login credential** — only you can sign in as `info@3x1.io`; the automated run
