@@ -121,7 +121,8 @@
     "admin": "Admin",
     "apps": "Apps",
     "databases": "Databases",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "proxyHosts": "Proxy hosts"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -171,7 +172,8 @@
     },
     "providers": {
       "byo": "Bring your own",
-      "proxmox": "Proxmox"
+      "proxmox": "Proxmox",
+      "cloudflare": "Cloudflare"
     },
     "kinds": {
       "byo": "Your server",
@@ -183,7 +185,7 @@
       "description": "Cloudy manages a server through a small agent that connects out to Cloudy — no inbound SSH needed.",
       "source": "Where is the server?",
       "byoTitle": "A server I already have",
-      "byoHint": "Any Ubuntu 22.04/24.04 or Debian 12/13 machine with internet access. You run one command on it.",
+      "byoHint": "Any Ubuntu 22.04/24.04, Debian 12/13 or CentOS Stream/RHEL/Rocky/Alma 9–10 machine with internet access. You run one command on it.",
       "proxmoxTitle": "Create one on Proxmox",
       "proxmoxHint": "A VM cloned from a cloud-init template, or an unprivileged LXC container.",
       "notConfiguredTitle": "Proxmox is not configured for this team",
@@ -212,7 +214,23 @@
       "howTitle": "How it works",
       "how1": "Cloudy gives you a one-time install command. It works once and expires after 15 minutes.",
       "how2": "The installer checks the agent download against its SHA-256, runs the enrolment checks and starts the agent under systemd.",
-      "how3": "The agent dials out to Cloudy, proves who it is with its own key, and only runs operations Cloudy has signed."
+      "how3": "The agent dials out to Cloudy, proves who it is with its own key, and only runs operations Cloudy has signed.",
+      "connectTitle": "Connect with SSH",
+      "connectHint": "Give Cloudy the address and a root (or passwordless-sudo) login. It detects plain Linux, Docker or Proxmox, installs the agent and imports what already runs.",
+      "host": "IP address or hostname",
+      "port": "SSH port",
+      "user": "User",
+      "userHint": "root, or a user with passwordless sudo.",
+      "auth": "Log in with",
+      "authPassword": "Password",
+      "authKey": "Private key",
+      "password": "Password",
+      "privateKey": "Private key",
+      "privateKeyHint": "OpenSSH or PEM, without a passphrase.",
+      "secretHint": "Used once to install Cloudy's own key and the agent, then forgotten. Cloudy never stores it.",
+      "registerProxmox": "If this is a Proxmox VE node, also add it as a Proxmox provider",
+      "registerProxmoxHint": "Cloudy creates an API token for cloudy@pve on the node so it can create VMs and LXCs there.",
+      "createConnect": "Connect server"
     },
     "detail": {
       "facts": "Server",
@@ -297,6 +315,23 @@
         "failed": "Failed",
         "timeout": "Timed out"
       }
+    },
+    "discovered": {
+      "title": "Found on this server",
+      "hint": "Found at enrolment. Expose a container with a published port behind a hostname — Cloudy adds a proxy host for it.",
+      "platform": "Platform",
+      "platforms": {
+        "linux": "Linux",
+        "docker": "Docker",
+        "proxmox": "Proxmox VE"
+      },
+      "kinds": {
+        "container": "Container",
+        "systemd": "Service",
+        "guest": "Guest"
+      },
+      "none": "Nothing else was running.",
+      "expose": "Expose"
     }
   },
   "apps": {
@@ -505,12 +540,12 @@
     "domainsLabel": "Domains"
   },
   "credentials": {
-    "description": "Provider accounts Cloudy uses to create machines. Secrets are encrypted with the team key and never shown in lists.",
+    "description": "Provider accounts Cloudy uses: Proxmox to create machines, Cloudflare to manage DNS. Secrets are encrypted with the team key and never shown in lists.",
     "readOnly": "Only owners and admins can see and manage provider credentials.",
-    "add": "Add Proxmox credential",
-    "addHint": "Use an API token limited to a Cloudy pool — never root@pam.",
+    "add": "Add credential",
+    "addHint": "Use tokens limited to what Cloudy needs — a Proxmox token scoped to a Cloudy pool (never root@pam), a Cloudflare token with Zone:Read and DNS:Edit.",
     "emptyTitle": "No credentials",
-    "emptyHint": "Add a Proxmox credential to create servers on Proxmox.",
+    "emptyHint": "Add a Proxmox credential to create servers on Proxmox, or a Cloudflare token so custom domains and proxy hosts get their DNS automatically.",
     "name": "Name",
     "provider": "Provider",
     "apiUrl": "API URL",
@@ -536,7 +571,11 @@
     "revealConfirm": "Reveal",
     "delete": "Delete",
     "deleteTitle": "Delete credential?",
-    "deleteHint": "Servers created with “{name}” are kept, but Cloudy can no longer manage their machines."
+    "deleteHint": "Servers created with “{name}” are kept, but Cloudy can no longer manage their machines.",
+    "accountId": "Account ID",
+    "apiToken": "API token",
+    "cloudflareHint": "With this token, a domain or proxy host in one of its zones gets its DNS record created and is verified at once.",
+    "validateCloudflare": "Check the token with Cloudflare before saving"
   },
   "members": {
     "description": "Everyone in this team and what they can do.",
@@ -779,5 +818,71 @@
       "expired": "Expired"
     },
     "arguments": "Arguments"
+  },
+  "proxy": {
+    "title": "Proxy hosts",
+    "description": "Put anything a server can reach behind a hostname with TLS — another container, a NAS, a VM — through that server's Caddy.",
+    "add": "Add proxy host",
+    "addHint": "The server's Caddy terminates TLS and proxies to the upstream, websockets included.",
+    "emptyTitle": "No proxy hosts",
+    "emptyHint": "Add one to route a hostname to any upstream a server can reach.",
+    "hostname": "Hostname",
+    "upstream": "Upstream",
+    "upstreamHint": "host:port, http://host:port or https://host:port — for example 10.0.0.5:5000.",
+    "server": "Server",
+    "tls": "TLS",
+    "tlsModes": {
+      "auto": "Public certificate",
+      "internal": "Cloudy's internal CA",
+      "off": "Off (plain HTTP)"
+    },
+    "skipVerify": "The upstream uses a self-signed certificate",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "verified": "Verified",
+    "unverified": "Not verified",
+    "verify": "Verify",
+    "verifyHint": "Add a TXT record {name} with the value {value}, then verify.",
+    "enable": "Enable",
+    "disable": "Disable",
+    "remove": "Remove",
+    "removeConfirm": "Remove {host}? Caddy stops serving it at once.",
+    "save": "Add proxy host",
+    "noServers": "Enrol a server first — proxy hosts run on a server's Caddy."
+  },
+  "sites": {
+    "title": "Sites",
+    "hint": "Apps running on this server, and its proxy hosts. Open a site to see its canvas.",
+    "new": "New site",
+    "empty": "No sites on this server yet.",
+    "proxyHost": "Proxy",
+    "site": "Site",
+    "deploy": "Deploy",
+    "network": "Network",
+    "edge": "Edge",
+    "tls": "TLS",
+    "tlsByCaddy": "Caddy, on demand",
+    "proxy": "Proxy",
+    "domains": "Domains",
+    "noDomains": "No domains yet.",
+    "verified": "Verified",
+    "pending": "Pending",
+    "addDomain": "Add domain",
+    "app": "App",
+    "web": "Web",
+    "size": "Size",
+    "vcpu": "{n} vCPU",
+    "address": "Address",
+    "worker": "Worker",
+    "workersHint": "Workers come from [processes] in cloudy.toml and deploy with the app.",
+    "addDatabase": "Add database",
+    "addDatabaseHint": "PostgreSQL or MySQL on this server",
+    "addCache": "Add cache",
+    "addCacheHint": "Redis on this server",
+    "addBucket": "Add bucket",
+    "addBucketHint": "S3-compatible object storage (MinIO) on this server",
+    "addServiceHint": "Provisioned on {server}. Attach it to the app from its page once it is running.",
+    "create": "Create",
+    "canvas": "Canvas"
   }
 }

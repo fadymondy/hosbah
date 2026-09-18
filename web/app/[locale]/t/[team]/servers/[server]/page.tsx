@@ -1,10 +1,12 @@
 "use client"
 
+import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { AlertCircleIcon, LoaderIcon, PlayIcon } from "lucide-react"
+import { AlertCircleIcon, LoaderIcon, PlayIcon, PlusIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
+import { AppStatusBadge } from "@/components/app-status"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
@@ -12,6 +14,7 @@ import { OperationLog } from "@/components/op-log"
 import { CheckBadge, OpStatusBadge, PresenceBadge } from "@/components/server-status"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -24,12 +27,16 @@ import {
   formatBytes,
   formatUptime,
   percent,
+  platformOf,
   PROVISION_STEPS,
   useEventStream,
+  type DiscoveredService,
+  type ProxyHost,
   type Install,
   type Operation,
   type Server,
 } from "@/lib/servers"
+import type { App } from "@/lib/apps"
 import { useTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
@@ -209,12 +216,23 @@ export default function ServerPage() {
         </section>
       ) : null}
 
+      {server.status === "enrolled" ? <Sites serverId={server.id} base={`/${locale}/t/${team.slug}`} manage={manage} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="facts-h" className="flex flex-col gap-2">
           <h2 id="facts-h" className="grid-micro">
             {t("servers.detail.facts")}
           </h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border p-4 text-sm">
+            <Fact
+              label={t("servers.discovered.platform")}
+              value={
+                platformOf(server.facts)
+                  ? t(`servers.discovered.platforms.${platformOf(server.facts)}`) +
+                    (server.facts?.proxmox?.version ? ` ${server.facts.proxmox.version}` : "")
+                  : null
+              }
+            />
             <Fact label={t("servers.detail.hostname")} value={server.hostname} />
             <Fact label={t("servers.address")} value={server.ip_address} />
             <Fact label={t("servers.os")} value={server.facts?.os_pretty || (server.os ? `${server.os} ${server.os_version ?? ""}` : null)} />
@@ -256,6 +274,8 @@ export default function ServerPage() {
           )}
         </section>
       </div>
+
+      {server.facts ? <Discovered services={server.facts.services ?? []} serverId={server.id} manage={manage} /> : null}
 
       <section aria-labelledby="ops-h" className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
@@ -414,5 +434,185 @@ function Fact({ label, value }: { label: string; value: string | null | undefine
         {value || "—"}
       </dd>
     </>
+  )
+}
+
+/** The host port a container publishes ("0.0.0.0:8080->80/tcp" → 8080), if any. */
+function publishedPort(ports?: string[]): number | null {
+  for (const p of ports ?? []) {
+    const m = /:(d+)->/.exec(p)
+    if (m) return Number(m[1])
+  }
+  return null
+}
+
+function Discovered({ services, serverId, manage }: { services: DiscoveredService[]; serverId: string; manage: boolean }) {
+  const { t } = useI18n()
+  const { team } = useTeam()
+  const errorText = useErrorText()
+  const [exposing, setExposing] = useState<string | null>(null)
+  const [hostname, setHostname] = useState("")
+  const [done, setDone] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | null>(null)
+
+  async function expose(name: string, port: number) {
+    setError(null)
+    try {
+      await apiFetch(`/api/teams/${team.slug}/proxy-hosts`, {
+        method: "POST",
+        body: { server: serverId, hostname: hostname.trim(), upstream: `127.0.0.1:${port}`, tls: "auto" },
+      })
+      setDone((d) => ({ ...d, [name]: hostname.trim() }))
+      setExposing(null)
+      setHostname("")
+    } catch (err) {
+      setError(errorText(err))
+    }
+  }
+  return (
+    <section aria-labelledby="found-h" className="flex flex-col gap-2" data-testid="discovered">
+      <div className="flex flex-col gap-1">
+        <h2 id="found-h" className="grid-micro">
+          {t("servers.discovered.title")}
+        </h2>
+        <p className="text-sm text-muted-foreground">{t("servers.discovered.hint")}</p>
+      </div>
+      <FormError message={error} />
+      {services.length === 0 ? (
+        <p className="border p-4 text-sm text-muted-foreground">{t("servers.discovered.none")}</p>
+      ) : (
+        <ul className="flex flex-col divide-y border text-sm">
+          {services.map((s) => (
+            <li key={`${s.kind}:${s.name}:${s.image ?? ""}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
+              <span className="grid-micro text-muted-foreground">{t(`servers.discovered.kinds.${s.kind}`)}</span>
+              <span dir="ltr" className="font-medium">
+                {s.name}
+              </span>
+              {s.image ? (
+                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
+                  {s.image}
+                </span>
+              ) : null}
+              <span className="ms-auto text-muted-foreground">{s.status}</span>
+              {s.ports?.length ? (
+                <span dir="ltr" className="w-full font-mono text-xs text-muted-foreground">
+                  {s.ports.join(", ")}
+                </span>
+              ) : null}
+              {manage && s.kind === "container" && publishedPort(s.ports) ? (
+                done[s.name] ? (
+                  <span dir="ltr" className="w-full text-xs text-primary">
+                    → {done[s.name]}
+                  </span>
+                ) : exposing === s.name ? (
+                  <form
+                    className="flex w-full flex-wrap gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void expose(s.name, publishedPort(s.ports)!)
+                    }}
+                  >
+                    <Input
+                      dir="ltr"
+                      required
+                      autoFocus
+                      className="h-8 max-w-xs"
+                      placeholder="app.example.com"
+                      aria-label={t("proxy.hostname")}
+                      value={hostname}
+                      onChange={(e) => setHostname(e.target.value)}
+                    />
+                    <Button type="submit" size="sm" disabled={!hostname.trim()}>
+                      {t("servers.discovered.expose")}
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setExposing(null)}>
+                      {t("common.cancel")}
+                    </Button>
+                  </form>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setExposing(s.name)}>
+                    {t("servers.discovered.expose")}
+                  </Button>
+                )
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/** The server's sites (apps) and proxy hosts: the way into each site's canvas. */
+function Sites({ serverId, base, manage }: { serverId: string; base: string; manage: boolean }) {
+  const { t } = useI18n()
+  const { team } = useTeam()
+  const [apps, setApps] = useState<App[] | null>(null)
+  const [proxies, setProxies] = useState<ProxyHost[]>([])
+
+  useEffect(() => {
+    apiFetch<{ apps: App[] }>(`/api/teams/${team.slug}/apps`)
+      .then((r) => setApps((r.apps ?? []).filter((a) => a.server_id === serverId)))
+      .catch(() => setApps([]))
+    apiFetch<{ proxy_hosts: ProxyHost[] }>(`/api/teams/${team.slug}/proxy-hosts?server=${serverId}`)
+      .then((r) => setProxies(r.proxy_hosts ?? []))
+      .catch(() => setProxies([]))
+  }, [team.slug, serverId])
+
+  return (
+    <section aria-labelledby="sites-h" className="flex flex-col gap-3" data-testid="server-sites">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <h2 id="sites-h" className="font-medium">
+            {t("sites.title")}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("sites.hint")}</p>
+        </div>
+        {manage ? (
+          <Button size="sm" nativeButton={false} render={<Link href={`${base}/apps/new?server=${serverId}`} />}>
+            <PlusIcon />
+            {t("sites.new")}
+          </Button>
+        ) : null}
+      </div>
+      {apps === null ? (
+        <Skeleton className="h-20 w-full" />
+      ) : apps.length === 0 && proxies.length === 0 ? (
+        <p className="border p-4 text-sm text-muted-foreground">{t("sites.empty")}</p>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {apps.map((a) => (
+            <li key={a.id}>
+              <Link href={`${base}/servers/${serverId}/sites/${a.id}`} className="flex h-full flex-col gap-2 border p-4 hover:bg-muted/50">
+                <span className="flex items-center justify-between gap-2">
+                  <span dir="ltr" className="font-medium">
+                    {a.name}
+                  </span>
+                  <AppStatusBadge status={a.status} />
+                </span>
+                <span dir="ltr" className="truncate font-mono text-xs text-muted-foreground">
+                  {a.domains?.[0]?.hostname ?? a.repo_url}
+                </span>
+              </Link>
+            </li>
+          ))}
+          {proxies.map((p) => (
+            <li key={p.id}>
+              <Link href={`${base}/proxy-hosts`} className="flex h-full flex-col gap-2 border border-dashed p-4 hover:bg-muted/50">
+                <span className="flex items-center justify-between gap-2">
+                  <span dir="ltr" className="font-medium">
+                    {p.hostname}
+                  </span>
+                  <span className="grid-micro text-muted-foreground">{t("sites.proxyHost")}</span>
+                </span>
+                <span dir="ltr" className="truncate font-mono text-xs text-muted-foreground">
+                  → {p.upstream}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

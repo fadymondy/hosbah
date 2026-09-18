@@ -1,6 +1,6 @@
 // Types for the P3 managed-data-services surface, matching internal/api/databases.go.
 
-export type DataServiceKind = "postgres" | "mysql" | "redis"
+export type DataServiceKind = "postgres" | "mysql" | "redis" | "minio"
 export type DataServiceStatus = "new" | "provisioning" | "running" | "failed" | "stopped"
 
 export interface DataService {

@@ -41,6 +41,24 @@ export type Facts = {
   systemd: boolean
   virtualization: string
   docker: DockerFacts
+  proxmox?: { installed: boolean; version?: string }
+  services?: DiscoveredService[]
+}
+
+export type DiscoveredService = {
+  kind: "container" | "systemd" | "guest"
+  name: string
+  image?: string
+  status: string
+  ports?: string[]
+}
+
+/** What Cloudy manages the host as — mirrors agentproto.Facts.Platform. */
+export function platformOf(f: Facts | undefined): "proxmox" | "docker" | "linux" | null {
+  if (!f) return null
+  if (f.proxmox?.installed) return "proxmox"
+  if (f.docker?.running) return "docker"
+  return "linux"
 }
 
 export type ServerStatus = "pending" | "provisioning" | "enrolled" | "failed"
@@ -216,4 +234,22 @@ export function useEventStream(url: string | null, handlers: Record<string, (dat
 /** i18n keys are dot-paths, so a kind or step ("docker.install") is looked up as "docker_install". */
 export function opKey(k: string): string {
   return k.replace(/\./g, "_")
+}
+
+/** A proxy host of the Caddy proxy manager (GET /api/teams/{team}/proxy-hosts). */
+export type ProxyHost = {
+  id: string
+  server_id: string
+  server_name?: string
+  hostname: string
+  upstream: string
+  tls: "auto" | "internal" | "off"
+  enabled: boolean
+  websockets: boolean
+  verified: boolean
+  verified_at: string | null
+  verify_name: string
+  verify_value: string
+  created_at: string
+  updated_at: string
 }

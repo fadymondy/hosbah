@@ -21,8 +21,10 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -37,6 +39,7 @@ import { useTeam } from "@/lib/team";
 
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SIZES = ["small", "medium", "large"] as const;
+type Source = "byo" | "connect" | "proxmox";
 
 export default function NewServerPage() {
   const { t, locale } = useI18n();
@@ -48,7 +51,14 @@ export default function NewServerPage() {
   const base = `/${locale}/t/${team.slug}`;
 
   const [providers, setProviders] = useState<ProviderOption[] | null>(null);
-  const [source, setSource] = useState<"byo" | "proxmox">("byo");
+  const [source, setSource] = useState<Source>("byo");
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("22");
+  const [user, setUser] = useState("root");
+  const [auth, setAuth] = useState<"password" | "key">("password");
+  const [password, setPassword] = useState("");
+  const [privateKey, setPrivateKey] = useState("");
+  const [registerProxmox, setRegisterProxmox] = useState(true);
   const [name, setName] = useState("");
   const [credential, setCredential] = useState("");
   const [kind, setKind] = useState<"vm" | "lxc">("lxc");
@@ -76,6 +86,10 @@ export default function NewServerPage() {
 
   const proxmox = providers?.find((p) => p.key === "proxmox");
   const nameOK = NAME.test(name) && name.length <= 63;
+  const connectOK =
+    host.trim() !== "" &&
+    user.trim() !== "" &&
+    (auth === "password" ? password !== "" : privateKey.trim() !== "");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -93,6 +107,23 @@ export default function NewServerPage() {
         );
         setCreated(res);
         setLive(res.server);
+      } else if (source === "connect") {
+        const res = await apiFetch<{ server: Server }>(`/api/teams/${team.slug}/servers`, {
+          method: "POST",
+          body: {
+            name,
+            provider: "byo",
+            connect: {
+              host: host.trim(),
+              port: Number(port) || 22,
+              user: user.trim(),
+              auth,
+              ...(auth === "password" ? { password } : { private_key: privateKey }),
+              register_proxmox: registerProxmox,
+            },
+          },
+        });
+        router.push(`${base}/servers/${res.server.id}`);
       } else {
         const res = await apiFetch<{ server: Server }>(`/api/teams/${team.slug}/servers`, {
           method: "POST",
@@ -181,13 +212,22 @@ export default function NewServerPage() {
         <form onSubmit={submit} className="flex min-w-0 flex-col gap-6">
           <FieldSet>
             <FieldLegend variant="label">{t("servers.new.source")}</FieldLegend>
-            <RadioGroup value={source} onValueChange={(v) => setSource(v as "byo" | "proxmox")}>
+            <RadioGroup value={source} onValueChange={(v) => setSource(v as Source)}>
               <FieldLabel htmlFor="src-byo">
                 <Field orientation="horizontal">
                   <RadioGroupItem value="byo" id="src-byo" />
                   <FieldContent>
                     <FieldTitle>{t("servers.new.byoTitle")}</FieldTitle>
                     <FieldDescription>{t("servers.new.byoHint")}</FieldDescription>
+                  </FieldContent>
+                </Field>
+              </FieldLabel>
+              <FieldLabel htmlFor="src-connect">
+                <Field orientation="horizontal">
+                  <RadioGroupItem value="connect" id="src-connect" />
+                  <FieldContent>
+                    <FieldTitle>{t("servers.new.connectTitle")}</FieldTitle>
+                    <FieldDescription>{t("servers.new.connectHint")}</FieldDescription>
                   </FieldContent>
                 </Field>
               </FieldLabel>
@@ -235,6 +275,19 @@ export default function NewServerPage() {
                 />
                 <FieldDescription>{t("servers.new.nameHint")}</FieldDescription>
               </Field>
+              {source === "connect" ? (
+                <ConnectFields
+                  {...{ host, setHost, port, setPort, user, setUser, auth, setAuth }}
+                  {...{
+                    password,
+                    setPassword,
+                    privateKey,
+                    setPrivateKey,
+                    registerProxmox,
+                    setRegisterProxmox,
+                  }}
+                />
+              ) : null}
               {source === "proxmox" && proxmox ? (
                 <>
                   <Field>
@@ -291,12 +344,19 @@ export default function NewServerPage() {
               ) : null}
               <FormError message={error} />
               <div>
-                <Button type="submit" disabled={busy || !nameOK || providers === null}>
+                <Button
+                  type="submit"
+                  disabled={
+                    busy || !nameOK || providers === null || (source === "connect" && !connectOK)
+                  }
+                >
                   {busy
                     ? t("common.working")
                     : source === "byo"
                       ? t("servers.new.createByo")
-                      : t("servers.new.createProxmox")}
+                      : source === "connect"
+                        ? t("servers.new.createConnect")
+                        : t("servers.new.createProxmox")}
                 </Button>
               </div>
             </FieldGroup>
@@ -326,5 +386,129 @@ function HowItWorks() {
         ))}
       </ol>
     </aside>
+  );
+}
+
+type Setter<T> = (v: T) => void;
+
+function ConnectFields(p: {
+  host: string;
+  setHost: Setter<string>;
+  port: string;
+  setPort: Setter<string>;
+  user: string;
+  setUser: Setter<string>;
+  auth: "password" | "key";
+  setAuth: Setter<"password" | "key">;
+  password: string;
+  setPassword: Setter<string>;
+  privateKey: string;
+  setPrivateKey: Setter<string>;
+  registerProxmox: boolean;
+  setRegisterProxmox: Setter<boolean>;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+        <Field>
+          <FieldLabel htmlFor="c-host">{t("servers.new.host")}</FieldLabel>
+          <Input
+            id="c-host"
+            dir="ltr"
+            required
+            maxLength={253}
+            value={p.host}
+            onChange={(e) => p.setHost(e.target.value)}
+            autoComplete="off"
+            placeholder="203.0.113.10"
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="c-port">{t("servers.new.port")}</FieldLabel>
+          <Input
+            id="c-port"
+            dir="ltr"
+            inputMode="numeric"
+            value={p.port}
+            onChange={(e) => p.setPort(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          />
+        </Field>
+      </div>
+      <Field>
+        <FieldLabel htmlFor="c-user">{t("servers.new.user")}</FieldLabel>
+        <Input
+          id="c-user"
+          dir="ltr"
+          required
+          maxLength={64}
+          value={p.user}
+          onChange={(e) => p.setUser(e.target.value)}
+          autoComplete="off"
+        />
+        <FieldDescription>{t("servers.new.userHint")}</FieldDescription>
+      </Field>
+      <FieldSet>
+        <FieldLegend variant="label">{t("servers.new.auth")}</FieldLegend>
+        <RadioGroup
+          value={p.auth}
+          onValueChange={(v) => p.setAuth(v as "password" | "key")}
+          className="flex flex-wrap gap-6"
+        >
+          <Field orientation="horizontal" className="w-auto">
+            <RadioGroupItem value="password" id="c-auth-pw" />
+            <FieldLabel htmlFor="c-auth-pw">{t("servers.new.authPassword")}</FieldLabel>
+          </Field>
+          <Field orientation="horizontal" className="w-auto">
+            <RadioGroupItem value="key" id="c-auth-key" />
+            <FieldLabel htmlFor="c-auth-key">{t("servers.new.authKey")}</FieldLabel>
+          </Field>
+        </RadioGroup>
+      </FieldSet>
+      {p.auth === "password" ? (
+        <Field>
+          <FieldLabel htmlFor="c-pw">{t("servers.new.password")}</FieldLabel>
+          <Input
+            id="c-pw"
+            type="password"
+            dir="ltr"
+            required
+            value={p.password}
+            onChange={(e) => p.setPassword(e.target.value)}
+            autoComplete="off"
+          />
+          <FieldDescription>{t("servers.new.secretHint")}</FieldDescription>
+        </Field>
+      ) : (
+        <Field>
+          <FieldLabel htmlFor="c-key">{t("servers.new.privateKey")}</FieldLabel>
+          <Textarea
+            id="c-key"
+            dir="ltr"
+            required
+            rows={6}
+            className="font-mono text-xs"
+            value={p.privateKey}
+            onChange={(e) => p.setPrivateKey(e.target.value)}
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+            spellCheck={false}
+          />
+          <FieldDescription>
+            {t("servers.new.privateKeyHint")} {t("servers.new.secretHint")}
+          </FieldDescription>
+        </Field>
+      )}
+      <Field orientation="horizontal">
+        <Checkbox
+          id="c-pve"
+          checked={p.registerProxmox}
+          onCheckedChange={(v) => p.setRegisterProxmox(v === true)}
+        />
+        <FieldContent>
+          <FieldLabel htmlFor="c-pve">{t("servers.new.registerProxmox")}</FieldLabel>
+          <FieldDescription>{t("servers.new.registerProxmoxHint")}</FieldDescription>
+        </FieldContent>
+      </Field>
+    </>
   );
 }

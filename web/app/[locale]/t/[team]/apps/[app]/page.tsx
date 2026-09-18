@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
-import { AlertCircleIcon, RocketIcon, RotateCcwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
+import { AlertCircleIcon, LayoutGridIcon, RocketIcon, RotateCcwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge, DeploymentStatusBadge } from "@/components/app-status"
@@ -42,6 +42,11 @@ export default function AppPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState("deployments")
+  // #domains, #env… (links from the site canvas) open that tab.
+  useEffect(() => {
+    const h = window.location.hash.slice(1)
+    if (h) setTab(h)
+  }, [])
   const app = detail?.app
   useDocumentTitle(`${app?.name ?? t("nav.apps")} — ${team.name}`)
 
@@ -115,6 +120,10 @@ export default function AppPage() {
         {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
       </span>
       <AppStatusBadge status={app.status} />
+      <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/sites/${app.id}`} />}>
+        <LayoutGridIcon />
+        {t("sites.canvas")}
+      </Button>
       {operate ? (
         <>
           <Button size="sm" disabled={busy} onClick={() => act(() => apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: {} }))}>

@@ -121,7 +121,8 @@
     "admin": "الإدارة",
     "apps": "التطبيقات",
     "databases": "قواعد البيانات",
-    "approvals": "الموافقات"
+    "approvals": "الموافقات",
+    "proxyHosts": "مضيفو الوكيل"
   },
   "feedback": {
     "launcher": "الإبلاغ عن مشكلة",
@@ -171,7 +172,8 @@
     },
     "providers": {
       "byo": "خادمك الخاص",
-      "proxmox": "Proxmox"
+      "proxmox": "Proxmox",
+      "cloudflare": "Cloudflare"
     },
     "kinds": {
       "byo": "خادمك",
@@ -183,7 +185,7 @@
       "description": "يدير Cloudy الخادم عبر وكيل صغير يتصل بـCloudy من الخادم نفسه — لا حاجة إلى فتح SSH للدخول.",
       "source": "أين الخادم؟",
       "byoTitle": "خادم أملكه بالفعل",
-      "byoHint": "أي جهاز بنظام Ubuntu 22.04/24.04 أو Debian 12/13 متصل بالإنترنت. تشغّل عليه أمرًا واحدًا.",
+      "byoHint": "أي جهاز بنظام Ubuntu 22.04/24.04 أو Debian 12/13 أو CentOS Stream/RHEL/Rocky/Alma 9–10 متصل بالإنترنت. تشغّل عليه أمرًا واحدًا.",
       "proxmoxTitle": "إنشاء خادم على Proxmox",
       "proxmoxHint": "آلة افتراضية منسوخة من قالب cloud-init، أو حاوية LXC غير مميّزة.",
       "notConfiguredTitle": "لم يُعدّ Proxmox لهذا الفريق",
@@ -212,7 +214,23 @@
       "howTitle": "كيف يعمل",
       "how1": "يعطيك Cloudy أمر تثبيت يُستخدم مرة واحدة وتنتهي صلاحيته بعد 15 دقيقة.",
       "how2": "يتحقق المُثبّت من بصمة SHA-256 للوكيل ويُجري فحوص التسجيل ثم يشغّله عبر systemd.",
-      "how3": "يتصل الوكيل بـCloudy من الخادم ويثبت هويته بمفتاحه الخاص، ولا ينفّذ إلا العمليات التي وقّعها Cloudy."
+      "how3": "يتصل الوكيل بـCloudy من الخادم ويثبت هويته بمفتاحه الخاص، ولا ينفّذ إلا العمليات التي وقّعها Cloudy.",
+      "connectTitle": "الاتصال عبر SSH",
+      "connectHint": "أعطِ Cloudy العنوان وبيانات دخول root (أو مستخدم لديه sudo دون كلمة مرور). يكتشف Linux عاديًا أو Docker أو Proxmox، ويثبّت الوكيل ويستورد ما يعمل بالفعل.",
+      "host": "عنوان IP أو اسم المضيف",
+      "port": "منفذ SSH",
+      "user": "المستخدم",
+      "userHint": "root، أو مستخدم لديه sudo دون كلمة مرور.",
+      "auth": "تسجيل الدخول باستخدام",
+      "authPassword": "كلمة المرور",
+      "authKey": "مفتاح خاص",
+      "password": "كلمة المرور",
+      "privateKey": "المفتاح الخاص",
+      "privateKeyHint": "بصيغة OpenSSH أو PEM، دون عبارة مرور.",
+      "secretHint": "تُستخدم مرة واحدة لتثبيت مفتاح Cloudy الخاص والوكيل، ثم تُنسى. لا يخزّنها Cloudy أبدًا.",
+      "registerProxmox": "إذا كان هذا خادم Proxmox VE، أضفه أيضًا كمزوّد Proxmox",
+      "registerProxmoxHint": "ينشئ Cloudy رمز API للمستخدم cloudy@pve على الخادم ليتمكن من إنشاء الآلات الافتراضية وحاويات LXC عليه.",
+      "createConnect": "اتصال بالخادم"
     },
     "detail": {
       "facts": "الخادم",
@@ -297,6 +315,23 @@
         "failed": "فشلت",
         "timeout": "انتهت المهلة"
       }
+    },
+    "discovered": {
+      "title": "ما وُجد على هذا الخادم",
+      "hint": "ما وُجد عند التسجيل. أتِح حاوية لها منفذ منشور خلف اسم مضيف — يضيف Cloudy مضيف وكيل لها.",
+      "platform": "المنصّة",
+      "platforms": {
+        "linux": "Linux",
+        "docker": "Docker",
+        "proxmox": "Proxmox VE"
+      },
+      "kinds": {
+        "container": "حاوية",
+        "systemd": "خدمة",
+        "guest": "ضيف"
+      },
+      "none": "لم يكن هناك شيء آخر يعمل.",
+      "expose": "إتاحة"
     }
   },
   "apps": {
@@ -505,12 +540,12 @@
     "domainsLabel": "النطاقات"
   },
   "credentials": {
-    "description": "حسابات المزوّدين التي يستخدمها Cloudy لإنشاء الأجهزة. الأسرار مشفّرة بمفتاح الفريق ولا تظهر في القوائم.",
+    "description": "حسابات المزوّدين التي يستخدمها Cloudy: ‏Proxmox لإنشاء الأجهزة، وCloudflare لإدارة DNS. تُشفَّر الأسرار بمفتاح الفريق ولا تظهر في القوائم أبدًا.",
     "readOnly": "يمكن للمالكين والمسؤولين فقط عرض بيانات اعتماد المزوّدين وإدارتها.",
-    "add": "إضافة بيانات اعتماد Proxmox",
-    "addHint": "استخدم رمز واجهة برمجية مقصورًا على مجموعة Cloudy — لا تستخدم root@pam أبدًا.",
+    "add": "إضافة بيانات اعتماد",
+    "addHint": "استخدم رموزًا محدودة بما يحتاجه Cloudy — رمز Proxmox مقصور على مجموعة Cloudy (وليس root@pam أبدًا)، ورمز Cloudflare بصلاحيتي Zone:Read وDNS:Edit.",
     "emptyTitle": "لا توجد بيانات اعتماد",
-    "emptyHint": "أضف بيانات اعتماد Proxmox لإنشاء الخوادم عليه.",
+    "emptyHint": "أضف بيانات اعتماد Proxmox لإنشاء خوادم عليه، أو رمز Cloudflare لتحصل النطاقات المخصصة ومضيفو الوكيل على سجلات DNS تلقائيًا.",
     "name": "الاسم",
     "provider": "المزوّد",
     "apiUrl": "رابط الواجهة البرمجية",
@@ -536,7 +571,11 @@
     "revealConfirm": "إظهار",
     "delete": "حذف",
     "deleteTitle": "حذف بيانات الاعتماد؟",
-    "deleteHint": "تبقى الخوادم التي أُنشئت بـ«{name}»، لكن Cloudy لن يتمكن بعد ذلك من إدارة أجهزتها."
+    "deleteHint": "تبقى الخوادم التي أُنشئت بـ«{name}»، لكن Cloudy لن يتمكن بعد ذلك من إدارة أجهزتها.",
+    "accountId": "معرّف الحساب",
+    "apiToken": "رمز API",
+    "cloudflareHint": "بهذا الرمز، يحصل أي نطاق أو مضيف وكيل ضمن مناطقه على سجل DNS ويُتحقق منه فورًا.",
+    "validateCloudflare": "التحقق من الرمز مع Cloudflare قبل الحفظ"
   },
   "members": {
     "description": "كل أعضاء هذا الفريق وما يمكنهم فعله.",
@@ -779,5 +818,71 @@
       "expired": "منتهية"
     },
     "arguments": "الوسائط"
+  },
+  "proxy": {
+    "title": "مضيفو الوكيل",
+    "description": "ضع أي شيء يصل إليه الخادم خلف اسم مضيف مع TLS — حاوية أخرى أو جهاز تخزين أو آلة افتراضية — عبر Caddy على ذلك الخادم.",
+    "add": "إضافة مضيف وكيل",
+    "addHint": "ينهي Caddy على الخادم اتصال TLS ويمرّر الطلبات إلى الوجهة، بما فيها WebSocket.",
+    "emptyTitle": "لا يوجد مضيفو وكيل",
+    "emptyHint": "أضف واحدًا لتوجيه اسم مضيف إلى أي وجهة يصل إليها الخادم.",
+    "hostname": "اسم المضيف",
+    "upstream": "الوجهة",
+    "upstreamHint": "host:port أو http://host:port أو https://host:port — مثل 10.0.0.5:5000.",
+    "server": "الخادم",
+    "tls": "TLS",
+    "tlsModes": {
+      "auto": "شهادة عامة",
+      "internal": "المرجع الداخلي لـCloudy",
+      "off": "بدون (HTTP عادي)"
+    },
+    "skipVerify": "تستخدم الوجهة شهادة موقّعة ذاتيًا",
+    "enabled": "مفعّل",
+    "disabled": "معطّل",
+    "verified": "تم التحقق",
+    "unverified": "لم يتم التحقق",
+    "verify": "تحقق",
+    "verifyHint": "أضف سجل TXT باسم {name} وقيمة {value}، ثم تحقّق.",
+    "enable": "تفعيل",
+    "disable": "تعطيل",
+    "remove": "إزالة",
+    "removeConfirm": "إزالة {host}؟ يتوقف Caddy عن خدمته فورًا.",
+    "save": "إضافة مضيف وكيل",
+    "noServers": "سجّل خادمًا أولًا — يعمل مضيفو الوكيل على Caddy الخاص بالخادم."
+  },
+  "sites": {
+    "title": "المواقع",
+    "hint": "التطبيقات التي تعمل على هذا الخادم، ومضيفو الوكيل عليه. افتح موقعًا لترى لوحته.",
+    "new": "موقع جديد",
+    "empty": "لا توجد مواقع على هذا الخادم بعد.",
+    "proxyHost": "وكيل",
+    "site": "موقع",
+    "deploy": "نشر",
+    "network": "الشبكة",
+    "edge": "الحافة",
+    "tls": "TLS",
+    "tlsByCaddy": "Caddy، عند الطلب",
+    "proxy": "الوكيل",
+    "domains": "النطاقات",
+    "noDomains": "لا توجد نطاقات بعد.",
+    "verified": "تم التحقق",
+    "pending": "قيد الانتظار",
+    "addDomain": "إضافة نطاق",
+    "app": "التطبيق",
+    "web": "ويب",
+    "size": "الحجم",
+    "vcpu": "{n} vCPU",
+    "address": "العنوان",
+    "worker": "عامل",
+    "workersHint": "تأتي العمليات الخلفية من [processes] في cloudy.toml وتُنشر مع التطبيق.",
+    "addDatabase": "إضافة قاعدة بيانات",
+    "addDatabaseHint": "PostgreSQL أو MySQL على هذا الخادم",
+    "addCache": "إضافة ذاكرة مؤقتة",
+    "addCacheHint": "Redis على هذا الخادم",
+    "addBucket": "إضافة حاوية تخزين",
+    "addBucketHint": "تخزين كائنات متوافق مع S3 ‏(MinIO) على هذا الخادم",
+    "addServiceHint": "تُجهَّز على {server}. اربطها بالتطبيق من صفحتها بعد أن تعمل.",
+    "create": "إنشاء",
+    "canvas": "اللوحة"
   }
 }

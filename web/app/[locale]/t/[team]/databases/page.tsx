@@ -29,7 +29,7 @@ import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import type { Server } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 
-const KINDS: DataServiceKind[] = ["postgres", "mysql", "redis"]
+const KINDS: DataServiceKind[] = ["postgres", "mysql", "redis", "minio"]
 
 export function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "running") return "default"

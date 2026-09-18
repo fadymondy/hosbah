@@ -23,6 +23,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
@@ -200,6 +201,13 @@ function Reveal({ team, cred }: { team: string; cred: Credential }) {
   )
 }
 
+const PROVIDERS = ["proxmox", "cloudflare"] as const
+type Provider = (typeof PROVIDERS)[number]
+
+const CLOUDFLARE_FIELDS = [
+  { key: "account_id", label: "credentials.accountId", required: false, placeholder: "" },
+] as const
+
 const FIELDS = [
   { key: "api_url", label: "credentials.apiUrl", required: true, placeholder: "https://pve.example:8006" },
   { key: "token_id", label: "credentials.tokenId", required: true, placeholder: "cloudy@pve!ctl" },
@@ -217,6 +225,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
   const { team } = useTeam()
   const errorText = useErrorText()
   const [open, setOpen] = useState(false)
+  const [provider, setProvider] = useState<Provider>("proxmox")
   const [name, setName] = useState("")
   const [secret, setSecret] = useState("")
   const [config, setConfig] = useState<Record<string, string>>({})
@@ -231,7 +240,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
     try {
       await apiFetch(`/api/teams/${team.slug}/credentials`, {
         method: "POST",
-        body: { provider: "proxmox", name, config, secret, skip_validation: !validate },
+        body: { provider, name, config, secret, skip_validation: !validate },
       })
       setOpen(false)
       setName("")
@@ -262,7 +271,30 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
               <FieldLabel htmlFor="cred-name">{t("credentials.name")}</FieldLabel>
               <Input id="cred-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-            {FIELDS.map((f) => (
+            <Field>
+              <FieldLabel htmlFor="cred-provider">{t("credentials.provider")}</FieldLabel>
+              <Select
+                value={provider}
+                onValueChange={(v) => {
+                  if (!v) return
+                  setProvider(v as Provider)
+                  setConfig({})
+                }}
+              >
+                <SelectTrigger id="cred-provider" className="w-full">
+                  <SelectValue>{(v: string) => t(`servers.providers.${v}`)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDERS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {t(`servers.providers.${p}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {provider === "cloudflare" ? <FieldDescription>{t("credentials.cloudflareHint")}</FieldDescription> : null}
+            </Field>
+            {(provider === "proxmox" ? FIELDS : CLOUDFLARE_FIELDS).map((f) => (
               <Field key={f.key}>
                 <FieldLabel htmlFor={`cred-${f.key}`}>
                   {t(f.label)}
@@ -280,13 +312,13 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
               </Field>
             ))}
             <Field>
-              <FieldLabel htmlFor="cred-secret">{t("credentials.secret")}</FieldLabel>
+              <FieldLabel htmlFor="cred-secret">{t(provider === "cloudflare" ? "credentials.apiToken" : "credentials.secret")}</FieldLabel>
               <Input id="cred-secret" type="password" dir="ltr" required autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </Field>
             <Field orientation="horizontal">
               <Checkbox id="cred-validate" checked={validate} onCheckedChange={(v) => setValidate(v === true)} />
               <FieldLabel htmlFor="cred-validate" className="flex flex-col items-start gap-1 font-normal">
-                <span>{t("credentials.validate")}</span>
+                <span>{t(provider === "cloudflare" ? "credentials.validateCloudflare" : "credentials.validate")}</span>
                 <span className="text-xs text-muted-foreground">{t("credentials.validateHint")}</span>
               </FieldLabel>
             </Field>

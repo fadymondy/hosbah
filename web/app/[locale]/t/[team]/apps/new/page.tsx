@@ -49,7 +49,10 @@ export default function NewAppPage() {
       .then((r) => {
         const ok = (r.servers ?? []).filter((s) => s.status === "enrolled")
         setServers(ok)
-        if (ok[0]) setServer((cur) => cur || ok[0].id)
+        // ?server=<id> (from a server's "New site") preselects that server.
+        const want = new URLSearchParams(window.location.search).get("server")
+        const pick = ok.find((s) => s.id === want) ?? ok[0]
+        if (pick) setServer((cur) => cur || pick.id)
       })
       .catch((err) => {
         setServers([])
