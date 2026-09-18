@@ -43,12 +43,7 @@ func ensureRestic(oc *OpContext) (changed bool, code int, err error) {
 		return false, 0, nil
 	}
 	oc.Info("restic is not installed — installing it now")
-	oc.Progress(1, 2)
-	if code, err := oc.Run("apt-get", "update"); err != nil {
-		return false, code, err
-	}
-	oc.Progress(2, 2)
-	if code, err := oc.Run("apt-get", "install", "-y", "--no-install-recommends", "restic"); err != nil {
+	if code, err := hostPkgManager().install(oc, []string{"restic"}); err != nil {
 		return false, code, err
 	}
 	return true, 0, nil
@@ -165,6 +160,9 @@ func dbProvision(oc *OpContext) (any, int, error) {
 	case "redis":
 		// No auth: the service is published on the private interface only.
 		args = append(args, p.Image, "redis-server", "--save", "60", "1", "--appendonly", "no")
+	case "minio":
+		args = append(args, "-e", "MINIO_ROOT_USER", "-e", "MINIO_ROOT_PASSWORD", p.Image, "server", "/data")
+		pairs = append(pairs, "MINIO_ROOT_USER="+agentproto.MinIORootUser, "MINIO_ROOT_PASSWORD="+root["password"])
 	}
 	oc.Info("starting %s %s on %s:%d", p.Kind, p.Version, p.Bind, p.Port)
 	if code, err := oc.RunEnv(pairs, "docker", args...); err != nil {
@@ -209,6 +207,9 @@ func dbWaitReady(oc *OpContext, kind, container, rootpw string, within time.Dura
 		case "redis":
 			out, _ := execIn(oc, nil, "", container, "redis-cli", "ping")
 			ok = strings.Contains(strings.ToUpper(out), "PONG")
+		case "minio":
+			_, err := execIn(oc, nil, "", container, "mc", "ready", "local")
+			ok = err == nil
 		}
 		if ok {
 			return nil
@@ -240,6 +241,10 @@ func dbServerVersion(oc *OpContext, kind, container, rootpw string) string {
 		}
 		return "Redis"
 	}
+	if kind == "minio" {
+		out, _ := execIn(oc, nil, "", container, "minio", "--version")
+		return "MinIO " + strings.TrimSpace(strings.TrimPrefix(firstLine(out), "minio version "))
+	}
 	return ""
 }
 
@@ -269,6 +274,8 @@ func dbCreate(oc *OpContext) (any, int, error) {
 		return dbCreatePostgres(oc, p, root["password"], user["password"])
 	case "mysql":
 		return dbCreateMySQL(oc, p, root["password"], user["password"])
+	case "minio":
+		return dbCreateMinIO(oc, p, root["password"], user["password"])
 	}
 	return nil, 2, errors.New("unsupported kind")
 }
@@ -423,6 +430,8 @@ func dumpSuffix(kind string) string {
 		return ".dump"
 	case "mysql":
 		return ".sql"
+	case "minio":
+		return ".tar"
 	default:
 		return ".rdb"
 	}
@@ -449,6 +458,10 @@ func dbDumpCommand(kind, db, rootpw, container string) (args, env []string) {
 			src = []string{db}
 		}
 		return append([]string{"docker", "exec", "-i", "-e", "MYSQL_PWD", container, "mysqldump", "-u", "root", "--single-transaction"}, src...), []string{"MYSQL_PWD=" + rootpw}
+	case "minio":
+		// docker cp streams the data directory as a tar; the MinIO image has no tar of its own. A copy
+		// of a live directory is crash-consistent per object, not a point-in-time snapshot.
+		return []string{"docker", "cp", container + ":/data/.", "-"}, nil
 	default: // redis
 		return []string{"docker", "exec", "-i", container, "redis-cli", "--rdb", "-"}, nil
 	}
@@ -582,6 +595,9 @@ func dbStartThrowaway(oc *OpContext, p agentproto.DBRestoreParams, rootpw string
 	case "mysql":
 		args = append(args, "-e", "MYSQL_ROOT_PASSWORD", p.Image)
 		pairs = append(pairs, "MYSQL_ROOT_PASSWORD="+rootpw)
+	case "minio":
+		args = append(args, "-e", "MINIO_ROOT_USER", "-e", "MINIO_ROOT_PASSWORD", p.Image, "server", "/data")
+		pairs = append(pairs, "MINIO_ROOT_USER="+agentproto.MinIORootUser, "MINIO_ROOT_PASSWORD="+rootpw)
 	case "redis":
 		args = append(args, p.Image)
 	}
@@ -620,6 +636,25 @@ func dbRestoreInto(oc *OpContext, p agentproto.DBRestoreParams, env []string, fi
 	case "mysql":
 		loadArgs = []string{"exec", "-i", "-e", "MYSQL_PWD", p.Container, "mysql", "-u", "root"}
 		loadEnv = []string{"MYSQL_PWD=" + rootpw}
+	case "minio":
+		// docker cp - reads the tar on stdin; MinIO then restarts to pick the objects up.
+		load := exec.CommandContext(oc.Ctx, "docker", "cp", "-", p.Container+":/data") //#nosec G204 -- fixed argv
+		load.Env = dockerBaseEnv()
+		load.Stdin = pipe
+		if err := restic.Start(); err != nil {
+			return "restic dump failed to start", false
+		}
+		if out, err := load.CombinedOutput(); err != nil {
+			return "could not copy the data in: " + clip(string(out), 200), false
+		}
+		_ = restic.Wait()
+		if _, err := oc.Run("docker", "restart", p.Container); err != nil {
+			return "could not restart the throwaway", false
+		}
+		if err := dbWaitReady(oc, p.Kind, p.Container, rootpw, 60*time.Second); err != nil {
+			return "the restored MinIO did not come up", false
+		}
+		return "MinIO data restored", true
 	case "redis":
 		// Load the RDB by piping it back through redis-cli --pipe is not for RDB; instead restore keys
 		// via DEBUG RELOAD after copying is complex. For the restore-test we verify the RDB parses by
@@ -671,6 +706,15 @@ func dbVerify(oc *OpContext, kind, container, rootpw, db string) string {
 	case "redis":
 		out, _ := execIn(oc, nil, "", container, "redis-cli", "DBSIZE")
 		return "redis answered DBSIZE " + strings.TrimSpace(firstLine(out))
+	case "minio":
+		out, _ := execIn(oc, []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000"}, "", container, "mc", "ls", "local")
+		n := 0
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+			if strings.TrimSpace(l) != "" {
+				n++
+			}
+		}
+		return fmt.Sprintf("%d bucket(s) reachable", n)
 	}
 	return "verified"
 }
@@ -694,3 +738,27 @@ func dbRemove(oc *OpContext) (any, int, error) {
 	return map[string]any{"container": p.Container, "volume_removed": removed}, 0, nil
 }
 
+
+// dbCreateMinIO creates a bucket and an access key for it with mc inside the MinIO container. The
+// root and user secrets reach mc through the environment (MC_HOST_local, U, S), never an argv.
+// Policies are MinIO's built-in ones (readwrite / readonly), which span the service's buckets.
+func dbCreateMinIO(oc *OpContext, p agentproto.DBCreateParams, rootpw, userpw string) (any, int, error) {
+	bucket := agentproto.BucketName(p.Database)
+	policy := "readwrite"
+	if p.Grants == "readonly" {
+		policy = "readonly"
+	}
+	env := []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000", "U=" + p.User, "S=" + userpw}
+	oc.Info("creating bucket %q and access key %q (%s)", bucket, p.User, policy)
+	for _, step := range [][]string{
+		{"mc", "mb", "--ignore-existing", "local/" + bucket},
+		{"sh", "-c", `mc admin user add local "$U" "$S"`},
+		{"sh", "-c", `mc admin policy attach local ` + policy + ` --user "$U" || true`},
+	} {
+		if out, err := execIn(oc, env, "", p.Container, step...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return nil, 1, errors.New("could not create the bucket and access key")
+		}
+	}
+	return agentproto.DBCreateResult{Database: p.Database, User: p.User}, 0, nil
+}

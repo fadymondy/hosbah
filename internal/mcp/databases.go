@@ -109,7 +109,7 @@ func DatabaseTools() []Tool {
 			Description: "Provision a managed data service (postgres, mysql or redis) on one of the team's servers.",
 			InputSchema: schema([]string{"name", "server", "kind"}, map[string]any{
 				"name": str("Lowercase letters, digits, dashes"), "server": str("Server name or id"),
-				"kind": map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis"}},
+				"kind": map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis", "minio"}, "description": "minio = S3-compatible object storage (buckets)"},
 				"version": str("Image tag (optional; a current version by default)")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {

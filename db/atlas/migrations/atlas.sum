@@ -1,4 +1,4 @@
-h1:qXTmgPNg6kNcLj1JmYUH/w3QsAExWODxsO2fLmi7mfA=
+h1:7lPRU1e03WZlx2K1g/dUq1LPz0jDgCoDUy06UMNqdWs=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -10,3 +10,7 @@ h1:qXTmgPNg6kNcLj1JmYUH/w3QsAExWODxsO2fLmi7mfA=
 20260917192739_p3_row_level_security.sql h1:dxvEJJvkEmqJFPLnR0gVkKWY9Eu4XQIQTBPz5nW4lZI=
 20260918211150_p4_approval_requests.sql h1:ebGcYJ9EKK5jipwstEZxPF18na1b6/SpYBoq4GcamiE=
 20260918211207_p4_row_level_security.sql h1:UR+wHsitTc3I5965XIXQqo5OGKyoD3eR13CWGLpnEl0=
+20260918213802_p5_cloudflare_credentials.sql h1:nR9UGovLCA4ma5Nml0HVwMS3w4dIsrqcNMH21gRYsD0=
+20260918214333_p5_proxy_hosts.sql h1:DvG7jxOKZ3JYyiaIlX9vDi+ICvkDEcITaFkiKur/cQk=
+20260918214334_p5_row_level_security.sql h1:Td6GAJx51ObtIygjZw+s9mLdEUO1Cc0pMH2NT0XpSKc=
+20260918220515_p5_minio_buckets.sql h1:ZZJEsw9u+OWhYX7fptHLwbYDgVDewaYkk1UWtS9okRw=

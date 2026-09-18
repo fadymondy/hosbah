@@ -116,6 +116,8 @@ func defaultVersion(kind string) string {
 		return "8.4"
 	case "redis":
 		return "7.2-alpine"
+	case "minio":
+		return "2025-09-07T16-13-09Z" // quay.io/minio/minio:RELEASE.<version>
 	}
 	return ""
 }
@@ -128,7 +130,7 @@ func (s *Service) CreateService(ctx context.Context, q *db.Queries, teamID strin
 		return db.DataService{}, invalid("a service name is lowercase letters, digits and dashes")
 	}
 	if !agentproto.ValidDBKind(in.Kind) {
-		return db.DataService{}, invalid("kind is postgres, mysql or redis")
+		return db.DataService{}, invalid("kind is postgres, mysql, redis or minio")
 	}
 	if in.Version == "" {
 		in.Version = defaultVersion(in.Kind)
@@ -399,8 +401,14 @@ func (s *Service) Attach(ctx context.Context, q *db.Queries, teamID string, acto
 	if err != nil {
 		return "", err
 	}
-	if err := s.deploy.SetEnv(ctx, q, teamID, actor, a, name, connURL); err != nil {
-		return "", err
+	vars := [][2]string{{name, connURL}}
+	if svc.Kind == "minio" {
+		vars = append(vars, s3Vars(connURL)...)
+	}
+	for _, v := range vars {
+		if err := s.deploy.SetEnv(ctx, q, teamID, actor, a, v[0], v[1]); err != nil {
+			return "", err
+		}
 	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "dataservice.attach", "data_service", svc.ID, auditExtra(actor, map[string]any{"app": a.ID, "var": name})); err != nil {
 		return "", err
@@ -456,11 +464,15 @@ func (s *Service) connString(ctx context.Context, q *db.Queries, teamID string, 
 	if err != nil {
 		return "", "", errors.New("the user password could not be opened")
 	}
+	ui := url.UserPassword(u.Name, string(pt))
+	if svc.Kind == "minio" {
+		// One URL carries everything; Attach expands it into the S3 variables apps expect.
+		return "S3_URL", fmt.Sprintf("s3://%s@%s:%d/%s", ui.String(), host, port, agentproto.BucketName(dbName)), nil
+	}
 	scheme := "postgres"
 	if svc.Kind == "mysql" {
 		scheme = "mysql"
 	}
-	ui := url.UserPassword(u.Name, string(pt))
 	return "DATABASE_URL", fmt.Sprintf("%s://%s@%s:%d/%s", scheme, ui.String(), host, port, dbName), nil
 }
 
@@ -712,4 +724,21 @@ func derefInt(p *int64) int64 {
 		return 0
 	}
 	return *p
+}
+
+// s3Vars expands an s3://key:secret@host:port/bucket URL into the variables S3 clients read
+// (the AWS SDKs, Laravel's s3 disk, boto3), with path-style addressing for MinIO.
+func s3Vars(u string) [][2]string {
+	p, err := url.Parse(u)
+	if err != nil || p.User == nil {
+		return nil
+	}
+	secret, _ := p.User.Password()
+	endpoint := "http://" + p.Host
+	return [][2]string{
+		{"AWS_ENDPOINT_URL", endpoint}, {"AWS_ENDPOINT", endpoint},
+		{"AWS_ACCESS_KEY_ID", p.User.Username()}, {"AWS_SECRET_ACCESS_KEY", secret},
+		{"AWS_BUCKET", strings.TrimPrefix(p.Path, "/")}, {"AWS_DEFAULT_REGION", "us-east-1"},
+		{"AWS_USE_PATH_STYLE_ENDPOINT", "true"},
+	}
 }

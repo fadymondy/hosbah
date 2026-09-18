@@ -33,8 +33,14 @@ var (
 	snapshotRE  = regexp.MustCompile(`^[0-9a-f]{8,64}$`)
 )
 
-// ValidDBKind: the three managed engines.
-func ValidDBKind(s string) bool { return s == "postgres" || s == "mysql" || s == "redis" }
+// ValidDBKind: the managed engines. minio is S3-compatible object storage (buckets).
+func ValidDBKind(s string) bool { return s == "postgres" || s == "mysql" || s == "redis" || s == "minio" }
+
+// BucketName maps a database name (lower snake) to an S3 bucket name (no underscores allowed).
+func BucketName(db string) string { return strings.ReplaceAll(db, "_", "-") }
+
+// MinIORootUser is the fixed root access key of a Cloudy MinIO service (the secret is generated).
+const MinIORootUser = "cloudy-root"
 
 // ValidDBName: a database or role identifier — lower snake, so it is safe verbatim in the fixed argv
 // (createdb / CREATE DATABASE / CREATE USER) the agent builds. No quoting games, no keywords slipping
@@ -70,6 +76,8 @@ func DBInternalPort(kind string) int {
 		return 3306
 	case "redis":
 		return 6379
+	case "minio":
+		return 9000
 	}
 	return 0
 }
@@ -84,6 +92,8 @@ func DBImage(kind, version string) string {
 		return "mysql:" + version
 	case "redis":
 		return "redis:" + version
+	case "minio":
+		return "quay.io/minio/minio:RELEASE." + version // Docker Hub's minio/minio is no longer published
 	}
 	return ""
 }
@@ -177,8 +187,8 @@ func (p DBCreateParams) Validate() error {
 	switch {
 	case !ValidID(p.ServiceID):
 		return errors.New("bad service id")
-	case p.Kind != "postgres" && p.Kind != "mysql":
-		return errors.New("databases and users apply to postgres and mysql only")
+	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
+		return errors.New("databases (buckets) and users apply to postgres, mysql and minio")
 	case !ValidDBName(p.Database):
 		return fmt.Errorf("bad database name %q", p.Database)
 	case !ValidDBName(p.User):

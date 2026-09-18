@@ -21,7 +21,7 @@ import (
 type DataServiceOut struct {
 	ID        string     `json:"id"`
 	Name      string     `json:"name"`
-	Kind      string     `json:"kind" enum:"postgres,mysql,redis"`
+	Kind      string     `json:"kind" enum:"postgres,mysql,redis,minio"`
 	Version   string     `json:"version"`
 	Status    string     `json:"status" enum:"new,provisioning,running,failed,stopped"`
 	ServerID  string     `json:"server_id"`
@@ -177,7 +177,7 @@ func (d *deps) registerDatabases(api huma.API) {
 		Body struct {
 			Name    string `json:"name" minLength:"1" maxLength:"40" doc:"Lowercase letters, digits and dashes; unique in the team."`
 			Server  string `json:"server" minLength:"1" maxLength:"64" doc:"Server id or name."`
-			Kind    string `json:"kind" enum:"postgres,mysql,redis"`
+			Kind    string `json:"kind" enum:"postgres,mysql,redis,minio"`
 			Version string `json:"version,omitempty" maxLength:"32" doc:"Image tag; defaults to a current version."`
 		}
 	}) (*dsCreateOut, error) {

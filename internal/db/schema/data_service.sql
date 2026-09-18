@@ -24,7 +24,7 @@ CREATE TABLE data_services (
 -- root/superuser credential, sealed with the team DEK bound to "dbroot:<id>"; it never leaves the
 -- database except sealed to the target agent inside a signed operation, or through the audited
 -- reveal path. host/port are the private endpoint the agent reports after provisioning.
-ALTER TABLE data_services ADD CONSTRAINT data_services_kind_check CHECK (kind IN ('postgres', 'mysql', 'redis'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_kind_check CHECK (kind IN ('postgres', 'mysql', 'redis', 'minio'));
 ALTER TABLE data_services ADD CONSTRAINT data_services_status_check CHECK (status IN ('new', 'provisioning', 'running', 'failed', 'stopped'));
 ALTER TABLE data_services ADD CONSTRAINT data_services_name_check CHECK (name ~ '^[a-z0-9][a-z0-9-]{0,39}$');
 ALTER TABLE data_services ADD CONSTRAINT data_services_sealed_check CHECK (root_sealed LIKE 'csv1:%');
