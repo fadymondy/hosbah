@@ -260,6 +260,35 @@ func (r *runner) load(ctx context.Context) error {
 	})
 }
 
+/*
+refreshHosts re-reads the app's domains just before a route is pushed.
+
+load() runs at the top of the pipeline; the switch happens after the build, which can be
+minutes later. route.set carries the app's *whole* host list, so pushing the list as it looked
+at load() silently unroutes any hostname added in between — last write wins on the agent.
+
+Seen live on 2026-09-18 on demo-1: sample-go and sample-node had a domain added seconds after
+their first deploy was queued, the switch pushed `hosts: []` over it, and the dashboard then
+showed a domain that Caddy answered 404 for. sample-python and sample-php, whose deploys were
+still queued when their domains were added, routed correctly — which is what made it look
+intermittent rather than ordered.
+
+A failure here is not worth failing a deploy over: keep the snapshot and carry on.
+*/
+func (r *runner) refreshHosts(ctx context.Context) {
+	err := r.tx(ctx, func(q *db.Queries) error {
+		domains, err := q.ListDomainsOfApp(ctx, db.ListDomainsOfAppParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
+		if err != nil {
+			return err
+		}
+		r.hosts = HostsOf(domains)
+		return nil
+	})
+	if err != nil {
+		r.logf("error", "could not re-read the app's domains before routing (%v) — using the list from the start of this deploy", err)
+	}
+}
+
 // HostsOf turns an app's domains into Caddy routes.
 func HostsOf(domains []db.Domain) []agentproto.Route {
 	out := []agentproto.Route{}
@@ -608,6 +637,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 
 	r.step(ctx, "switch")
+	r.refreshHosts(ctx)
 	upstream := fmt.Sprintf("127.0.0.1:%d", web.HostPort)
 	if err := r.op(ctx, "switch", agentproto.KindRouteSet, agentproto.RouteParams{AppID: r.app.ID, Hosts: r.hosts, Upstream: upstream}, nil); err != nil {
 		if r.live != nil && r.live.HostPort != nil {
@@ -710,6 +740,7 @@ func (r *runner) swap(ctx context.Context) (*db.Release, error) {
 	if err != nil {
 		return nil, err
 	}
+	r.refreshHosts(ctx)
 	params := agentproto.RollbackParams{AppID: r.app.ID, Web: web, Hosts: r.hosts, GraceSeconds: 10}
 	for _, w := range eff.Workers() {
 		wp, err := r.startParams(ctx, target.Image, w, eff)

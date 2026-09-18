@@ -31,8 +31,42 @@ import (
 // frontend needs BuildKit). Distribution packages, like docker.io in P1: no third-party repository.
 var buildPackages = []string{"git", "docker-buildx"}
 
+/*
+A tool can already be on the host under a different package name, and then installing the
+distribution package is not merely redundant — it fails.
+
+The case that bit us: a server with Docker CE from download.docker.com carries buildx as
+`docker-buildx-plugin`, which owns /usr/libexec/docker/cli-plugins/docker-buildx. Debian's
+`docker-buildx` ships the same path, so dpkg refuses to unpack it ("trying to overwrite …,
+which is also in package docker-buildx-plugin") and apt-get exits 100. dpkg-query alone cannot
+see this, because it only ever asks about the name Cloudy chose.
+
+So the capability decides, not the package name: if the tool already runs, there is nothing to
+install. Only a package whose capability is genuinely absent is handed to apt-get.
+*/
+var buildCapability = map[string][]string{
+	"git":           {"git", "--version"},
+	"docker-buildx": {"docker", "buildx", "version"},
+}
+
+// satisfiedPackages drops from missing every package whose capability already works.
+func satisfiedPackages(oc *OpContext, missing []string) []string {
+	var still []string
+	for _, p := range missing {
+		probe, ok := buildCapability[p]
+		if ok {
+			if _, err := execOutput(oc, probe[0], probe[1:]...); err == nil {
+				oc.Info("%s: %q already works — another package provides it, not installing", p, strings.Join(probe, " "))
+				continue
+			}
+		}
+		still = append(still, p)
+	}
+	return still
+}
+
 func stepBuildTools(oc *OpContext) (any, int, error) {
-	missing := missingPackages(oc, buildPackages)
+	missing := satisfiedPackages(oc, missingPackages(oc, buildPackages))
 	if len(missing) == 0 {
 		oc.Info("already installed: %s — nothing to do", strings.Join(buildPackages, ", "))
 		return map[string]any{"changed": false}, 0, nil
