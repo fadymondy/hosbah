@@ -75,7 +75,7 @@ func ManageTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				return fmt.Sprintf("Dropped %s on %s (removed on the server now; backups are kept).\n", d.Name, svc.Name), nil
+				return fmt.Sprintf("Dropping %s on %s. It disappears from get_database once the server confirms; if the drop fails it shows as failed and can be retried. Backups are kept.\n", d.Name, svc.Name), nil
 			},
 		},
 		{
