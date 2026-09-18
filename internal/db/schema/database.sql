@@ -14,7 +14,7 @@ CREATE TABLE databases (
 -- Cloudy: a logical database inside a data service (a Postgres/MySQL database; for Redis a logical
 -- db number is not modelled — Redis services carry no databases row). name is the identifier used
 -- verbatim in the agent's fixed argv (createdb / CREATE DATABASE), so it is constrained tightly.
-ALTER TABLE databases ADD CONSTRAINT databases_status_check CHECK (status IN ('new', 'creating', 'ready', 'failed'));
+ALTER TABLE databases ADD CONSTRAINT databases_status_check CHECK (status IN ('new', 'creating', 'ready', 'failed', 'dropping'));
 ALTER TABLE databases ADD CONSTRAINT databases_name_check CHECK (name ~ '^[a-z_][a-z0-9_]{0,62}$');
 CREATE UNIQUE INDEX databases_service_name_key ON databases (data_service_id, name);
 CREATE UNIQUE INDEX databases_id_team_key ON databases (id, team_id);
