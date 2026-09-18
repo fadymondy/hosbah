@@ -55,7 +55,7 @@ RETURNING *;
 
 -- name: ServerSeen :exec
 UPDATE servers SET last_seen_at = now(),
-    ip_address = coalesce(sqlc.narg('ip_address')::text, ip_address),
+    ip_address = coalesce(ip_address, sqlc.narg('ip_address')::text), -- the peer only fills a missing address (it may be a proxy)
     agent_version = coalesce(sqlc.narg('agent_version')::text, agent_version)
 WHERE id = sqlc.arg('id')::text;
 
@@ -81,3 +81,7 @@ WHERE id = sqlc.arg('id')::text;
 SELECT s.id, s.team_id, s.name, s.agent_public_key, t.dek_wrapped
 FROM servers s JOIN teams t ON t.id = s.team_id
 WHERE s.id = $1;
+
+-- name: ForgetServerConnectSecret :exec
+-- server.connect is done (either way): drop the sealed password/key; keep host, port and user.
+UPDATE servers SET spec = spec #- '{connect,secret_sealed}', updated_at = now() WHERE id = sqlc.arg('id')::text;

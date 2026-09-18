@@ -38,6 +38,12 @@ func startServer(t *testing.T, addr string, allowed ssh.PublicKey) *testServer {
 			}
 			return nil, errors.New("key not allowed")
 		},
+		PasswordCallback: func(_ ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
+			if string(pw) == testPassword {
+				return nil, nil
+			}
+			return nil, errors.New("wrong password")
+		},
 	}
 	cfg.AddHostKey(hostSigner)
 	ln, err := net.Listen("tcp", addr)

@@ -134,3 +134,5 @@ func diskUsage(path string) (total, used uint64) {
 	total = st.Blocks * bs
 	return total, total - st.Bfree*bs
 }
+
+func readOSReleaseID() string { return readOSRelease()["ID"] }

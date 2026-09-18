@@ -73,11 +73,7 @@ func stepBuildTools(oc *OpContext) (any, int, error) {
 	}
 	oc.Info("missing: %s", strings.Join(missing, ", "))
 	oc.Progress(1, 3)
-	if code, err := oc.Run("apt-get", "update"); err != nil {
-		return nil, code, err
-	}
-	oc.Progress(2, 3)
-	if code, err := oc.Run("apt-get", append([]string{"install", "-y", "--no-install-recommends"}, missing...)...); err != nil {
+	if code, err := hostPkgManager().install(oc, missing); err != nil {
 		return nil, code, err
 	}
 	oc.Progress(3, 3)

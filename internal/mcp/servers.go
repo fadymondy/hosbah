@@ -64,6 +64,17 @@ func ServerTools() []Tool {
 					var f agentproto.Facts
 					if json.Unmarshal([]byte(*s.Facts), &f) == nil {
 						fmt.Fprintf(&b, "cpus: %d\nmemory: %s\nsystemd: %v\ndocker: %s\n", f.CPUs, bytesOf(f.MemTotalBytes), f.Systemd, dockerOf(f.Docker))
+						fmt.Fprintf(&b, "platform: %s", f.Platform())
+						if f.Proxmox.Version != "" {
+							fmt.Fprintf(&b, " (Proxmox VE %s)", f.Proxmox.Version)
+						}
+						b.WriteString("\n")
+						if len(f.Services) > 0 {
+							b.WriteString("found on the server:\n")
+							for _, sv := range f.Services {
+								fmt.Fprintf(&b, "  %-9s %-28s %-10s %s %s\n", sv.Kind, sv.Name, sv.Status, sv.Image, strings.Join(sv.Ports, ", "))
+							}
+						}
 					}
 				}
 				if s.Error != nil {

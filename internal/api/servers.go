@@ -4,19 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
 	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/crypto"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
 	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/providers/sshboot"
 	"github.com/fadymondy/cloudy/internal/provisioning"
 	"github.com/fadymondy/cloudy/internal/tenancy"
 )
@@ -176,80 +174,32 @@ func (d *deps) registerServers(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "create-server", Method: http.MethodPost, Path: "/api/teams/{team}/servers",
 		DefaultStatus: http.StatusCreated, Tags: []string{"Servers"},
-		Summary: "Add a server: bring your own (returns a one-time install command) or create one on Proxmox (owner or admin)",
+		Summary: "Add a server: bring your own (a one-time install command, or connect over SSH with a password or key) or create one on Proxmox (owner or admin)",
 	}, func(ctx context.Context, in *struct {
 		TeamPath
 		Body struct {
-			Name         string `json:"name" minLength:"1" maxLength:"63" pattern:"^[A-Za-z0-9][A-Za-z0-9._-]*$" doc:"Letters, digits, dot, dash, underscore; unique in the team."`
-			Provider     string `json:"provider" enum:"byo,proxmox"`
-			CredentialID string `json:"credential_id,omitempty" maxLength:"64" doc:"Proxmox: which of the team's credentials to use."`
-			Kind         string `json:"kind,omitempty" enum:"vm,lxc" doc:"Proxmox: a VM cloned from the cloud-init template, or an unprivileged LXC."`
-			Size         string `json:"size,omitempty" enum:"small,medium,large"`
+			Name         string     `json:"name" minLength:"1" maxLength:"63" pattern:"^[A-Za-z0-9][A-Za-z0-9._-]*$" doc:"Letters, digits, dot, dash, underscore; unique in the team."`
+			Provider     string     `json:"provider" enum:"byo,proxmox"`
+			CredentialID string     `json:"credential_id,omitempty" maxLength:"64" doc:"Proxmox: which of the team's credentials to use."`
+			Kind         string     `json:"kind,omitempty" enum:"vm,lxc" doc:"Proxmox: a VM cloned from the cloud-init template, or an unprivileged LXC."`
+			Size         string     `json:"size,omitempty" enum:"small,medium,large"`
+			Connect      *ConnectIn `json:"connect,omitempty" doc:"Bring-your-own only: log in over SSH and set the server up now, instead of returning an install command."`
 		}
 	}) (*serverCreatedOut, error) {
 		out := &serverCreatedOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			b := in.Body
-			serverID := newUUID()
-			kind, status := "byo", "pending"
-			var credID, spec *string
-			if b.Provider == "proxmox" {
-				cred, err := q.CredentialInTeam(ctx, db.CredentialInTeamParams{ID: b.CredentialID, TeamID: m.TeamID})
-				if err != nil || cred.Provider != "proxmox" {
-					return huma.Error422UnprocessableEntity("choose one of this team's Proxmox credentials")
-				}
-				if b.Kind == "" {
-					return huma.Error422UnprocessableEntity("choose a VM or an LXC")
-				}
-				size := b.Size
-				if size == "" {
-					size = "small"
-				}
-				raw, _ := json.Marshal(map[string]string{"kind": b.Kind, "size": size})
-				kind, status, credID, spec = b.Kind, "provisioning", &cred.ID, ptr(string(raw))
+			var conn *provisioning.ConnectInput
+			if c := b.Connect; c != nil {
+				conn = &provisioning.ConnectInput{Host: c.Host, Port: c.Port, User: c.User, Auth: c.Auth,
+					Password: c.Password, PrivateKey: c.PrivateKey, RegisterProxmox: c.RegisterProxmox}
 			}
-			row, err := q.InsertServer(ctx, db.InsertServerParams{ID: serverID, TeamID: m.TeamID, Name: b.Name, Provider: b.Provider,
-				Kind: kind, Status: status, CredentialID: credID, Spec: spec, CreatedBy: id.ID})
+			row, inst, err := provisioning.AddServer(ctx, d.ops, q, m.TeamID, id.ID, provisioning.AddInput{Name: b.Name, Provider: b.Provider,
+				CredentialID: b.CredentialID, Kind: b.Kind, Size: b.Size, Connect: conn})
 			if err != nil {
-				if strings.Contains(err.Error(), "servers_team_name_key") {
-					return huma.Error409Conflict("a server with that name already exists in this team")
-				}
-				return huma.Error500InternalServerError("could not add the server")
+				return provisioningErr(err)
 			}
-
-			if b.Provider == "byo" {
-				inst, err := d.ops.NewEnrollment(ctx, q, m.TeamID, serverID, id.ID)
-				if err != nil {
-					return huma.Error500InternalServerError("could not create the install command")
-				}
-				out.Body.Install = &inst
-			} else {
-				// The per-server bootstrap key: its public half goes on the guest (cloud-init sshkeys /
-				// LXC ssh-public-keys); the private half is sealed with the team key.
-				pub, privPEM, err := sshboot.GenerateKey()
-				if err != nil {
-					return huma.Error500InternalServerError("could not create the bootstrap key")
-				}
-				dek, err := d.ops.TeamDEK(ctx, q, m.TeamID)
-				if err != nil {
-					return huma.Error500InternalServerError("team key unavailable")
-				}
-				sealed, err := crypto.Seal(dek, m.TeamID, provisioning.SSHKeyContext(serverID), privPEM)
-				if err != nil {
-					return huma.Error500InternalServerError("could not seal the bootstrap key")
-				}
-				if err := q.SetServerSSHKey(ctx, db.SetServerSSHKeyParams{ID: serverID, TeamID: m.TeamID, SshPublicKey: &pub, SshPrivateKeySealed: &sealed}); err != nil {
-					return huma.Error500InternalServerError("could not store the bootstrap key")
-				}
-				if _, _, err := d.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: m.TeamID, ServerID: serverID,
-					Kind: ops.KindProviderCreate, Params: json.RawMessage(`{}`), CreatedBy: id.ID, Executor: ops.ExecutorControlPlane}); err != nil {
-					return huma.Error500InternalServerError("could not queue provisioning")
-				}
-			}
-			if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "server.created", "server", serverID,
-				map[string]any{"name": b.Name, "provider": b.Provider, "kind": kind}); err != nil {
-				return huma.Error500InternalServerError("audit failed")
-			}
+			out.Body.Install = inst
 			out.Body.Server = toServerOut(row, time.Now(), true)
 			return nil
 		})
@@ -337,4 +287,28 @@ func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membe
 		}
 	}
 	return out
+}
+
+// ConnectIn is how to log in to a server the user already has. The password or key is sealed with
+// the team key for the connect operation only, then forgotten; Cloudy installs its own key.
+type ConnectIn struct {
+	Host            string `json:"host" minLength:"1" maxLength:"253" doc:"IP address or hostname."`
+	Port            int    `json:"port,omitempty" minimum:"1" maximum:"65535" doc:"Default 22."`
+	User            string `json:"user" minLength:"1" maxLength:"64" pattern:"^[a-z_][a-z0-9_.-]*$" doc:"root, or a user with passwordless sudo."`
+	Auth            string `json:"auth" enum:"password,key"`
+	Password        string `json:"password,omitempty" maxLength:"1024" writeOnly:"true"`
+	PrivateKey      string `json:"private_key,omitempty" maxLength:"16384" writeOnly:"true" doc:"OpenSSH or PEM private key, without a passphrase."`
+	RegisterProxmox *bool  `json:"register_proxmox,omitempty" doc:"If the host is a Proxmox VE node, also create an API token and save it as a credential. Default true."`
+}
+
+// provisioningErr maps a provisioning refusal to 422/409 and anything else to 500.
+func provisioningErr(err error) error {
+	var ue *provisioning.UserError
+	if errors.As(err, &ue) {
+		if ue.Conflict {
+			return huma.Error409Conflict(ue.Msg)
+		}
+		return huma.Error422UnprocessableEntity(ue.Msg)
+	}
+	return huma.Error500InternalServerError(err.Error())
 }

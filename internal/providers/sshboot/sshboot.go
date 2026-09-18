@@ -67,8 +67,115 @@ type Config struct {
 	Addr          string // host:22
 	User          string
 	PrivateKeyPEM []byte
+	Password      string // offered after the key, if set (connecting a server the user already has)
 	HostKey       HostKeyPolicy
 	DialTimeout   time.Duration // per attempt, including the handshake; default 10s
+	// FailFastAuth stops retrying on an authentication failure. For a server that already exists a
+	// wrong password will not fix itself, and retrying risks tripping fail2ban.
+	FailFastAuth bool
+}
+
+// Client is one SSH connection that can run several commands (probe, install, …) without logging
+// in again.
+type Client struct{ c *ssh.Client }
+
+// Close ends the connection.
+func (c *Client) Close() error { return c.c.Close() }
+
+// Connect dials (retrying as Run does) and authenticates.
+func Connect(ctx context.Context, cfg Config) (*Client, error) {
+	auth, err := authMethods(cfg)
+	if err != nil {
+		return nil, err
+	}
+	hk, mismatch, err := hostKeyCallback(cfg.HostKey)
+	if err != nil {
+		return nil, err
+	}
+	timeout := cfg.DialTimeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	sc := &ssh.ClientConfig{User: cfg.User, Auth: auth, HostKeyCallback: hk, Timeout: timeout}
+	c, err := dial(ctx, cfg.Addr, sc, timeout, mismatch, cfg.FailFastAuth)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{c: c}, nil
+}
+
+// Output runs command and returns its stdout (stderr is dropped). Non-zero exit is an error.
+func (c *Client) Output(ctx context.Context, command string) (string, error) {
+	var buf bytes.Buffer
+	err := c.Run(ctx, command, &buf, io.Discard)
+	return buf.String(), err
+}
+
+// Stream runs command, streaming stdout and stderr into out line by line.
+func (c *Client) Stream(ctx context.Context, command string, out io.Writer) error {
+	var mu sync.Mutex
+	stdout, stderr := &lineWriter{mu: &mu, out: out}, &lineWriter{mu: &mu, out: out}
+	err := c.Run(ctx, command, stdout, stderr)
+	stdout.flush()
+	stderr.flush()
+	return err
+}
+
+// Run runs command with the given writers. The command never appears in errors.
+func (c *Client) Run(ctx context.Context, command string, stdout, stderr io.Writer) error {
+	sess, err := c.c.NewSession()
+	if err != nil {
+		return fmt.Errorf("sshboot: opening session: %w", err)
+	}
+	defer sess.Close()
+	sess.Stdout, sess.Stderr = stdout, stderr
+	if err := sess.Start(command); err != nil {
+		return fmt.Errorf("sshboot: starting remote command: %w", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- sess.Wait() }()
+	select {
+	case err = <-done:
+	case <-ctx.Done():
+		_ = sess.Signal(ssh.SIGKILL)
+		c.c.Close()
+		<-done
+		return fmt.Errorf("sshboot: remote command interrupted: %w", ctx.Err())
+	}
+	var ee *ssh.ExitError
+	switch {
+	case errors.As(err, &ee):
+		return fmt.Errorf("sshboot: remote command exited with status %d: %w", ee.ExitStatus(), err)
+	case err != nil:
+		return fmt.Errorf("sshboot: remote command: %w", err)
+	}
+	return nil
+}
+
+// authMethods offers the key first, then the password (plain and keyboard-interactive, since many
+// sshd configs enable only the latter).
+func authMethods(cfg Config) ([]ssh.AuthMethod, error) {
+	var out []ssh.AuthMethod
+	if len(cfg.PrivateKeyPEM) > 0 {
+		signer, err := ssh.ParsePrivateKey(cfg.PrivateKeyPEM)
+		if err != nil {
+			return nil, errors.New("sshboot: the private key could not be parsed")
+		}
+		out = append(out, ssh.PublicKeys(signer))
+	}
+	if pw := cfg.Password; pw != "" {
+		out = append(out, ssh.Password(pw), ssh.KeyboardInteractive(func(_, _ string, qs []string, _ []bool) ([]string, error) {
+			answers := make([]string, len(qs))
+			for i := range answers {
+				answers[i] = pw
+			}
+			return answers, nil
+		}))
+	}
+	if len(out) == 0 {
+		return nil, errors.New("sshboot: no private key or password")
+	}
+	return out, nil
 }
 
 const (
@@ -82,64 +189,12 @@ const (
 //
 // The command itself never appears in errors: install commands carry an enrolment token.
 func Run(ctx context.Context, cfg Config, command string, out io.Writer) error {
-	signer, err := ssh.ParsePrivateKey(cfg.PrivateKeyPEM)
-	if err != nil {
-		return errors.New("sshboot: the private key could not be parsed")
-	}
-	hk, mismatch, err := hostKeyCallback(cfg.HostKey)
+	c, err := Connect(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	timeout := cfg.DialTimeout
-	if timeout <= 0 {
-		timeout = 10 * time.Second
-	}
-	sc := &ssh.ClientConfig{
-		User:            cfg.User,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: hk,
-		Timeout:         timeout,
-	}
-
-	client, err := dial(ctx, cfg.Addr, sc, timeout, mismatch)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	sess, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("sshboot: opening session: %w", err)
-	}
-	defer sess.Close()
-	var mu sync.Mutex
-	stdout, stderr := &lineWriter{mu: &mu, out: out}, &lineWriter{mu: &mu, out: out}
-	sess.Stdout, sess.Stderr = stdout, stderr
-	if err := sess.Start(command); err != nil {
-		return fmt.Errorf("sshboot: starting remote command: %w", err)
-	}
-	done := make(chan error, 1)
-	go func() { done <- sess.Wait() }()
-	select {
-	case err = <-done:
-	case <-ctx.Done():
-		_ = sess.Signal(ssh.SIGKILL)
-		client.Close()
-		<-done
-		stdout.flush()
-		stderr.flush()
-		return fmt.Errorf("sshboot: remote command interrupted: %w", ctx.Err())
-	}
-	stdout.flush()
-	stderr.flush()
-	var ee *ssh.ExitError
-	switch {
-	case errors.As(err, &ee):
-		return fmt.Errorf("sshboot: remote command exited with status %d: %w", ee.ExitStatus(), err)
-	case err != nil:
-		return fmt.Errorf("sshboot: remote command: %w", err)
-	}
-	return nil
+	defer c.Close()
+	return c.Stream(ctx, command, out)
 }
 
 // hostKeyCallback implements the policy. The returned flag is set when a key was refused, which
@@ -184,7 +239,7 @@ func hostKeyCallback(p HostKeyPolicy) (ssh.HostKeyCallback, *atomic.Bool, error)
 // dial retries with exponential backoff until it connects, the host key is refused, or ctx ends.
 // Authentication failures are retried too: sshd often starts before cloud-init has written the
 // authorized keys.
-func dial(ctx context.Context, addr string, sc *ssh.ClientConfig, timeout time.Duration, mismatch *atomic.Bool) (*ssh.Client, error) {
+func dial(ctx context.Context, addr string, sc *ssh.ClientConfig, timeout time.Duration, mismatch *atomic.Bool, failFastAuth bool) (*ssh.Client, error) {
 	backoff := firstBackoff
 	var last error
 	for attempt := 1; ; attempt++ {
@@ -194,6 +249,9 @@ func dial(ctx context.Context, addr string, sc *ssh.ClientConfig, timeout time.D
 		}
 		if mismatch.Load() {
 			return nil, err
+		}
+		if failFastAuth && strings.Contains(err.Error(), "unable to authenticate") {
+			return nil, errors.New("sshboot: the server refused the username, password or key")
 		}
 		last = err
 		select {

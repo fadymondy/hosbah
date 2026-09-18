@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -227,7 +228,7 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 			AgentVersion:   optional(clip(req.AgentVersion, 64)),
 			Facts:          ptr(string(factsJSON)),
 			Checks:         ptr(string(checksJSON)),
-			IpAddress:      optional(remoteIP(r)),
+			IpAddress:      optional(serverAddress(req.Facts.PrimaryIP, remoteIP(r))),
 			ID:             e.ServerID,
 			TeamID:         e.TeamID,
 		})
@@ -335,4 +336,13 @@ func (c *distCache) load(dir string) distInfo {
 		out.sha[arch] = sum
 	}
 	return out
+}
+
+// serverAddress prefers the address the agent reports for itself: behind NPM or Cloudflare the TCP
+// peer is the proxy, not the server.
+func serverAddress(reported, peer string) string {
+	if ip := net.ParseIP(strings.TrimSpace(reported)); ip != nil && !ip.IsLoopback() && !ip.IsUnspecified() {
+		return ip.String()
+	}
+	return peer
 }

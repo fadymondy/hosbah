@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/fadymondy/cloudy/internal/app"
+	"github.com/fadymondy/cloudy/internal/cloudflare"
 	"github.com/fadymondy/cloudy/internal/crypto"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
 	"github.com/fadymondy/cloudy/internal/ops"
@@ -35,6 +36,7 @@ func CredentialContext(id string) string   { return "credential:" + id }
 var configKeys = map[string][]string{
 	"proxmox": {"api_url", "token_id", "node", "storage", "bridge", "pool", "template_vmid", "lxc_template",
 		"snippets_storage", "snippets_dir", "tls_fingerprint", "insecure_tls"},
+	"cloudflare": {"account_id"},
 }
 
 // CleanConfig trims values, drops empty ones and refuses unknown keys.
@@ -57,6 +59,9 @@ func CleanConfig(provider string, in map[string]string) (map[string]string, erro
 
 // Validate builds the driver from an unsaved credential and asks the provider.
 func Validate(ctx context.Context, provider string, cfg map[string]string, secret string) error {
+	if provider == "cloudflare" {
+		return cloudflare.New(secret).Verify(ctx)
+	}
 	p, err := providers.New(provider, providers.Credential{Config: cfg, Secret: secret})
 	if err != nil {
 		return err
@@ -175,7 +180,7 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 	}
 	newInstall := func() (ops.Install, error) {
 		var inst ops.Install
-		err := system(ctx, a, func(q *db.Queries) error {
+		err := inTeam(ctx, a, srv.TeamID, func(q *db.Queries) error {
 			var err error
 			inst, err = svc.NewEnrollment(ctx, q, srv.TeamID, srv.ID, "system:provisioning")
 			return err
@@ -308,4 +313,10 @@ func orDefault(s, d string) string {
 		return d
 	}
 	return s
+}
+
+// inTeam runs fn in the server's team scope. Enrolment tokens are team rows: minting one inserts
+// and reads it back (RETURNING), and RLS lets system scope insert but not read agent_enrollments.
+func inTeam(ctx context.Context, a *app.App, teamID string, fn func(q *db.Queries) error) error {
+	return tenancy.Tx(ctx, a.SQLDB, tenancy.Scope{TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error { return fn(q) })
 }

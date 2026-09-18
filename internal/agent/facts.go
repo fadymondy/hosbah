@@ -20,8 +20,11 @@ import (
 func CollectFacts(ctx context.Context) agentproto.Facts {
 	f := agentproto.Facts{Arch: runtime.GOARCH, CPUs: runtime.NumCPU(), Ports: map[string]bool{}}
 	f.Hostname, _ = os.Hostname()
+	f.PrimaryIP = primaryIP()
 	collectPlatform(ctx, &f)
 	f.Docker = DockerInfo(ctx)
+	f.Proxmox = ProxmoxInfo(ctx)
+	f.Services = DiscoverServices(ctx, f.Docker.Running, f.Proxmox.Installed)
 	for _, p := range agentproto.PortsToCheck {
 		f.Ports[p] = portFree(p)
 	}
@@ -127,3 +130,17 @@ var selfPath = func() string {
 	}
 	return p
 }()
+
+// primaryIP is the address the host uses for outbound traffic: the local end of a UDP "connection"
+// to a public address. No packet is sent (UDP connect only picks a route).
+func primaryIP() string {
+	c, err := net.Dial("udp", "1.1.1.1:53")
+	if err != nil {
+		return ""
+	}
+	defer c.Close()
+	if a, ok := c.LocalAddr().(*net.UDPAddr); ok && !a.IP.IsLoopback() {
+		return a.IP.String()
+	}
+	return ""
+}

@@ -123,16 +123,7 @@ func provisionStep(oc *OpContext) (any, int, error) {
 
 var basePackages = []string{"ca-certificates", "curl", "gnupg"}
 
-func missingPackages(oc *OpContext, pkgs []string) []string {
-	var missing []string
-	for _, p := range pkgs {
-		out, err := execOutput(oc, "dpkg-query", "-W", "-f=${Status}", p)
-		if err != nil || !strings.Contains(out, "install ok installed") {
-			missing = append(missing, p)
-		}
-	}
-	return missing
-}
+func missingPackages(oc *OpContext, pkgs []string) []string { return hostPkgManager().missing(oc, pkgs) }
 
 func stepBasePackages(oc *OpContext) (any, int, error) {
 	missing := missingPackages(oc, basePackages)
@@ -141,12 +132,8 @@ func stepBasePackages(oc *OpContext) (any, int, error) {
 		return map[string]any{"changed": false}, 0, nil
 	}
 	oc.Info("missing: %s", strings.Join(missing, ", "))
-	oc.Progress(1, 2)
-	if code, err := oc.Run("apt-get", "update"); err != nil {
-		return nil, code, err
-	}
-	oc.Progress(2, 2)
-	if code, err := oc.Run("apt-get", append([]string{"install", "-y", "--no-install-recommends"}, missing...)...); err != nil {
+	oc.Progress(1, 1)
+	if code, err := hostPkgManager().install(oc, missing); err != nil {
 		return nil, code, err
 	}
 	return map[string]any{"changed": true, "installed": missing}, 0, nil
@@ -160,12 +147,9 @@ func stepDockerInstall(oc *OpContext) (any, int, error) {
 	}
 	if !d.Installed {
 		oc.Progress(1, 3)
-		if code, err := oc.Run("apt-get", "update"); err != nil {
-			return nil, code, err
-		}
-		oc.Progress(2, 3)
-		// The distribution's docker.io package: no third-party apt repository or key to trust.
-		if code, err := oc.Run("apt-get", "install", "-y", "--no-install-recommends", "docker.io"); err != nil {
+		// Debian/Ubuntu: the distribution's docker.io, no third-party repository or key to trust.
+		// RHEL family: Docker CE from download.docker.com (the distributions ship only podman).
+		if code, err := hostPkgManager().install(oc, []string{"docker.io"}); err != nil {
 			return nil, code, err
 		}
 	} else {

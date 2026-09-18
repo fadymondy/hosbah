@@ -21,3 +21,5 @@ func containerVirt(context.Context) string { return "" }
 func activeSwap() string { return "" }
 
 func diskUsage(string) (total, used uint64) { return 0, 0 }
+
+func readOSReleaseID() string { return "" }

@@ -130,3 +130,19 @@ func TestEvaluateChecks(t *testing.T) {
 		}
 	}
 }
+
+func TestChecksAcceptRHELFamilyAndPlatform(t *testing.T) {
+	for _, tc := range []struct {
+		id, ver string
+		pass    bool
+	}{{"rocky", "9.4", true}, {"almalinux", "10.0", true}, {"centos", "9", true}, {"centos", "7", false}, {"fedora", "40", false}} {
+		c := EvaluateChecks(Facts{OSID: tc.id, OSVersion: tc.ver})
+		if got := c[0].Status == CheckPass; got != tc.pass {
+			t.Errorf("%s %s: os check %+v", tc.id, tc.ver, c[0])
+		}
+	}
+	if (Facts{Proxmox: ProxmoxFacts{Installed: true}, Docker: DockerFacts{Running: true}}).Platform() != "proxmox" ||
+		(Facts{Docker: DockerFacts{Running: true}}).Platform() != "docker" || (Facts{}).Platform() != "linux" {
+		t.Fatal("platform precedence")
+	}
+}

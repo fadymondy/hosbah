@@ -64,6 +64,7 @@ func Boot() *app.App {
 		panic("cloudy: " + err.Error())
 	}
 	svc.RegisterRunner(ops.KindProviderCreate, provisioning.Runner(a, svc))
+	svc.RegisterRunner(ops.KindServerConnect, provisioning.ConnectRunner(a, svc))
 	svc.Mount(k.Router) // /install, /agent/* — outside /api, authenticated by token or signature
 	svc.Start()
 	a.Ops = svc
@@ -88,7 +89,7 @@ func Boot() *app.App {
 
 	k.Router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P3","togo":%q}`, togoVersion())
+		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P5","togo":%q}`, togoVersion())
 	})
 	return a
 }

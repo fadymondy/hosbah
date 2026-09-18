@@ -7,7 +7,10 @@ import (
 
 // Facts are what an agent reports about its host at enrolment (and system.info refreshes).
 type Facts struct {
-	Hostname      string          `json:"hostname"`
+	Hostname string `json:"hostname"`
+	// PrimaryIP is the host's own outbound address. The TCP peer the control plane sees can be a proxy
+	// (NPM, Cloudflare), so the server's address comes from here when the agent reports it.
+	PrimaryIP     string          `json:"primary_ip,omitempty"`
 	OSID          string          `json:"os_id"`      // /etc/os-release ID: ubuntu, debian…
 	OSVersion     string          `json:"os_version"` // VERSION_ID: 24.04, 12…
 	OSPretty      string          `json:"os_pretty"`
@@ -18,7 +21,48 @@ type Facts struct {
 	Systemd       bool            `json:"systemd"`        // PID 1 is systemd
 	Virt          string          `json:"virtualization"` // container / vm hint (lxc, docker, kvm…), "" if unknown
 	Docker        DockerFacts     `json:"docker"`
+	Proxmox       ProxmoxFacts    `json:"proxmox"`
 	Ports         map[string]bool `json:"ports"` // port -> free to bind (80, 443, 2019)
+	// Services is what already runs on the host (containers, well-known systemd units), so an
+	// existing server can be imported with its workloads visible.
+	Services []Service `json:"services,omitempty"`
+}
+
+// ProxmoxFacts: the host is a Proxmox VE node (pveversion answers).
+type ProxmoxFacts struct {
+	Installed bool   `json:"installed"`
+	Version   string `json:"version,omitempty"`
+}
+
+// Service is one workload found on the host.
+type Service struct {
+	Kind   string   `json:"kind"` // container | systemd | guest
+	Name   string   `json:"name"`
+	Image  string   `json:"image,omitempty"`
+	Status string   `json:"status"`
+	Ports  []string `json:"ports,omitempty"`
+}
+
+// Platform is what Cloudy manages the host as: proxmox (a hypervisor), docker (an engine is
+// running) or linux (plain; docker.install will add the engine).
+func (f Facts) Platform() string {
+	switch {
+	case f.Proxmox.Installed:
+		return "proxmox"
+	case f.Docker.Running:
+		return "docker"
+	default:
+		return "linux"
+	}
+}
+
+// RHELFamily reports a dnf-based distribution.
+func RHELFamily(osID string) bool {
+	switch osID {
+	case "centos", "rhel", "rocky", "almalinux", "ol", "fedora":
+		return true
+	}
+	return false
 }
 
 // DockerFacts is what docker.check and enrolment learn about the Docker engine.
@@ -85,13 +129,14 @@ func EvaluateChecks(f Facts) []Check {
 	osLabel := strings.TrimSpace(f.OSID + " " + f.OSVersion)
 	switch {
 	case f.OSID == "ubuntu" && (f.OSVersion == "22.04" || f.OSVersion == "24.04"),
-		f.OSID == "debian" && (f.OSVersion == "12" || f.OSVersion == "13"):
+		f.OSID == "debian" && (f.OSVersion == "12" || f.OSVersion == "13"),
+		RHELFamily(f.OSID) && f.OSID != "fedora" && (strings.HasPrefix(f.OSVersion, "9") || strings.HasPrefix(f.OSVersion, "10")):
 		add("os", CheckPass, osLabel)
 	default:
 		if osLabel == "" {
 			osLabel = "unknown"
 		}
-		add("os", CheckFail, osLabel+" is not supported — use Ubuntu 22.04/24.04 or Debian 12/13")
+		add("os", CheckFail, osLabel+" is not supported — use Ubuntu 22.04/24.04, Debian 12/13 or CentOS Stream/RHEL/Rocky/Alma 9 or 10")
 	}
 
 	switch f.Arch {
