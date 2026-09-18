@@ -1,4 +1,4 @@
-.PHONY: dev generate migrate seed build test agent
+.PHONY: dev generate migrate seed build test agent cli
 
 AGENT_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -25,3 +25,10 @@ build: ## Build the API binary
 
 test: ## Run tests
 	go test ./...
+
+cli: ## The cloudy CLI for Windows, macOS and Linux (amd64 + arm64) into bin/cli
+	mkdir -p bin/cli
+	for os in linux darwin windows; do for arch in amd64 arm64; do \
+		ext=""; [ $$os = windows ] && ext=".exe"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "-s -w -X main.version=$(AGENT_VERSION)" -o bin/cli/cloudy-$$os-$$arch$$ext ./cmd/cloudy || exit 1; \
+	done; done

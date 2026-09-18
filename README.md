@@ -54,6 +54,18 @@ docker run -d --name cloudy-target --privileged --cgroupns=host \
 docker exec cloudy-target sh -c 'curl -fsSL http://host.docker.internal:8710/install/cle_… | sh'
 ```
 
+### Connect a server over SSH
+
+**Servers → Add server → Connect with SSH**: an address, root (or a passwordless-sudo user) and a
+password or private key. The control-plane operation `server.connect` (`internal/provisioning/connect.go`)
+logs in once, probes the OS and whether it is plain Linux, Docker or Proxmox VE, installs Cloudy's
+own per-server key for root, installs the agent and waits for it to enrol. The login is sealed with
+the team key only while the operation runs and is forgotten afterwards, whatever the outcome. On a
+Proxmox node it can also create a `cloudy@pve` API token and save it as a team credential
+(`register_proxmox`, on by default). The agent's facts carry the platform and what already runs
+(containers, well-known systemd units, Proxmox guests), and the server page lists them. Ubuntu, Debian
+and the RHEL family (CentOS Stream, RHEL, Rocky and Alma 9–10, via dnf) are supported.
+
 ### Proxmox
 
 `internal/providers/proxmox` implements the plan's Provider interface. It can clone a VM from a
@@ -105,7 +117,19 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
 - **GitHub App**: written behind an interface but **not configured**. Set `CLOUDY_GITHUB_APP_ID`,
   `CLOUDY_GITHUB_APP_SLUG`, `CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE` and `CLOUDY_GITHUB_WEBHOOK_SECRET`
   to enable it; until then `/hooks/github` answers 503 and the UI says "GitHub App not configured".
-- **Tenant apps domain**: still an owner decision, so apps are reached through their own domains only.
+- **Apps domain**: set `CLOUDY_APPS_DOMAIN` (e.g. `fadymondy.com`) and every new app gets `<CLOUDY_APPS_PREFIX><app>.<domain>`
+  (default prefix `cloudy-app-`), created already verified. With `CLOUDY_CLOUDFLARE_TOKEN` Cloudy also creates and
+  deletes its A/AAAA record (only records it made, marked "managed by Cloudy"). Unset = off. Moving to a dedicated
+  domain later is only an `.env` change.
+- **Caddy proxy manager** (`internal/deploy/proxyhosts.go`, agent `proxy.set`): a *proxy host* puts any upstream a server
+  can reach (`host:port`, `http://…`, `https://…` with optional skip-verify) behind a hostname on that server's Caddy.
+  Like Nginx Proxy Manager, but on the Caddy Cloudy already runs. Hostnames share one namespace with app domains, use
+  the same TLS modes, and get a public certificate only once verified (TXT, or at once through the team's
+  Cloudflare). Web: **Proxy hosts**; API: `/api/teams/{team}/proxy-hosts`; MCP: `list_proxy_hosts`, `add_proxy_host`,
+  `update_proxy_host`, `verify_proxy_host`, `remove_proxy_host`.
+- **Team Cloudflare**: a team can save a `cloudflare` credential (API token with Zone:Read + DNS:Edit). A custom
+  domain in one of its zones then gets its DNS record created and is verified at once, with no TXT step.
+  Removing the domain removes only the records Cloudy created.
 
 The team MCP adds `list_apps`, `get_app`, `list_deployments`, `get_deployment`, `deploy_logs`,
 `list_env`, `list_domains` (read), `deploy_app` (with `wait`), `cancel_deployment`, `rollback_app`,
@@ -118,6 +142,23 @@ The team MCP adds `list_apps`, `get_app`, `list_deployments`, `get_deployment`, 
 Railpack; Node also has a release command and a worker). Serve them over http from bare clones, or
 point an app at any public repository, then: **Apps → New app** → repository URL, branch, server →
 *Detect runtime* → *Create and deploy*.
+
+## Buckets and importing
+
+- **Buckets**: a data service of kind `minio` is S3-compatible object storage (`quay.io/minio/minio`, published on the
+  server's private address only). Its "databases" are buckets (`my_files` becomes the bucket `my-files`) and its users are access
+  keys with MinIO's `readwrite` or `readonly` policy. Attaching it to an app sets `S3_URL` plus the `AWS_*` variables
+  S3 clients read, with path-style addressing. Backups stream the data directory through restic (`docker cp`, since the
+  image has no tar). This copies a live directory, so each object is consistent but the whole backup is not a point-in-time snapshot. A restore-test
+  copies it into a throwaway MinIO, restarts it and lists the buckets.
+- **Importing what runs**: a connected server lists its containers, well-known services and Proxmox guests. A container
+  with a published port can be **exposed** behind a hostname from the server page, which creates a proxy host for it.
+
+## SDKs, CLI and mobile
+
+See `sdk/README.md`. The Go (`pkg/cloudy`), Node, Python and PHP/Laravel SDKs and the `cloudy` CLI
+(`cmd/cloudy`, `make cli` builds it for Windows, macOS and Linux) call the team MCP endpoint with a `cld_…` token.
+A mobile app uses the REST API with the Bearer token `POST /api/auth/login` returns.
 
 ## Ports (local)
 
@@ -178,7 +219,7 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 
 | Endpoint | Tokens | Tools |
 |---|---|---|
-| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations` (read) · `invite_member` (write) · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
+| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
 | `POST /api/admin/mcp` | platform-admin `cla_…` | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
 
 Every tool declares a scope (`internal/mcp/scopes_test.go` fails otherwise); a token without it gets

@@ -1,0 +1,16 @@
+{
+  "name": "@cloudy/sdk",
+  "version": "0.1.0",
+  "description": "Cloudy SDK for Node.js and TypeScript — manage servers, apps, domains and proxy hosts from your app.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "npm run build && node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT",
+  "devDependencies": { "typescript": "^5.6.0" }
+}

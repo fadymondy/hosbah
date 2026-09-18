@@ -1,0 +1,15 @@
+{
+    "name": "fadymondy/cloudy-sdk",
+    "description": "Cloudy SDK for PHP and Laravel — manage servers, apps, domains and proxy hosts from your app.",
+    "type": "library",
+    "license": "MIT",
+    "require": { "php": ">=8.1", "ext-json": "*" },
+    "suggest": { "illuminate/support": "Laravel integration (service provider + Cloudy facade)" },
+    "autoload": { "psr-4": { "Cloudy\\": "src/" }, "files": ["src/Cloudy.php"] },
+    "extra": {
+        "laravel": {
+            "providers": ["Cloudy\Laravel\CloudyServiceProvider"],
+            "aliases": { "Cloudy": "Cloudy\Laravel\Facades\Cloudy" }
+        }
+    }
+}
