@@ -1,0 +1,25 @@
+# Cloudy control plane on Proxmox LXC 117 (10.10.10.117). Images built on the
+# workstation and loaded via `docker load`. NPM host 61 forwards
+# cloudy-app.fadymondy.com -> 10.10.10.117:3710 (web). web proxies /api -> api.
+# The managed server "target-1" (cloudy-target agent) stays on the workstation and
+# connects out to wss://cloudy-app.fadymondy.com/agent/ws (same pinned key via CLOUDY_KEK).
+name: cloudy-prod
+services:
+  api:
+    image: cloudy-api
+    container_name: cloudy-api
+    env_file: .env.prod
+    ports:
+      - "0.0.0.0:8710:8710"
+    restart: unless-stopped
+  web:
+    image: cloudy-web
+    container_name: cloudy-web
+    environment:
+      NODE_ENV: production
+      API_ORIGIN: http://api:8710
+    ports:
+      - "0.0.0.0:3710:3710"
+    depends_on:
+      - api
+    restart: unless-stopped
