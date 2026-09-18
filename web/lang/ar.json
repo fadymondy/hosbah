@@ -230,7 +230,10 @@
       "secretHint": "تُستخدم مرة واحدة لتثبيت مفتاح Cloudy الخاص والوكيل، ثم تُنسى. لا يخزّنها Cloudy أبدًا.",
       "registerProxmox": "إذا كان هذا خادم Proxmox VE، أضفه أيضًا كمزوّد Proxmox",
       "registerProxmoxHint": "ينشئ Cloudy رمز API للمستخدم cloudy@pve على الخادم ليتمكن من إنشاء الآلات الافتراضية وحاويات LXC عليه.",
-      "createConnect": "اتصال بالخادم"
+      "createConnect": "اتصال بالخادم",
+      "ipconfig": "عنوان ثابت (اختياري)",
+      "ipconfigHint": "للشبكات التي لا تحتوي على DHCP، مثل ip=10.10.10.121/24,gw=10.10.10.1. اتركه فارغًا لاستخدام DHCP.",
+      "nameserver": "خادم DNS (اختياري)"
     },
     "detail": {
       "facts": "الخادم",

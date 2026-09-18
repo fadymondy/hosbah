@@ -183,6 +183,8 @@ func (d *deps) registerServers(api huma.API) {
 			CredentialID string     `json:"credential_id,omitempty" maxLength:"64" doc:"Proxmox: which of the team's credentials to use."`
 			Kind         string     `json:"kind,omitempty" enum:"vm,lxc" doc:"Proxmox: a VM cloned from the cloud-init template, or an unprivileged LXC."`
 			Size         string     `json:"size,omitempty" enum:"small,medium,large"`
+			IPConfig     string     `json:"ipconfig,omitempty" maxLength:"200" doc:"Proxmox: static address for networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1 (empty: DHCP)."`
+			Nameserver   string     `json:"nameserver,omitempty" maxLength:"45" doc:"Proxmox LXC: resolver for a static address, e.g. 1.1.1.1."`
 			Connect      *ConnectIn `json:"connect,omitempty" doc:"Bring-your-own only: log in over SSH and set the server up now, instead of returning an install command."`
 		}
 	}) (*serverCreatedOut, error) {
@@ -195,7 +197,7 @@ func (d *deps) registerServers(api huma.API) {
 					Password: c.Password, PrivateKey: c.PrivateKey, RegisterProxmox: c.RegisterProxmox}
 			}
 			row, inst, err := provisioning.AddServer(ctx, d.ops, q, m.TeamID, id.ID, provisioning.AddInput{Name: b.Name, Provider: b.Provider,
-				CredentialID: b.CredentialID, Kind: b.Kind, Size: b.Size, Connect: conn})
+				CredentialID: b.CredentialID, Kind: b.Kind, Size: b.Size, IPConfig: b.IPConfig, Nameserver: b.Nameserver, Connect: conn})
 			if err != nil {
 				return provisioningErr(err)
 			}

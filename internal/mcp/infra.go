@@ -38,6 +38,8 @@ func InfraTools() []Tool {
 				"credential":       str("proxmox: credential id or name"),
 				"kind":             map[string]any{"type": "string", "enum": []string{"vm", "lxc"}},
 				"size":             map[string]any{"type": "string", "enum": []string{"small", "medium", "large"}},
+				"ipconfig":         str("proxmox: static address for networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1"),
+				"nameserver":       str("proxmox LXC: resolver for a static address, e.g. 1.1.1.1"),
 			}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
@@ -71,6 +73,7 @@ func InfraTools() []Tool {
 						return "", err
 					}
 					in.Provider, in.CredentialID, in.Kind, in.Size = "proxmox", cred.ID, args.Str("kind"), args.Str("size")
+					in.IPConfig, in.Nameserver = args.Str("ipconfig"), args.Str("nameserver")
 				default:
 					return "", errors.New("method must be install, connect or proxmox")
 				}

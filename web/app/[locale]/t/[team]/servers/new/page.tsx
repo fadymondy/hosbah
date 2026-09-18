@@ -63,6 +63,8 @@ export default function NewServerPage() {
   const [credential, setCredential] = useState("");
   const [kind, setKind] = useState<"vm" | "lxc">("lxc");
   const [size, setSize] = useState<(typeof SIZES)[number]>("small");
+  const [ipconfig, setIpconfig] = useState("");
+  const [nameserver, setNameserver] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ server: Server; install: Install } | null>(null);
@@ -127,7 +129,15 @@ export default function NewServerPage() {
       } else {
         const res = await apiFetch<{ server: Server }>(`/api/teams/${team.slug}/servers`, {
           method: "POST",
-          body: { name, provider: "proxmox", credential_id: credential, kind, size },
+          body: {
+            name,
+            provider: "proxmox",
+            credential_id: credential,
+            kind,
+            size,
+            ...(ipconfig.trim() ? { ipconfig: ipconfig.trim() } : {}),
+            ...(nameserver.trim() ? { nameserver: nameserver.trim() } : {}),
+          },
         });
         router.push(`${base}/servers/${res.server.id}`);
       }
@@ -339,6 +349,29 @@ export default function NewServerPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="px-ip">{t("servers.new.ipconfig")}</FieldLabel>
+                    <Input
+                      id="px-ip"
+                      dir="ltr"
+                      placeholder="ip=10.10.10.121/24,gw=10.10.10.1"
+                      value={ipconfig}
+                      onChange={(e) => setIpconfig(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <FieldDescription>{t("servers.new.ipconfigHint")}</FieldDescription>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="px-ns">{t("servers.new.nameserver")}</FieldLabel>
+                    <Input
+                      id="px-ns"
+                      dir="ltr"
+                      placeholder="1.1.1.1"
+                      value={nameserver}
+                      onChange={(e) => setNameserver(e.target.value)}
+                      autoComplete="off"
+                    />
                   </Field>
                 </>
               ) : null}

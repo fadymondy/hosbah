@@ -349,6 +349,9 @@ func (d *Driver) createLXC(ctx context.Context, node string, vmid int, name, tem
 	if keys := joinKeys(s.SSHPublicKeys); keys != "" {
 		p.Set("ssh-public-keys", keys) // plain text here, unlike qemu's sshkeys
 	}
+	if ns := strings.TrimSpace(s.Options["nameserver"]); ns != "" {
+		p.Set("nameserver", ns) // a static address usually needs its own resolver (the host's may be unreachable)
+	}
 	if d.pool != "" {
 		p.Set("pool", d.pool)
 	}

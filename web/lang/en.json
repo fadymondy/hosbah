@@ -230,7 +230,10 @@
       "secretHint": "Used once to install Cloudy's own key and the agent, then forgotten. Cloudy never stores it.",
       "registerProxmox": "If this is a Proxmox VE node, also add it as a Proxmox provider",
       "registerProxmoxHint": "Cloudy creates an API token for cloudy@pve on the node so it can create VMs and LXCs there.",
-      "createConnect": "Connect server"
+      "createConnect": "Connect server",
+      "ipconfig": "Static address (optional)",
+      "ipconfigHint": "For networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1. Leave empty to use DHCP.",
+      "nameserver": "DNS server (optional)"
     },
     "detail": {
       "facts": "Server",

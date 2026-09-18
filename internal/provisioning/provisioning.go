@@ -166,7 +166,11 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 	if err != nil {
 		return nil, fmt.Errorf("prepare: %w", err)
 	}
-	var spec struct{ Kind, Size string }
+	var spec struct {
+		Kind, Size string
+		IPConfig   string `json:"ipconfig"`
+		Nameserver string `json:"nameserver"`
+	}
 	if srv.Spec != nil {
 		_ = json.Unmarshal([]byte(*srv.Spec), &spec)
 	}
@@ -189,6 +193,13 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 	}
 
 	cs := providers.CreateSpec{Name: srv.Name, Kind: spec.Kind, Size: spec.Size, SSHPublicKeys: []string{*srv.SshPublicKey}, Tags: []string{"cloudy"}}
+	cs.Options = map[string]string{}
+	if spec.IPConfig != "" {
+		cs.Options["ipconfig0"] = spec.IPConfig
+	}
+	if spec.Nameserver != "" {
+		cs.Options["nameserver"] = spec.Nameserver
+	}
 	if delivers {
 		inst, err := newInstall()
 		if err != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -26,7 +27,12 @@ type AddInput struct {
 	CredentialID string // proxmox
 	Kind         string // proxmox: vm | lxc
 	Size         string // proxmox: small | medium | large
-	Connect      *ConnectInput
+	// IPConfig, proxmox: a static address for networks without DHCP, e.g. "ip=10.10.10.121/24,gw=10.10.10.1"
+	// (qemu ipconfig0 syntax; the same keys set an LXC's net0). Empty: DHCP.
+	IPConfig string
+	// Nameserver, proxmox LXC: the resolver for a static address (e.g. 1.1.1.1). Empty: the node's.
+	Nameserver string
+	Connect    *ConnectInput
 }
 
 // ConnectInput is how to log in to a server the user already has.
@@ -72,7 +78,20 @@ func AddServer(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, act
 		if size == "" {
 			size = "small"
 		}
-		raw, _ := json.Marshal(map[string]string{"kind": in.Kind, "size": size})
+		settings := map[string]string{"kind": in.Kind, "size": size}
+		if ip := strings.TrimSpace(in.IPConfig); ip != "" {
+			if strings.ContainsAny(ip, " \t\n") || !strings.Contains(ip, "ip=") {
+				return db.Server{}, nil, refuse("ipconfig looks like ip=10.10.10.121/24,gw=10.10.10.1 (or leave it empty for DHCP)")
+			}
+			settings["ipconfig"] = ip
+		}
+		if ns := strings.TrimSpace(in.Nameserver); ns != "" {
+			if net.ParseIP(ns) == nil {
+				return db.Server{}, nil, refuse("nameserver must be an IP address, e.g. 1.1.1.1")
+			}
+			settings["nameserver"] = ns
+		}
+		raw, _ := json.Marshal(settings)
 		s := string(raw)
 		kind, status, credID, spec = in.Kind, "provisioning", &cred.ID, &s
 	case in.Provider != "byo":

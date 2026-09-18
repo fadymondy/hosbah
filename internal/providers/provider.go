@@ -62,7 +62,7 @@ type CreateSpec struct {
 	UserData string
 	Tags     []string
 	// Options are provider-specific settings. Proxmox understands "ipconfig0" ("ip=dhcp" by
-	// default, or "ip=10.10.10.50/24,gw=10.10.10.1"), "cores", "memory_mb" and "disk_gb".
+	// default, or "ip=10.10.10.50/24,gw=10.10.10.1"), "nameserver" (LXC), "cores", "memory_mb" and "disk_gb".
 	Options map[string]string
 }
 
