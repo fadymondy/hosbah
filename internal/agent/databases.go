@@ -762,3 +762,57 @@ func dbCreateMinIO(oc *OpContext, p agentproto.DBCreateParams, rootpw, userpw st
 	}
 	return agentproto.DBCreateResult{Database: p.Database, User: p.User}, 0, nil
 }
+
+// ---- db.drop -------------------------------------------------------------------------------------
+
+// dbDrop drops one database (bucket) and its users. Names are validated identifiers; the root secret
+// travels in the environment, never on an argv.
+func dbDrop(oc *OpContext) (any, int, error) {
+	p, err := decode[agentproto.DBDropParams](oc)
+	if err != nil {
+		return nil, 2, err
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
+	if err != nil {
+		return nil, 1, err
+	}
+	if !containerRunning(oc, p.Container) {
+		return nil, 1, errors.New("the data service is not running")
+	}
+	rootpw := root["password"]
+	var out string
+	switch p.Kind {
+	case "postgres":
+		sql := fmt.Sprintf("\\set ON_ERROR_STOP on\nDROP DATABASE IF EXISTS \"%s\" WITH (FORCE);\n", p.Database)
+		for _, u := range p.Users {
+			sql += fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";\n", u)
+		}
+		out, err = execIn(oc, []string{"PGPASSWORD=" + rootpw}, sql, p.Container, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres")
+	case "mysql":
+		sql := fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;\n", p.Database)
+		for _, u := range p.Users {
+			sql += fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';\n", u)
+		}
+		out, err = execIn(oc, []string{"MYSQL_PWD=" + rootpw}, sql, p.Container, "mysql", "-u", "root")
+	case "minio":
+		env := []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000"}
+		out, err = execIn(oc, env, "", p.Container, "mc", "rb", "--force", "local/"+agentproto.BucketName(p.Database))
+		if err != nil && strings.Contains(out, "does not exist") {
+			err = nil // already gone: dropping is idempotent
+		}
+		for _, u := range p.Users {
+			if err == nil {
+				_, _ = execIn(oc, env, "", p.Container, "mc", "admin", "user", "rm", "local", u)
+			}
+		}
+	}
+	if err != nil {
+		oc.Info("%s", strings.TrimSpace(out))
+		return nil, 1, errors.New("could not drop the database")
+	}
+	oc.Info("dropped %s %q and %d user(s)", p.Kind, p.Database, len(p.Users))
+	return map[string]any{"database": p.Database, "users": p.Users}, 0, nil
+}

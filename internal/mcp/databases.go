@@ -106,7 +106,7 @@ func DatabaseTools() []Tool {
 		// ---- write ----
 		{
 			Name: "create_database", Scope: scopes.Write,
-			Description: "Provision a managed data service (postgres, mysql or redis) on one of the team's servers.",
+			Description: "Provision a managed data service (postgres, mysql, redis, or minio for S3-compatible buckets) on one of the team's servers. create_db adds databases and users inside it.",
 			InputSchema: schema([]string{"name", "server", "kind"}, map[string]any{
 				"name": str("Lowercase letters, digits, dashes"), "server": str("Server name or id"),
 				"kind": map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis", "minio"}, "description": "minio = S3-compatible object storage (buckets)"},

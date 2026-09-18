@@ -219,7 +219,7 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 
 | Endpoint | Tokens | Tools |
 |---|---|---|
-| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
+| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · databases: `create_db`, `attach_database`, `set_backup_schedule`, `drop_database`, `delete_data_service` · servers: `run_server_step` · apps: `update_app`, `list_releases`, `rotate_deploy_hook` · team: `update_member_role`, `delete_credential` · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
 | `POST /api/admin/mcp` | platform-admin `cla_…` | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
 
 Every tool declares a scope (`internal/mcp/scopes_test.go` fails otherwise); a token without it gets

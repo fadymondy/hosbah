@@ -89,6 +89,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppRemove:     appRemove,
 		agentproto.KindDBProvision:   dbProvision,
 		agentproto.KindDBCreate:      dbCreate,
+		agentproto.KindDBDrop:        dbDrop,
 		agentproto.KindDBBackup:      dbBackup,
 		agentproto.KindDBRestore:     dbRestore,
 		agentproto.KindDBRemove:      dbRemove,
@@ -216,7 +217,7 @@ func laneOf(op agentproto.SignedOp) string {
 			return "app:" + p.AppID
 		}
 		return "app:?"
-	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBBackup,
+	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBDrop, agentproto.KindDBBackup,
 		agentproto.KindDBRestore, agentproto.KindDBRemove:
 		var p struct {
 			ServiceID string `json:"service_id"`

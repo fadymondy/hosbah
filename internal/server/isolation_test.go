@@ -251,6 +251,9 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
 		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
 		"remove_proxy_host": {"proxy": proxyA.ID},
+		"update_app": {"app": appA.App.ID, "branch": "x"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
+		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},
+		"update_member_role": {"member": memberA, "role": "viewer"}, "delete_credential": {"credential": credA.ID, "confirm": "pve-a"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -267,6 +270,8 @@ func TestIsolationSweep(t *testing.T) {
 	for name, args := range map[string]map[string]any{
 		"get_database": {"database": "svc-x"}, "list_backups": {"database": "svc-x"}, "backup_now": {"database": "svc-x"},
 		"reveal_db_url": {"database": "svc-x"}, "restore_backup": {"database": "svc-x", "confirm": "svc-x"},
+		"create_db": {"database": "svc-x", "name": "x"}, "drop_database": {"database": "svc-x", "name": "x", "confirm": "x"},
+		"delete_data_service": {"database": "svc-x", "confirm": "svc-x"}, "set_backup_schedule": {"database": "svc-x", "cron": "0 3 * * *"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {

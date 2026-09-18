@@ -51,7 +51,7 @@ func Timeout(kind string) time.Duration {
 		return 20 * time.Minute // pull an image, start the engine, wait for readiness, restore
 	case agentproto.KindDBBackup:
 		return 30 * time.Minute
-	case agentproto.KindDBCreate, agentproto.KindDBRemove:
+	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop:
 		return 5 * time.Minute
 	}
 	return 10 * time.Minute

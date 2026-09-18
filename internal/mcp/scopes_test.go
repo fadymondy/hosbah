@@ -93,6 +93,7 @@ func TestDestructiveToolInventory(t *testing.T) {
 	want := map[string]bool{
 		"delete_app": true, "delete_server": true, "remove_domain": true,
 		"restore_backup": true, "revoke_invitation": true, "remove_member": true,
+		"drop_database": true, "delete_data_service": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

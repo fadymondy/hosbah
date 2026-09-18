@@ -17,6 +17,7 @@ const (
 	KindDBBackup    = "db.backup"    // pg_dump -Fc / mysqldump / Redis RDB, pushed into a restic repository
 	KindDBRestore   = "db.restore"   // restore a snapshot into a throwaway container and verify it (restore-test)
 	KindDBRemove    = "db.remove"     // stop and remove a service's container and its volume (the service was deleted)
+	KindDBDrop      = "db.drop"       // drop one database (bucket) and its users inside a running service
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -291,6 +292,36 @@ type DBRemoveParams struct {
 func (p DBRemoveParams) Validate() error {
 	if !ValidID(p.ServiceID) || p.Container == "" || p.Volume == "" {
 		return errors.New("bad remove params")
+	}
+	return nil
+}
+
+// DBDropParams: db.drop — drop one database (a MinIO bucket) and the users created for it. Idempotent:
+// dropping what is already gone succeeds.
+type DBDropParams struct {
+	ServiceID  string   `json:"service_id"`
+	Kind       string   `json:"kind"`
+	Container  string   `json:"container"`
+	Database   string   `json:"database"`
+	Users      []string `json:"users,omitempty"`
+	RootSecret string   `json:"root_secret"`
+}
+
+func (p DBDropParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
+		return errors.New("databases apply to postgres, mysql and minio")
+	case !ValidDBName(p.Database):
+		return fmt.Errorf("bad database name %q", p.Database)
+	case p.Container == "" || p.RootSecret == "":
+		return errors.New("container and root secret are required")
+	}
+	for _, u := range p.Users {
+		if !ValidDBName(u) {
+			return fmt.Errorf("bad user name %q", u)
+		}
 	}
 	return nil
 }
