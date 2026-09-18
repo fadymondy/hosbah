@@ -21,7 +21,7 @@ import (
 // key and only ever returned by the audited reveal endpoint.
 type CredentialOut struct {
 	ID              string            `json:"id"`
-	Provider        string            `json:"provider" enum:"proxmox"`
+	Provider        string            `json:"provider" enum:"proxmox,cloudflare"`
 	Name            string            `json:"name"`
 	Config          map[string]string `json:"config" doc:"Non-secret settings (API URL, token id, node, storage…)."`
 	LastValidatedAt *time.Time        `json:"last_validated_at"`
@@ -74,10 +74,10 @@ func (d *deps) registerCredentials(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		TeamPath
 		Body struct {
-			Provider string            `json:"provider" enum:"proxmox"`
+			Provider string            `json:"provider" enum:"proxmox,cloudflare"`
 			Name     string            `json:"name" minLength:"1" maxLength:"80"`
-			Config   map[string]string `json:"config" doc:"proxmox: api_url, token_id, node, storage, bridge, pool, template_vmid, lxc_template, snippets_storage, snippets_dir, tls_fingerprint, insecure_tls"`
-			Secret   string            `json:"secret" minLength:"1" maxLength:"4096" doc:"proxmox: the API token secret."`
+			Config   map[string]string `json:"config" doc:"proxmox: api_url, token_id, node, storage, bridge, pool, template_vmid, lxc_template, snippets_storage, snippets_dir, tls_fingerprint, insecure_tls. cloudflare: account_id (optional)"`
+			Secret   string            `json:"secret" minLength:"1" maxLength:"4096" doc:"proxmox: the API token secret. cloudflare: an API token with Zone:Read and DNS:Edit."`
 			// Not `validate` with default:"true": huma re-applies a bool default over an explicit false.
 			SkipValidation bool `json:"skip_validation,omitempty" doc:"Save without checking the credential against the provider first."`
 		}

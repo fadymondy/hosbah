@@ -133,6 +133,7 @@ func (s *Service) CreateApp(ctx context.Context, q *db.Queries, teamID string, a
 		"name": a.Name, "server": srv.Name, "repo_url": a.RepoURL, "branch": a.Branch})); err != nil {
 		return db.App{}, "", err
 	}
+	s.addAppsHostname(ctx, q, teamID, a, srv)
 	return a, s.HookURL(plain), nil
 }
 
@@ -195,6 +196,7 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 			return conflict("a deployment is running — cancel it first")
 		}
 	}
+	host := platformHost(ctx, q, teamID, a)
 	raw, _ := json.Marshal(agentproto.RemoveParams{AppID: a.ID, App: a.Name})
 	if _, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindAppRemove,
 		Params: raw, CreatedBy: actor.UserID}); err != nil {
@@ -203,7 +205,11 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 	if n, err := q.DeleteAppInTeam(ctx, db.DeleteAppInTeamParams{ID: a.ID, TeamID: teamID}); err != nil || n == 0 {
 		return notFound("app")
 	}
-	return tenancy.Record(ctx, q, teamID, actor.UserID, "app.deleted", "app", a.ID, actor.audit(map[string]any{"name": a.Name}))
+	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "app.deleted", "app", a.ID, actor.audit(map[string]any{"name": a.Name})); err != nil {
+		return err
+	}
+	s.removeAppsDNS(ctx, host)
+	return nil
 }
 
 // ---- deployments -------------------------------------------------------------------------------------
@@ -421,6 +427,9 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if !agentproto.ValidTLS(tls) {
 		return db.Domain{}, invalid("tls must be auto, internal or off")
 	}
+	if s.apps.Owns(hostname) {
+		return db.Domain{}, invalid("hostnames under "+s.apps.Domain+" are given to apps automatically")
+	}
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
 	d, err := q.InsertDomain(ctx, db.InsertDomainParams{TeamID: teamID, AppID: a.ID, Hostname: hostname, Tls: tls, VerifyToken: "cloudy-verify=" + hex.EncodeToString(tok)})
@@ -432,6 +441,12 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.added", "app", a.ID, actor.audit(map[string]any{"hostname": hostname, "tls": tls})); err != nil {
 		return db.Domain{}, err
+	}
+	if s.wireTeamDNS(ctx, q, teamID, a, hostname) {
+		if err := q.MarkDomainVerified(ctx, db.MarkDomainVerifiedParams{ID: d.ID, TeamID: teamID}); err == nil {
+			now := time.Now()
+			d.VerifiedAt = &now
+		}
 	}
 	return d, s.SyncRoutes(ctx, q, teamID, a)
 }
@@ -449,12 +464,16 @@ func DomainByRef(ctx context.Context, q *db.Queries, teamID string, a db.App, re
 
 // RemoveDomain stops routing a hostname.
 func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) error {
+	if d.VerifyToken == "platform" {
+		return invalid("the app's platform hostname cannot be removed")
+	}
 	if n, err := q.DeleteDomainInTeam(ctx, db.DeleteDomainInTeamParams{ID: d.ID, TeamID: teamID}); err != nil || n == 0 {
 		return notFound("domain")
 	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.removed", "app", a.ID, actor.audit(map[string]any{"hostname": d.Hostname})); err != nil {
 		return err
 	}
+	s.unwireTeamDNS(ctx, q, teamID, d.Hostname)
 	return s.SyncRoutes(ctx, q, teamID, a)
 }
 

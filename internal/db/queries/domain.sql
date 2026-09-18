@@ -34,4 +34,9 @@ UPDATE domains SET verified_at = now(), updated_at = now() WHERE id = $1 AND tea
 
 -- name: TLSAllowed :one
 -- System scope: Caddy's on-demand TLS ask. A certificate only for a verified auto-TLS domain.
-SELECT count(*) FROM domains WHERE hostname = $1 AND tls = 'auto' AND verified_at IS NOT NULL;
+SELECT ((SELECT count(*) FROM domains d WHERE d.hostname = $1 AND d.tls = 'auto' AND d.verified_at IS NOT NULL)
+     + (SELECT count(*) FROM proxy_hosts p WHERE p.hostname = $1 AND p.tls = 'auto' AND p.enabled AND p.verified_at IS NOT NULL))::bigint AS n;
+
+-- name: HostnameTaken :one
+-- System scope: is this hostname routed anywhere in Cloudy (any team)?
+SELECT ((SELECT count(*) FROM domains d WHERE d.hostname = $1) + (SELECT count(*) FROM proxy_hosts p WHERE p.hostname = $1))::bigint AS n;

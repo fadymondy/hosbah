@@ -31,6 +31,7 @@ import (
 
 	"github.com/fadymondy/cloudy/internal/agentproto"
 	"github.com/fadymondy/cloudy/internal/app"
+	"github.com/fadymondy/cloudy/internal/cloudflare"
 	"github.com/fadymondy/cloudy/internal/crypto"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
 	"github.com/fadymondy/cloudy/internal/ops"
@@ -50,6 +51,10 @@ type Service struct {
 	active map[string]bool
 
 	github GitHubApp
+	// apps is the platform apps domain (CLOUDY_APPS_DOMAIN …); see appsdomain.go.
+	apps AppsDomain
+	// cfOpts, when set, configures every Cloudflare client (tests).
+	cfOpts []cloudflare.Option
 }
 
 // New builds the service; Start launches its worker.
@@ -59,7 +64,7 @@ func New(a *app.App, o *ops.Service) *Service {
 		log = slog.Default()
 	}
 	return &Service{a: a, ops: o, log: log.With("component", "deploy"), wake: make(chan struct{}, 1), active: map[string]bool{},
-		github: GitHubFromEnv()}
+		github: GitHubFromEnv(), apps: AppsDomainFromEnv()}
 }
 
 // Start launches the worker. Deployments this control plane was running when it stopped are
