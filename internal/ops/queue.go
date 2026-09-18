@@ -23,6 +23,9 @@ const (
 // Control-plane operation kinds (run by the control plane itself, logged like agent ops).
 const (
 	KindProviderCreate = "provider.create"
+	// KindServerConnect logs into a server the user already has (root or sudo user; password or key),
+	// installs Cloudy's key and the agent, and waits for it to enrol.
+	KindServerConnect = "server.connect"
 )
 
 // Timeout is how long an operation may run once sent (the agent enforces it too, with exit 124).
@@ -32,7 +35,7 @@ func Timeout(kind string) time.Duration {
 		return 2 * time.Minute
 	case agentproto.KindAgentUpdate:
 		return 5 * time.Minute
-	case agentproto.KindProvisionStep, KindProviderCreate:
+	case agentproto.KindProvisionStep, KindProviderCreate, KindServerConnect:
 		return 30 * time.Minute
 	case agentproto.KindAppBuild:
 		return 45 * time.Minute
@@ -40,7 +43,7 @@ func Timeout(kind string) time.Duration {
 		return 20 * time.Minute
 	case agentproto.KindAppStart, agentproto.KindAppRollback:
 		return 15 * time.Minute // a 600 s health gate plus an image start
-	case agentproto.KindRouteSet, agentproto.KindOpCancel:
+	case agentproto.KindRouteSet, agentproto.KindOpCancel, agentproto.KindProxySet:
 		return 2 * time.Minute
 	case agentproto.KindAppLogs:
 		return 6 * time.Minute
@@ -89,7 +92,7 @@ func (s *Service) Enqueue(ctx context.Context, q *db.Queries, sp EnqueueSpec) (o
 	if sp.Executor == "" {
 		sp.Executor = ExecutorAgent
 	}
-	if sp.Executor == ExecutorAgent && !isAgentKind(sp.Kind) || sp.Executor == ExecutorControlPlane && sp.Kind != KindProviderCreate {
+	if sp.Executor == ExecutorAgent && !isAgentKind(sp.Kind) || sp.Executor == ExecutorControlPlane && sp.Kind != KindProviderCreate && sp.Kind != KindServerConnect {
 		return db.Operation{}, false, ErrKind
 	}
 	canon, err := agentproto.CanonicalParams(sp.Params)

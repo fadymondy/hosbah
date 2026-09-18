@@ -45,6 +45,8 @@ type routeEntry struct {
 type routeTable struct {
 	AskURL string                `json:"ask_url,omitempty"`
 	Apps   map[string]routeEntry `json:"apps"`
+	// Proxies are the proxy manager's hosts (proxy.set), keyed by proxy id.
+	Proxies map[string]proxyEntry `json:"proxies,omitempty"`
 }
 
 var routesMu sync.Mutex
@@ -93,6 +95,14 @@ func setAskURL(u string) error {
 	return saveRoutes(t)
 }
 
+// proxyEntry is one proxy host: a hostname in front of any upstream the server can reach.
+type proxyEntry struct {
+	Host       agentproto.Route `json:"host"`
+	Dial       string           `json:"dial"`
+	TLS        bool             `json:"tls,omitempty"`
+	SkipVerify bool             `json:"skip_verify,omitempty"`
+}
+
 // renderCaddy turns the route table into Caddy's JSON config.
 func renderCaddy(t routeTable) map[string]any {
 	ids := make([]string, 0, len(t.Apps))
@@ -138,6 +148,34 @@ func renderCaddy(t routeTable) map[string]any {
 		}
 		if len(secure) > 0 {
 			httpsRoutes = append(httpsRoutes, route(id, "-https", secure, e.Upstream))
+		}
+	}
+	pids := make([]string, 0, len(t.Proxies))
+	for id := range t.Proxies {
+		pids = append(pids, id)
+	}
+	sort.Strings(pids)
+	for _, id := range pids {
+		p := t.Proxies[id]
+		proxy := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": p.Dial}}, "flush_interval": -1}
+		if p.TLS {
+			tr := map[string]any{"protocol": "http", "tls": map[string]any{}}
+			if p.SkipVerify {
+				tr["tls"] = map[string]any{"insecure_skip_verify": true}
+			}
+			proxy["transport"] = tr
+		}
+		r := map[string]any{"@id": agentproto.ProxyRouteID(id), "match": []any{map[string]any{"host": []string{p.Host.Hostname}}},
+			"terminal": true, "handle": []any{proxy}}
+		switch p.Host.TLS {
+		case "off":
+			httpRoutes = append(httpRoutes, r)
+		case "internal":
+			httpsRoutes = append(httpsRoutes, r)
+			internalHosts = append(internalHosts, p.Host.Hostname)
+		default:
+			httpsRoutes = append(httpsRoutes, r)
+			autoHosts = append(autoHosts, p.Host.Hostname)
 		}
 	}
 	httpRoutes = append(httpRoutes, map[string]any{

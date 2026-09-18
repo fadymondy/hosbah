@@ -114,6 +114,11 @@ func TestIsolationSweep(t *testing.T) {
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 
+	// P5: a proxy host of A's (Caddy proxy manager) on that server.
+	var proxyA struct{ ID, Hostname string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/proxy-hosts", map[string]any{"server": srvA, "hostname": "nas-" + suffix + ".example.test",
+		"upstream": "10.0.0.5:5000", "tls": "off"}, 201, &proxyA)
+
 	// P4: a pending approval request of A's, made the only way one can be made — by turning the
 	// team setting on and letting a destructive MCP call be held. Sweeping it matters because an
 	// approval is a capability to destroy something: B must not be able to read it or decide it.
@@ -153,6 +158,7 @@ func TestIsolationSweep(t *testing.T) {
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
+		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x"} }, // a service B may not see
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
@@ -243,11 +249,16 @@ func TestIsolationSweep(t *testing.T) {
 		"set_env": {"app": appA.App.ID, "name": "X", "value": "y"}, "unset_env": {"app": appA.App.ID, "name": "SECRET_A"},
 		"add_domain": {"app": appA.App.ID, "hostname": "b.example.test"}, "verify_domain": {"app": appA.App.ID, "domain": domA.ID},
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
+		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
+		"remove_proxy_host": {"proxy": proxyA.ID},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
 			t.Errorf("MCP %s as team B on team A's app should be not found: %+v", name, res)
 		}
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_proxy_hosts", nil); strings.Contains(res.Text, proxyA.Hostname) {
+		t.Errorf("list_proxy_hosts as B leaked team A's proxy host: %s", res.Text)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)

@@ -69,6 +69,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedProcessType(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedProxyHost(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedRelease(ctx, a); err != nil {
 		return err
 	}

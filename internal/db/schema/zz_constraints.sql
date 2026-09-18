@@ -35,3 +35,6 @@ ALTER TABLE releases ADD CONSTRAINT releases_deployment_fk FOREIGN KEY (deployme
 ALTER TABLE notifications ADD CONSTRAINT notifications_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
 ALTER TABLE operations ADD CONSTRAINT operations_deployment_fk FOREIGN KEY (deployment_id) REFERENCES deployments (id) ON DELETE SET NULL;
 CREATE INDEX operations_deployment_idx ON operations (deployment_id) WHERE deployment_id IS NOT NULL;
+-- P5: Caddy proxy manager.
+ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
+ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;

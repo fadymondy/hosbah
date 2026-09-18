@@ -1035,6 +1035,50 @@ resources:
           pg: text
           "null": true
       controller: true
+    - name: ProxyHost
+      table: proxy_hosts
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: hostname
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: upstream
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: tls
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: websockets
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: Release
       table: releases
       fields:

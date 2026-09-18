@@ -30,6 +30,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterOperationRoutes(api, a)
 	RegisterOperationLogRoutes(api, a)
 	RegisterProcessTypeRoutes(api, a)
+	RegisterProxyHostRoutes(api, a)
 	RegisterReleaseRoutes(api, a)
 	RegisterReportRoutes(api, a)
 	RegisterReportCommentRoutes(api, a)

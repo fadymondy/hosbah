@@ -70,3 +70,36 @@ func TestRenderCaddyEmpty(t *testing.T) {
 		t.Error("no tls app expected without hosts or an ask URL")
 	}
 }
+
+func TestRenderCaddyProxyHosts(t *testing.T) {
+	cfg := renderCaddy(routeTable{
+		AskURL: "http://cp.test/internal/tls/allow",
+		Apps:   map[string]routeEntry{},
+		Proxies: map[string]proxyEntry{
+			"p1": {Host: agentproto.Route{Hostname: "nas.example.com", TLS: "auto"}, Dial: "10.0.0.5:5000"},
+			"p2": {Host: agentproto.Route{Hostname: "pve.example.com", TLS: "internal"}, Dial: "10.0.0.2:8006", TLS: true, SkipVerify: true},
+			"p3": {Host: agentproto.Route{Hostname: "printer.lan.test", TLS: "off"}, Dial: "10.0.0.9:80"},
+		},
+	})
+	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	pj, _ := json.Marshal(servers["cloudy_http"])
+	sj, _ := json.Marshal(servers["cloudy_https"])
+	if !strings.Contains(string(pj), "printer.lan.test") || strings.Contains(string(pj), "nas.example.com") {
+		t.Errorf("plain: %s", pj)
+	}
+	if !strings.Contains(string(sj), `"dial":"10.0.0.5:5000"`) || !strings.Contains(string(sj), "cloudy-proxy-p2") {
+		t.Errorf("secure: %s", sj)
+	}
+	if !strings.Contains(string(sj), `"insecure_skip_verify":true`) {
+		t.Errorf("https upstream transport missing: %s", sj)
+	}
+	all, _ := json.Marshal(cfg)
+	if !strings.Contains(string(all), `"subjects":["nas.example.com"]`) {
+		t.Errorf("auto TLS subjects: %s", all)
+	}
+	// The 404 fallback stays last on :80.
+	routes := servers["cloudy_http"].(map[string]any)["routes"].([]any)
+	if routes[len(routes)-1].(map[string]any)["@id"] != "cloudy-fallback" {
+		t.Error("fallback is not last")
+	}
+}

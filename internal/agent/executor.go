@@ -82,6 +82,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppRelease:    appRelease,
 		agentproto.KindAppStart:      appStart,
 		agentproto.KindRouteSet:      routeSet,
+		agentproto.KindProxySet:      proxySet,
 		agentproto.KindAppDrain:      appDrain,
 		agentproto.KindAppRollback:   appRollback,
 		agentproto.KindAppLogs:       appLogs,
