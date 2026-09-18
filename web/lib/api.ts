@@ -97,7 +97,24 @@ export const ROLES: Role[] = ["owner", "admin", "deployer", "viewer"]
 export type User = { id: string | number; email: string; platform_admin: boolean }
 export type TeamSummary = { id: string | number; name: string; slug: string; role: Role }
 export type Me = { user: User; teams: TeamSummary[] }
-export type Team = TeamSummary & { created_at?: string }
+export type Team = TeamSummary & { created_at?: string; require_destructive_approval?: boolean }
+
+// ApprovalRequest is a destructive MCP call held for a person (P4). args_summary is redacted
+// JSON — the tool, the resource and the argument NAMES, never a value.
+export type ApprovalRequest = {
+  id: string
+  tool: string
+  resource_type: string
+  resource_name: string
+  status: "pending" | "approved" | "used" | "rejected" | "expired"
+  token_id: string
+  token_name: string
+  args_summary: string
+  decided_by: string | null
+  decided_at: string | null
+  expires_at: string
+  created_at: string
+}
 
 export type Member = { id: string | number; user_id: string | number; email: string; role: Role; created_at: string }
 export type Invitation = {

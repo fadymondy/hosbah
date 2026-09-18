@@ -114,6 +114,28 @@ func TestIsolationSweep(t *testing.T) {
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 
+	// P4: a pending approval request of A's, made the only way one can be made — by turning the
+	// team setting on and letting a destructive MCP call be held. Sweeping it matters because an
+	// approval is a capability to destroy something: B must not be able to read it or decide it.
+	ua.mustJSON("PATCH", "/api/teams/"+teamA.ID, map[string]any{"require_destructive_approval": true}, 200, nil)
+	var tokADestructive struct{ ID, Token string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/mcp-tokens", map[string]any{"name": "a-destructive",
+		"scopes": []string{"read", "destructive"}, "expires_in_days": 30}, 201, &tokADestructive)
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokADestructive.Token, "delete_server",
+		map[string]any{"server": srvA, "confirm": "alpha-" + suffix}); !res.IsError {
+		t.Fatalf("with approval required, delete_server should have been held: %q", res.Text)
+	}
+	var approvalsA struct {
+		Requests []struct {
+			ID string `json:"id"`
+		} `json:"requests"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/approvals?status=pending", nil, 200, &approvalsA)
+	if len(approvalsA.Requests) != 1 {
+		t.Fatalf("team A should have one pending approval request, got %+v", approvalsA.Requests)
+	}
+	approvalA := approvalsA.Requests[0].ID
+
 	// Team B: B's own, unrelated team.
 	var teamB struct{ ID, Slug string }
 	ub.mustJSON("POST", "/api/teams", map[string]any{"name": "Bravo " + suffix}, 201, &teamB)
@@ -133,6 +155,11 @@ func TestIsolationSweep(t *testing.T) {
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x"} }, // a service B may not see
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
+		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
+		// both: an approval authorises destroying something, so being able to tell "exists but
+		// not yours" from "does not exist" would be a way to enumerate another team's pending
+		// deletions — and, worse, a route that leaked through would let B approve them.
+		"approval": func(string) []string { return []string{approvalA, "00000000-0000-4000-8000-0000000000a1"} },
 		"id": func(path string) []string {
 			switch {
 			case strings.Contains(path, "/invitations/"):

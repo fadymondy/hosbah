@@ -254,10 +254,11 @@ func UserTools() []Tool {
 			},
 		},
 		{
-			Name:        "revoke_invitation",
-			Description: "Revoke a pending invitation. Destructive: confirm must equal the invitee's email.",
-			Scope:       scopes.Destructive,
-			Destructive: true,
+			Name:         "revoke_invitation",
+			Description:  "Revoke a pending invitation. Destructive: confirm must equal the invitee's email.",
+			Scope:        scopes.Destructive,
+			Destructive:  true,
+			ResourceType: "invitation",
 			InputSchema: schema([]string{"id", "confirm"}, map[string]any{
 				"id":      str("Invitation id (from list_invitations)"),
 				"confirm": str("The invitee's email, exactly"),
@@ -285,10 +286,11 @@ func UserTools() []Tool {
 			},
 		},
 		{
-			Name:        "remove_member",
-			Description: "Remove a member from the team. Destructive: confirm must equal the member's email.",
-			Scope:       scopes.Destructive,
-			Destructive: true,
+			Name:         "remove_member",
+			Description:  "Remove a member from the team. Destructive: confirm must equal the member's email.",
+			Scope:        scopes.Destructive,
+			Destructive:  true,
+			ResourceType: "member",
 			InputSchema: schema([]string{"member_id", "confirm"}, map[string]any{
 				"member_id": str("Member id (from list_members)"),
 				"confirm":   str("The member's email, exactly"),

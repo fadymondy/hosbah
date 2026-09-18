@@ -179,7 +179,7 @@ func DatabaseTools() []Tool {
 
 		// ---- destructive ----
 		{
-			Name: "restore_backup", Scope: scopes.Destructive, Destructive: true,
+			Name: "restore_backup", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
 			Description: "Restore a backup into a throwaway container and verify it (restore-test). confirm must equal the data service's name.",
 			InputSchema: schema([]string{"database", "confirm"}, map[string]any{"database": dbArg,
 				"backup": str("Backup id (optional; the newest succeeded backup by default)"),

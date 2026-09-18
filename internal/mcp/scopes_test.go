@@ -59,6 +59,59 @@ func TestDestructiveToolsRequireConfirm(t *testing.T) {
 	}
 }
 
+/*
+Every destructive tool names a ResourceType, and it is one the database will accept.
+
+The gate files an approval request and writes an audit entry against this value, so a tool that
+leaves it empty would file rows with an empty subject — or, once approval_requests_resource_type_check
+rejects them, fail at the moment someone turns the team setting on. That is the worst possible time
+to find out, so it is a build-time failure instead.
+*/
+func TestDestructiveToolsNameAKnownResourceType(t *testing.T) {
+	// Mirrors approval_requests_resource_type_check in internal/db/schema/approval_request.sql.
+	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user"}
+	for _, srv := range []*Server{UserServer(), AdminServer()} {
+		for _, tool := range srv.Tools {
+			if !tool.Destructive {
+				continue
+			}
+			if tool.ResourceType == "" {
+				t.Errorf("%s/%s is destructive but names no ResourceType", srv.Name, tool.Name)
+				continue
+			}
+			if !contains(known, tool.ResourceType) {
+				t.Errorf("%s/%s has ResourceType %q, which approval_requests_resource_type_check does not allow",
+					srv.Name, tool.Name, tool.ResourceType)
+			}
+		}
+	}
+}
+
+// The plan's destructive set for the team server. Named explicitly so that removing a tool's
+// destructive scope — the exact mistake that would silently un-gate a delete — fails here.
+func TestDestructiveToolInventory(t *testing.T) {
+	want := map[string]bool{
+		"delete_app": true, "delete_server": true, "remove_domain": true,
+		"restore_backup": true, "revoke_invitation": true, "remove_member": true,
+	}
+	got := map[string]bool{}
+	for _, tool := range UserServer().Tools {
+		if tool.Destructive {
+			got[tool.Name] = true
+		}
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("%s is missing from the user server's destructive tools", name)
+		}
+	}
+	for name := range got {
+		if !want[name] {
+			t.Errorf("%s is destructive but not in the expected inventory — add it here deliberately", name)
+		}
+	}
+}
+
 // An out-of-scope call fails in-band (a tools/call result with isError), never as a transport
 // error, and never reaches the tool or the database.
 func TestOutOfScopeCallFailsInBand(t *testing.T) {

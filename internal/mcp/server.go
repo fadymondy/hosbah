@@ -62,14 +62,19 @@ type Env struct {
 	Then func(ctx context.Context) (string, error)
 }
 
-// Tool is one callable. Scope is mandatory; Destructive tools must take `confirm`.
+// Tool is one callable. Scope is mandatory; Destructive tools must take `confirm` and name a
+// ResourceType, which is what an approval request is filed against (scopes_test.go enforces both).
 type Tool struct {
 	Name        string
 	Description string
 	InputSchema map[string]any
 	Scope       string
 	Destructive bool
-	Run         func(ctx context.Context, env *Env, args Args) (string, error)
+	// ResourceType is the kind of thing a destructive tool destroys ("app", "server", …). It is
+	// the subject of the audit entry and of any approval request, so it must match one of the
+	// values approval_requests_resource_type_check allows.
+	ResourceType string
+	Run          func(ctx context.Context, env *Env, args Args) (string, error)
 }
 
 // Server is one MCP endpoint: its tools, how it authenticates, and the tenancy scope a
@@ -202,21 +207,66 @@ func (s *Server) call(ctx context.Context, a *app.App, c Caller, t Tool, args Ar
 		return "", fmt.Errorf("%s is not callable: it declares no valid scope", t.Name)
 	}
 	if !contains(c.Scopes, t.Scope) {
+		if t.Destructive {
+			s.auditRefusal(ctx, a, c, t, args, "missing the destructive scope")
+		}
 		return "", fmt.Errorf("%s needs the %q scope, which this token does not carry. "+
 			"Mint a token with that scope to allow it.", t.Name, t.Scope)
 	}
 	if t.Destructive && args.Str("confirm") == "" {
+		s.auditRefusal(ctx, a, c, t, args, "no confirm argument")
 		return "", fmt.Errorf("%s is destructive: pass confirm set to the exact name of the resource it acts on", t.Name)
 	}
+	// The approval request must be filed and committed before the tool's transaction opens, or a
+	// held call would roll back the very request it just told the caller to get approved.
+	approvalID := ""
+	if t.Destructive && c.TeamID != "" {
+		id, err := s.precheck(ctx, a, c, t, args)
+		if err != nil {
+			reason := "refused: " + err.Error()
+			var h errHeld
+			if errors.As(err, &h) {
+				reason = "held"
+			}
+			s.auditRefusal(ctx, a, c, t, args, reason)
+			return "", err
+		}
+		approvalID = id
+	}
+
 	var out string
 	var env *Env
 	scope := s.TxScope(c)
 	err := tenancy.Tx(ctx, a.SQLDB, scope, func(q *db.Queries, tx *sql.Tx) error {
 		var err error
 		env = &Env{App: a, Caller: c, Q: q, Tx: tx, Scope: scope}
+		// The approval gate and the audit entry run in the tool's own transaction, so a tool
+		// that fails rolls back the approval it burnt along with everything else.
+		//
+		// Team-bound callers only. The admin server's tools act across the platform and have no
+		// team whose setting could hold them, so there is nothing to check and nowhere to file
+		// the request — gating them here would read the setting of a team that does not exist
+		// and, failing closed, break every admin destructive call.
+		if t.Destructive && c.TeamID != "" {
+			if err := s.gate(ctx, env, t, args, approvalID); err != nil {
+				return err
+			}
+		}
 		out, err = t.Run(ctx, env, args)
 		return err
 	})
+	if t.Destructive {
+		// A destructive result has no business carrying a secret; redact one rather than return it.
+		out = scrubSecrets(out)
+		if err != nil {
+			reason := "refused: " + err.Error()
+			var held errHeld
+			if errors.As(err, &held) {
+				reason = "held"
+			}
+			s.auditRefusal(ctx, a, c, t, args, reason)
+		}
+	}
 	if err != nil || env == nil || env.Then == nil {
 		return out, err
 	}

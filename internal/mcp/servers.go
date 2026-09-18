@@ -11,7 +11,9 @@ import (
 	"github.com/fadymondy/cloudy/internal/agentproto"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
 	"github.com/fadymondy/cloudy/internal/ops"
+	"github.com/fadymondy/cloudy/internal/provisioning"
 	"github.com/fadymondy/cloudy/internal/scopes"
+	"github.com/fadymondy/cloudy/internal/tenancy"
 )
 
 // ServerTools are the P1 read tools. All `read`: they never return secrets, key material, sealed
@@ -138,6 +140,66 @@ func ServerTools() []Tool {
 					return "No operations yet.", nil
 				}
 				return b.String(), nil
+			},
+		},
+
+		// ---- destructive ----
+		{
+			Name: "delete_server", Scope: scopes.Destructive, Destructive: true, ResourceType: "server",
+			Description: "Remove a server from the team. A Proxmox machine Cloudy created is destroyed first; a bring-your-own server is only forgotten (nothing on it is touched except that its agent stops being trusted). Apps must be deleted first. confirm must equal the server's name.",
+			InputSchema: schema([]string{"server", "confirm"}, map[string]any{
+				"server":  str("Server id or name"),
+				"confirm": str("The server's name, exactly"),
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
+					return "", err
+				}
+				s, err := findServer(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, s.Name); err != nil {
+					return "", err
+				}
+				// The same guard the dashboard has. Deleting a server out from under running apps
+				// would leave their rows pointing at nothing, so it is refused, not cascaded —
+				// a machine caller is exactly who would do this by accident.
+				if n, err := env.Q.CountAppsOnServer(ctx, db.CountAppsOnServerParams{ServerID: s.ID, TeamID: env.Caller.TeamID}); err == nil && n > 0 {
+					return "", fmt.Errorf("%d app(s) still run on %s — delete them first; nothing was changed", n, s.Name)
+				}
+				if s.Provider == "proxmox" && s.ProviderRef != nil && s.CredentialID != nil {
+					if env.App == nil || env.App.Keys == nil {
+						return "", errors.New("the provider driver is not available, so the machine was not deleted")
+					}
+					if err := provisioning.DeleteMachine(ctx, env.App.Keys, env.Q, s); err != nil {
+						return "", fmt.Errorf("the machine could not be deleted on Proxmox, so the server was kept: %w", err)
+					}
+				}
+				if n, err := env.Q.DeleteServerInTeam(ctx, db.DeleteServerInTeamParams{ID: s.ID, TeamID: env.Caller.TeamID}); err != nil || n == 0 {
+					return "", errors.New("server not found")
+				}
+				if err := tenancy.Record(ctx, env.Q, env.Caller.TeamID, actor(env), "server.deleted", "server", s.ID,
+					auditChanges(env, map[string]any{"name": s.Name, "provider": s.Provider})); err != nil {
+					return "", err
+				}
+				// Dropping the websocket is deliberately deferred: it must not happen if the
+				// transaction below rolls back, or a still-registered agent would be disconnected
+				// for a deletion that never committed.
+				id := s.ID
+				env.Then = func(ctx context.Context) (string, error) {
+					if env.App != nil {
+						if o, ok := env.App.Ops.(interface{ Disconnect(string) }); ok {
+							o.Disconnect(id)
+						}
+					}
+					return "", nil
+				}
+				verb := "forgotten"
+				if s.Provider == "proxmox" {
+					verb = "destroyed on Proxmox and removed"
+				}
+				return fmt.Sprintf("Server %s %s.", s.Name, verb), nil
 			},
 		},
 	}

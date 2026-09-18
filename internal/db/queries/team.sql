@@ -28,3 +28,11 @@ ORDER BY t.created_at;
 
 -- name: RenameTeam :one
 UPDATE teams SET name = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- name: SetTeamDestructiveApproval :one
+UPDATE teams SET require_destructive_approval = $2, updated_at = now() WHERE id = $1 RETURNING *;
+
+-- TeamRequiresApproval is read on every destructive MCP call, so it is a single boolean and not
+-- a whole row: the caller has no business loading the team's wrapped DEK to answer it.
+-- name: TeamRequiresApproval :one
+SELECT require_destructive_approval FROM teams WHERE id = $1;

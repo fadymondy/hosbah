@@ -212,6 +212,7 @@ function AppSidebar({ side }: { side: "left" | "right" }) {
         { href: `${base}/members`, label: t("nav.members"), icon: <UsersIcon /> },
         { href: `${base}/invitations`, label: t("nav.invitations"), icon: <MailPlusIcon /> },
         { href: `${base}/tokens`, label: t("nav.tokens"), icon: <KeyRoundIcon /> },
+        { href: `${base}/approvals`, label: t("nav.approvals"), icon: <ShieldCheckIcon /> },
         // Credentials are owner/admin only (the API answers 403 to anyone else).
         ...(teamCtx?.manage ? [{ href: `${base}/credentials`, label: t("nav.credentials"), icon: <LockKeyholeIcon /> }] : []),
         { href: `${base}/audit`, label: t("nav.audit"), icon: <ScrollTextIcon /> },

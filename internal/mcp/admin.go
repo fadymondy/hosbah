@@ -439,10 +439,11 @@ func AdminTools() []Tool {
 			},
 		},
 		{
-			Name:        "set_platform_admin",
-			Description: "Grant or remove platform administration for an account. Destructive: confirm must equal the account's email. The change applies to that person's next sign-in.",
-			Scope:       ScopeAdmin,
-			Destructive: true,
+			Name:         "set_platform_admin",
+			Description:  "Grant or remove platform administration for an account. Destructive: confirm must equal the account's email. The change applies to that person's next sign-in.",
+			Scope:        ScopeAdmin,
+			Destructive:  true,
+			ResourceType: "user",
 			InputSchema: schema([]string{"email", "admin", "confirm"}, map[string]any{
 				"email": str(""), "admin": map[string]any{"type": "boolean"}, "confirm": str("The account's email, exactly"),
 			}),

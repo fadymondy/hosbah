@@ -456,7 +456,7 @@ func AppTools() []Tool {
 
 		// ---- destructive ----
 		{
-			Name: "delete_app", Scope: scopes.Destructive, Destructive: true,
+			Name: "delete_app", Scope: scopes.Destructive, Destructive: true, ResourceType: "app",
 			Description: "Delete an app: its route, containers and images on the server, its env, domains, deployments and releases. confirm must equal the app's name.",
 			InputSchema: schema([]string{"app", "confirm"}, map[string]any{"app": appArg, "confirm": str("The app's name, exactly")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
@@ -478,6 +478,37 @@ func AppTools() []Tool {
 					return "", err
 				}
 				return "Deleted " + a.Name + ". Its containers, route and images are removed from the server as soon as its agent is connected.", nil
+			},
+		},
+		{
+			Name: "remove_domain", Scope: scopes.Destructive, Destructive: true, ResourceType: "domain",
+			Description: "Stop routing a hostname to an app. The app keeps running; only the route goes. confirm must equal the hostname.",
+			InputSchema: schema([]string{"app", "domain", "confirm"}, map[string]any{"app": appArg,
+				"domain":  str("Hostname or domain id"),
+				"confirm": str("The hostname, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				d, err := deploy.DomainByRef(ctx, env.Q, env.Caller.TeamID, a, args.Str("domain"))
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, d.Hostname); err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				if err := s.RemoveDomain(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, d); err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("%s no longer routes to %s. Caddy is updated as soon as the server's agent is connected.", d.Hostname, a.Name), nil
 			},
 		},
 	}

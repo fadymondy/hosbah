@@ -5,9 +5,16 @@ CREATE TABLE teams (
     slug text NOT NULL,
     owner_id text NOT NULL,
     dek_wrapped text NOT NULL,
+    require_destructive_approval boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Cloudy (P4): with require_destructive_approval on, a destructive MCP tool stops acting on the
+-- token's authority alone. It files an approval_requests row and answers in-band; an owner or
+-- admin approves it in the dashboard, and only then does a retry of the same call go through.
+-- Off by default: turning it on is a deliberate choice to slow machine callers down, and defaulting
+-- it on would break every existing token's destructive calls silently on upgrade.
 
 -- Cloudy: tenancy constraints (hand-added).
 CREATE UNIQUE INDEX teams_slug_key ON teams (slug);

@@ -120,7 +120,8 @@
     "settings": "Settings",
     "admin": "Admin",
     "apps": "Apps",
-    "databases": "Databases"
+    "databases": "Databases",
+    "approvals": "Approvals"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -749,5 +750,34 @@
     "saveSchedule": "Save schedule",
     "deleteTitle": "Delete {name}?",
     "deleteHint": "Its container and volume are removed from the server. This cannot be undone."
+  },
+  "approvals": {
+    "title": "Approvals",
+    "description": "Destructive calls from MCP tokens that are waiting for a person.",
+    "requireTitle": "Require approval for destructive calls",
+    "requireHint": "When this is on, an MCP token with the destructive scope cannot delete anything on its own. The call is refused and filed here, and it only goes through after an owner or admin approves it and the caller tries again.",
+    "requireOn": "On — destructive MCP calls wait for a person",
+    "requireOff": "Off — a token with the destructive scope acts immediately",
+    "disabledNote": "Approvals are off for this team, so nothing is being held.",
+    "empty": "Nothing is waiting for approval.",
+    "emptyDisabled": "Nothing has been held. Turn the setting above on to start requiring approval.",
+    "tool": "Call",
+    "resource": "Resource",
+    "token": "Token",
+    "asked": "Asked",
+    "expires": "Expires",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approved": "Approved. The caller has to run the same call again for it to take effect.",
+    "rejected": "Rejected. The call will keep being refused.",
+    "viewerNote": "Only owners and admins can approve or reject.",
+    "status": {
+      "pending": "Waiting",
+      "approved": "Approved",
+      "used": "Used",
+      "rejected": "Rejected",
+      "expired": "Expired"
+    },
+    "arguments": "Arguments"
   }
 }

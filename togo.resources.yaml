@@ -147,6 +147,55 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: ApprovalRequest
+      table: approval_requests
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: user_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: tool
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: resource_type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: resource_name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: args_summary
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: decided_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: Backup
       table: backups
       fields:

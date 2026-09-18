@@ -19,12 +19,14 @@ import (
 )
 
 type TeamOut struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Slug        string    `json:"slug"`
-	Role        string    `json:"role"`
-	MemberCount int64     `json:"member_count"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Role        string `json:"role"`
+	MemberCount int64  `json:"member_count"`
+	// RequireDestructiveApproval: a destructive MCP call files an approval request instead of acting.
+	RequireDestructiveApproval bool      `json:"require_destructive_approval"`
+	CreatedAt                  time.Time `json:"created_at"`
 }
 
 type teamOut struct{ Body TeamOut }
@@ -114,19 +116,22 @@ func (d *deps) registerTeams(api huma.API) {
 				return errNotFound
 			}
 			n, _ := q.CountMembers(ctx, m.TeamID)
-			out.Body = TeamOut{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: m.Role, MemberCount: n, CreatedAt: t.CreatedAt}
+			out.Body = TeamOut{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: m.Role, MemberCount: n, RequireDestructiveApproval: t.RequireDestructiveApproval, CreatedAt: t.CreatedAt}
 			return nil
 		})
 		return out, err
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID: "rename-team", Method: http.MethodPatch, Path: "/api/teams/{team}",
-		Summary: "Rename a team (owner or admin)", Tags: []string{"Teams"},
+		OperationID: "update-team", Method: http.MethodPatch, Path: "/api/teams/{team}",
+		Summary: "Rename a team or change its settings (owner or admin)", Tags: []string{"Teams"},
 	}, func(ctx context.Context, in *struct {
 		TeamPath
 		Body struct {
-			Name string `json:"name" minLength:"1" maxLength:"80"`
+			Name string `json:"name,omitempty" maxLength:"80"`
+			// RequireDestructiveApproval is a pointer so that omitting it leaves the setting alone —
+			// a rename must not silently turn the approval gate off.
+			RequireDestructiveApproval *bool `json:"require_destructive_approval,omitempty" doc:"When on, a destructive MCP call files an approval request instead of acting."`
 		}
 	}) (*teamOut, error) {
 		out := &teamOut{}
@@ -135,20 +140,29 @@ func (d *deps) registerTeams(api huma.API) {
 			if err != nil {
 				return errNotFound
 			}
-			name := strings.TrimSpace(in.Body.Name)
-			if name == "" {
-				return huma.Error422UnprocessableEntity("a team needs a name")
+			t := before
+			if in.Body.RequireDestructiveApproval != nil && *in.Body.RequireDestructiveApproval != before.RequireDestructiveApproval {
+				if t, err = q.SetTeamDestructiveApproval(ctx, db.SetTeamDestructiveApprovalParams{
+					ID: m.TeamID, RequireDestructiveApproval: *in.Body.RequireDestructiveApproval,
+				}); err != nil {
+					return huma.Error500InternalServerError("could not change the approval setting")
+				}
+				if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "team.destructive_approval_changed", "team", m.TeamID,
+					map[string]any{"require_destructive_approval": map[string]bool{"old": before.RequireDestructiveApproval, "new": *in.Body.RequireDestructiveApproval}}); err != nil {
+					return huma.Error500InternalServerError("audit failed")
+				}
 			}
-			t, err := q.RenameTeam(ctx, db.RenameTeamParams{ID: m.TeamID, Name: name})
-			if err != nil {
-				return huma.Error500InternalServerError("could not rename")
-			}
-			if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "team.renamed", "team", m.TeamID,
-				map[string]any{"name": map[string]string{"old": before.Name, "new": name}}); err != nil {
-				return huma.Error500InternalServerError("audit failed")
+			if name := strings.TrimSpace(in.Body.Name); name != "" && name != before.Name {
+				if t, err = q.RenameTeam(ctx, db.RenameTeamParams{ID: m.TeamID, Name: name}); err != nil {
+					return huma.Error500InternalServerError("could not rename")
+				}
+				if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "team.renamed", "team", m.TeamID,
+					map[string]any{"name": map[string]string{"old": before.Name, "new": name}}); err != nil {
+					return huma.Error500InternalServerError("audit failed")
+				}
 			}
 			n, _ := q.CountMembers(ctx, m.TeamID)
-			out.Body = TeamOut{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: m.Role, MemberCount: n, CreatedAt: t.CreatedAt}
+			out.Body = TeamOut{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: m.Role, MemberCount: n, RequireDestructiveApproval: t.RequireDestructiveApproval, CreatedAt: t.CreatedAt}
 			return nil
 		})
 		return out, err

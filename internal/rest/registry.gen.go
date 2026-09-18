@@ -13,6 +13,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterAdminMcpTokenRoutes(api, a)
 	RegisterAgentEnrollmentRoutes(api, a)
 	RegisterAppRoutes(api, a)
+	RegisterApprovalRequestRoutes(api, a)
 	RegisterBackupRoutes(api, a)
 	RegisterBackupScheduleRoutes(api, a)
 	RegisterCredentialRoutes(api, a)

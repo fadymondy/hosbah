@@ -1,4 +1,4 @@
-h1:qSiLcWxiKvk5dNxCaXjnvSA7QQmBZo3XpU7RTNQQtGY=
+h1:qXTmgPNg6kNcLj1JmYUH/w3QsAExWODxsO2fLmi7mfA=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -8,3 +8,5 @@ h1:qSiLcWxiKvk5dNxCaXjnvSA7QQmBZo3XpU7RTNQQtGY=
 20260914145012_p2_row_level_security.sql h1:DoH1XN14L6nyz8UHShCBhv2cQ0Nw5ZfyuAF0X3X/qOo=
 20260917192738_p3_data_services_backups.sql h1:vTkQ8r9yAfJS32Li85/rCWVk3VTK4a6OOnJ7CNvDmOc=
 20260917192739_p3_row_level_security.sql h1:dxvEJJvkEmqJFPLnR0gVkKWY9Eu4XQIQTBPz5nW4lZI=
+20260918211150_p4_approval_requests.sql h1:ebGcYJ9EKK5jipwstEZxPF18na1b6/SpYBoq4GcamiE=
+20260918211207_p4_row_level_security.sql h1:UR+wHsitTc3I5965XIXQqo5OGKyoD3eR13CWGLpnEl0=
