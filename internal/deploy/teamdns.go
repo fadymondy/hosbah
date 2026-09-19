@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"errors"
+	"net"
 
 	"github.com/fadymondy/cloudy/internal/cloudflare"
 	"github.com/fadymondy/cloudy/internal/crypto"
@@ -57,6 +58,12 @@ func (s *Service) wireTeamDNS(ctx context.Context, q *db.Queries, teamID string,
 
 // wireTeamDNSTo points hostname at srv through the team's Cloudflare (see wireTeamDNS).
 func (s *Service) wireTeamDNSTo(ctx context.Context, q *db.Queries, teamID string, srv db.Server, hostname string) bool {
+	if srv.IpAddress == nil {
+		return false
+	}
+	if ip := net.ParseIP(*srv.IpAddress); ip == nil || ip.IsPrivate() || ip.IsLoopback() {
+		return false // a private address in public DNS helps nobody: tunnel the server instead
+	}
 	cf, z, err := s.teamZone(ctx, q, teamID, hostname)
 	if err != nil {
 		if !errors.Is(err, cloudflare.ErrNotFound) {

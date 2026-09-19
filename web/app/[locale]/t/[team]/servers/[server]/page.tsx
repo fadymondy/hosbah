@@ -7,6 +7,7 @@ import { AlertCircleIcon, LoaderIcon, PlayIcon, PlusIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge } from "@/components/app-status"
+import { ServerTunnels } from "@/components/server-tunnels"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
@@ -216,6 +217,7 @@ export default function ServerPage() {
         </section>
       ) : null}
 
+      {server.status === "enrolled" ? <ServerTunnels serverId={server.id} manage={manage} /> : null}
       {server.status === "enrolled" ? <Sites serverId={server.id} base={`/${locale}/t/${team.slug}`} manage={manage} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">

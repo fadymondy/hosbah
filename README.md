@@ -154,6 +154,20 @@ point an app at any public repository, then: **Apps → New app** → repository
 - **Importing what runs**: a connected server lists its containers, well-known services and Proxmox guests. A container
   with a published port can be **exposed** behind a hostname from the server page, which creates a proxy host for it.
 
+## Tunnels (frp, Tailscale)
+
+For servers without a public address: a customer box behind NAT, a laptop, a Docker Desktop target.
+
+- **frp**: a team `frp` credential names the frps (`server_addr`, `server_port`, the port range Cloudy may
+  allocate, `public_ip` where DNS points, `edge_host` where the edge reaches the frps ports) and holds its auth token.
+  `enable_tunnel` makes the agent run a pinned `frpc` (v0.65.0, sha256-checked) exposing the server's Caddy on an
+  allocated port. Every domain and proxy host on that server is then published: a proxied Cloudflare record at
+  `public_ip` (team `cloudflare` credential) and an NPM proxy host to `edge_host:port` (team `npm` credential; Cloudy
+  only changes proxy hosts it created). The server's Caddy routes by Host.
+- **Tailscale**: a team `tailscale` credential (reusable auth key); `enable_tunnel` joins the server to the tailnet and
+  records its tailnet IP.
+- API `/api/teams/{team}/tunnels`, `/servers/{server}/tunnels`; MCP `enable_tunnel`, `disable_tunnel`, `list_tunnels`.
+
 ## SDKs, CLI and mobile
 
 See `sdk/README.md`. The Go (`pkg/cloudy`), Node, Python and PHP/Laravel SDKs and the `cloudy` CLI

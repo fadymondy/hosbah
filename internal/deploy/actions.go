@@ -442,7 +442,7 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.added", "app", a.ID, actor.audit(map[string]any{"hostname": hostname, "tls": tls})); err != nil {
 		return db.Domain{}, err
 	}
-	if s.wireTeamDNS(ctx, q, teamID, a, hostname) {
+	if s.publishTunnelled(ctx, q, teamID, a.ServerID, hostname) || s.wireTeamDNS(ctx, q, teamID, a, hostname) {
 		if err := q.MarkDomainVerified(ctx, db.MarkDomainVerifiedParams{ID: d.ID, TeamID: teamID}); err == nil {
 			now := time.Now()
 			d.VerifiedAt = &now
@@ -474,6 +474,7 @@ func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string
 		return err
 	}
 	s.unwireTeamDNS(ctx, q, teamID, d.Hostname)
+	s.unpublishHost(ctx, q, teamID, d.Hostname)
 	return s.SyncRoutes(ctx, q, teamID, a)
 }
 

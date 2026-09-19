@@ -173,7 +173,10 @@
     "providers": {
       "byo": "Bring your own",
       "proxmox": "Proxmox",
-      "cloudflare": "Cloudflare"
+      "cloudflare": "Cloudflare",
+      "frp": "frp",
+      "npm": "Nginx Proxy Manager",
+      "tailscale": "Tailscale"
     },
     "kinds": {
       "byo": "Your server",
@@ -578,7 +581,29 @@
     "accountId": "Account ID",
     "apiToken": "API token",
     "cloudflareHint": "With this token, a domain or proxy host in one of its zones gets its DNS record created and is verified at once.",
-    "validateCloudflare": "Check the token with Cloudflare before saving"
+    "validateCloudflare": "Check the token with Cloudflare before saving",
+    "frpServer": "frp server address",
+    "frpPort": "frp server port",
+    "frpPublicIp": "Public IP (DNS points here)",
+    "frpEdgeHost": "Edge host (how NPM reaches the frp ports)",
+    "frpPortFrom": "First tunnel port",
+    "frpPortTo": "Last tunnel port",
+    "npmUrl": "Nginx Proxy Manager URL",
+    "npmEmail": "NPM admin email",
+    "npmCert": "NPM certificate ID for new proxy hosts",
+    "secretFor": {
+      "proxmox": "Token secret",
+      "cloudflare": "API token",
+      "frp": "frps auth token",
+      "npm": "NPM admin password",
+      "tailscale": "Tailscale auth key"
+    },
+    "hintFor": {
+      "cloudflare": "With this token, a domain or proxy host in one of its zones gets its DNS record created and is verified at once.",
+      "frp": "Servers without a public address expose their Caddy on a port of this frp server; their domains are published at the public IP.",
+      "npm": "Nginx Proxy Manager as the public edge: Cloudy adds a proxy host for every domain on a tunnelled server, and only ever changes its own.",
+      "tailscale": "A reusable auth key: servers you open a Tailscale tunnel for join your tailnet."
+    }
   },
   "members": {
     "description": "Everyone in this team and what they can do.",
@@ -887,5 +912,22 @@
     "addServiceHint": "Provisioned on {server}. Attach it to the app from its page once it is running.",
     "create": "Create",
     "canvas": "Canvas"
+  },
+  "tunnels": {
+    "title": "Tunnels",
+    "hint": "How this server is reached when it has no public address.",
+    "open": "Open tunnel",
+    "close": "Close",
+    "credential": "Tunnel credential",
+    "kinds": {
+      "frp": "frp",
+      "tailscale": "Tailscale"
+    },
+    "status": {
+      "pending": "Opening…",
+      "active": "Active",
+      "failed": "Failed",
+      "removing": "Closing…"
+    }
   }
 }

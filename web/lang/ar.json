@@ -173,7 +173,10 @@
     "providers": {
       "byo": "خادمك الخاص",
       "proxmox": "Proxmox",
-      "cloudflare": "Cloudflare"
+      "cloudflare": "Cloudflare",
+      "frp": "frp",
+      "npm": "Nginx Proxy Manager",
+      "tailscale": "Tailscale"
     },
     "kinds": {
       "byo": "خادمك",
@@ -578,7 +581,29 @@
     "accountId": "معرّف الحساب",
     "apiToken": "رمز API",
     "cloudflareHint": "بهذا الرمز، يحصل أي نطاق أو مضيف وكيل ضمن مناطقه على سجل DNS ويُتحقق منه فورًا.",
-    "validateCloudflare": "التحقق من الرمز مع Cloudflare قبل الحفظ"
+    "validateCloudflare": "التحقق من الرمز مع Cloudflare قبل الحفظ",
+    "frpServer": "عنوان خادم frp",
+    "frpPort": "منفذ خادم frp",
+    "frpPublicIp": "عنوان IP العام (يشير إليه DNS)",
+    "frpEdgeHost": "مضيف الحافة (كيف يصل NPM إلى منافذ frp)",
+    "frpPortFrom": "أول منفذ للنفق",
+    "frpPortTo": "آخر منفذ للنفق",
+    "npmUrl": "رابط Nginx Proxy Manager",
+    "npmEmail": "بريد مسؤول NPM",
+    "npmCert": "معرّف شهادة NPM لمضيفي الوكيل الجدد",
+    "secretFor": {
+      "proxmox": "سر الرمز",
+      "cloudflare": "رمز API",
+      "frp": "رمز مصادقة frps",
+      "npm": "كلمة مرور مسؤول NPM",
+      "tailscale": "مفتاح مصادقة Tailscale"
+    },
+    "hintFor": {
+      "cloudflare": "بهذا الرمز، يحصل أي نطاق أو مضيف وكيل ضمن مناطقه على سجل DNS ويُتحقق منه فورًا.",
+      "frp": "الخوادم التي ليس لها عنوان عام تعرض Caddy الخاص بها على منفذ في خادم frp هذا، وتُنشر نطاقاتها على العنوان العام.",
+      "npm": "Nginx Proxy Manager كحافة عامة: يضيف Cloudy مضيف وكيل لكل نطاق على خادم عبر نفق، ولا يغيّر إلا ما أنشأه.",
+      "tailscale": "مفتاح مصادقة قابل لإعادة الاستخدام: تنضم الخوادم التي تفتح لها نفق Tailscale إلى شبكتك."
+    }
   },
   "members": {
     "description": "كل أعضاء هذا الفريق وما يمكنهم فعله.",
@@ -887,5 +912,22 @@
     "addServiceHint": "تُجهَّز على {server}. اربطها بالتطبيق من صفحتها بعد أن تعمل.",
     "create": "إنشاء",
     "canvas": "اللوحة"
+  },
+  "tunnels": {
+    "title": "الأنفاق",
+    "hint": "كيف يُوصل إلى هذا الخادم حين لا يكون له عنوان عام.",
+    "open": "فتح نفق",
+    "close": "إغلاق",
+    "credential": "بيانات اعتماد النفق",
+    "kinds": {
+      "frp": "frp",
+      "tailscale": "Tailscale"
+    },
+    "status": {
+      "pending": "جارٍ الفتح…",
+      "active": "نشط",
+      "failed": "فشل",
+      "removing": "جارٍ الإغلاق…"
+    }
   }
 }

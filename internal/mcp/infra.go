@@ -119,9 +119,11 @@ func InfraTools() []Tool {
 			Name: "add_credential", Scope: scopes.Write,
 			Description: "Save a provider credential, sealed with the team key and checked against the provider first. " +
 				"cloudflare: secret = an API token with Zone:Read + DNS:Edit — custom domains in its zones then get DNS records and verification automatically. " +
-				"proxmox: secret = the API token secret; config = api_url, token_id, node, storage (+ bridge, pool, template_vmid, lxc_template, tls_fingerprint…).",
+				"proxmox: secret = the API token secret; config = api_url, token_id, node, storage (+ bridge, pool, template_vmid, lxc_template, lxc_features, tls_fingerprint…). " +
+				"frp: secret = the frps auth token; config = server_addr, server_port, port_from, port_to, public_ip, edge_host. " +
+				"npm: secret = the Nginx Proxy Manager password; config = api_url, email, certificate_id. tailscale: secret = a reusable auth key (tskey-…).",
 			InputSchema: schema([]string{"provider", "name", "secret"}, map[string]any{
-				"provider": map[string]any{"type": "string", "enum": []string{"cloudflare", "proxmox"}},
+				"provider": map[string]any{"type": "string", "enum": []string{"cloudflare", "proxmox", "frp", "npm", "tailscale"}},
 				"name":     str("A name unique in the team"),
 				"secret":   str("The API token (secret)"),
 				"config":   map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}},

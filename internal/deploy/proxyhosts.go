@@ -74,7 +74,7 @@ func (s *Service) CreateProxyHost(ctx context.Context, q *db.Queries, teamID str
 		actor.audit(map[string]any{"hostname": host, "upstream": up, "server": srv.Name, "tls": tls})); err != nil {
 		return db.ProxyHost{}, err
 	}
-	if s.wireTeamDNSTo(ctx, q, teamID, srv, host) {
+	if s.publishTunnelled(ctx, q, teamID, srv.ID, host) || s.wireTeamDNSTo(ctx, q, teamID, srv, host) {
 		if err := q.MarkProxyHostVerified(ctx, db.MarkProxyHostVerifiedParams{ID: p.ID, TeamID: teamID}); err == nil {
 			now := time.Now()
 			p.VerifiedAt = &now
@@ -122,6 +122,7 @@ func (s *Service) DeleteProxyHost(ctx context.Context, q *db.Queries, teamID str
 		return err
 	}
 	s.unwireTeamDNS(ctx, q, teamID, p.Hostname)
+	s.unpublishHost(ctx, q, teamID, p.Hostname)
 	return nil
 }
 

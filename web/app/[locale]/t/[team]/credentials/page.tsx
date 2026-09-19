@@ -201,8 +201,26 @@ function Reveal({ team, cred }: { team: string; cred: Credential }) {
   )
 }
 
-const PROVIDERS = ["proxmox", "cloudflare"] as const
+const PROVIDERS = ["proxmox", "cloudflare", "frp", "npm", "tailscale"] as const
 type Provider = (typeof PROVIDERS)[number]
+
+type CredField = { key: string; label: string; required: boolean; placeholder: string }
+
+const FRP_FIELDS: CredField[] = [
+  { key: "server_addr", label: "credentials.frpServer", required: true, placeholder: "45.129.183.99" },
+  { key: "server_port", label: "credentials.frpPort", required: false, placeholder: "7000" },
+  { key: "public_ip", label: "credentials.frpPublicIp", required: true, placeholder: "45.129.183.99" },
+  { key: "edge_host", label: "credentials.frpEdgeHost", required: false, placeholder: "10.10.10.1" },
+  { key: "port_from", label: "credentials.frpPortFrom", required: false, placeholder: "47000" },
+  { key: "port_to", label: "credentials.frpPortTo", required: false, placeholder: "47999" },
+]
+
+const NPM_FIELDS: CredField[] = [
+  { key: "api_url", label: "credentials.npmUrl", required: true, placeholder: "https://npm.example.com" },
+  { key: "email", label: "credentials.npmEmail", required: true, placeholder: "admin@example.com" },
+  { key: "certificate_id", label: "credentials.npmCert", required: false, placeholder: "2" },
+]
+
 
 const CLOUDFLARE_FIELDS = [
   { key: "account_id", label: "credentials.accountId", required: false, placeholder: "" },
@@ -219,6 +237,14 @@ const FIELDS = [
   { key: "template_vmid", label: "credentials.templateVmid", required: false, placeholder: "9000" },
   { key: "tls_fingerprint", label: "credentials.fingerprint", required: false, placeholder: "AB:CD:…" },
 ] as const
+const FIELDS_BY_PROVIDER: Record<string, readonly CredField[]> = {
+  proxmox: FIELDS,
+  cloudflare: CLOUDFLARE_FIELDS,
+  frp: FRP_FIELDS,
+  npm: NPM_FIELDS,
+  tailscale: [],
+}
+
 
 function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
   const { t } = useI18n()
@@ -292,9 +318,9 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
                   ))}
                 </SelectContent>
               </Select>
-              {provider === "cloudflare" ? <FieldDescription>{t("credentials.cloudflareHint")}</FieldDescription> : null}
+              {provider !== "proxmox" ? <FieldDescription>{t(`credentials.hintFor.${provider}`)}</FieldDescription> : null}
             </Field>
-            {(provider === "proxmox" ? FIELDS : CLOUDFLARE_FIELDS).map((f) => (
+            {(FIELDS_BY_PROVIDER[provider] ?? []).map((f) => (
               <Field key={f.key}>
                 <FieldLabel htmlFor={`cred-${f.key}`}>
                   {t(f.label)}
@@ -312,7 +338,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
               </Field>
             ))}
             <Field>
-              <FieldLabel htmlFor="cred-secret">{t(provider === "cloudflare" ? "credentials.apiToken" : "credentials.secret")}</FieldLabel>
+              <FieldLabel htmlFor="cred-secret">{t(`credentials.secretFor.${provider}`)}</FieldLabel>
               <Input id="cred-secret" type="password" dir="ltr" required autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </Field>
             <Field orientation="horizontal">

@@ -159,6 +159,7 @@ func TestIsolationSweep(t *testing.T) {
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
+		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x"} }, // a service B may not see
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
@@ -251,6 +252,7 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
 		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
 		"remove_proxy_host": {"proxy": proxyA.ID},
+		"enable_tunnel": {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
 		"update_app": {"app": appA.App.ID, "branch": "x"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
 		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},
 		"update_member_role": {"member": memberA, "role": "viewer"}, "delete_credential": {"credential": credA.ID, "confirm": "pve-a"},

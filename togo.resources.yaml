@@ -1538,3 +1538,52 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: Tunnel
+      table: tunnels
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: credential_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: remote_port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: address
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true

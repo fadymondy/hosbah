@@ -21,6 +21,7 @@ import (
 	"github.com/fadymondy/cloudy/internal/cloudflare"
 	"github.com/fadymondy/cloudy/internal/crypto"
 	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/cloudy/internal/npm"
 	"github.com/fadymondy/cloudy/internal/ops"
 	"github.com/fadymondy/cloudy/internal/providers"
 	_ "github.com/fadymondy/cloudy/internal/providers/proxmox" // registers "proxmox"
@@ -37,6 +38,12 @@ var configKeys = map[string][]string{
 	"proxmox": {"api_url", "token_id", "node", "storage", "bridge", "pool", "template_vmid", "lxc_template",
 		"snippets_storage", "snippets_dir", "tls_fingerprint", "insecure_tls", "lxc_features"},
 	"cloudflare": {"account_id"},
+	// frp: the frps the agents dial (server_addr:server_port), the remote-port range Cloudy may allocate,
+	// the public IP DNS points at, and the host the edge (NPM) reaches the frps listeners on.
+	"frp": {"server_addr", "server_port", "port_from", "port_to", "public_ip", "edge_host"},
+	// npm: Nginx Proxy Manager as the public edge; certificate_id is the NPM certificate to use (0: none).
+	"npm":       {"api_url", "email", "certificate_id"},
+	"tailscale": {"tags"},
 }
 
 // CleanConfig trims values, drops empty ones and refuses unknown keys.
@@ -61,6 +68,26 @@ func CleanConfig(provider string, in map[string]string) (map[string]string, erro
 func Validate(ctx context.Context, provider string, cfg map[string]string, secret string) error {
 	if provider == "cloudflare" {
 		return cloudflare.New(secret).Verify(ctx)
+	}
+	switch provider {
+	case "frp":
+		addr := net.JoinHostPort(cfg["server_addr"], orDefault(cfg["server_port"], "7000"))
+		conn, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "tcp", addr)
+		if err != nil {
+			return fmt.Errorf("the frp server %s is not reachable: %w", addr, err)
+		}
+		_ = conn.Close()
+		if cfg["public_ip"] == "" || net.ParseIP(cfg["public_ip"]) == nil {
+			return errors.New("frp: public_ip (the address DNS points at) is required")
+		}
+		return nil
+	case "npm":
+		return npm.New(cfg["api_url"], cfg["email"], secret).Login(ctx)
+	case "tailscale":
+		if !strings.HasPrefix(strings.TrimSpace(secret), "tskey-") {
+			return errors.New("a Tailscale auth key starts with tskey-")
+		}
+		return nil
 	}
 	p, err := providers.New(provider, providers.Credential{Config: cfg, Secret: secret})
 	if err != nil {

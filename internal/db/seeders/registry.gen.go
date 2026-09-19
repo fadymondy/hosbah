@@ -90,5 +90,8 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedTeamMember(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedTunnel(ctx, a); err != nil {
+		return err
+	}
 	return nil
 }
