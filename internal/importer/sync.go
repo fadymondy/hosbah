@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"strings"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
@@ -18,7 +19,7 @@ const Actor = "system:import"
 
 // Result counts what one sync did.
 type Result struct {
-	Created, Updated, Missing, Ignored int
+	Created, Updated, Missing, Ignored, Removed int
 }
 
 // SyncFacts parses a facts document (agentproto.Facts JSON) and syncs its services. A document
@@ -31,6 +32,29 @@ func SyncFacts(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, fact
 		return Result{}, nil
 	}
 	return Sync(ctx, sqlDB, teamID, serverID, *f.Services)
+}
+
+// discoveredKeys are the origin keys of everything the server reported, importable or not.
+func discoveredKeys(services []agentproto.Service) []string {
+	var keys []string
+	for _, s := range services {
+		name := strings.TrimSpace(strings.TrimPrefix(s.Name, "/"))
+		switch s.Kind {
+		case "guest":
+			if s.ID != "" {
+				keys = append(keys, "guest:"+s.ID)
+			}
+		case "container":
+			if name != "" {
+				keys = append(keys, name)
+			}
+		case "systemd":
+			if u := strings.TrimSuffix(name, ".service"); u != "" {
+				keys = append(keys, u)
+			}
+		}
+	}
+	return keys
 }
 
 // Sync upserts the imported apps and data services of one server from its discovered services, in
@@ -79,6 +103,49 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 		serverIP := ""
 		if srv.IpAddress != nil {
 			serverIP = *srv.IpAddress
+		}
+		// A guest that is itself one of the team's servers (its address is a server's) is a server
+		// Hosbah already manages, not a site on this one.
+		servers, err := q.ListServersOfTeam(ctx, teamID)
+		if err != nil {
+			return err
+		}
+		serverAddrs := map[string]bool{}
+		for _, other := range servers {
+			if other.ID != serverID && other.IpAddress != nil && *other.IpAddress != "" {
+				serverAddrs[*other.IpAddress] = true
+			}
+		}
+		importable := map[string]bool{}
+		kept := items[:0:0]
+		for _, it := range items {
+			if it.OriginKind == "guest" && it.Origin.Address != "" && serverAddrs[it.Origin.Address] {
+				continue
+			}
+			importable[it.OriginKey] = true
+			kept = append(kept, it)
+		}
+		items = kept
+		// Records for workloads that are still reported but no longer importable (Hosbah's own, or
+		// a guest that is a Hosbah server) are removed — the record only, never the workload.
+		for _, k := range discoveredKeys(services) {
+			if importable[k] {
+				continue
+			}
+			if a, ok := appByKey[k]; ok {
+				if _, err := q.DeleteAppInTeam(ctx, db.DeleteAppInTeamParams{ID: a.ID, TeamID: teamID}); err != nil {
+					return err
+				}
+				delete(appByKey, k)
+				res.Removed++
+			}
+			if d, ok := dsByKey[k]; ok {
+				if _, err := q.DeleteDataServiceInTeam(ctx, db.DeleteDataServiceInTeamParams{ID: d.ID, TeamID: teamID}); err != nil {
+					return err
+				}
+				delete(dsByKey, k)
+				res.Removed++
+			}
 		}
 
 		seen := map[string]bool{}
@@ -157,9 +224,9 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 				}
 			}
 		}
-		if res.Created > 0 || res.Missing > 0 {
+		if res.Created > 0 || res.Missing > 0 || res.Removed > 0 {
 			return tenancy.Record(ctx, q, teamID, Actor, "server.workloads_imported", "server", serverID, map[string]any{
-				"created": res.Created, "missing": res.Missing, "updated": res.Updated})
+				"created": res.Created, "missing": res.Missing, "updated": res.Updated, "removed": res.Removed})
 		}
 		return nil
 	})
@@ -191,8 +258,8 @@ func Backfill(ctx context.Context, sqlDB *sql.DB, log *slog.Logger) (int, error)
 			continue
 		}
 		n++
-		if log != nil && (res.Created > 0 || res.Missing > 0) {
-			log.Info("imported workloads", "server", r.ID, "created", res.Created, "updated", res.Updated, "missing", res.Missing)
+		if log != nil && (res.Created > 0 || res.Missing > 0 || res.Removed > 0) {
+			log.Info("imported workloads", "server", r.ID, "created", res.Created, "updated", res.Updated, "missing", res.Missing, "removed", res.Removed)
 		}
 	}
 	return n, nil

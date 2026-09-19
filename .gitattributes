@@ -4,3 +4,4 @@
 db/atlas/migrations/** text eol=lf
 *.sql text eol=lf
 *.sh text eol=lf
+*.hcl text eol=lf

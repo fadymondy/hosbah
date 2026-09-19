@@ -24,6 +24,8 @@ func TestClassify(t *testing.T) {
 		{"caddy unit", agentproto.Service{Kind: "systemd", Name: "cloudy-caddy", Status: "active", Ports: []string{"80"}}, nil},
 		{"frpc", agentproto.Service{Kind: "container", Name: "cloudy-frpc", Image: "snowdreamtech/frpc"}, nil},
 		{"hosbah-", agentproto.Service{Kind: "container", Name: "hosbah-agent", Image: "x"}, nil},
+		{"own control-plane guest", agentproto.Service{Kind: "guest", Name: "cloudy", ID: "117", Type: "lxc", Address: "10.10.10.117"}, nil},
+		{"own demo guest", agentproto.Service{Kind: "guest", Name: "cloudy-demo", ID: "120", Type: "lxc"}, nil},
 
 		// Database engines by image.
 		{"postgres", agentproto.Service{Kind: "container", Name: "pg-main", Image: "postgres:16-alpine", Ports: []string{"127.0.0.1:5433->5432/tcp"}},

@@ -58,7 +58,7 @@ type Item struct {
 }
 
 // Classify maps discovered services to imported apps and data services. Pure: no I/O.
-//   - Hosbah's own workloads (cloudy-* / hosbah-* containers and units) are skipped.
+//   - Hosbah's own workloads (cloudy-* / hosbah-* containers, units and guests) are skipped.
 //   - A container whose image is a database engine is a data service; every other container is an app.
 //   - A Proxmox guest whose name has a database token (pg, postgres, mysql, maria, redis, mongo,
 //     minio…) is a data service; every other guest is an app.
@@ -94,7 +94,8 @@ func classifyOne(s agentproto.Service) (Item, bool) {
 		}
 		return it, true
 	case "guest":
-		if s.ID == "" {
+		// Hosbah's own guests (its control plane, its demo servers) are not sites either.
+		if s.ID == "" || IsHosbahOwned(name) {
 			return Item{}, false
 		}
 		if name == "" {
