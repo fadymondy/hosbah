@@ -14,14 +14,17 @@ const nextConfig = {
   async headers() {
     // Dev chunks use stable filenames with a 4h max-age; a stale stylesheet
     // cost fadymondy.com an hour of wrong diagnoses. Dev only.
+    // The service worker must never be cached, or an old one keeps serving after a deploy.
+    const sw = { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }
     return process.env.NODE_ENV === "development"
       ? [
+          sw,
           {
             source: "/_next/static/:path*",
             headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
           },
         ]
-      : []
+      : [sw]
   },
 }
 
