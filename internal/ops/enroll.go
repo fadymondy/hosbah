@@ -23,6 +23,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
@@ -196,6 +197,7 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	fp := sha256.Sum256(pub)
 	var resp agentproto.EnrollResponse
 	errBlocked := errors.New("blocked")
+	enrolTeam := ""
 
 	err = tenancy.Tx(r.Context(), s.a.SQLDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
 		ctx := r.Context()
@@ -209,6 +211,7 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		if n, err := q.ConsumeEnrollment(ctx, e.ID); err != nil || n == 0 {
 			return errBadToken
 		}
+		enrolTeam = e.TeamID
 		if err := tenancy.SetTeam(ctx, tx, e.TeamID); err != nil {
 			return err
 		}
@@ -255,6 +258,10 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		writeJSON(http.StatusInternalServerError, map[string]string{"error": "enrolment failed"})
 	default:
 		s.log.Info("agent enrolled", "server", resp.ServerID, "hostname", req.Facts.Hostname)
+		// What the server already runs (server.connect's import) becomes imported apps and data services.
+		if _, err := importer.Sync(r.Context(), s.a.SQLDB, enrolTeam, resp.ServerID, req.Facts.Services); err != nil {
+			s.log.Warn("imported workloads not synced", "server", resp.ServerID, "err", err)
+		}
 		s.broker.Publish(ServerTopic(resp.ServerID))
 		writeJSON(http.StatusCreated, resp)
 	}

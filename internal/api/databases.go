@@ -12,6 +12,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -21,13 +22,19 @@ import (
 type DataServiceOut struct {
 	ID        string     `json:"id"`
 	Name      string     `json:"name"`
-	Kind      string     `json:"kind" enum:"postgres,mysql,redis,minio"`
+	Kind      string     `json:"kind" enum:"postgres,mysql,redis,minio,mongodb" doc:"mongodb only for imported services"`
 	Version   string     `json:"version"`
 	Status    string     `json:"status" enum:"new,provisioning,running,failed,stopped"`
 	ServerID  string     `json:"server_id"`
 	Host      *string    `json:"host"`
 	Port      *int64     `json:"port"`
 	Error     *string    `json:"error"`
+	Container *string    `json:"container" doc:"The container name (managed, or an imported container)"`
+	Source        string           `json:"source" enum:"managed,imported" doc:"imported: found running on the server; Hosbah holds no credential and never backs it up or changes it"`
+	OriginKind    *string          `json:"origin_kind" doc:"imported only: container or guest"`
+	Origin        *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
+	ImportedState *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt    *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
 	CreatedAt time.Time  `json:"created_at"`
 }
 
@@ -81,7 +88,8 @@ type DataServiceDetailOut struct {
 
 func toDataServiceOut(s db.DataService) DataServiceOut {
 	return DataServiceOut{ID: s.ID, Name: s.Name, Kind: s.Kind, Version: s.Version, Status: s.Status,
-		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt}
+		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt, Container: s.Container,
+		Source: s.Source, OriginKind: s.OriginKind, Origin: originOf(s.Origin), ImportedState: s.ImportedState, LastSeenAt: s.LastSeenAt}
 }
 func toBackupOut(b db.Backup) BackupOut {
 	return BackupOut{ID: b.ID, Kind: b.Kind, Status: b.Status, Target: b.Target, SizeBytes: b.SizeBytes,
@@ -113,6 +121,9 @@ func (d *deps) dbs() *dbsvc.Service {
 func dbErr(err error, fallback string) error {
 	if err == nil {
 		return nil
+	}
+	if ie := asImported(err); ie != nil {
+		return ie
 	}
 	var de *dbsvc.Error
 	if errors.As(err, &de) {
@@ -373,6 +384,9 @@ func (d *deps) registerDatabases(api huma.API) {
 		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			svc, err := serviceIn(ctx, q, m, in.Service)
 			if err != nil {
+				return err
+			}
+			if err := refuseImportedService(svc); err != nil {
 				return err
 			}
 			b, err := q.BackupInTeam(ctx, db.BackupInTeamParams{ID: in.Backup, TeamID: m.TeamID})

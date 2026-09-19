@@ -16,7 +16,7 @@ DELETE FROM data_services WHERE id = $1;
 -- Hosbah tenant queries.
 -- name: InsertDataService :one
 INSERT INTO data_services (id, team_id, server_id, name, kind, version, status, root_sealed, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, sqlc.arg('root_sealed')::text, $8)
 RETURNING *;
 
 -- name: ListDataServicesOfTeam :many
@@ -44,3 +44,28 @@ DELETE FROM data_services WHERE id = $1 AND team_id = $2;
 -- Read by an authenticated agent (app.server_id) or the scheduler (app.system) for provisioning/backup.
 -- name: DataServiceForAgent :one
 SELECT * FROM data_services WHERE id = $1;
+
+-- Imported workloads (team scope).
+-- name: ImportedDataServicesOfServer :many
+SELECT * FROM data_services WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
+
+-- name: InsertImportedDataService :one
+INSERT INTO data_services (id, team_id, server_id, name, kind, version, status, container, host, port, source,
+    origin_kind, origin_key, origin, imported_state, last_seen_at, created_by)
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('name'), sqlc.arg('kind'), sqlc.arg('version'),
+    sqlc.arg('status'), sqlc.narg('container'), sqlc.narg('host'), sqlc.narg('port'), 'imported', sqlc.arg('origin_kind'),
+    sqlc.arg('origin_key'), sqlc.arg('origin')::jsonb, sqlc.arg('imported_state'), now(), sqlc.arg('created_by'))
+RETURNING *;
+
+-- name: RefreshImportedDataService :exec
+UPDATE data_services SET version = sqlc.arg('version'), host = sqlc.narg('host'), port = sqlc.narg('port'),
+    origin = sqlc.arg('origin')::jsonb, imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'),
+    last_seen_at = now(), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
+
+-- name: MarkImportedDataServiceMissing :exec
+UPDATE data_services SET imported_state = 'missing', status = 'stopped', updated_at = now()
+WHERE id = $1 AND team_id = $2 AND source = 'imported' AND imported_state IS DISTINCT FROM 'missing';
+
+-- name: DeleteImportedDataServicesOnServer :exec
+DELETE FROM data_services WHERE server_id = $1 AND team_id = $2 AND source = 'imported';

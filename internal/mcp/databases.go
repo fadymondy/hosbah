@@ -9,6 +9,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -22,7 +23,7 @@ func DatabaseTools() []Tool {
 	return []Tool{
 		{
 			Name: "list_databases", Scope: scopes.Read,
-			Description: "The team's managed data services (Postgres/MySQL/Redis): kind, version, status and private endpoint.",
+			Description: "The team's data services: managed ones (Postgres/MySQL/Redis/MinIO) and imported ones found running on its servers (marked imported; Hosbah never changes those): kind, version, status and endpoint.",
 			InputSchema: schema(nil, map[string]any{}),
 			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
 				rows, err := env.Q.ListDataServicesOfTeam(ctx, env.Caller.TeamID)
@@ -38,6 +39,9 @@ func DatabaseTools() []Tool {
 					endpoint := "—"
 					if r.Host != nil && r.Port != nil {
 						endpoint = fmt.Sprintf("%s:%d", *r.Host, *r.Port)
+					}
+					if r.Source == importer.SourceImported {
+						endpoint += "  imported (" + orDash(r.ImportedState) + ")"
 					}
 					fmt.Fprintf(&b, "  %-20s %-9s %-8s %-10s endpoint %-22s (id %s)\n", r.Name, r.Kind, r.Version, r.Status, endpoint, r.ID)
 				}
@@ -55,6 +59,10 @@ func DatabaseTools() []Tool {
 				}
 				var b strings.Builder
 				fmt.Fprintf(&b, "%s  (id %s)\nkind: %s %s\nstatus: %s\n", svc.Name, svc.ID, svc.Kind, svc.Version, svc.Status)
+				if svc.Source == importer.SourceImported {
+					fmt.Fprintf(&b, "imported: Hosbah found it running and holds no credential; it never backs it up or changes it\n%s\nlast seen: %s\n",
+						importedLine(svc.Name, svc.OriginKind, svc.Origin, svc.ImportedState, svc.Kind+" "+svc.Version), lastSeen(svc.LastSeenAt))
+				}
 				if svc.Host != nil && svc.Port != nil {
 					fmt.Fprintf(&b, "endpoint: %s:%d (private)\n", *svc.Host, *svc.Port)
 				}

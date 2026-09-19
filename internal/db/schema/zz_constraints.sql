@@ -41,3 +41,5 @@ ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_server_fk FOREIGN KEY (server
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_credential_fk FOREIGN KEY (credential_id) REFERENCES credentials (id) ON DELETE RESTRICT;
+-- Imported workloads: the tombstones of deleted imported records go with their server.
+ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;

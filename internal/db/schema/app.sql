@@ -4,8 +4,8 @@ CREATE TABLE apps (
     team_id text NOT NULL,
     server_id text NOT NULL,
     name text NOT NULL,
-    repo_url text NOT NULL,
-    branch text NOT NULL,
+    repo_url text,
+    branch text,
     runtime text,
     port bigint NOT NULL DEFAULT 8080,
     healthcheck_path text NOT NULL DEFAULT '/',
@@ -15,6 +15,12 @@ CREATE TABLE apps (
     current_release_id text,
     status text NOT NULL DEFAULT 'new',
     git_installation_id text,
+    source text NOT NULL DEFAULT 'git',
+    origin_kind text,
+    origin_key text,
+    origin jsonb,
+    imported_state text,
+    last_seen_at timestamptz,
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -33,3 +39,15 @@ CREATE UNIQUE INDEX apps_team_name_key ON apps (team_id, name);
 CREATE UNIQUE INDEX apps_id_team_key ON apps (id, team_id);
 CREATE UNIQUE INDEX apps_deploy_hook_key ON apps (deploy_hook_hash) WHERE deploy_hook_hash IS NOT NULL;
 CREATE INDEX apps_server_idx ON apps (server_id);
+
+-- Imported workloads: an app with source 'imported' is something Hosbah found already running on a
+-- server (a container, a systemd unit, a Proxmox guest). Hosbah shows it and never deploys, restarts
+-- or removes it. origin_key is stable per server (container name, unit name, guest:<vmid>); origin is
+-- what discovery reported (image, ports, address, guest_type, cpus, mem_bytes, disk_bytes, status).
+-- A git app always has its repository and branch.
+ALTER TABLE apps ADD CONSTRAINT apps_source_check CHECK (source IN ('git', 'imported'));
+ALTER TABLE apps ADD CONSTRAINT apps_git_repo_check CHECK (source <> 'git' OR (repo_url IS NOT NULL AND branch IS NOT NULL));
+ALTER TABLE apps ADD CONSTRAINT apps_origin_kind_check CHECK (origin_kind IS NULL OR origin_kind IN ('container', 'systemd', 'guest'));
+ALTER TABLE apps ADD CONSTRAINT apps_imported_state_check CHECK (imported_state IS NULL OR imported_state IN ('running', 'stopped', 'missing'));
+ALTER TABLE apps ADD CONSTRAINT apps_imported_origin_check CHECK (source <> 'imported' OR (origin_kind IS NOT NULL AND origin_key IS NOT NULL));
+CREATE UNIQUE INDEX apps_server_origin_key ON apps (server_id, origin_key) WHERE source = 'imported';

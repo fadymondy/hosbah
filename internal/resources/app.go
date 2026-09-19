@@ -14,8 +14,8 @@ type AppResponse struct {
 	TeamID             string    `json:"team_id"`
 	ServerID           string    `json:"server_id"`
 	Name               string    `json:"name"`
-	RepoURL            string    `json:"repo_url"`
-	Branch             string    `json:"branch"`
+	RepoURL            *string   `json:"repo_url"`
+	Branch             *string   `json:"branch"`
 	Runtime            *string   `json:"runtime"`
 	Port               int64     `json:"port"`
 	HealthcheckPath    string    `json:"healthcheck_path"`

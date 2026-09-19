@@ -16,6 +16,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -200,6 +201,7 @@ func (s *Service) heartbeat(ctx context.Context, ac *agentConn, f agentproto.Fra
 func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.Event) {
 	requeued := false
 	deployment := ""
+	var importFacts []byte // a completed system.info: sync the server's imported workloads after the commit
 	err := s.agentTx(ctx, ac, func(q *db.Queries) error {
 		op, err := q.OperationForServer(ctx, db.OperationForServerParams{ID: ev.OpID, ServerID: ac.serverID})
 		if errors.Is(err, sql.ErrNoRows) {
@@ -285,6 +287,9 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 				}
 				if json.Unmarshal([]byte(*res), &r) == nil && len(r.Facts) > 2 {
 					err = q.RefreshServerFacts(ctx, db.RefreshServerFactsParams{Facts: string(r.Facts), ID: ac.serverID})
+					if err == nil {
+						importFacts = r.Facts
+					}
 				}
 			}
 		}
@@ -292,6 +297,12 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 	})
 	if err != nil {
 		s.log.Warn("agent event not stored", "server", ac.serverID, "op", ev.OpID, "seq", ev.Seq, "err", err)
+	}
+	if err == nil && importFacts != nil {
+		// Discovered workloads become imported apps and data services (team scope; never deletes).
+		if _, ierr := importer.SyncFacts(ctx, s.a.SQLDB, ac.teamID, ac.serverID, importFacts); ierr != nil {
+			s.log.Warn("imported workloads not synced", "server", ac.serverID, "err", ierr)
+		}
 	}
 	if requeued {
 		s.Wake()

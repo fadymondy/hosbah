@@ -22,6 +22,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/crypto"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
 	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
 	"github.com/fadymondy/hosbah/internal/ops"
@@ -97,6 +98,10 @@ func Boot() *app.App {
 	databases := dbsvc.New(a, svc, deploys)
 	databases.StartScheduler()
 	a.DBSvc = databases
+	// Servers connected before workload import existed: convert what their facts already list.
+	if _, err := importer.Backfill(context.Background(), a.SQLDB, a.Log); err != nil {
+		a.Log.Warn("imported workloads backfill failed", "err", err)
+	}
 	a.Stop = func() { databases.StopScheduler(); deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())

@@ -109,10 +109,12 @@ type Overview struct {
 	PlatformAdmins     int64        `json:"platform_admins"`
 	Teams              int64        `json:"teams"`
 	Servers            ServerCounts `json:"servers"`
-	Apps               int64        `json:"apps"`
+	Apps               int64        `json:"apps" doc:"Every app, imported ones included"`
+	AppsImported       int64        `json:"apps_imported" doc:"Apps imported from what servers already run"`
 	DeploymentsLast24h WindowCounts `json:"deployments_last_24h"`
 	OperationsLast24h  WindowCounts `json:"operations_last_24h" doc:"failed counts failed and timed-out operations"`
-	Databases          int64        `json:"databases" doc:"Data services (database servers)"`
+	Databases          int64        `json:"databases" doc:"Data services (database servers), imported ones included"`
+	DatabasesImported  int64        `json:"databases_imported" doc:"Data services imported from what servers already run"`
 	RecentSignups      []Signup     `json:"recent_signups"`
 }
 
@@ -123,7 +125,7 @@ func GetOverview(ctx context.Context, q *db.Queries) (Overview, error) {
 	}
 	o := Overview{Users: c.Users, PlatformAdmins: c.PlatformAdmins, Teams: c.Teams,
 		Servers: ServerCounts{Total: c.ServersTotal, Online: c.ServersOnline, Offline: c.ServersTotal - c.ServersOnline},
-		Apps:    c.Apps, Databases: c.Databases,
+		Apps:    c.Apps, Databases: c.Databases, AppsImported: c.AppsImported, DatabasesImported: c.DatabasesImported,
 		DeploymentsLast24h: WindowCounts{Total: c.Deployments24h, Failed: c.DeploymentsFailed24h},
 		OperationsLast24h:  WindowCounts{Total: c.Operations24h, Failed: c.OperationsFailed24h},
 		RecentSignups:      []Signup{}}

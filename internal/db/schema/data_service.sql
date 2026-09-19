@@ -11,8 +11,14 @@ CREATE TABLE data_services (
     volume text,
     host text,
     port bigint,
-    root_sealed text NOT NULL,
+    root_sealed text,
     error text,
+    source text NOT NULL DEFAULT 'managed',
+    origin_kind text,
+    origin_key text,
+    origin jsonb,
+    imported_state text,
+    last_seen_at timestamptz,
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -24,11 +30,21 @@ CREATE TABLE data_services (
 -- root/superuser credential, sealed with the team DEK bound to "dbroot:<id>"; it never leaves the
 -- database except sealed to the target agent inside a signed operation, or through the audited
 -- reveal path. host/port are the private endpoint the agent reports after provisioning.
-ALTER TABLE data_services ADD CONSTRAINT data_services_kind_check CHECK (kind IN ('postgres', 'mysql', 'redis', 'minio'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_kind_check CHECK (kind IN ('postgres', 'mysql', 'redis', 'minio', 'mongodb'));
 ALTER TABLE data_services ADD CONSTRAINT data_services_status_check CHECK (status IN ('new', 'provisioning', 'running', 'failed', 'stopped'));
 ALTER TABLE data_services ADD CONSTRAINT data_services_name_check CHECK (name ~ '^[a-z0-9][a-z0-9-]{0,39}$');
-ALTER TABLE data_services ADD CONSTRAINT data_services_sealed_check CHECK (root_sealed LIKE 'csv1:%');
+ALTER TABLE data_services ADD CONSTRAINT data_services_sealed_check CHECK (root_sealed IS NULL OR root_sealed LIKE 'csv1:%');
 ALTER TABLE data_services ADD CONSTRAINT data_services_port_check CHECK (port IS NULL OR port BETWEEN 1 AND 65535);
 CREATE UNIQUE INDEX data_services_team_name_key ON data_services (team_id, name);
 CREATE UNIQUE INDEX data_services_id_team_key ON data_services (id, team_id);
 CREATE INDEX data_services_server_idx ON data_services (server_id);
+
+-- Imported workloads: a data service with source 'imported' is a database Hosbah found running on a
+-- server. Hosbah knows no credential for it (root_sealed is NULL) and never backs it up, restores it or
+-- changes it. A managed service always has its sealed root credential; mongodb exists only imported.
+ALTER TABLE data_services ADD CONSTRAINT data_services_source_check CHECK (source IN ('managed', 'imported'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_managed_check CHECK (source <> 'managed' OR (root_sealed IS NOT NULL AND kind <> 'mongodb'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_origin_kind_check CHECK (origin_kind IS NULL OR origin_kind IN ('container', 'systemd', 'guest'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_imported_state_check CHECK (imported_state IS NULL OR imported_state IN ('running', 'stopped', 'missing'));
+ALTER TABLE data_services ADD CONSTRAINT data_services_imported_origin_check CHECK (source <> 'imported' OR (origin_kind IS NOT NULL AND origin_key IS NOT NULL));
+CREATE UNIQUE INDEX data_services_server_origin_key ON data_services (server_id, origin_key) WHERE source = 'imported';

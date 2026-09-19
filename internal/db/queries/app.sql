@@ -17,8 +17,8 @@ DELETE FROM apps WHERE id = $1;
 -- name: InsertApp :one
 INSERT INTO apps (id, team_id, server_id, name, repo_url, branch, port, healthcheck_path, healthcheck_timeout,
     autodeploy_paused, deploy_hook_hash, status, created_by)
-VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('name'), sqlc.arg('repo_url'),
-    sqlc.arg('branch'), sqlc.arg('port'), sqlc.arg('healthcheck_path'), sqlc.arg('healthcheck_timeout'),
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('name'), sqlc.arg('repo_url')::text,
+    sqlc.arg('branch')::text, sqlc.arg('port'), sqlc.arg('healthcheck_path'), sqlc.arg('healthcheck_timeout'),
     false, sqlc.narg('deploy_hook_hash'), 'new', sqlc.arg('created_by'))
 RETURNING *;
 
@@ -35,7 +35,7 @@ SELECT * FROM apps
 WHERE team_id = sqlc.arg('team_id')::text AND (id = sqlc.arg('ref')::text OR name = sqlc.arg('ref')::text);
 
 -- name: UpdateAppSettings :one
-UPDATE apps SET branch = sqlc.arg('branch'), port = sqlc.arg('port'), healthcheck_path = sqlc.arg('healthcheck_path'),
+UPDATE apps SET branch = sqlc.arg('branch')::text, port = sqlc.arg('port'), healthcheck_path = sqlc.arg('healthcheck_path'),
     healthcheck_timeout = sqlc.arg('healthcheck_timeout'), autodeploy_paused = sqlc.arg('autodeploy_paused'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
 RETURNING *;
@@ -50,7 +50,7 @@ UPDATE apps SET deploy_hook_hash = $3, updated_at = now() WHERE id = $1 AND team
 DELETE FROM apps WHERE id = $1 AND team_id = $2;
 
 -- name: CountAppsOnServer :one
-SELECT count(*) FROM apps WHERE server_id = $1 AND team_id = $2;
+SELECT count(*) FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'git';
 
 -- name: AppByDeployHook :one
 -- Token scope (app.token_hash = the presented deploy-hook token's hash).
@@ -66,4 +66,27 @@ UPDATE apps SET status = sqlc.arg('status'), runtime = coalesce(sqlc.narg('runti
 WHERE id = sqlc.arg('id');
 
 -- name: AppsForRepo :many
-SELECT * FROM apps WHERE repo_url = sqlc.arg('repo_url') AND branch = sqlc.arg('branch') AND NOT autodeploy_paused;
+SELECT * FROM apps WHERE source = 'git' AND repo_url = sqlc.arg('repo_url')::text AND branch = sqlc.arg('branch')::text AND NOT autodeploy_paused;
+
+-- Imported workloads (team scope: the importer runs as the server's team).
+-- name: ImportedAppsOfServer :many
+SELECT * FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
+
+-- name: InsertImportedApp :one
+INSERT INTO apps (id, team_id, server_id, name, port, status, source, origin_kind, origin_key, origin, imported_state, last_seen_at, created_by)
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('name'), sqlc.arg('port'), sqlc.arg('status'), 'imported',
+    sqlc.arg('origin_kind'), sqlc.arg('origin_key'), sqlc.arg('origin')::jsonb, sqlc.arg('imported_state'), now(), sqlc.arg('created_by'))
+RETURNING *;
+
+-- name: RefreshImportedApp :exec
+UPDATE apps SET origin_kind = sqlc.arg('origin_kind'), origin = sqlc.arg('origin')::jsonb, imported_state = sqlc.arg('imported_state'),
+    status = sqlc.arg('status'), last_seen_at = now(), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
+
+-- name: MarkImportedAppMissing :exec
+UPDATE apps SET imported_state = 'missing', status = 'stopped', updated_at = now()
+WHERE id = $1 AND team_id = $2 AND source = 'imported' AND imported_state IS DISTINCT FROM 'missing';
+
+-- name: DeleteImportedAppsOnServer :exec
+-- Removing a server forgets the workloads imported from it (records only; nothing runs on the host).
+DELETE FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'imported';

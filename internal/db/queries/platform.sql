@@ -42,11 +42,13 @@ SELECT
     (SELECT count(*) FROM servers)::bigint AS servers_total,
     (SELECT count(*) FROM servers WHERE status = 'enrolled' AND last_seen_at > now() - make_interval(secs => sqlc.arg('online_seconds')::int))::bigint AS servers_online,
     (SELECT count(*) FROM apps)::bigint AS apps,
+    (SELECT count(*) FROM apps WHERE source = 'imported')::bigint AS apps_imported,
     (SELECT count(*) FROM deployments WHERE created_at > now() - interval '24 hours')::bigint AS deployments_24h,
     (SELECT count(*) FROM deployments WHERE created_at > now() - interval '24 hours' AND status = 'failed')::bigint AS deployments_failed_24h,
     (SELECT count(*) FROM operations WHERE created_at > now() - interval '24 hours')::bigint AS operations_24h,
     (SELECT count(*) FROM operations WHERE created_at > now() - interval '24 hours' AND status IN ('failed', 'timeout'))::bigint AS operations_failed_24h,
-    (SELECT count(*) FROM data_services)::bigint AS databases;
+    (SELECT count(*) FROM data_services)::bigint AS databases,
+    (SELECT count(*) FROM data_services WHERE source = 'imported')::bigint AS databases_imported;
 
 -- name: RecentSignups :many
 SELECT id, email, created_at FROM users ORDER BY created_at DESC, id LIMIT 5;

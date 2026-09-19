@@ -11,6 +11,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -39,6 +40,11 @@ func AppTools() []Tool {
 				var b strings.Builder
 				fmt.Fprintf(&b, "%d app(s):\n", len(rows))
 				for _, r := range rows {
+					if r.Source == importer.SourceImported {
+						fmt.Fprintf(&b, "  %-20s %-9s server %-16s %s  (id %s)\n", r.Name, r.Status, r.ServerName,
+							importedLine(r.Name, r.OriginKind, r.Origin, r.ImportedState, ""), r.ID)
+						continue
+					}
 					live := "—"
 					if rel, err := env.Q.LiveReleaseOfApp(ctx, r.ID); err == nil {
 						live = fmt.Sprintf("v%d", rel.Version)
@@ -63,8 +69,13 @@ func AppTools() []Tool {
 					return "", err
 				}
 				var b strings.Builder
+				if a.Source == importer.SourceImported {
+					fmt.Fprintf(&b, "%s  (id %s)\nimported: Hosbah shows it but does not deploy or change it\n%s\nlast seen: %s\n", a.Name, a.ID,
+						importedLine(a.Name, a.OriginKind, a.Origin, a.ImportedState, ""), lastSeen(a.LastSeenAt))
+					return b.String(), nil
+				}
 				fmt.Fprintf(&b, "%s  (id %s)\nstatus: %s\nrepository: %s @ %s\nruntime: %s\nport: %d · health check GET %s within %ds\nauto-deploy: %s\n",
-					a.Name, a.ID, a.Status, a.RepoURL, a.Branch, orDash(a.Runtime), a.Port, a.HealthcheckPath, a.HealthcheckTimeout,
+					a.Name, a.ID, a.Status, orDash(a.RepoURL), orDash(a.Branch), orDash(a.Runtime), a.Port, a.HealthcheckPath, a.HealthcheckTimeout,
 					map[bool]string{true: "paused", false: "on"}[a.AutodeployPaused])
 				if s, err := env.Q.ServerInTeam(ctx, db.ServerInTeamParams{ID: a.ServerID, TeamID: env.Caller.TeamID}); err == nil {
 					fmt.Fprintf(&b, "server: %s (%s)\n", s.Name, presence(s, time.Now()))
@@ -323,7 +334,7 @@ func AppTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				out := fmt.Sprintf("Created %s (id %s) on server %s from %s @ %s.\nDeploy hook (shown once — POST to it to deploy): %s\n", a.Name, a.ID, args.Str("server"), a.RepoURL, a.Branch, hook)
+				out := fmt.Sprintf("Created %s (id %s) on server %s from %s @ %s.\nDeploy hook (shown once — POST to it to deploy): %s\n", a.Name, a.ID, args.Str("server"), orDash(a.RepoURL), orDash(a.Branch), hook)
 				if args.Bool("deploy") {
 					d, err := s.QueueDeployment(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, "deploy", "", nil)
 					if err != nil {

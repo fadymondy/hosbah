@@ -88,14 +88,14 @@ resources:
           "null": false
         - name: repo_url
           go: string
-          gql: String!
+          gql: String
           pg: text
-          "null": false
+          "null": true
         - name: branch
           go: string
-          gql: String!
+          gql: String
           pg: text
-          "null": false
+          "null": true
         - name: runtime
           go: string
           gql: String
@@ -140,6 +140,36 @@ resources:
           go: string
           gql: String
           pg: text
+          "null": true
+        - name: source
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: origin_kind
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: origin_key
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: origin
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: imported_state
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: last_seen_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
           "null": true
         - name: created_by
           go: string
@@ -423,13 +453,43 @@ resources:
           "null": true
         - name: root_sealed
           go: string
-          gql: String!
+          gql: String
           pg: text
-          "null": false
+          "null": true
         - name: error
           go: string
           gql: String
           pg: text
+          "null": true
+        - name: source
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: origin_kind
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: origin_key
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: origin
+          go: string
+          gql: String
+          pg: jsonb
+          "null": true
+        - name: imported_state
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: last_seen_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
           "null": true
         - name: created_by
           go: string
@@ -736,6 +796,40 @@ resources:
           pg: text
           "null": false
         - name: updated_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ImportIgnore
+      table: import_ignores
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: origin_key
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
           go: string
           gql: String!
           pg: text

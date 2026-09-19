@@ -261,6 +261,14 @@ func (d *deps) registerServers(api huma.API) {
 			if n, err := q.CountAppsOnServer(ctx, db.CountAppsOnServerParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil && n > 0 {
 				return huma.Error409Conflict(fmt.Sprintf("%d app(s) run on this server — delete them first", n))
 			}
+			// Workloads imported from this server are only records: forgetting the server forgets them
+			// (nothing on the host changes).
+			if err := q.DeleteImportedAppsOnServer(ctx, db.DeleteImportedAppsOnServerParams{ServerID: s.ID, TeamID: m.TeamID}); err != nil {
+				return huma.Error500InternalServerError("could not forget the server's imported apps")
+			}
+			if err := q.DeleteImportedDataServicesOnServer(ctx, db.DeleteImportedDataServicesOnServerParams{ServerID: s.ID, TeamID: m.TeamID}); err != nil {
+				return huma.Error500InternalServerError("could not forget the server's imported databases")
+			}
 			if s.Provider == "proxmox" && s.ProviderRef != nil && s.CredentialID != nil {
 				if err := provisioning.DeleteMachine(ctx, d.a.Keys, q, s); err != nil {
 					return huma.Error502BadGateway("the machine could not be deleted on Proxmox, so the server was kept: " + err.Error())

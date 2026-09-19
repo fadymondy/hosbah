@@ -66,11 +66,11 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 			status, out = http.StatusConflict, map[string]string{"error": "deploys from the hook are paused for this app"}
 			return nil
 		}
-		ref := a.Branch
+		ref := BranchOf(a)
 		switch p := payload.Ref; {
 		case strings.HasPrefix(p, "refs/heads/"):
-			if b := strings.TrimPrefix(p, "refs/heads/"); b != a.Branch {
-				status, out = http.StatusAccepted, map[string]string{"skipped": "a push to " + b + ", not " + a.Branch}
+			if b := strings.TrimPrefix(p, "refs/heads/"); b != BranchOf(a) {
+				status, out = http.StatusAccepted, map[string]string{"skipped": "a push to " + b + ", not " + BranchOf(a)}
 				return nil
 			}
 		case strings.HasPrefix(p, "refs/"):
@@ -145,7 +145,7 @@ func (s *Service) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) queueForTeam(ctx context.Context, a db.App) error {
 	return tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{TeamID: a.TeamID}, func(q *db.Queries, _ *sql.Tx) error {
-		_, err := s.QueueDeployment(ctx, q, a.TeamID, Actor{Via: "github"}, a, "deploy", a.Branch, nil)
+		_, err := s.QueueDeployment(ctx, q, a.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil)
 		return err
 	})
 }

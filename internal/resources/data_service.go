@@ -21,7 +21,7 @@ type DataServiceResponse struct {
 	Volume     *string   `json:"volume"`
 	Host       *string   `json:"host"`
 	Port       *int64    `json:"port"`
-	RootSealed string    `json:"root_sealed"`
+	RootSealed *string   `json:"root_sealed"`
 	Error      *string   `json:"error"`
 	CreatedBy  string    `json:"created_by"`
 	CreatedAt  time.Time `json:"created_at"`

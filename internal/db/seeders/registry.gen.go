@@ -51,6 +51,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedEnvVar(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedImportIgnore(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedInvitation(ctx, a); err != nil {
 		return err
 	}

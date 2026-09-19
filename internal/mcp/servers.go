@@ -179,6 +179,13 @@ func ServerTools() []Tool {
 				if n, err := env.Q.CountAppsOnServer(ctx, db.CountAppsOnServerParams{ServerID: s.ID, TeamID: env.Caller.TeamID}); err == nil && n > 0 {
 					return "", fmt.Errorf("%d app(s) still run on %s — delete them first; nothing was changed", n, s.Name)
 				}
+				// Imported workloads are only records: forgetting the server forgets them.
+				if err := env.Q.DeleteImportedAppsOnServer(ctx, db.DeleteImportedAppsOnServerParams{ServerID: s.ID, TeamID: env.Caller.TeamID}); err != nil {
+					return "", errors.New("could not forget the server's imported apps")
+				}
+				if err := env.Q.DeleteImportedDataServicesOnServer(ctx, db.DeleteImportedDataServicesOnServerParams{ServerID: s.ID, TeamID: env.Caller.TeamID}); err != nil {
+					return "", errors.New("could not forget the server's imported databases")
+				}
 				if s.Provider == "proxmox" && s.ProviderRef != nil && s.CredentialID != nil {
 					if env.App == nil || env.App.Keys == nil {
 						return "", errors.New("the provider driver is not available, so the machine was not deleted")

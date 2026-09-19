@@ -32,13 +32,14 @@ never returns a secret except RevealEnv's one value.
 type ActionError struct {
 	Status int
 	Msg    string
+	Code   string // machine-readable, e.g. ImportedCode; "" for most refusals
 }
 
 func (e *ActionError) Error() string { return e.Msg }
 
-func notFound(what string) error { return &ActionError{404, what + " not found"} }
-func conflict(msg string) error  { return &ActionError{409, msg} }
-func invalid(msg string) error   { return &ActionError{422, msg} }
+func notFound(what string) error { return &ActionError{Status: 404, Msg: what + " not found"} }
+func conflict(msg string) error  { return &ActionError{Status: 409, Msg: msg} }
+func invalid(msg string) error   { return &ActionError{Status: 422, Msg: msg} }
 
 // Actor is who asked: a member in the browser, an MCP token, a deploy hook, the GitHub App.
 type Actor struct {
@@ -148,6 +149,9 @@ func AppByRef(ctx context.Context, q *db.Queries, teamID, ref string) (db.App, e
 
 // RotateHook replaces the app's deploy-hook token; the old URL stops working at once.
 func (s *Service) RotateHook(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App) (string, error) {
+	if err := refuseImported(a); err != nil {
+		return "", err
+	}
 	plain, hash := tokens.New(HookTokenPrefix)
 	if err := q.SetAppDeployHook(ctx, db.SetAppDeployHookParams{ID: a.ID, TeamID: teamID, DeployHookHash: &hash}); err != nil {
 		return "", err
@@ -160,6 +164,9 @@ func (s *Service) RotateHook(ctx context.Context, q *db.Queries, teamID string, 
 
 // UpdateSettings changes branch, port and health check (they apply from the next deploy).
 func (s *Service) UpdateSettings(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, branch string, port, healthTimeout int, healthPath string, paused bool) (db.App, error) {
+	if err := refuseImported(a); err != nil {
+		return db.App{}, err
+	}
 	if !agentproto.ValidRef(branch) || port < 1 || port > 65535 || !strings.HasPrefix(healthPath, "/") || healthTimeout < 5 || healthTimeout > 600 {
 		return db.App{}, invalid("a valid branch, port 1–65535, a health-check path starting with /, and a timeout of 5–600 seconds")
 	}
@@ -174,6 +181,9 @@ func (s *Service) UpdateSettings(ctx context.Context, q *db.Queries, teamID stri
 
 // SetPaused pauses or resumes deploys from the deploy hook and the GitHub App (manual deploys still work).
 func (s *Service) SetPaused(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, paused bool) error {
+	if err := refuseImported(a); err != nil {
+		return err
+	}
 	if err := q.SetAppAutodeployPaused(ctx, db.SetAppAutodeployPausedParams{ID: a.ID, TeamID: teamID, AutodeployPaused: paused}); err != nil {
 		return err
 	}
@@ -187,6 +197,9 @@ func (s *Service) SetPaused(ctx context.Context, q *db.Queries, teamID string, a
 // DeleteApp removes the app: its route, containers and images on the server (an app.remove
 // operation, which runs when the agent is connected), then every row it owns.
 func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App) error {
+	if IsImported(a) {
+		return s.forgetImportedApp(ctx, q, teamID, actor, a)
+	}
 	recent, err := q.ListDeploymentsOfApp(ctx, db.ListDeploymentsOfAppParams{AppID: a.ID, TeamID: teamID, Limit: 2})
 	if err != nil {
 		return err
@@ -217,8 +230,11 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 // QueueDeployment asks for a deploy, rollback or restart. A deployment still waiting for the same
 // app is superseded (the newest request wins); a running one finishes first.
 func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, kind, ref string, target *string) (db.Deployment, error) {
+	if err := refuseImported(a); err != nil {
+		return db.Deployment{}, err
+	}
 	if ref == "" {
-		ref = a.Branch
+		ref = BranchOf(a)
 	}
 	if kind == "deploy" && !agentproto.ValidRef(ref) {
 		return db.Deployment{}, invalid("that is not a valid branch, tag or commit")
@@ -294,6 +310,9 @@ func (s *Service) CancelDeployment(ctx context.Context, q *db.Queries, teamID st
 // Rollback re-points the app at a kept release: release ("" = the one live before the current, or an
 // id, or a version like "3" / "v3").
 func (s *Service) Rollback(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, release string) (db.Deployment, db.Release, error) {
+	if err := refuseImported(a); err != nil {
+		return db.Deployment{}, db.Release{}, err
+	}
 	var target db.Release
 	release = strings.TrimPrefix(strings.TrimSpace(release), "v")
 	if release == "" {
@@ -329,6 +348,9 @@ func (s *Service) Rollback(ctx context.Context, q *db.Queries, teamID string, ac
 // Restart starts the live release in fresh containers (new env values take effect) with the same
 // health gate and switch as a deploy.
 func (s *Service) Restart(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App) (db.Deployment, error) {
+	if err := refuseImported(a); err != nil {
+		return db.Deployment{}, err
+	}
 	live, err := q.LiveReleaseOfApp(ctx, a.ID)
 	if err != nil || live.TeamID != teamID {
 		return db.Deployment{}, conflict("nothing is live to restart — deploy first")
@@ -342,6 +364,9 @@ const maxEnvValue = 32 << 10
 
 // SetEnv seals and stores a value (applied by the next deploy or restart).
 func (s *Service) SetEnv(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, name, value string) error {
+	if err := refuseImported(a); err != nil {
+		return err
+	}
 	if !validEnvName(name) {
 		return invalid("variable names are letters, digits and _, not starting with a digit")
 	}
@@ -367,6 +392,9 @@ func (s *Service) SetEnv(ctx context.Context, q *db.Queries, teamID string, acto
 
 // UnsetEnv removes a variable.
 func (s *Service) UnsetEnv(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, name string) error {
+	if err := refuseImported(a); err != nil {
+		return err
+	}
 	n, err := q.DeleteEnvVarInApp(ctx, db.DeleteEnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: name})
 	if err != nil {
 		return err
@@ -417,6 +445,9 @@ func NormalizeHostname(h string) string { return strings.TrimSuffix(strings.ToLo
 
 // AddDomain routes a hostname to the app (at once, if a release is live).
 func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, hostname, tls string) (db.Domain, error) {
+	if err := refuseImported(a); err != nil {
+		return db.Domain{}, err
+	}
 	hostname = NormalizeHostname(hostname)
 	if tls == "" {
 		tls = "auto"
@@ -464,6 +495,9 @@ func DomainByRef(ctx context.Context, q *db.Queries, teamID string, a db.App, re
 
 // RemoveDomain stops routing a hostname.
 func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) error {
+	if err := refuseImported(a); err != nil {
+		return err
+	}
 	if d.VerifyToken == "platform" {
 		return invalid("the app's platform hostname cannot be removed")
 	}
@@ -486,6 +520,9 @@ var LookupTXT = func(ctx context.Context, name string) ([]string, error) {
 // VerifyDomain checks the _cloudy-verify TXT record. Verification gates public certificates (the
 // on-demand TLS ask), not routing.
 func (s *Service) VerifyDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) (bool, string, error) {
+	if err := refuseImported(a); err != nil {
+		return false, "", err
+	}
 	if d.VerifiedAt != nil {
 		return true, d.Hostname + " is already verified.", nil
 	}
@@ -512,6 +549,9 @@ func (s *Service) VerifyDomain(ctx context.Context, q *db.Queries, teamID string
 // SyncRoutes points the app's hostnames at its live release now (domains added or removed between
 // deploys). Nothing live: nothing to route yet — the next deploy's switch includes them.
 func (s *Service) SyncRoutes(ctx context.Context, q *db.Queries, teamID string, a db.App) error {
+	if IsImported(a) {
+		return nil // Hosbah does not route an imported workload
+	}
 	live, err := q.LiveReleaseOfApp(ctx, a.ID)
 	if err != nil || live.HostPort == nil || live.TeamID != teamID {
 		return nil
@@ -563,6 +603,9 @@ func (s *Service) Detect(ctx context.Context, q *db.Queries, teamID string, acto
 
 // RuntimeLogs queues app.logs: the process's recent lines, then following for a while.
 func (s *Service) RuntimeLogs(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, process string, tail, follow int) (db.Operation, error) {
+	if err := refuseImported(a); err != nil {
+		return db.Operation{}, err
+	}
 	if process == "" {
 		process = "web"
 	}

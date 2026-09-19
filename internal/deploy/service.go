@@ -537,7 +537,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	var built agentproto.BuildResult
 	if err := r.op(ctx, "build", agentproto.KindAppBuild, agentproto.BuildParams{
 		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
-		GitSource: agentproto.GitSource{RepoURL: r.app.RepoURL, Ref: r.dep.Ref},
+		GitSource: agentproto.GitSource{RepoURL: RepoOf(r.app), Ref: r.dep.Ref},
 		Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
 	}, &built); err != nil {
 		return nil, fmt.Errorf("build: %w", err)

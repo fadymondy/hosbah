@@ -28,6 +28,9 @@ type ScheduleInput struct {
 
 // SetSchedule creates or updates a service's single backup schedule.
 func (s *Service) SetSchedule(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, in ScheduleInput) (db.BackupSchedule, error) {
+	if err := refuseImported(svc); err != nil {
+		return db.BackupSchedule{}, err
+	}
 	in.Cron = strings.TrimSpace(in.Cron)
 	if _, err := cronNext(in.Cron, time.Now().UTC()); err != nil {
 		return db.BackupSchedule{}, invalid("that is not a valid cron expression (five fields, e.g. 0 3 * * *)")
@@ -123,6 +126,9 @@ func (s *Service) runScheduledBackup(ctx context.Context, sch db.BackupSchedule)
 		var err error
 		if svc, err = q.DataServiceInTeam(ctx, db.DataServiceInTeamParams{ID: sch.DataServiceID, TeamID: sch.TeamID}); err != nil {
 			return err
+		}
+		if svc.Source == SourceImported {
+			return errors.New("imported services are never backed up")
 		}
 		if svc.Status != "running" {
 			return errors.New("service not running")

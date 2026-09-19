@@ -89,3 +89,7 @@ UPDATE servers SET spec = spec #- '{connect,secret_sealed}', updated_at = now() 
 -- name: RefreshServerFacts :exec
 -- Agent scope: a completed system.info replaces the server's facts (discovered services, guests…).
 UPDATE servers SET facts = sqlc.arg('facts')::jsonb, updated_at = now() WHERE id = sqlc.arg('id')::text;
+
+-- name: ServersWithDiscoveredServices :many
+-- System scope (API boot): every server whose facts list discovered workloads, for the one-time import backfill.
+SELECT id, team_id, facts FROM servers WHERE facts IS NOT NULL AND jsonb_typeof(facts->'services') = 'array';

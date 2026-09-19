@@ -28,6 +28,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/config"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/migrate"
 	"github.com/fadymondy/hosbah/internal/ops"
 )
@@ -114,6 +115,35 @@ func TestIsolationSweep(t *testing.T) {
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 
+	// Imported workloads of A's: a site and a database found running on that server (records only).
+	if _, err := importer.Sync(context.Background(), testDB(t), teamA.ID, srvA, []agentproto.Service{
+		{Kind: "container", Name: "imp-site", Image: "nginx", Status: "running"},
+		{Kind: "container", Name: "imp-pg", Image: "postgres:16", Status: "running"}}); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	var impApps struct {
+		Apps []struct{ ID, Name, Source string } `json:"apps"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/apps", nil, 200, &impApps)
+	var impDS struct {
+		Services []struct{ ID, Name, Source string } `json:"services"`
+	}
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/data-services", nil, 200, &impDS)
+	impAppID, impSvcID := "", ""
+	for _, a := range impApps.Apps {
+		if a.Source == "imported" && a.Name == "imp-site" {
+			impAppID = a.ID
+		}
+	}
+	for _, s := range impDS.Services {
+		if s.Source == "imported" && s.Name == "imp-pg" {
+			impSvcID = s.ID
+		}
+	}
+	if impAppID == "" || impSvcID == "" {
+		t.Fatalf("team A's imported records are missing: %+v %+v", impApps, impDS)
+	}
+
 	// P5: a proxy host of A's (Caddy proxy manager) on that server.
 	var proxyA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/proxy-hosts", map[string]any{"server": srvA, "hostname": "nas-" + suffix + ".example.test",
@@ -154,13 +184,13 @@ func TestIsolationSweep(t *testing.T) {
 		"op":         func(string) []string { return []string{opA} },
 		"credential": func(string) []string { return []string{credA.ID} },
 		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
-		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name} },
+		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
-		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x"} }, // a service B may not see
+		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg"} }, // services B may not see (one of A's imported)
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
 		// both: an approval authorises destroying something, so being able to tell "exists but
@@ -266,8 +296,22 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_proxy_hosts", nil); strings.Contains(res.Text, proxyA.Hostname) {
 		t.Errorf("list_proxy_hosts as B leaked team A's proxy host: %s", res.Text)
 	}
-	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) {
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) || strings.Contains(res.Text, "imp-site") {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
+		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)
+	}
+	// Imported records of A's, by id and name: not found, and nothing acts on them.
+	for name, args := range map[string]map[string]any{
+		"get_app": {"app": impAppID}, "delete_app": {"app": impAppID, "confirm": "imp-site"}, "deploy_app": {"app": "imp-site"},
+		"get_database": {"database": impSvcID}, "delete_data_service": {"database": "imp-pg", "confirm": "imp-pg"},
+		"backup_now": {"database": impSvcID},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError || !strings.Contains(res.Text, "not found") {
+			t.Errorf("MCP %s as team B on team A's imported record should be not found: %+v", name, res)
+		}
 	}
 	// P3 data-service MCP tools: a service ref team B may not see is not found; nothing acts.
 	for name, args := range map[string]map[string]any{
@@ -329,6 +373,8 @@ func TestIsolationSweep(t *testing.T) {
 		t.Errorf("reveal as owner: %q", revealed.Value)
 	}
 	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID, nil, 200, nil)
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/apps/"+impAppID, nil, 200, nil)
+	ua.mustJSON("GET", "/api/teams/"+teamA.ID+"/data-services/"+impSvcID, nil, 200, nil)
 	var after struct {
 		Name        string
 		MemberCount int64 `json:"member_count"`

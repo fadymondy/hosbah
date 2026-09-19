@@ -15,6 +15,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -27,8 +28,8 @@ type AppOut struct {
 	Name               string         `json:"name"`
 	ServerID           string         `json:"server_id"`
 	ServerName         string         `json:"server_name,omitempty"`
-	RepoURL            string         `json:"repo_url"`
-	Branch             string         `json:"branch"`
+	RepoURL            *string        `json:"repo_url" doc:"null for an imported app"`
+	Branch             *string        `json:"branch" doc:"null for an imported app"`
 	Runtime            *string        `json:"runtime"`
 	Port               int64          `json:"port"`
 	HealthcheckPath    string         `json:"healthcheck_path"`
@@ -36,6 +37,11 @@ type AppOut struct {
 	AutodeployPaused   bool           `json:"autodeploy_paused"`
 	Status             string         `json:"status" enum:"new,deploying,running,failed,stopped"`
 	CurrentReleaseID   *string        `json:"current_release_id"`
+	Source             string          `json:"source" enum:"git,imported" doc:"imported: found running on the server; Hosbah shows it but never deploys or changes it"`
+	OriginKind         *string         `json:"origin_kind" doc:"imported only: container, systemd or guest"`
+	Origin             *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
+	ImportedState      *string         `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt         *time.Time      `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
 	CreatedAt          time.Time      `json:"created_at"`
 	LatestDeployment   *DeploymentOut `json:"latest_deployment,omitempty"`
 	Domains            []DomainOut    `json:"domains,omitempty"`
@@ -125,7 +131,41 @@ type NotificationOut struct {
 func toAppOut(a db.App, server string) AppOut {
 	return AppOut{ID: a.ID, Name: a.Name, ServerID: a.ServerID, ServerName: server, RepoURL: a.RepoURL, Branch: a.Branch,
 		Runtime: a.Runtime, Port: a.Port, HealthcheckPath: a.HealthcheckPath, HealthcheckTimeout: a.HealthcheckTimeout,
-		AutodeployPaused: a.AutodeployPaused, Status: a.Status, CurrentReleaseID: a.CurrentReleaseID, CreatedAt: a.CreatedAt}
+		AutodeployPaused: a.AutodeployPaused, Status: a.Status, CurrentReleaseID: a.CurrentReleaseID, CreatedAt: a.CreatedAt,
+		Source: a.Source, OriginKind: a.OriginKind, Origin: originOf(a.Origin), ImportedState: a.ImportedState, LastSeenAt: a.LastSeenAt}
+}
+
+// originOf decodes an imported record's origin (nil for a git app or a managed service).
+func originOf(raw *string) *importer.Origin {
+	if raw == nil || *raw == "" {
+		return nil
+	}
+	var o importer.Origin
+	if json.Unmarshal([]byte(*raw), &o) != nil {
+		return nil
+	}
+	if o.Ports == nil {
+		o.Ports = []string{}
+	}
+	return &o
+}
+
+// importedErr is the 409 an imported workload's refusal becomes: {"code":"imported_workload","message":…}.
+type importedErr struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *importedErr) Error() string  { return e.Message }
+func (e *importedErr) GetStatus() int { return http.StatusConflict }
+
+// asImported turns a deploy.ActionError carrying deploy.ImportedCode into importedErr.
+func asImported(err error) error {
+	var ae *deploy.ActionError
+	if errors.As(err, &ae) && ae.Code == deploy.ImportedCode {
+		return &importedErr{Code: ae.Code, Message: ae.Msg}
+	}
+	return nil
 }
 
 func toDeploymentOut(d db.Deployment) DeploymentOut {
@@ -181,6 +221,9 @@ func (d *deps) deploys() *deploy.Service {
 func actionErr(err error, fallback string) error {
 	if err == nil {
 		return nil
+	}
+	if ie := asImported(err); ie != nil {
+		return ie
 	}
 	var ae *deploy.ActionError
 	if errors.As(err, &ae) {
@@ -327,7 +370,8 @@ func (d *deps) registerApps(api huma.API) {
 			for _, r := range rows {
 				a := db.App{ID: r.ID, TeamID: r.TeamID, ServerID: r.ServerID, Name: r.Name, RepoURL: r.RepoURL, Branch: r.Branch, Runtime: r.Runtime,
 					Port: r.Port, HealthcheckPath: r.HealthcheckPath, HealthcheckTimeout: r.HealthcheckTimeout, AutodeployPaused: r.AutodeployPaused,
-					Status: r.Status, CurrentReleaseID: r.CurrentReleaseID, CreatedAt: r.CreatedAt}
+					Status: r.Status, CurrentReleaseID: r.CurrentReleaseID, CreatedAt: r.CreatedAt, Source: r.Source, OriginKind: r.OriginKind,
+					OriginKey: r.OriginKey, Origin: r.Origin, ImportedState: r.ImportedState, LastSeenAt: r.LastSeenAt}
 				o := toAppOut(a, r.ServerName)
 				if deps, err := d.deploymentsOf(ctx, q, m, a, 1); err == nil && len(deps) > 0 {
 					o.LatestDeployment = &deps[0]
@@ -427,7 +471,7 @@ func (d *deps) registerApps(api huma.API) {
 				return err
 			}
 			b := in.Body
-			branch, port, path, timeout, paused := a.Branch, int(a.Port), a.HealthcheckPath, int(a.HealthcheckTimeout), a.AutodeployPaused
+			branch, port, path, timeout, paused := deploy.BranchOf(a), int(a.Port), a.HealthcheckPath, int(a.HealthcheckTimeout), a.AutodeployPaused
 			if b.Branch != nil {
 				branch = *b.Branch
 			}
@@ -639,6 +683,9 @@ func (d *deps) registerApps(api huma.API) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityDeploy, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			a, err := appIn(ctx, q, m, in.App)
 			if err != nil {
+				return err
+			}
+			if err := refuseImportedApp(a); err != nil {
 				return err
 			}
 			dep, err := deploy.DeploymentByRef(ctx, q, m.TeamID, a, in.Deployment)
@@ -885,6 +932,9 @@ func (d *deps) registerApps(api huma.API) {
 			if err != nil {
 				return err
 			}
+			if err := refuseImportedApp(a); err != nil {
+				return err
+			}
 			dm, err := deploy.DomainByRef(ctx, q, m.TeamID, a, in.Domain)
 			if err != nil {
 				return errNotFound
@@ -908,6 +958,9 @@ func (d *deps) registerApps(api huma.API) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			a, err := appIn(ctx, q, m, in.App)
 			if err != nil {
+				return err
+			}
+			if err := refuseImportedApp(a); err != nil {
 				return err
 			}
 			dm, err := deploy.DomainByRef(ctx, q, m.TeamID, a, in.Domain)
@@ -1114,4 +1167,21 @@ func (d *deps) registerApps(api huma.API) {
 	})
 
 	_ = agentproto.KindAppBuild
+}
+
+// refuseImportedApp answers 409 imported_workload before a route looks anything else up (a domain,
+// a deployment), so the refusal does not depend on what an imported app happens not to have.
+func refuseImportedApp(a db.App) error {
+	if deploy.IsImported(a) {
+		return &importedErr{Code: deploy.ImportedCode, Message: deploy.ImportedMessage(a.Name)}
+	}
+	return nil
+}
+
+// refuseImportedService is the same for a data service.
+func refuseImportedService(s db.DataService) error {
+	if s.Source == deploy.SourceImported {
+		return &importedErr{Code: deploy.ImportedCode, Message: deploy.ImportedMessage(s.Name)}
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -243,7 +244,7 @@ func ManageTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				branch, path, paused := a.Branch, a.HealthcheckPath, a.AutodeployPaused
+				branch, path, paused := deploy.BranchOf(a), a.HealthcheckPath, a.AutodeployPaused
 				if v := args.Str("branch"); v != "" {
 					branch = v
 				}
@@ -259,7 +260,7 @@ func ManageTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				return fmt.Sprintf("%s: branch %s, port %d, health %s (%ds), auto-deploy paused %v.\n", u.Name, u.Branch, u.Port, u.HealthcheckPath, u.HealthcheckTimeout, u.AutodeployPaused), nil
+				return fmt.Sprintf("%s: branch %s, port %d, health %s (%ds), auto-deploy paused %v.\n", u.Name, deploy.BranchOf(u), u.Port, u.HealthcheckPath, u.HealthcheckTimeout, u.AutodeployPaused), nil
 			},
 		},
 		{

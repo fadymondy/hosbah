@@ -46,9 +46,9 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Message }
 
-func notFound(what string) error { return &Error{404, what + " not found"} }
-func invalid(msg string) error   { return &Error{422, msg} }
-func conflict(msg string) error  { return &Error{409, msg} }
+func notFound(what string) error { return &Error{Status: 404, Message: what + " not found"} }
+func invalid(msg string) error   { return &Error{Status: 422, Message: msg} }
+func conflict(msg string) error  { return &Error{Status: 409, Message: msg} }
 
 // Service runs P3 data-service and backup actions.
 type Service struct {
@@ -205,6 +205,9 @@ func (s *Service) provision(ctx context.Context, teamID string, svc db.DataServi
 
 // CreateDatabaseAndUser creates a database and a user with grants on a postgres/mysql service.
 func (s *Service) CreateDatabaseAndUser(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, dbName, userName, grants string) (db.Database, db.DatabaseUser, error) {
+	if err := refuseImported(svc); err != nil {
+		return db.Database{}, db.DatabaseUser{}, err
+	}
 	if svc.Kind == "redis" {
 		return db.Database{}, db.DatabaseUser{}, invalid("Redis services have no databases or users")
 	}
@@ -285,6 +288,9 @@ func (s *Service) createInto(ctx context.Context, teamID string, svc db.DataServ
 
 // Backup queues a manual backup and runs it in the background.
 func (s *Service) Backup(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, kind string) (db.Backup, error) {
+	if err := refuseImported(svc); err != nil {
+		return db.Backup{}, err
+	}
 	if svc.Status != "running" {
 		return db.Backup{}, conflict("the service is not running")
 	}
@@ -346,6 +352,9 @@ func (s *Service) runBackup(ctx context.Context, teamID string, svc db.DataServi
 // RestoreTest restores a backup into a throwaway container and stamps the result. The agent's
 // db.restore never touches the live service; it verifies the dump opens.
 func (s *Service) RestoreTest(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, b db.Backup) error {
+	if err := refuseImported(svc); err != nil {
+		return err
+	}
 	if b.Status != "succeeded" || b.SnapshotID == nil {
 		return conflict("only a completed backup can be restore-tested")
 	}
@@ -394,6 +403,12 @@ func (s *Service) runRestoreTest(ctx context.Context, teamID string, svc db.Data
 // Redis uses the service endpoint. The value is sealed with the team key via deploy.SetEnv and
 // applies from the app's next deploy or restart.
 func (s *Service) Attach(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, a db.App, userRef string) (string, error) {
+	if err := refuseImported(svc); err != nil {
+		return "", err
+	}
+	if deploy.IsImported(a) {
+		return "", deploy.ImportedError(a.Name)
+	}
 	if svc.Status != "running" || svc.Host == nil || svc.Port == nil {
 		return "", conflict("the service is not running yet")
 	}
@@ -418,6 +433,9 @@ func (s *Service) Attach(ctx context.Context, q *db.Queries, teamID string, acto
 
 // RevealURL returns a service's connection string (audited). secrets:read only.
 func (s *Service) RevealURL(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, userRef string) (string, error) {
+	if err := refuseImported(svc); err != nil {
+		return "", err
+	}
 	_, connURL, err := s.connString(ctx, q, teamID, svc, userRef)
 	if err != nil {
 		return "", err
@@ -480,6 +498,9 @@ func (s *Service) connString(ctx context.Context, q *db.Queries, teamID string, 
 
 // DeleteService removes the service's container and volume on the server, then its rows.
 func (s *Service) DeleteService(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService) error {
+	if svc.Source == SourceImported {
+		return s.forgetImported(ctx, q, teamID, actor, svc)
+	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "dataservice.delete", "data_service", svc.ID, auditExtra(actor, nil)); err != nil {
 		return err
 	}
@@ -560,7 +581,10 @@ func (s *Service) sealRoot(agentKey string, dek []byte, teamID string, svc db.Da
 	if svc.Kind == "redis" {
 		return "", nil
 	}
-	pt, err := crypto.Open(dek, teamID, rootContext(svc.ID), svc.RootSealed)
+	if svc.RootSealed == nil {
+		return "", errors.New("Hosbah holds no credential for this service")
+	}
+	pt, err := crypto.Open(dek, teamID, rootContext(svc.ID), *svc.RootSealed)
 	if err != nil {
 		return "", errors.New("the root credential could not be opened")
 	}
@@ -754,7 +778,7 @@ func (s *Service) hostPort(ctx context.Context, teamID, serverID string, svc db.
 	_ = s.sys(ctx, teamID, func(q *db.Queries) error {
 		others, err := q.ListDataServicesOfServer(ctx, db.ListDataServicesOfServerParams{ServerID: serverID, TeamID: teamID})
 		for _, o := range others {
-			if o.ID != svc.ID && o.Port != nil {
+			if o.ID != svc.ID && o.Port != nil && (o.OriginKind == nil || *o.OriginKind != "guest") {
 				used[int(*o.Port)] = true
 			}
 		}
