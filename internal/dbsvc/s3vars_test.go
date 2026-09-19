@@ -18,3 +18,12 @@ func TestS3Vars(t *testing.T) {
 		t.Error("expected nil for a bad URL")
 	}
 }
+
+func TestNextFreePort(t *testing.T) {
+	if p := nextFreePort(5432, map[int]bool{}); p != 5432 {
+		t.Fatalf("free base: %d", p)
+	}
+	if p := nextFreePort(5432, map[int]bool{5432: true, 5433: true}); p != 5434 {
+		t.Fatalf("second postgres: %d", p)
+	}
+}

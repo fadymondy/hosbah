@@ -182,7 +182,7 @@ func (s *Service) provision(ctx context.Context, teamID string, svc db.DataServi
 			return nil, "", err
 		}
 		bind := privateBind(serverID)
-		port := agentproto.DBInternalPort(svc.Kind)
+		port := s.hostPort(ctx, teamID, serverID, svc)
 		p := agentproto.DBProvisionParams{
 			ServiceID: svc.ID, Name: svc.Name, Kind: svc.Kind, Version: svc.Version,
 			Image: agentproto.DBImage(svc.Kind, svc.Version), Container: agentproto.DBContainerName(svc.Name),
@@ -741,4 +741,33 @@ func s3Vars(u string) [][2]string {
 		{"AWS_BUCKET", strings.TrimPrefix(p.Path, "/")}, {"AWS_DEFAULT_REGION", "us-east-1"},
 		{"AWS_USE_PATH_STYLE_ENDPOINT", "true"},
 	}
+}
+
+// hostPort picks the private-address port a service is published on: the one it already has (a
+// resumed provision), else the engine's usual port or the next one no other service on the server
+// holds. A fixed port meant a second Postgres on a server could never start.
+func (s *Service) hostPort(ctx context.Context, teamID, serverID string, svc db.DataService) int {
+	if svc.Port != nil && *svc.Port > 0 {
+		return int(*svc.Port)
+	}
+	used := map[int]bool{}
+	_ = s.sys(ctx, teamID, func(q *db.Queries) error {
+		others, err := q.ListDataServicesOfServer(ctx, db.ListDataServicesOfServerParams{ServerID: serverID, TeamID: teamID})
+		for _, o := range others {
+			if o.ID != svc.ID && o.Port != nil {
+				used[int(*o.Port)] = true
+			}
+		}
+		return err
+	})
+	return nextFreePort(agentproto.DBInternalPort(svc.Kind), used)
+}
+
+func nextFreePort(base int, used map[int]bool) int {
+	for p := base; p < base+1000 && p <= 65535; p++ {
+		if !used[p] {
+			return p
+		}
+	}
+	return base
 }
