@@ -20,7 +20,7 @@ func TestAppsDomainFromEnvAndHostname(t *testing.T) {
 	t.Setenv("CLOUDY_APPS_DOMAIN", "apps.example.dev")
 	t.Setenv("CLOUDY_CLOUDFLARE_TOKEN", "x")
 	d = AppsDomainFromEnv()
-	if d.Hostname("api") != "api.apps.example.dev" || d.DNS == nil {
+	if d.Hostname("shop") != "shop.apps.example.dev" || d.Hostname("www") != "" || d.DNS == nil {
 		t.Fatalf("d = %+v", d)
 	}
 
