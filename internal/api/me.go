@@ -11,7 +11,6 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/tenancy"
-	"github.com/fadymondy/hosbah/internal/totp"
 )
 
 type UserOut struct {
@@ -86,54 +85,8 @@ func (d *deps) registerMe(api huma.API) {
 		return out, err
 	})
 
-	type twoFAOut struct {
-		Body struct {
-			Enabled bool `json:"enabled"`
-		}
-	}
-	huma.Register(api, huma.Operation{
-		OperationID: "get-my-2fa", Method: http.MethodGet, Path: "/api/me/2fa",
-		Summary: "Whether two-factor sign-in is on for my account", Tags: []string{"Account"},
-	}, func(ctx context.Context, _ *struct{}) (*twoFAOut, error) {
-		id, err := current(ctx)
-		if err != nil {
-			return nil, err
-		}
-		out := &twoFAOut{}
-		row, err := db.New(d.a.SQLDB).TotpForSubject(ctx, id.ID)
-		if err == nil {
-			out.Body.Enabled = row.Enabled == "true"
-		} else if !isNoRows(err) {
-			return nil, huma.Error500InternalServerError("lookup failed")
-		}
-		return out, nil
-	})
-
-	huma.Register(api, huma.Operation{
-		OperationID: "disable-my-2fa", Method: http.MethodPost, Path: "/api/me/2fa/disable",
-		Summary: "Turn off two-factor sign-in (needs a current code)", Tags: []string{"Account"},
-	}, func(ctx context.Context, in *struct {
-		Body struct {
-			Code string `json:"code" minLength:"6" maxLength:"6"`
-		}
-	}) (*twoFAOut, error) {
-		id, err := current(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q := db.New(d.a.SQLDB)
-		row, err := q.TotpForSubject(ctx, id.ID)
-		if err != nil || row.Enabled != "true" {
-			return nil, huma.Error409Conflict("two-factor sign-in is not on")
-		}
-		if !totp.Valid(row.Secret, in.Body.Code, time.Now()) {
-			return nil, huma.Error422UnprocessableEntity("that code is not valid")
-		}
-		if err := q.DeleteTotp(ctx, id.ID); err != nil {
-			return nil, huma.Error500InternalServerError("could not disable")
-		}
-		return &twoFAOut{}, nil
-	})
+	// Two-factor (/api/me/2fa, /enroll, /confirm, /disable, /recovery) lives in internal/account,
+	// mounted by internal/server: the web branches on its {error, code} answers.
 
 	type reportsOut struct {
 		Body struct {

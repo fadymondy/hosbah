@@ -12,14 +12,17 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/togo-framework/auth"
 	"github.com/togo-framework/togo"
 
+	"github.com/fadymondy/hosbah/internal/account"
 	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/app"
 	"github.com/fadymondy/hosbah/internal/config"
 	"github.com/fadymondy/hosbah/internal/crypto"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
 	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
@@ -53,12 +56,28 @@ func Boot() *app.App {
 	}
 	a.Keys = keys
 
+	authSvc, ok := auth.FromKernel(k)
+	if !ok {
+		panic("cloudy: auth service not registered")
+	}
+	// Email verification, password reset, sign-in by code and two-factor (internal/account).
+	accounts := account.New(a.SQLDB, keys, authSvc, a.Log, mailSender)
+	if n, err := accounts.ImportPluginTOTP(context.Background()); err != nil {
+		a.Log.Error("could not carry over the plugin's two-factor secrets", "error", err)
+	} else if n > 0 {
+		a.Log.Info("two-factor secrets carried over from auth_totp, now sealed", "accounts", n)
+	}
+
 	// Outermost first.
 	k.UseMiddleware(securityHeaders)
 	k.UseMiddleware(tenancy.MetaMiddleware)
-	k.UseMiddleware(accountGate(a)) // sign-up mode; disabled accounts cannot sign in
-	k.UseMiddleware(requireSecondFactor(a))
+	k.UseMiddleware(accountGate(a))      // sign-up mode (closed / invite-only)
+	k.UseMiddleware(accounts.Middleware) // register withholds the session until verified; login: disabled, unverified, 2FA
 	requireAuthorization(k, a)
+	accounts.Mount(
+		func(p string, h http.HandlerFunc) { k.Router.Post(p, h) },
+		func(p string, h http.HandlerFunc) { k.Router.Get(p, h) },
+	)
 
 	svc, err := ops.New(a, ops.ConfigFromEnv())
 	if err != nil {
@@ -137,3 +156,7 @@ func OpenAPI() ([]byte, error) {
 	api.Register(humaAPI, nil, nil)
 	return humaAPI.OpenAPI().YAML()
 }
+
+// mailSender overrides how account emails are delivered; nil means mail.FromEnv (SMTP from
+// MAIL_*, or the log with DEV_MAIL_LOG=1). The integration tests set it to capture codes.
+var mailSender mail.Sender

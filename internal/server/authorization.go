@@ -76,6 +76,8 @@ Framework routes closed to everyone, admins included.
   - /api/auth/dev, /api/auth/mfa: auth-dev (admin session for an empty body) and auth-mfa
     (magic-link token echo, FM-81; user_id taken from the request body) are not installed.
     Blocking the paths too means re-installing either by accident still exposes nothing.
+  - /api/auth/2fa/enroll, /api/auth/2fa/verify: the plugin's TOTP stored the secret in plain
+    text and its login never asked for it. Two-factor is internal/account's /api/me/2fa/*.
   - /graphql: not mounted in P0 — the generated resolvers are unscoped CRUD over tenant tables.
 */
 func isBlocked(r *http.Request) bool {
@@ -83,6 +85,7 @@ func isBlocked(r *http.Request) bool {
 	for _, prefix := range []string{
 		"/api/auth/tokens", "/api/auth/otp", "/api/auth/pin",
 		"/api/auth/dev", "/api/auth/mfa", "/api/auth/magic",
+		"/api/auth/2fa/enroll", "/api/auth/2fa/verify",
 		"/graphql",
 	} {
 		if p == prefix || strings.HasPrefix(p, prefix+"/") {
@@ -104,7 +107,16 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/csrf",
 		"/api/auth/methods",
 		"/api/auth/register", // public sign-up (Hosbah is headed for public SaaS)
-		"/api/auth/login",    // wrapped by requireSecondFactor (login_2fa.go)
+		"/api/auth/login",    // wrapped by internal/account: disabled, unverified, 2FA challenge
+		// The account cycle (internal/account): each answers the same whether or not an address
+		// has an account, and is rate-limited per client and per address.
+		"/api/auth/verify-email",
+		"/api/auth/verify-email/resend",
+		"/api/auth/password/forgot",
+		"/api/auth/password/reset",
+		"/api/auth/code/request",
+		"/api/auth/code/verify",
+		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
 		"/api/auth/logout",
 		"/api/settings/public": // sign-up mode, announcement, support email — shown before sign-in
 		return true
@@ -121,13 +133,12 @@ func isTokenAuthed(r *http.Request) bool {
 // memberPrefixes are reachable by any signed-in account. Each entry's handlers take identity
 // from the session only and scope every row by team membership (handlers + RLS).
 var memberPrefixes = []string{
-	"/api/me",          // your own account, teams, 2FA state, reports
-	"/api/teams",       // create a team; /api/teams/{team}/... is membership-checked
-	"/api/invitations", // view / accept an invitation by its token
-	"/api/feedback",    // "Report a problem" — files as you
-	"/api/auth/me",     // plugin: who am I
-	"/api/auth/change-password",
-	"/api/auth/2fa", // plugin: TOTP enroll / verify for the session's own user
+	"/api/me",                   // your own account, teams, two-factor (/api/me/2fa/*), reports
+	"/api/teams",                // create a team; /api/teams/{team}/... is membership-checked
+	"/api/invitations",          // view / accept an invitation by its token
+	"/api/feedback",             // "Report a problem" — files as you
+	"/api/auth/me",              // plugin: who am I
+	"/api/auth/change-password", // plugin: needs the current password
 }
 
 func isMemberAllowed(r *http.Request) bool {

@@ -54,3 +54,27 @@ func TestValidWindow(t *testing.T) {
 		t.Fatal("an undecodable secret validated")
 	}
 }
+
+func TestMatchIsSingleUse(t *testing.T) {
+	secret, err := NewSecret()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	code, _ := Code(secret, now)
+	step := Match(secret, code, now, 0)
+	if step != now.Unix()/Period {
+		t.Fatalf("step = %d", step)
+	}
+	if Match(secret, code, now, step) != 0 {
+		t.Fatal("a used step matched again")
+	}
+	prev, _ := Code(secret, now.Add(-Period*time.Second))
+	if Match(secret, prev, now, 0) == 0 {
+		t.Fatal("previous step should be within skew")
+	}
+	old, _ := Code(secret, now.Add(-3*Period*time.Second))
+	if Match(secret, old, now, 0) != 0 {
+		t.Fatal("a code three steps old matched")
+	}
+}

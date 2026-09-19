@@ -33,6 +33,7 @@ require (
 	github.com/togo-framework/validation v0.1.0
 	github.com/vektah/gqlparser/v2 v2.5.22
 	golang.org/x/crypto v0.28.0
+	rsc.io/qr v0.2.0
 )
 
 require (

@@ -223,23 +223,33 @@ func CheckSignup(ctx context.Context, sqlDB *sql.DB, email, invitationToken stri
 	case SignupClosed:
 		return refuse(http.StatusForbidden, "sign-up is closed on this platform")
 	case SignupInviteOnly:
-		invitationToken = strings.TrimSpace(invitationToken)
-		if invitationToken == "" {
+		if strings.TrimSpace(invitationToken) == "" {
 			return refuse(http.StatusForbidden, "sign-up is by invitation only — use the link in your invitation")
 		}
-		hash := tokens.Hash(invitationToken)
-		ok := false
-		_ = tenancy.Tx(ctx, sqlDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, _ *sql.Tx) error {
-			inv, err := q.InvitationByTokenHash(ctx, hash)
-			if err == nil && inv.Status == "pending" && time.Now().Before(inv.ExpiresAt) &&
-				strings.EqualFold(strings.TrimSpace(inv.Email), strings.TrimSpace(email)) {
-				ok = true
-			}
-			return nil
-		})
-		if !ok {
+		if !InvitationValidFor(ctx, sqlDB, email, invitationToken) {
 			return refuse(http.StatusForbidden, "sign-up is by invitation only, and this invitation is not valid for that email")
 		}
 	}
 	return nil
+}
+
+// InvitationValidFor reports whether token belongs to a pending, unexpired invitation addressed
+// to email. Sign-up uses it twice: for invite-only mode, and to skip email verification (the
+// invitation was delivered to that inbox, so it already proves the address).
+func InvitationValidFor(ctx context.Context, sqlDB *sql.DB, email, token string) bool {
+	token = strings.TrimSpace(token)
+	if token == "" || strings.TrimSpace(email) == "" {
+		return false
+	}
+	hash := tokens.Hash(token)
+	ok := false
+	_ = tenancy.Tx(ctx, sqlDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, _ *sql.Tx) error {
+		inv, err := q.InvitationByTokenHash(ctx, hash)
+		if err == nil && inv.Status == "pending" && time.Now().Before(inv.ExpiresAt) &&
+			strings.EqualFold(strings.TrimSpace(inv.Email), strings.TrimSpace(email)) {
+			ok = true
+		}
+		return nil
+	})
+	return ok
 }

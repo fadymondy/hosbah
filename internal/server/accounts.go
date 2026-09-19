@@ -83,18 +83,19 @@ func issuedAt(r *http.Request) (time.Time, bool) {
 }
 
 /*
-accountGate wraps the auth plugin's two credential endpoints with the platform's rules:
+accountGate applies the platform's sign-up mode to the auth plugin's POST /api/auth/register:
+403 with a clear message when sign-up is closed, or invite-only without a valid
+`invitation_token` for the same email. It is the outer layer; internal/account (inside it) then
+withholds the session until the address is verified.
 
-  - POST /api/auth/register honours platform_settings.signup_mode (403 with a clear message when
-    sign-up is closed, or invite-only without a valid `invitation_token` for the same email).
-  - POST /api/auth/login refuses a disabled account (403 account_disabled) after the plugin has
-    checked the password — so the answer never tells a stranger whether an email is disabled —
-    and discards the session the plugin minted.
+The disabled-account refusal on sign-in (403 account_disabled) lives in internal/account with the
+other sign-in rules, because every path that creates a session — password, emailed code,
+verification code, two-factor challenge — has to apply it.
 */
 func accountGate(a *app.App) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost || (r.URL.Path != "/api/auth/register" && r.URL.Path != "/api/auth/login") || a == nil || a.SQLDB == nil {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/auth/register" || a == nil || a.SQLDB == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -109,53 +110,16 @@ func accountGate(a *app.App) func(http.Handler) http.Handler {
 				InvitationToken string `json:"invitation_token"`
 			}
 			_ = json.Unmarshal(raw, &body)
-
-			if r.URL.Path == "/api/auth/register" {
-				if err := platform.CheckSignup(r.Context(), a.SQLDB, body.Email, body.InvitationToken); err != nil {
-					var pe *platform.Error
-					if errors.As(err, &pe) {
-						writeJSONError(w, pe.Status, pe.Msg)
-					} else {
-						writeJSONError(w, http.StatusInternalServerError, "registration failed")
-					}
-					return
+			if err := platform.CheckSignup(r.Context(), a.SQLDB, body.Email, body.InvitationToken); err != nil {
+				var pe *platform.Error
+				if errors.As(err, &pe) {
+					writeJSONError(w, pe.Status, pe.Msg)
+				} else {
+					writeJSONError(w, http.StatusInternalServerError, "registration failed")
 				}
-				next.ServeHTTP(w, r)
 				return
 			}
-
-			rec := newRecorder()
-			next.ServeHTTP(rec, r)
-			if rec.code == http.StatusOK && body.Email != "" {
-				if u, err := db.New(a.SQLDB).UserByEmail(r.Context(), body.Email); err == nil && u.DisabledAt != nil {
-					writeJSONError(w, http.StatusForbidden, "account_disabled")
-					return
-				}
-			}
-			rec.flush(w)
+			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// recorder buffers a response so a wrapper can drop it (and its Set-Cookie) after the fact.
-type recorder struct {
-	header http.Header
-	code   int
-	body   bytes.Buffer
-}
-
-func newRecorder() *recorder { return &recorder{header: http.Header{}, code: http.StatusOK} }
-
-func (r *recorder) Header() http.Header         { return r.header }
-func (r *recorder) Write(b []byte) (int, error) { return r.body.Write(b) }
-func (r *recorder) WriteHeader(code int)        { r.code = code }
-
-func (r *recorder) flush(w http.ResponseWriter) {
-	for k, vs := range r.header {
-		for _, v := range vs {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(r.code)
-	_, _ = w.Write(r.body.Bytes())
 }

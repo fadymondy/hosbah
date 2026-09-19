@@ -449,6 +449,7 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 	}
 	t.Setenv("DATABASE_URL", os.Getenv("TEST_DATABASE_URL"))
 	t.Setenv("APP_ENV", "development")
+	mailSender = mailbox.send
 	a := Boot()
 	if err := a.Kernel.Boot(context.Background()); err != nil {
 		t.Fatalf("boot: %v", err)
@@ -563,9 +564,14 @@ func (c *client) mustJSON(method, path string, body any, want int, out any) {
 	}
 }
 
+// register signs up, which answers 403 email_unverified, then enters the emailed code, which
+// signs in (internal/account).
 func (c *client) register(email string) {
 	c.t.Helper()
-	c.mustJSON("POST", "/api/auth/register", map[string]any{"email": email, "password": c.pw}, 201, nil)
+	before := mailbox.count(email)
+	c.mustJSON("POST", "/api/auth/register", map[string]any{"email": email, "password": c.pw}, 403, nil)
+	code := mailbox.wait(c.t, email, before)
+	c.mustJSON("POST", "/api/auth/verify-email", map[string]any{"email": email, "code": code}, 200, nil)
 }
 
 func (c *client) login(email string) {

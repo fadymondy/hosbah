@@ -18,7 +18,11 @@ CREATE TABLE users (
     disabled_at timestamptz,
     -- Hosbah: sessions are stateless JWTs; one issued at or before this instant is refused.
     -- Set when the account is disabled, so re-enabling it does not revive old sessions.
-    sessions_revoked_at timestamptz
+    sessions_revoked_at timestamptz,
+    -- Hosbah: set when a password sign-up has not proved its address yet (internal/account).
+    -- NULL means verified, so every account that existed before verification did stays usable,
+    -- and so do invitation sign-ups (the invitation proved the address).
+    email_unverified_at timestamptz
 );
 
 -- TOTP secrets from POST /api/auth/2fa/enroll. Hosbah's login wrapper reads them to require

@@ -74,8 +74,24 @@ func TestFrameworkAndGeneratedRoutes(t *testing.T) {
 		"/api/authz/can":       "admin",
 		"/api/_meta/resources": "admin",
 		// Signed-in plugin routes.
-		"/api/auth/me":         "member",
-		"/api/auth/2fa/enroll": "member",
+		"/api/auth/me":              "member",
+		"/api/auth/change-password": "member",
+		"/api/me/2fa":               "member",
+		"/api/me/2fa/enroll":        "member",
+		"/api/me/2fa/confirm":       "member",
+		"/api/me/2fa/disable":       "member",
+		"/api/me/2fa/recovery":      "member",
+		// The plugin's own TOTP (plain-text secret, never checked at sign-in): replaced.
+		"/api/auth/2fa/enroll": "blocked",
+		"/api/auth/2fa/verify": "blocked",
+		// The account cycle: public.
+		"/api/auth/verify-email":        "public",
+		"/api/auth/verify-email/resend": "public",
+		"/api/auth/password/forgot":     "public",
+		"/api/auth/password/reset":      "public",
+		"/api/auth/code/request":        "public",
+		"/api/auth/code/verify":         "public",
+		"/api/auth/2fa/challenge":       "public",
 	} {
 		if got := classify("POST", path); got != want {
 			t.Errorf("%s: tier %s, want %s", path, got, want)

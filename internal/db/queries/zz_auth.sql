@@ -8,8 +8,10 @@ SELECT id, email, roles, created_at, disabled_at FROM users WHERE lower(email) =
 -- name: SetUserRoles :exec
 UPDATE users SET roles = $2 WHERE id = $1;
 
--- name: TotpForSubject :one
-SELECT secret, enabled FROM auth_totp WHERE subject = $1;
+-- name: PluginTotpSecrets :many
+-- The plugin's plain-text TOTP secrets (auth_totp), read once at boot to move enabled ones into
+-- account_totp sealed (internal/account.ImportPluginTOTP).
+SELECT t.subject, t.secret, t.enabled FROM auth_totp t JOIN users u ON u.id = t.subject;
 
--- name: DeleteTotp :exec
+-- name: DeletePluginTotp :exec
 DELETE FROM auth_totp WHERE subject = $1;
