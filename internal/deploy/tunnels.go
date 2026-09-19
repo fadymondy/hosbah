@@ -258,19 +258,29 @@ func (s *Service) publishHost(ctx context.Context, q *db.Queries, teamID, server
 	if !ok {
 		return false
 	}
-	if cf, _, err := s.teamZone(ctx, q, teamID, hostname); err == nil && e.publicIP != "" {
+	// Only hostnames in one of the team's Cloudflare zones are public: a test name (*.localhost,
+	// *.test) never reaches DNS or the edge.
+	cf, _, err := s.teamZone(ctx, q, teamID, hostname)
+	if err != nil {
+		return false
+	}
+	if e.publicIP != "" {
 		cctx, cancel := context.WithTimeout(ctx, dnsTimeout)
 		if _, _, err := cf.PointHost(cctx, hostname, e.publicIP, true); err != nil {
 			s.log.Warn("tunnel edge: DNS failed", "host", hostname, "err", err)
 		}
 		cancel()
 	}
+	// NPM reloads nginx on every change, which can take a while: do it after the request returns.
 	if c, cert := s.teamNPM(ctx, q, teamID); c != nil {
-		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		if err := c.Route(cctx, hostname, e.edgeHost, e.port, cert); err != nil {
-			s.log.Warn("tunnel edge: NPM failed", "host", hostname, "err", err)
-		}
-		cancel()
+		edge := *e
+		go func() {
+			cctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			if err := c.Route(cctx, hostname, edge.edgeHost, edge.port, cert); err != nil {
+				s.log.Warn("tunnel edge: NPM failed", "host", hostname, "err", err)
+			}
+		}()
 	}
 	return true
 }
@@ -278,11 +288,13 @@ func (s *Service) publishHost(ctx context.Context, q *db.Queries, teamID, server
 // unpublishHost removes what publishHost made (only Cloudy's own records and proxy hosts).
 func (s *Service) unpublishHost(ctx context.Context, q *db.Queries, teamID, hostname string) {
 	if c, _ := s.teamNPM(ctx, q, teamID); c != nil {
-		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		if err := c.Unroute(cctx, hostname); err != nil {
-			s.log.Warn("tunnel edge: NPM unroute failed", "host", hostname, "err", err)
-		}
-		cancel()
+		go func() {
+			cctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			if err := c.Unroute(cctx, hostname); err != nil {
+				s.log.Warn("tunnel edge: NPM unroute failed", "host", hostname, "err", err)
+			}
+		}()
 	}
 }
 
@@ -346,9 +358,6 @@ func derefStr(p *string) string {
 // publishTunnelled publishes hostname through the server's tunnel, if it has one, and reports
 // whether it may count as verified: published, and its zone is in the team's Cloudflare.
 func (s *Service) publishTunnelled(ctx context.Context, q *db.Queries, teamID, serverID, hostname string) bool {
-	if !s.publishHost(ctx, q, teamID, serverID, hostname) {
-		return false
-	}
-	_, _, err := s.teamZone(ctx, q, teamID, hostname)
-	return err == nil
+	// publishHost only publishes hostnames whose zone the team's Cloudflare holds, so published is verified.
+	return s.publishHost(ctx, q, teamID, serverID, hostname)
 }

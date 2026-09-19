@@ -400,6 +400,9 @@ func AppTools() []Tool {
 				if err != nil {
 					return "", err
 				}
+				if d.VerifiedAt != nil {
+					return fmt.Sprintf("%s now routes to %s (tls %s), verified through the team's Cloudflare (DNS created).", d.Hostname, a.Name, d.Tls), nil
+				}
 				return fmt.Sprintf("%s now routes to %s (tls %s). To verify it, add a TXT record _cloudy-verify.%s = %s and call verify_domain.",
 					d.Hostname, a.Name, d.Tls, d.Hostname, d.VerifyToken), nil
 			},
