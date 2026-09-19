@@ -1,17 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { CheckCircle2Icon, ShieldCheckIcon } from "lucide-react"
+import { CheckCircle2Icon, GlobeIcon, InfoIcon, ShieldCheckIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
 import { apiFetch } from "@/lib/api"
 import type { Domain, Integrations, TLSMode } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -55,7 +55,10 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
     setBusy(true)
     setError(null)
     try {
-      await apiFetch(`${path}/domains`, { method: "POST", body: { hostname: hostname.trim().toLowerCase(), tls } })
+      await apiFetch(`${path}/domains`, {
+        method: "POST",
+        body: { hostname: hostname.trim().toLowerCase(), tls },
+      })
       setHostname("")
       await load()
     } catch (err) {
@@ -68,10 +71,7 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
   async function verify(d: Domain) {
     setError(null)
     try {
-      const r = await apiFetch<{ verified: boolean; message: string; domain: Domain }>(
-        `${path}/domains/${d.id}/verify`,
-        { method: "POST" },
-      )
+      const r = await apiFetch<{ verified: boolean; message: string; domain: Domain }>(`${path}/domains/${d.id}/verify`, { method: "POST" })
       setMessages((m) => ({ ...m, [d.id]: r.message }))
       setDomains((list) => list?.map((x) => (x.id === d.id ? r.domain : x)) ?? list)
     } catch (err) {
@@ -80,17 +80,24 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
   }
 
   return (
-    <div className="flex flex-col gap-4" data-testid="domains">
-      {appsDomain === false ? <p className="text-sm text-muted-foreground">{t("apps.domains.noAppsDomain")}</p> : null}
-      <FormError message={error} />
+    <div data-testid="domains">
+      {appsDomain === false ? <Notice icon={<InfoIcon />}>{t("apps.domains.noAppsDomain")}</Notice> : null}
+      <ErrorBand message={error} />
       {domains === null ? (
-        <Skeleton className="h-16 w-full" />
+        <LoadingRows rows={2} />
       ) : domains.length === 0 ? (
-        <p className="border p-4 text-sm text-muted-foreground">{t("apps.domains.empty")}</p>
+        <Empty className="border-b">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GlobeIcon />
+            </EmptyMedia>
+            <EmptyDescription>{t("apps.domains.empty")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <ul className="flex flex-col divide-y border">
+        <ul className="flex flex-col divide-y divide-line border-b border-line">
           {domains.map((d) => (
-            <li key={d.id} className="flex flex-col gap-3 p-4" data-domain={d.hostname}>
+            <li key={d.id} className="flex flex-col gap-3 px-6 py-4" data-domain={d.hostname}>
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   dir="ltr"
@@ -161,57 +168,55 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
       )}
 
       {manage ? (
-        <form onSubmit={add} className="flex flex-col gap-4 border p-4">
-          <h3 className="font-medium">{t("apps.domains.addTitle")}</h3>
-          <FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              <Field>
-                <FieldLabel htmlFor="dom-host">{t("apps.domains.hostname")}</FieldLabel>
-                <Input
-                  id="dom-host"
-                  dir="ltr"
-                  required
-                  maxLength={253}
-                  placeholder="app.example.com"
-                  value={hostname}
-                  onChange={(e) => setHostname(e.target.value)}
-                  aria-invalid={hostname !== "" && !hostOK}
-                  autoComplete="off"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="dom-tls">{t("apps.domains.tlsLabel")}</FieldLabel>
-                <Select value={tls} onValueChange={(v) => v && setTls(v as TLSMode)}>
-                  <SelectTrigger id="dom-tls" className="w-full">
-                    <SelectValue>{(v: string) => t(`apps.domains.tls.${v}`)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TLS.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {t(`apps.domains.tls.${m}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-              {TLS.map((m) => (
-                <li key={m}>
-                  <span className="font-medium text-foreground">{t(`apps.domains.tls.${m}`)}</span> —{" "}
-                  {t(`apps.domains.tlsHint.${m}`)}
-                </li>
-              ))}
-            </ul>
-            <div>
-              <Button type="submit" disabled={busy || !hostOK}>
-                {busy ? t("common.working") : t("apps.domains.add")}
-              </Button>
-            </div>
-          </FieldGroup>
+        <form onSubmit={add}>
+          <SectionTitle title={t("apps.domains.addTitle")} />
+          <SettingsRow label={t("apps.domains.hostname")} htmlFor="dom-host">
+            <Input
+              id="dom-host"
+              dir="ltr"
+              required
+              maxLength={253}
+              placeholder="app.example.com"
+              value={hostname}
+              onChange={(e) => setHostname(e.target.value)}
+              aria-invalid={hostname !== "" && !hostOK}
+              autoComplete="off"
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={t("apps.domains.tlsLabel")}
+            htmlFor="dom-tls"
+            hint={
+              <span className="flex flex-col gap-1">
+                {TLS.map((m) => (
+                  <span key={m}>
+                    <span className="font-medium text-grid-fg">{t(`apps.domains.tls.${m}`)}</span> — {t(`apps.domains.tlsHint.${m}`)}
+                  </span>
+                ))}
+              </span>
+            }
+          >
+            <Select value={tls} onValueChange={(v) => v && setTls(v as TLSMode)}>
+              <SelectTrigger id="dom-tls" className="w-full">
+                <SelectValue>{(v: string) => t(`apps.domains.tls.${v}`)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TLS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {t(`apps.domains.tls.${m}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsRow>
+          <div className="flex justify-end border-b border-line px-6 py-4">
+            <Button type="submit" disabled={busy || !hostOK}>
+              {busy ? t("common.working") : t("apps.domains.add")}
+            </Button>
+          </div>
         </form>
       ) : (
-        <p className="text-sm text-muted-foreground">{t("common.readOnly")}</p>
+        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("common.readOnly")}</p>
       )}
     </div>
   )

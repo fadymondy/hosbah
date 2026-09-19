@@ -5,7 +5,7 @@
 // edit it here. This file only supplies Hosbah's strings, its /api/feedback JSON transport and
 // the current team.
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MessageSquareWarningIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -16,6 +16,12 @@ import { useI18n } from "@/lib/i18n"
 import { useOptionalTeam } from "@/lib/team"
 import { openMahaamFeedback } from "@/components/feedback/mahaam-feedback"
 
+/** Opens "Report a problem" from anywhere (the account menu on phones, where the header button hides). */
+export const REPORT_EVENT = "hosbah:report"
+export function requestReport() {
+  if (!openMahaamFeedback()) window.dispatchEvent(new Event(REPORT_EVENT))
+}
+
 // The fields the Hosbah API contract names for POST /api/feedback.
 const CONTRACT_FIELDS = ["title", "body", "issue_type", "page_url", "route", "user_agent", "viewport"] as const
 
@@ -23,6 +29,11 @@ export function ReportProblem() {
   const { t, locale } = useI18n()
   const team = useOptionalTeam()?.team
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const onReport = () => setOpen(true)
+    window.addEventListener(REPORT_EVENT, onReport)
+    return () => window.removeEventListener(REPORT_EVENT, onReport)
+  }, [])
 
   async function send(submission: FeedbackSubmission) {
     const team_id = team?.id

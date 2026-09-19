@@ -81,6 +81,7 @@ export default function DataServicePage() {
 
   const actions = manage ? (
     <ConfirmButton
+      size="default"
       label={t("common.delete")}
       title={t("databases.deleteTitle", { name: s.name })}
       description={t("databases.deleteHint")}

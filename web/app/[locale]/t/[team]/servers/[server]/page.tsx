@@ -206,9 +206,7 @@ export default function ServerPage() {
       ) : null}
 
       {server.status === "enrolled" ? (
-        <div className="border-b border-line px-6 py-6 empty:hidden">
-          <ServerTunnels serverId={server.id} manage={manage} />
-        </div>
+        <ServerTunnels serverId={server.id} manage={manage} />
       ) : null}
       {server.status === "enrolled" ? (
         <Sites

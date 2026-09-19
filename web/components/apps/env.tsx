@@ -1,15 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { EyeIcon, InfoIcon, PencilIcon } from "lucide-react"
+import { EyeIcon, InfoIcon, KeyRoundIcon, PencilIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
-import { FormError, useErrorText } from "@/components/form-error"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api"
@@ -76,18 +75,22 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
   }
 
   return (
-    <div className="flex flex-col gap-4" data-testid="env">
-      <Alert>
-        <InfoIcon />
-        <AlertDescription>{t("apps.env.applies")}</AlertDescription>
-      </Alert>
-      <FormError message={error} />
+    <div data-testid="env">
+      <Notice icon={<InfoIcon />}>{t("apps.env.applies")}</Notice>
+      <ErrorBand message={error} />
       {vars === null ? (
-        <Skeleton className="h-16 w-full" />
+        <LoadingRows />
       ) : vars.length === 0 ? (
-        <p className="border p-4 text-sm text-muted-foreground">{t("apps.env.empty")}</p>
+        <Empty className="border-b">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <KeyRoundIcon />
+            </EmptyMedia>
+            <EmptyDescription>{t("apps.env.empty")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -136,7 +139,9 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
                           confirmLabel={t("apps.env.remove")}
                           onConfirm={async () => {
                             try {
-                              await apiFetch(`${path}/env/${encodeURIComponent(v.name)}`, { method: "DELETE" })
+                              await apiFetch(`${path}/env/${encodeURIComponent(v.name)}`, {
+                                method: "DELETE",
+                              })
                             } catch (err) {
                               throw new Error(errorText(err))
                             }
@@ -150,55 +155,48 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
       {manage ? (
-        <>
-          <p className="text-xs text-muted-foreground">{t("apps.env.revealHint")}</p>
-          <form onSubmit={save} className="flex flex-col gap-4 border p-4">
-            <h3 className="font-medium">{t("apps.env.setTitle")}</h3>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="env-name">{t("apps.env.name")}</FieldLabel>
-                <Input
-                  id="env-name"
-                  dir="ltr"
-                  required
-                  maxLength={128}
-                  value={name}
-                  placeholder="DATABASE_URL"
-                  onChange={(e) => setName(e.target.value)}
-                  aria-invalid={name !== "" && !nameOK}
-                  autoComplete="off"
-                />
-                <FieldDescription>{t("apps.env.nameHint")}</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="env-value">{t("apps.env.value")}</FieldLabel>
-                <Textarea
-                  id="env-value"
-                  dir="ltr"
-                  rows={3}
-                  value={value}
-                  maxLength={32768}
-                  onChange={(e) => setValue(e.target.value)}
-                  className="font-mono text-xs"
-                  autoComplete="off"
-                />
-                {vars?.some((v) => v.name === name) ? (
-                  <FieldDescription>{t("apps.env.overwrite")}</FieldDescription>
-                ) : null}
-              </Field>
-              <div>
-                <Button type="submit" disabled={busy || !nameOK}>
-                  {busy ? t("common.working") : t("common.save")}
-                </Button>
-              </div>
-            </FieldGroup>
-          </form>
-        </>
+        <form onSubmit={save}>
+          <SectionTitle title={t("apps.env.setTitle")} hint={t("apps.env.revealHint")} />
+          <SettingsRow label={t("apps.env.name")} htmlFor="env-name" hint={t("apps.env.nameHint")}>
+            <Input
+              id="env-name"
+              dir="ltr"
+              required
+              maxLength={128}
+              value={name}
+              placeholder="DATABASE_URL"
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={name !== "" && !nameOK}
+              autoComplete="off"
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={t("apps.env.value")}
+            htmlFor="env-value"
+            hint={vars?.some((v) => v.name === name) ? t("apps.env.overwrite") : undefined}
+          >
+            <Textarea
+              id="env-value"
+              dir="ltr"
+              rows={3}
+              value={value}
+              maxLength={32768}
+              onChange={(e) => setValue(e.target.value)}
+              className="font-mono text-xs"
+              autoComplete="off"
+            />
+          </SettingsRow>
+          <div className="flex justify-end border-b border-line px-6 py-4">
+            <Button type="submit" disabled={busy || !nameOK}>
+              {busy ? t("common.working") : t("common.save")}
+            </Button>
+          </div>
+        </form>
       ) : (
-        <p className="text-sm text-muted-foreground">{t("common.readOnly")}</p>
+        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("common.readOnly")}</p>
       )}
     </div>
   )

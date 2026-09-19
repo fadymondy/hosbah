@@ -117,18 +117,19 @@ export default function AppPage() {
         {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
       </span>
       <AppStatusBadge status={app.status} />
-      <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/sites/${app.id}`} />}>
+      <Button variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/sites/${app.id}`} />}>
         <LayoutGridIcon />
         {t("sites.canvas")}
       </Button>
       {operate ? (
         <>
-          <Button size="sm" disabled={busy} onClick={() => act(() => apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: {} }))}>
+          <Button disabled={busy} onClick={() => act(() => apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: {} }))}>
             <RocketIcon />
             {t("apps.actions.deploy")}
           </Button>
           {prev ? (
             <ConfirmButton
+              size="default"
               icon={<RotateCcwIcon />}
               label={t("apps.actions.rollbackTo", { version: prev.version })}
               title={t("apps.actions.rollbackTitle", { version: prev.version })}
@@ -147,13 +148,12 @@ export default function AppPage() {
               }}
             />
           ) : (
-            <Button size="sm" variant="outline" disabled title={t("apps.actions.noPrevious")}>
+            <Button variant="outline" disabled title={t("apps.actions.noPrevious")}>
               <RotateCcwIcon />
               {t("apps.actions.rollback")}
             </Button>
           )}
           <Button
-            size="sm"
             variant="outline"
             disabled={busy || !live}
             title={live ? undefined : t("apps.actions.noLive")}
@@ -235,7 +235,7 @@ export default function AppPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as string)} className="gap-0">
         <div className="overflow-x-auto border-b border-line px-6 py-3">
-          <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
             <TabsTrigger value="deployments">{t("apps.tabs.deployments")}</TabsTrigger>
             <TabsTrigger value="logs">{t("apps.tabs.logs")}</TabsTrigger>
             <TabsTrigger value="env">{t("apps.tabs.env")}</TabsTrigger>
@@ -307,19 +307,19 @@ export default function AppPage() {
           {anyActive ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("apps.deploy.following")}</p> : null}
         </TabsContent>
 
-        <TabsContent value="logs" className="px-6 py-6">
+        <TabsContent value="logs">
           <RuntimeLogsPanel path={path} team={team.slug} app={app} processes={detail.processes} operate={operate} live={!!live} />
         </TabsContent>
-        <TabsContent value="env" className="px-6 py-6">
+        <TabsContent value="env">
           <EnvPanel path={path} manage={manage} />
         </TabsContent>
-        <TabsContent value="domains" className="px-6 py-6">
+        <TabsContent value="domains">
           <DomainsPanel team={team.slug} path={path} manage={manage} />
         </TabsContent>
-        <TabsContent value="releases" className="px-6 py-6">
+        <TabsContent value="releases">
           <ReleasesPanel path={path} operate={operate} liveId={app.current_release_id} onRollback={pushDeployment} />
         </TabsContent>
-        <TabsContent value="settings" className="px-6 py-6">
+        <TabsContent value="settings">
           <SettingsPanel team={team.slug} path={path} detail={detail} manage={manage} onSaved={(a) => setDetail((d) => (d ? { ...d, app: a } : d))} />
         </TabsContent>
       </Tabs>

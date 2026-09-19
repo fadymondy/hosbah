@@ -1,17 +1,18 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { InboxIcon } from "lucide-react"
+import { InboxIcon, MessageSquareShareIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { Badge } from "@/components/ui/badge"
 import { ChangePassword } from "@/components/account/change-password"
 import { TwoFactor } from "@/components/account/two-factor"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch, type Report } from "@/lib/api"
+import { MAHAAM_FEEDBACK } from "@/lib/config"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 
@@ -48,10 +49,17 @@ function MyReports() {
   return (
     <section>
       <SectionTitle title={t("account.reports.title")} className="mt-6 border-t" />
+      {MAHAAM_FEEDBACK ? (
+        <Notice icon={<MessageSquareShareIcon />} title={t("account.reports.mahaamTitle")} data-testid="reports-mahaam">
+          {t("account.reports.mahaamHint")}
+        </Notice>
+      ) : null}
       <ErrorBand message={error} />
       {reports === null ? (
-        <LoadingRows />
-      ) : reports.length === 0 && !error ? (
+        MAHAAM_FEEDBACK ? null : (
+          <LoadingRows />
+        )
+      ) : MAHAAM_FEEDBACK && reports.length === 0 ? null : reports.length === 0 && !error ? (
         <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">

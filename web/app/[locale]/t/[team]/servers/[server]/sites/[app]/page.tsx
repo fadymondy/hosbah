@@ -26,14 +26,7 @@ import { ErrorBand, LoadingRows } from "@/components/states"
 import { PresenceBadge } from "@/components/server-status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api"
@@ -118,12 +111,12 @@ export default function SiteCanvasPage() {
     <PageBody
       title={
         <span className="flex flex-wrap items-center gap-2">
-          <span className="grid size-8 place-items-center border border-line bg-primary/10 font-mono text-sm uppercase text-primary">
+          <span className="grid size-8 place-items-center border border-line bg-grid-soft font-mono text-sm uppercase text-grid-brand">
             {app.name.slice(0, 1)}
           </span>
           <span dir="ltr">{app.name}</span>
-          <span className="text-muted-foreground">·</span>
-          <span dir="ltr" className="font-normal text-muted-foreground">
+          <span className="text-grid-muted">·</span>
+          <span dir="ltr" className="font-normal text-grid-muted">
             {app.branch}
           </span>
           <AppStatusBadge status={app.status} />
@@ -148,9 +141,9 @@ export default function SiteCanvasPage() {
       <ErrorBand message={error} />
       <div
         data-testid="site-canvas"
-        className="relative overflow-x-auto border-b border-line bg-grid-soft/40 p-6 [background-image:radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:20px_20px]"
+        className="relative overflow-x-auto border-b border-line bg-grid-bg p-6 [background-image:radial-gradient(var(--color-line)_1px,transparent_1px)] [background-size:20px_20px]"
       >
-        <div className="grid min-w-[56rem] grid-cols-[1fr_1fr_1fr] items-start gap-10">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-10">
           {/* Network: edge and domains */}
           <Group icon={<NetworkIcon />} label={t("sites.network")}>
             <Card title={t("sites.edge")}>
@@ -159,7 +152,7 @@ export default function SiteCanvasPage() {
             </Card>
             <Card title={t("sites.domains")} testId="canvas-domains">
               {detail.domains.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-muted-foreground">{t("sites.noDomains")}</p>
+                <p className="px-4 py-3 text-sm text-grid-muted">{t("sites.noDomains")}</p>
               ) : (
                 detail.domains.map((d) => (
                   <Row
@@ -170,7 +163,12 @@ export default function SiteCanvasPage() {
                         {d.hostname}
                       </span>
                     }
-                    value={<Dot ok={d.verified || d.tls !== "auto"} text={d.verified ? t("sites.verified") : d.tls === "auto" ? t("sites.pending") : d.tls} />}
+                    value={
+                      <Dot
+                        ok={d.verified || d.tls !== "auto"}
+                        text={d.verified ? t("sites.verified") : d.tls === "auto" ? t("sites.pending") : d.tls}
+                      />
+                    }
                   />
                 ))
               )}
@@ -221,26 +219,34 @@ export default function SiteCanvasPage() {
             ))}
             {workers.map((p) => (
               <Card key={p.name} title={<span dir="ltr">{p.name}</span>}>
-                <Row icon={<LayersIcon />} label={t("sites.worker")} value={<code dir="ltr" className="truncate text-xs">{p.command ?? "—"}</code>} />
+                <Row
+                  icon={<LayersIcon />}
+                  label={t("sites.worker")}
+                  value={
+                    <code dir="ltr" className="truncate text-xs">
+                      {p.command ?? "—"}
+                    </code>
+                  }
+                />
               </Card>
             ))}
-            <p className="px-1 text-xs text-muted-foreground">{t("sites.workersHint")}</p>
+            <p className="px-1 text-xs break-words text-grid-muted">{t("sites.workersHint")}</p>
           </Group>
 
           {/* Resources: attached on the same server */}
-          <div className="flex flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-3">
             {services.map((s) => (
               <Link
                 key={s.id}
                 href={`${base}/databases/${s.id}`}
-                className="flex items-start gap-3 border bg-background p-4 hover:bg-muted/50"
+                className="flex items-start gap-3 border border-line bg-grid-card p-4 hover:bg-grid-soft"
               >
-                <DatabaseIcon className="mt-0.5 size-4 text-muted-foreground" aria-hidden />
+                <DatabaseIcon className="mt-0.5 size-4 shrink-0 text-grid-brand" aria-hidden />
                 <span className="flex min-w-0 flex-col">
                   <span dir="ltr" className="font-medium">
                     {s.name}
                   </span>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-grid-muted">
                     {s.kind} {s.version} · {s.status}
                   </span>
                 </span>
@@ -248,9 +254,19 @@ export default function SiteCanvasPage() {
             ))}
             {manage ? (
               <>
-                <AddCard icon={<DatabaseIcon />} title={t("sites.addDatabase")} hint={t("sites.addDatabaseHint")} onClick={() => setAdding("postgres")} />
+                <AddCard
+                  icon={<DatabaseIcon />}
+                  title={t("sites.addDatabase")}
+                  hint={t("sites.addDatabaseHint")}
+                  onClick={() => setAdding("postgres")}
+                />
                 <AddCard icon={<ZapIcon />} title={t("sites.addCache")} hint={t("sites.addCacheHint")} onClick={() => setAdding("redis")} />
-                <AddCard icon={<ArchiveIcon />} title={t("sites.addBucket")} hint={t("sites.addBucketHint")} onClick={() => setAdding("minio")} />
+                <AddCard
+                  icon={<ArchiveIcon />}
+                  title={t("sites.addBucket")}
+                  hint={t("sites.addBucketHint")}
+                  onClick={() => setAdding("minio")}
+                />
               </>
             ) : null}
           </div>
@@ -271,8 +287,8 @@ export default function SiteCanvasPage() {
 
 function Group({ icon, label, children }: { icon: ReactNode; label: ReactNode; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 border bg-muted/40 p-3">
-      <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground [&_svg]:size-4">
+    <section className="flex min-w-0 flex-col gap-3 border border-dashed border-line p-3">
+      <div className="flex items-center gap-2 px-1 text-sm text-grid-muted [&_svg]:size-4">
         {icon}
         {label}
       </div>
@@ -283,9 +299,9 @@ function Group({ icon, label, children }: { icon: ReactNode; label: ReactNode; c
 
 function Card({ title, children, testId }: { title: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <div className="flex flex-col border bg-background" data-testid={testId}>
-      <div className="grid-rule-bottom px-4 py-3 font-medium">{title}</div>
-      <div className="flex flex-col divide-y">{children}</div>
+    <div className="flex flex-col border border-line bg-grid-card" data-testid={testId}>
+      <div className="border-b border-line px-4 py-3 text-sm font-medium text-grid-fg">{title}</div>
+      <div className="flex flex-col divide-y divide-line">{children}</div>
     </div>
   )
 }
@@ -293,7 +309,7 @@ function Card({ title, children, testId }: { title: ReactNode; children: ReactNo
 function Row({ icon, label, value }: { icon: ReactNode; label: ReactNode; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-      <span className="flex min-w-0 items-center gap-2 text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+      <span className="flex min-w-0 items-center gap-2 text-grid-muted [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
         {label}
       </span>
@@ -304,8 +320,8 @@ function Row({ icon, label, value }: { icon: ReactNode; label: ReactNode; value:
 
 function Dot({ ok, text }: { ok: boolean; text: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className={`size-1.5 rounded-full ${ok ? "bg-primary" : "bg-muted-foreground/60"}`} aria-hidden />
+    <span className="flex items-center gap-1.5 text-xs text-grid-muted">
+      <span className={`size-1.5 rounded-full ${ok ? "bg-grid-brand" : "bg-grid-muted/60"}`} aria-hidden />
       {text}
     </span>
   )
@@ -313,25 +329,37 @@ function Dot({ ok, text }: { ok: boolean; text: string }) {
 
 function CardLink({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <Link href={href} className="flex items-center gap-2 px-4 py-3 text-sm text-primary hover:underline [&_svg]:size-4">
+    <Link href={href} className="flex items-center gap-2 px-4 py-3 text-sm text-grid-brand hover:bg-grid-soft [&_svg]:size-4">
       {icon}
       {children}
     </Link>
   )
 }
 
-function AddCard({ icon, title, hint, onClick, disabled }: { icon: ReactNode; title: string; hint: string; onClick?: () => void; disabled?: boolean }) {
+function AddCard({
+  icon,
+  title,
+  hint,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode
+  title: string
+  hint: string
+  onClick?: () => void
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-start gap-3 border bg-background p-4 text-start hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:text-muted-foreground"
+      className="flex items-start gap-3 border border-dashed border-line bg-grid-card p-4 text-start hover:border-solid hover:bg-grid-soft disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-grid-brand"
     >
       {icon}
       <span className="flex flex-col">
         <span className="font-medium">{title}</span>
-        <span className="text-sm text-muted-foreground">{hint}</span>
+        <span className="text-sm text-grid-muted">{hint}</span>
       </span>
     </button>
   )
@@ -390,7 +418,14 @@ function AddServiceDialog({
             {kinds.length > 1 ? (
               <div className="flex gap-2" role="radiogroup" aria-label={t("databases.kind")}>
                 {kinds.map((k) => (
-                  <Button key={k} type="button" size="sm" variant={k === kind ? "default" : "outline"} aria-pressed={k === kind} onClick={() => setKind(k)}>
+                  <Button
+                    key={k}
+                    type="button"
+                    size="sm"
+                    variant={k === kind ? "default" : "outline"}
+                    aria-pressed={k === kind}
+                    onClick={() => setKind(k)}
+                  >
                     {k === "postgres" ? "PostgreSQL" : "MySQL"}
                   </Button>
                 ))}

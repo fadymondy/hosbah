@@ -728,6 +728,8 @@
       "title": "My reports",
       "emptyTitle": "No reports yet",
       "emptyHint": "Problems you report with “Report a problem” appear here with their status.",
+      "mahaamTitle": "Reports go to the Hosbah team’s tracker",
+      "mahaamHint": "“Report a problem” files your report straight into the Hosbah team’s issue tracker. After you send it, the confirmation shows its issue key (MH-…) — keep it if you want to follow up.",
       "key": "Key",
       "titleCol": "Title",
       "status": "Status",

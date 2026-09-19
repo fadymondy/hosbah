@@ -1,11 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { PackageIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, Strip, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { shortSha, type Deployment, type Release } from "@/lib/apps"
@@ -45,15 +47,24 @@ export function ReleasesPanel({
   }, [load, liveId])
 
   return (
-    <div className="flex flex-col gap-4" data-testid="releases">
-      <p className="text-sm text-muted-foreground">{t("apps.releases.hint")}</p>
-      <FormError message={error} />
+    <div data-testid="releases">
+      <Strip>
+        <p className="text-sm text-grid-muted">{t("apps.releases.hint")}</p>
+      </Strip>
+      <ErrorBand message={error} />
       {releases === null ? (
-        <Skeleton className="h-16 w-full" />
+        <LoadingRows />
       ) : releases.length === 0 ? (
-        <p className="border p-4 text-sm text-muted-foreground">{t("apps.releases.empty")}</p>
+        <Empty className="border-b">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageIcon />
+            </EmptyMedia>
+            <EmptyDescription>{t("apps.releases.empty")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -114,7 +125,7 @@ export function ReleasesPanel({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </div>
   )

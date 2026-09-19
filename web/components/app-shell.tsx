@@ -17,6 +17,7 @@ import {
   LogOutIcon,
   MailPlusIcon,
   MenuIcon,
+  MessageSquareWarningIcon,
   NetworkIcon,
   PlusIcon,
   ScrollTextIcon,
@@ -32,7 +33,7 @@ import {
 } from "lucide-react"
 
 import { ThemedCubeMark } from "@/components/cube-mark"
-import { ReportProblem } from "@/components/feedback/report-problem"
+import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
 import { LanguageMenu, ThemeToggle } from "@/components/preferences"
 import { Button } from "@/components/ui/button"
 import {
@@ -375,6 +376,10 @@ function UserMenu() {
         <DropdownMenuItem onClick={() => router.push(`/${locale}/account`)}>
           <UserIcon />
           {t("shell.accountAnd2fa")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={requestReport}>
+          <MessageSquareWarningIcon />
+          {t("feedback.launcher")}
         </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" disabled={signingOut} onClick={signOut}>
           <LogOutIcon />
