@@ -8,10 +8,16 @@
 export class ApiError extends Error {
   status: number
   code: string
-  constructor(status: number, code: string, message?: string) {
+  /** The machine-readable reason when the API gives one ({code: "email_unverified"…}). */
+  reason?: string
+  /** The raw error body, for flows that need its extra fields (email, challenge…). */
+  data: Record<string, unknown>
+  constructor(status: number, code: string, message?: string, data: Record<string, unknown> = {}) {
     super(message ?? code)
     this.status = status
     this.code = code
+    this.data = data
+    this.reason = typeof data.code === "string" ? data.code : undefined
   }
 }
 
@@ -45,7 +51,7 @@ async function csrfToken(): Promise<string | null> {
 function errorFrom(status: number, body: unknown): ApiError {
   if (body && typeof body === "object") {
     const b = body as Record<string, unknown>
-    if (typeof b.error === "string") return new ApiError(status, b.error)
+    if (typeof b.error === "string") return new ApiError(status, b.error, undefined, b)
     if (typeof b.detail === "string" || typeof b.title === "string") {
       const detail = typeof b.detail === "string" ? b.detail : String(b.title)
       return new ApiError(status, detail)

@@ -2,61 +2,176 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 
+import { CodeInput, RecoveryInput, RESEND_SECONDS } from "@/components/auth/code-input"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { apiFetch, ApiError } from "@/lib/api"
-import { safeNext } from "@/lib/next-param"
+import { ApiError } from "@/lib/api"
+import { auth, authMessage, nextStep } from "@/lib/auth"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
+import { safeNext } from "@/lib/next-param"
 
+type Mode = "password" | "code"
+
+/**
+ * Sign in: a password or a code mailed to the address; then, when the account has an
+ * authenticator, its code (or a recovery code). An unverified account is sent to verify first.
+ */
 export default function LoginPage() {
   const { t, locale } = useI18n()
-  useDocumentTitle(t("auth.login.title"))
   const router = useRouter()
   const next = safeNext(useSearchParams().get("next"), locale)
   const errorText = useErrorText()
 
+  const [mode, setMode] = useState<Mode>("password")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [code, setCode] = useState("")
-  const [needCode, setNeedCode] = useState(false)
+  const [codeSent, setCodeSent] = useState(false)
+  const [otp, setOtp] = useState("")
+  const [cooldown, setCooldown] = useState(0)
+  const [challenge, setChallenge] = useState<string | null>(null)
+  const [second, setSecond] = useState("")
+  const [useRecovery, setUseRecovery] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useDocumentTitle(challenge ? t("account.twoFactorTitle") : t("auth.login.title"))
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const id = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(id)
+  }, [cooldown])
+
+  const done = () => router.replace(next ?? `/${locale}`)
+  const fail = (err: unknown) => setError(authMessage(err, t, errorText))
+
+  /** A refusal that is really a next step: verify the address, or answer the second factor. */
+  function follow(err: unknown): boolean {
+    const step = nextStep(err, email.trim())
+    if (step?.kind === "verify") {
+      const q = new URLSearchParams({ email: step.email, ...(next ? { next } : {}) })
+      router.push(`/${locale}/verify-email?${q}`)
+      return true
+    }
+    if (step?.kind === "challenge") {
+      setChallenge(step.challenge)
+      setSecond("")
+      setUseRecovery(false)
+      setError(null)
+      return true
+    }
+    return false
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    setBusy(true)
     setError(null)
+    setBusy(true)
     try {
-      await apiFetch("/api/auth/login", {
-        method: "POST",
-        body: needCode ? { email, password, code } : { email, password },
-      })
-      router.replace(next ?? `/${locale}`)
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "totp_required") {
-        // First pass: the account has 2FA, ask for the code. Second pass: the code was wrong.
-        if (needCode) setError(t("auth.login.badCode"))
-        setNeedCode(true)
-        setCode("")
+      if (challenge) {
+        await auth.challenge(challenge, useRecovery ? { recovery_code: second } : { code: second })
+        done()
+      } else if (mode === "password") {
+        await auth.login(email.trim(), password, locale)
+        done()
+      } else if (!codeSent) {
+        await auth.requestCode(email.trim(), locale)
+        setCodeSent(true)
+        setCooldown(RESEND_SECONDS)
       } else {
-        setError(errorText(err))
+        await auth.signInWithCode(email.trim(), otp)
+        done()
       }
+    } catch (err) {
+      if (challenge && err instanceof ApiError && err.reason === "challenge_expired") {
+        // The second step lasts five minutes; after that the sign-in starts over.
+        setChallenge(null)
+        setSecond("")
+      }
+      if (!follow(err)) fail(err)
     } finally {
       setBusy(false)
     }
   }
 
+  async function resend() {
+    setError(null)
+    try {
+      await auth.requestCode(email.trim(), locale)
+      setCooldown(RESEND_SECONDS)
+    } catch (err) {
+      fail(err)
+    }
+  }
+
+  function switchMode() {
+    setMode((m) => (m === "password" ? "code" : "password"))
+    setCodeSent(false)
+    setOtp("")
+    setError(null)
+  }
+
   const registerHref = `/${locale}/register${next ? `?next=${encodeURIComponent(next)}` : ""}`
+
+  if (challenge) {
+    return (
+      <AuthFrame
+        title={t("account.twoFactorTitle")}
+        description={useRecovery ? t("account.recoveryIntro") : t("account.twoFactorIntro")}
+      >
+        <form onSubmit={onSubmit}>
+          <FieldGroup>
+            <FormError message={error} />
+            <Field>
+              <FieldLabel htmlFor={useRecovery ? "recovery" : "code"}>
+                {useRecovery ? t("account.recoveryCode") : t("account.appCode")}
+              </FieldLabel>
+              {useRecovery ? (
+                <RecoveryInput value={second} onChange={setSecond} />
+              ) : (
+                <CodeInput value={second} onChange={setSecond} autoFocus />
+              )}
+            </Field>
+            <Field>
+              <Button type="submit" disabled={busy || !second}>
+                {busy ? t("common.working") : t("account.continue")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setUseRecovery((v) => !v)
+                  setSecond("")
+                  setError(null)
+                }}
+              >
+                {useRecovery ? t("account.useAppCode") : t("account.useRecovery")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setChallenge(null)
+                  setError(null)
+                }}
+              >
+                {t("account.startOver")}
+              </Button>
+            </Field>
+          </FieldGroup>
+        </form>
+      </AuthFrame>
+    )
+  }
 
   return (
     <AuthFrame
-      title={needCode ? t("auth.login.codeTitle") : t("auth.login.title")}
-      description={needCode ? t("auth.login.codeDescription") : t("auth.login.description")}
+      title={t("auth.login.title")}
+      description={mode === "code" ? t("account.codeLoginIntro") : t("auth.login.description")}
       footer={
         <>
           {t("auth.login.noAccount")}{" "}
@@ -69,69 +184,64 @@ export default function LoginPage() {
       <form onSubmit={onSubmit}>
         <FieldGroup>
           <FormError message={error} />
-          {!needCode ? (
-            <>
-              <Field>
-                <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  dir="ltr"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="password">{t("auth.password")}</FieldLabel>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </Field>
-            </>
-          ) : (
+          <Field>
+            <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
+            <Input
+              id="email"
+              type="email"
+              dir="ltr"
+              autoComplete="email"
+              required
+              readOnly={mode === "code" && codeSent}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+
+          {mode === "password" ? (
             <Field>
-              <FieldLabel htmlFor="code">{t("auth.code")}</FieldLabel>
+              <div className="flex items-center justify-between gap-2">
+                <FieldLabel htmlFor="password">{t("auth.password")}</FieldLabel>
+                <Link
+                  href={`/${locale}/forgot-password`}
+                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  {t("account.forgotLink")}
+                </Link>
+              </div>
               <Input
-                id="code"
-                dir="ltr"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
+                id="password"
+                type="password"
+                autoComplete="current-password"
                 required
-                autoFocus
-                className="font-mono tracking-[0.4em]"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
-              <FieldDescription>
-                <span dir="ltr">{email}</span>
-              </FieldDescription>
             </Field>
-          )}
+          ) : codeSent ? (
+            <Field>
+              <FieldLabel htmlFor="code">{t("account.code")}</FieldLabel>
+              <CodeInput value={otp} onChange={setOtp} autoFocus />
+              <FieldDescription>{t("account.codeSentTo", { email: email.trim() })}</FieldDescription>
+            </Field>
+          ) : null}
+
           <Field>
             <Button type="submit" disabled={busy}>
-              {busy ? t("common.working") : needCode ? t("auth.login.verify") : t("auth.login.submit")}
+              {busy
+                ? t("common.working")
+                : mode === "code" && !codeSent
+                  ? t("account.sendCode")
+                  : t("auth.login.submit")}
             </Button>
-            {needCode ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setNeedCode(false)
-                  setError(null)
-                }}
-              >
-                {t("common.back")}
+            {mode === "code" && codeSent ? (
+              <Button type="button" variant="ghost" disabled={cooldown > 0} onClick={() => void resend()}>
+                {cooldown > 0 ? t("account.resendIn", { seconds: cooldown }) : t("account.resend")}
               </Button>
             ) : null}
+            <Button type="button" variant="ghost" onClick={switchMode}>
+              {mode === "password" ? t("account.useEmailCode") : t("account.usePassword")}
+            </Button>
           </Field>
         </FieldGroup>
       </form>
