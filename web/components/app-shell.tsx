@@ -33,6 +33,7 @@ import {
 } from "lucide-react"
 
 import { ThemedCubeMark } from "@/components/cube-mark"
+import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
 import { LanguageMenu, ThemeToggle } from "@/components/preferences"
 import { Button } from "@/components/ui/button"
@@ -98,6 +99,8 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
         <Announcement />
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </div>
+      {/* Mahaam Feedback SDK, for signed-in people only: the shell only renders behind the session. */}
+      <MahaamFeedback />
 
       <Sheet open={navOpen} onOpenChange={setNavOpen}>
         <SheetContent side={locale === "ar" ? "right" : "left"} className="w-72 gap-0 p-0">

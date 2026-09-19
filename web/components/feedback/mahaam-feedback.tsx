@@ -18,20 +18,52 @@ declare global {
  * @mahaam/feedback/react does: the script tag carries the public key and the locale, and the
  * widget exposes window.MahaamFeedback. Renders nothing; a no-op when Mahaam is not configured.
  */
+// How many signed-in shells are mounted, and a pending teardown. React may unmount and remount at
+// once (Strict Mode in development, a layout re-keying); the teardown waits a tick so a remount
+// cancels it instead of loading the widget twice.
+let mounted = 0
+let teardown: ReturnType<typeof setTimeout> | undefined
+
+/** The widget's own top-level elements (it renders into shadow roots appended to <body>). */
+function widgetHosts(): Element[] {
+  return Array.from(document.body.children).filter((el) => {
+    const root = (el as HTMLElement).shadowRoot
+    return !!root && !!root.querySelector(".launcher, [id^='mf-']")
+  })
+}
+
+function removeWidget() {
+  document.querySelectorAll("script[data-mahaam-feedback]").forEach((s) => s.remove())
+  widgetHosts().forEach((el) => el.remove())
+  delete window.MahaamFeedback
+}
+
 export function MahaamFeedback() {
   const { locale } = useI18n()
   useEffect(() => {
-    if (!MAHAAM_FEEDBACK || document.querySelector("script[data-mahaam-feedback]")) return
-    const s = document.createElement("script")
-    s.src = `${MAHAAM_URL}/embed/v1.js`
-    s.defer = true
-    s.dataset.key = MAHAAM_FEEDBACK_KEY
-    s.dataset.locale = locale
-    // Mahaam's floating launcher is shown on every page; the header button and the account menu
-    // open the same dialog (window.MahaamFeedback.open()).
-    s.dataset.theme = "auto"
-    s.dataset.mahaamFeedback = ""
-    document.body.appendChild(s)
+    if (!MAHAAM_FEEDBACK) return
+    mounted++
+    clearTimeout(teardown)
+    if (!document.querySelector("script[data-mahaam-feedback]") && !window.MahaamFeedback) {
+      const s = document.createElement("script")
+      s.src = `${MAHAAM_URL}/embed/v1.js`
+      s.defer = true
+      s.dataset.key = MAHAAM_FEEDBACK_KEY
+      s.dataset.locale = locale
+      // Mahaam's floating launcher; the header button and the account menu open the same dialog.
+      s.dataset.theme = "auto"
+      s.dataset.mahaamFeedback = ""
+      document.body.appendChild(s)
+    }
+    // Only signed-in pages mount this (it lives in the app shell). When the last one goes — signing
+    // out reaches the sign-in page without a reload — the widget goes too, so it never floats over
+    // the public pages.
+    return () => {
+      mounted--
+      teardown = setTimeout(() => {
+        if (mounted === 0) removeWidget()
+      }, 0)
+    }
   }, [locale])
   return null
 }

@@ -3,7 +3,6 @@ import { notFound } from "next/navigation"
 import { Suspense, type ReactNode } from "react"
 
 import "../globals.css"
-import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { Providers } from "@/components/providers"
 import { RegisterServiceWorker } from "@/components/pwa"
 import en from "@/lang/en.json"
@@ -59,8 +58,6 @@ export default async function RootLayout({
         <Providers locale={locale} dict={locale === "ar" ? ar : en}>
           {/* useSearchParams (language switch, ?next=) needs a boundary for static rendering. */}
           <Suspense>{children}</Suspense>
-          {/* Mahaam Feedback SDK: its floating launcher on every page (no-op when not configured). */}
-          <MahaamFeedback />
           <RegisterServiceWorker />
         </Providers>
       </body>
