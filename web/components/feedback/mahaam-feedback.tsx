@@ -50,7 +50,9 @@ export function MahaamFeedback() {
       s.defer = true
       s.dataset.key = MAHAAM_FEEDBACK_KEY
       s.dataset.locale = locale
-      // Mahaam's floating launcher; the header button and the account menu open the same dialog.
+      // No floating launcher: the header's "Report a problem" button (and the account menu on phones)
+      // opens the dialog through window.MahaamFeedback.open().
+      s.dataset.launcher = "false"
       s.dataset.theme = "auto"
       s.dataset.mahaamFeedback = ""
       document.body.appendChild(s)
