@@ -1428,5 +1428,172 @@
     "typeUrl": "Or type a repository URL",
     "private": "Private",
     "branch": "Branch"
+  },
+  "lists": {
+    "count": "{shown} of {total}",
+    "total": "{total} total",
+    "edit": "Edit",
+    "manage": "Manage",
+    "branch": "Branch",
+    "port": "Port",
+    "searchApps": "Search apps by name, branch, domain…",
+    "searchDatabases": "Search databases by name, kind, endpoint…",
+    "searchProxy": "Search by hostname or upstream…",
+    "searchTunnels": "Search tunnels…",
+    "deleteApp": "Delete {name}?",
+    "deleteAppBody": "Its containers, releases and domains are removed from the server. This cannot be undone.",
+    "deleteDatabase": "Delete {name}?",
+    "deleteDatabaseBody": "Its container and volume are removed from the server, data included. This cannot be undone.",
+    "editApp": "Edit {name}",
+    "editAppHint": "Changes apply from the next deploy.",
+    "editProxyHint": "The hostname cannot change; remove the host and add another for that.",
+    "healthPath": "Health check path",
+    "pauseAutodeploy": "Pause automatic deploys",
+    "websockets": "Allow websockets",
+    "reconnect": "Reconnect",
+    "noTunnels": "No tunnel is open on this server.",
+    "noTunnelCreds": "Add an frp or Tailscale credential first, then open a tunnel here.",
+    "credentials": "Credentials",
+    "kind": "Kind",
+    "status": "Status",
+    "address": "Address"
+  },
+  "site": {
+    "visit": "Visit",
+    "soon": "soon",
+    "notBuilt": "Designed, not built yet",
+    "details": "Details",
+    "health": "Health check",
+    "saved": "Site updated",
+    "title": "Title",
+    "titleHint": "Shown instead of {name}. The name in URLs and on the server does not change.",
+    "description": "Description",
+    "appearanceHint": "How this site looks in lists, on the home page and in its header.",
+    "deploymentsHint": "Every deploy with its live log. Roll back to the previous release or restart the running one.",
+    "searchDeployments": "Search by number, commit, status…",
+    "environmentHint": "Sealed variables, applied on the next deploy or restart.",
+    "databasesHint": "Data services on this site's server. Attaching injects a sealed DATABASE_URL or REDIS_URL.",
+    "databasesEmpty": "Create a Postgres, MySQL or Redis service on this server, then attach it here.",
+    "newDatabase": "New database",
+    "attach": "Attach",
+    "attached": "Attached as {variable}; it applies on the next deploy or restart.",
+    "injected": "Connection variables set on this site:",
+    "workersHint": "The processes this site runs besides web, as its cloudy.toml declares them.",
+    "workersEmpty": "No worker processes",
+    "workersEmptyHint": "Add a [processes] entry to cloudy.toml (a queue worker, a scheduler, a Go routine runner) and deploy.",
+    "workersNote": "Workers start after the health gate on every deploy and drain with the old release. Per-worker scaling and restarts are coming.",
+    "process": "Process",
+    "command": "Command",
+    "logsGuest": "Logs are read from containers. For a guest, open its console on the server.",
+    "proxyHint": "Hostnames Caddy serves for this site, with HTTPS. Each one needs a DNS record pointing at the server.",
+    "backupsHint": "Snapshots and backups of what this site runs on.",
+    "backupsData": "Backups belong to the data",
+    "backupsDataHint": "A git-deployed site is rebuilt from its repository; what needs backing up is its databases. Schedules and restores are on each database.",
+    "nav": {
+      "label": "Site sections",
+      "overview": "Overview",
+      "repository": "Repository",
+      "deployments": "Deployments",
+      "environment": "Environment",
+      "databases": "Databases",
+      "storage": "Storage",
+      "workers": "Workers",
+      "queues": "Queues",
+      "schedules": "Schedules",
+      "realtime": "Realtime",
+      "browsers": "Browsers",
+      "stacks": "Apps & stacks",
+      "logs": "Logs",
+      "monitors": "Alerts & monitors",
+      "proxy": "Proxy manager",
+      "dns": "DNS & SSL",
+      "backups": "Backups",
+      "settings": "Settings & actions"
+    },
+    "groups": {
+      "code": "Code",
+      "services": "Services",
+      "observe": "Observe",
+      "network": "Network",
+      "manage": "Manage"
+    },
+    "flow": {
+      "title": "How a request reaches this site",
+      "hint": "Click any stop to manage it.",
+      "visitors": "Visitors",
+      "dns": "DNS",
+      "proxy": "Caddy proxy",
+      "app": "This site",
+      "processes": "Processes",
+      "data": "Data",
+      "none": "—",
+      "hosts": "{n} hostnames",
+      "runsOn": "Runs on"
+    },
+    "planned": {
+      "repository": {
+        "hint": "The repository behind this site, read through gh on its server.",
+        "p1": "Recent commits on the deployed branch, with which one is live",
+        "p2": "Changes between the live release and the branch head",
+        "p3": "Deploy any commit, or switch branch",
+        "p4": "Open pull requests and their checks"
+      },
+      "storage": {
+        "hint": "Files this site keeps outside its releases.",
+        "p1": "Persistent volumes mounted into every release",
+        "p2": "S3-compatible buckets (MinIO) with sealed credentials injected",
+        "p3": "Usage per volume and bucket",
+        "p4": "Browse, upload and download files"
+      },
+      "queues": {
+        "hint": "Job queues, by framework.",
+        "p1": "Laravel queues / Horizon, BullMQ, Asynq and Celery detected from the app",
+        "p2": "Pending, running and failed jobs per queue",
+        "p3": "Retry or flush failed jobs",
+        "p4": "Alerts when a queue backs up"
+      },
+      "schedules": {
+        "hint": "Cron jobs run inside the site's release.",
+        "p1": "Schedules with a cron expression and a command",
+        "p2": "Each run's output and exit code, kept",
+        "p3": "Run now, pause and resume",
+        "p4": "An alert when a run fails or is late"
+      },
+      "realtime": {
+        "hint": "Socket servers, by app type.",
+        "p1": "Laravel Reverb, Socket.IO / ws for Node, and Go websocket servers",
+        "p2": "Runs as its own process with Caddy routing websockets to it",
+        "p3": "Live connection and message counts",
+        "p4": "Keys and allowed origins"
+      },
+      "browsers": {
+        "hint": "Headless browsers this site can drive, like Chromebox.",
+        "p1": "Create a browser on the server with a CDP endpoint injected as an env var",
+        "p2": "For crawling, screenshots, PDFs and tests",
+        "p3": "Live view of a session",
+        "p4": "Limits on memory, sessions and idle time"
+      },
+      "stacks": {
+        "hint": "Ready apps and starter stacks, installed in one step.",
+        "p1": "Apps to connect: SearXNG, Firecrawl, Evolution API, OpenSEO, mail services",
+        "p2": "Starter stacks for a new site: Laravel, Laravilt, Laravel with TomatoPHP, togo",
+        "p3": "A catalog anyone can publish to: a recipe is a manifest plus scripts",
+        "p4": "Each install wires its env vars, domain and database"
+      },
+      "monitors": {
+        "hint": "Know when something is wrong before visitors do.",
+        "p1": "Uptime checks on each hostname, from outside",
+        "p2": "Rules on CPU, memory, disk and response time",
+        "p3": "Notify by email, webhook, Telegram or WhatsApp",
+        "p4": "Incident history with what fired and when it recovered"
+      },
+      "dns": {
+        "hint": "Cloudflare DNS records and certificates for this site's hostnames.",
+        "p1": "Records for each hostname, created and repaired from here",
+        "p2": "Proxied or DNS-only, per record",
+        "p3": "Certificate issuer, expiry and renewals from Caddy",
+        "p4": "Force HTTPS, HSTS and redirects between hostnames"
+      }
+    }
   }
 }

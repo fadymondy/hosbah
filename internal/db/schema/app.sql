@@ -21,6 +21,10 @@ CREATE TABLE apps (
     origin jsonb,
     imported_state text,
     last_seen_at timestamptz,
+    title text,
+    description text,
+    color text,
+    icon text,
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -51,3 +55,12 @@ ALTER TABLE apps ADD CONSTRAINT apps_origin_kind_check CHECK (origin_kind IS NUL
 ALTER TABLE apps ADD CONSTRAINT apps_imported_state_check CHECK (imported_state IS NULL OR imported_state IN ('running', 'stopped', 'missing'));
 ALTER TABLE apps ADD CONSTRAINT apps_imported_origin_check CHECK (source <> 'imported' OR (origin_kind IS NOT NULL AND origin_key IS NOT NULL));
 CREATE UNIQUE INDEX apps_server_origin_key ON apps (server_id, origin_key) WHERE source = 'imported';
+
+-- Appearance: how the team presents the app. title is a display name (name stays the slug used in
+-- URLs, containers and hostnames and is not editable); description is a short note; color is
+-- #RRGGBB; icon is a key from provisioning.ServerIcons (internal/provisioning/appearance.go — keep
+-- in step). NULL is the default look. An uploaded logo lives in app_logos.
+ALTER TABLE apps ADD CONSTRAINT apps_title_check CHECK (title IS NULL OR char_length(title) BETWEEN 1 AND 80);
+ALTER TABLE apps ADD CONSTRAINT apps_description_check CHECK (description IS NULL OR char_length(description) BETWEEN 1 AND 280);
+ALTER TABLE apps ADD CONSTRAINT apps_color_check CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$');
+ALTER TABLE apps ADD CONSTRAINT apps_icon_check CHECK (icon IS NULL OR icon IN ('server', 'database', 'globe', 'cloud', 'cpu', 'box', 'rocket', 'shield', 'code', 'terminal', 'layers', 'zap', 'flame', 'leaf', 'star', 'heart', 'briefcase', 'home', 'store', 'graduation-cap', 'building', 'gamepad', 'music', 'camera'));

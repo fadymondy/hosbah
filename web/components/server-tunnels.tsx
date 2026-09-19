@@ -1,9 +1,17 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
+import { NetworkIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
+
+import { ConfirmButton } from "@/components/confirm-button"
+import { ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 
 import { useErrorText } from "@/components/form-error"
-import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
+import { ErrorBand, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { apiFetch } from "@/lib/api"
@@ -24,8 +32,9 @@ type Cred = { id: string; name: string; provider: string }
 
 /** A server's tunnels (frp / tailscale): its way in when it has no public address. */
 export function ServerTunnels({ serverId, manage }: { serverId: string; manage: boolean }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { team } = useTeam()
+  const [q, setQ] = useState("")
   const errorText = useErrorText()
   const [rows, setRows] = useState<TunnelRow[]>([])
   const [creds, setCreds] = useState<Cred[]>([])
@@ -55,13 +64,13 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.slug, serverId, manage])
 
-  async function open() {
+  async function open(credential = choice) {
     setBusy(true)
     setError(null)
     try {
       await apiFetch(`/api/teams/${team.slug}/servers/${serverId}/tunnels`, {
         method: "POST",
-        body: { credential: choice },
+        body: { credential },
       })
       load()
     } catch (err) {
@@ -83,36 +92,97 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
     }
   }
 
-  if (rows.length === 0 && (!manage || creds.length === 0)) return null
+  const shown = rows.filter((r) => matches(q, r.kind, r.status, r.address, r.remote_port))
   return (
     <section aria-labelledby="tunnels-h" data-testid="server-tunnels">
       <SectionTitle id="tunnels-h" title={t("tunnels.title")} hint={t("tunnels.hint")} />
       <ErrorBand message={error} />
-      {rows.length > 0 ? (
-        <ul className="flex flex-col divide-y divide-line border-b border-line text-sm">
-          {rows.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3">
-              <span className="font-medium text-grid-fg">{t(`tunnels.kinds.${r.kind}`)}</span>
-              <span className="text-grid-muted">{t(`tunnels.status.${r.status}`, undefined, r.status)}</span>
-              {r.address ? (
-                <span dir="ltr" className="font-mono text-xs">
-                  {r.address}
-                </span>
-              ) : null}
-              {manage ? (
-                <Button size="sm" variant="outline" className="ms-auto" onClick={() => close(r.kind)}>
-                  {t("tunnels.close")}
-                </Button>
-              ) : null}
-              {r.error ? (
-                <span dir="auto" className="w-full text-xs text-grid-danger">
-                  {r.error}
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {rows.length === 0 ? (
+        <Empty className="border-b">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <NetworkIcon />
+            </EmptyMedia>
+            <EmptyTitle>{t("lists.noTunnels")}</EmptyTitle>
+            {manage && creds.length === 0 ? <EmptyDescription>{t("lists.noTunnelCreds")}</EmptyDescription> : null}
+          </EmptyHeader>
+          {manage && creds.length === 0 ? (
+            <Button variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/credentials`} />}>
+              <PlusIcon />
+              {t("lists.credentials")}
+            </Button>
+          ) : null}
+        </Empty>
+      ) : (
+        <>
+          <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchTunnels")} shown={shown.length} total={rows.length} />
+          <TableBand>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("lists.kind")}</TableHead>
+                  <TableHead>{t("lists.status")}</TableHead>
+                  <TableHead>{t("lists.address")}</TableHead>
+                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shown.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-2">
+                        <NetworkIcon className="size-4 text-grid-brand" />
+                        {t(`tunnels.kinds.${r.kind}`)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={r.status === "active" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                        {t(`tunnels.status.${r.status}`, undefined, r.status)}
+                      </Badge>
+                      {r.error ? (
+                        <p dir="auto" className="mt-1 max-w-md text-xs text-grid-danger">
+                          {r.error}
+                        </p>
+                      ) : null}
+                    </TableCell>
+                    <TableCell dir="ltr" className="text-start font-mono text-xs">
+                      {r.address ?? "—"}
+                    </TableCell>
+                    {manage ? (
+                      <TableCell>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {creds.some((c) => c.provider === r.kind) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => {
+                                const c = creds.find((x) => x.provider === r.kind)
+                                if (c) void open(c.id)
+                              }}
+                            >
+                              <RefreshCwIcon />
+                              {t("lists.reconnect")}
+                            </Button>
+                          ) : null}
+                          <ConfirmButton
+                            icon={<Trash2Icon />}
+                            label={t("tunnels.close")}
+                            title={t("tunnels.close")}
+                            description={r.address ?? t(`tunnels.kinds.${r.kind}`)}
+                            confirmLabel={t("tunnels.close")}
+                            onConfirm={() => close(r.kind)}
+                          />
+                        </div>
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableBand>
+        </>
+      )}
       {manage && creds.length > 0 ? (
         <SettingsRow label={t("tunnels.credential")}>
           <div className="flex flex-wrap items-center gap-2">
@@ -128,7 +198,8 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
                 ))}
               </SelectContent>
             </Select>
-            <Button disabled={busy || !choice} onClick={open}>
+            <Button disabled={busy || !choice} onClick={() => void open()}>
+              <PlusIcon />
               {busy ? t("common.working") : t("tunnels.open")}
             </Button>
           </div>

@@ -16,6 +16,17 @@ type FeedRef struct {
 	Name string `json:"name"`
 }
 
+// FeedApp is the app of a deployment in the feed, with how the team styles it.
+type FeedApp struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Color       *string `json:"color"`
+	Icon        *string `json:"icon"`
+	LogoURL     *string `json:"logo_url" doc:"The uploaded logo: a relative URL versioned by the image's hash, or null."`
+}
+
 // FeedUser is who asked for a deployment.
 type FeedUser struct {
 	Email string `json:"email"`
@@ -25,7 +36,7 @@ type FeedUser struct {
 type FeedItem struct {
 	ID            string     `json:"id"`
 	Number        int64      `json:"number"`
-	App           FeedRef    `json:"app"`
+	App           FeedApp    `json:"app"`
 	Server        FeedRef    `json:"server" doc:"name is empty if the server is gone."`
 	Status        string     `json:"status" enum:"queued,running,succeeded,failed,cancelled"`
 	Kind          string     `json:"kind" enum:"deploy,rollback,restart"`
@@ -90,9 +101,12 @@ func TeamFeed(ctx context.Context, q *db.Queries, teamID string, limit int, befo
 			out.NextCursor = &c
 			break
 		}
-		it := FeedItem{ID: r.ID, Number: r.Number, App: FeedRef{ID: r.AppID, Name: r.AppName}, Server: FeedRef{ID: r.ServerID},
+		it := FeedItem{ID: r.ID, Number: r.Number, App: FeedApp{ID: r.AppID, Name: r.AppName, Title: r.AppTitle, Description: r.AppDescription, Color: r.AppColor, Icon: r.AppIcon}, Server: FeedRef{ID: r.ServerID},
 			Status: r.Status, Kind: r.Kind, Branch: r.Ref, CommitSHA: r.CommitSha, CommitMessage: r.CommitMessage, Trigger: r.Trigger,
 			CreatedAt: r.CreatedAt, FinishedAt: r.FinishedAt}
+		if r.AppLogoEtag != nil {
+			it.App.LogoURL = AppLogoURL(teamID, r.AppID, *r.AppLogoEtag)
+		}
 		if r.ServerName != nil {
 			it.Server.Name = *r.ServerName
 		}

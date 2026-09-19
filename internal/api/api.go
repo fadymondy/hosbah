@@ -43,6 +43,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerServers(api)
 	d.registerServerAppearance(api)
 	d.registerServerLogo(api)
+	d.registerAppLogo(api)
 	d.registerOperations(api)
 	d.registerApps(api)
 	d.registerWorkloads(api)

@@ -25,7 +25,12 @@ import (
 // AppOut is an app as the API shows it. Never the deploy-hook token or its hash.
 type AppOut struct {
 	ID                 string         `json:"id"`
-	Name               string         `json:"name"`
+	Name               string         `json:"name" doc:"The slug used in URLs, containers and hostnames; never changes."`
+	Title              *string        `json:"title" doc:"Display name (at most 80 characters); null: show name."`
+	Description        *string        `json:"description" doc:"A short note (at most 280 characters)."`
+	Color              *string        `json:"color" doc:"#RRGGBB (uppercase), or null for the default."`
+	Icon               *string        `json:"icon" doc:"Icon key (the servers' list), or null for the default."`
+	LogoURL            *string        `json:"logo_url" doc:"The uploaded logo (PUT …/apps/{app}/logo), shown instead of the icon: a relative URL versioned by the image's hash, or null."`
 	ServerID           string         `json:"server_id"`
 	ServerName         string         `json:"server_name,omitempty"`
 	RepoURL            *string        `json:"repo_url" doc:"null for an imported app"`
@@ -130,7 +135,7 @@ type NotificationOut struct {
 }
 
 func toAppOut(a db.App, server string) AppOut {
-	return AppOut{ID: a.ID, Name: a.Name, ServerID: a.ServerID, ServerName: server, RepoURL: a.RepoURL, Branch: a.Branch,
+	return AppOut{ID: a.ID, Name: a.Name, Title: a.Title, Description: a.Description, Color: a.Color, Icon: a.Icon, ServerID: a.ServerID, ServerName: server, RepoURL: a.RepoURL, Branch: a.Branch,
 		Runtime: a.Runtime, Port: a.Port, HealthcheckPath: a.HealthcheckPath, HealthcheckTimeout: a.HealthcheckTimeout,
 		AutodeployPaused: a.AutodeployPaused, Status: a.Status, CurrentReleaseID: a.CurrentReleaseID, CreatedAt: a.CreatedAt,
 		Source: a.Source, OriginKind: a.OriginKind, Origin: originOf(a.Origin), ImportedState: a.ImportedState, LastSeenAt: a.LastSeenAt}
@@ -275,7 +280,7 @@ func (d *deps) appDetail(ctx context.Context, q *db.Queries, m *tenancy.Membersh
 	if s, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: a.ServerID, TeamID: m.TeamID}); err == nil {
 		srvName = s.Name
 	}
-	out.App = toAppOut(a, srvName)
+	out.App = appOutWithLogo(ctx, q, m.TeamID, a, srvName)
 	if r, err := q.LiveReleaseOfApp(ctx, a.ID); err == nil && r.TeamID == m.TeamID {
 		ro := toReleaseOut(r)
 		out.Live = &ro
@@ -379,7 +384,8 @@ func (d *deps) registerApps(api huma.API) {
 				a := db.App{ID: r.ID, TeamID: r.TeamID, ServerID: r.ServerID, Name: r.Name, RepoURL: r.RepoURL, Branch: r.Branch, Runtime: r.Runtime,
 					Port: r.Port, HealthcheckPath: r.HealthcheckPath, HealthcheckTimeout: r.HealthcheckTimeout, AutodeployPaused: r.AutodeployPaused,
 					Status: r.Status, CurrentReleaseID: r.CurrentReleaseID, CreatedAt: r.CreatedAt, Source: r.Source, OriginKind: r.OriginKind,
-					OriginKey: r.OriginKey, Origin: r.Origin, ImportedState: r.ImportedState, LastSeenAt: r.LastSeenAt}
+					OriginKey: r.OriginKey, Origin: r.Origin, ImportedState: r.ImportedState, LastSeenAt: r.LastSeenAt,
+					Title: r.Title, Description: r.Description, Color: r.Color, Icon: r.Icon}
 				o := toAppOut(a, r.ServerName)
 				if deps, err := d.deploymentsOf(ctx, q, m, a, 1); err == nil && len(deps) > 0 {
 					o.LatestDeployment = &deps[0]
@@ -392,6 +398,7 @@ func (d *deps) registerApps(api huma.API) {
 				}
 				out.Body.Apps = append(out.Body.Apps, o)
 			}
+			attachAppLogos(ctx, q, m.TeamID, out.Body.Apps)
 			return nil
 		})
 		return out, err
@@ -461,7 +468,9 @@ func (d *deps) registerApps(api huma.API) {
 
 	type appOut struct{ Body AppOut }
 	huma.Register(api, huma.Operation{OperationID: "update-app", Method: http.MethodPatch, Path: "/api/teams/{team}/apps/{app}",
-		Summary: "Change an app's branch, port, health check or auto-deploy pause (owner or admin; applies from the next deploy)", Tags: tags,
+		Summary: "Change an app's branch, port, health check or auto-deploy pause (owner or admin; applies from the next deploy; git apps only), " +
+			"and its appearance — title, description, color, icon (any app, imported ones too; audited as app.appearance_updated). " +
+			"The name is the slug of URLs, containers and hostnames and cannot be changed.", Tags: tags,
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
@@ -470,6 +479,10 @@ func (d *deps) registerApps(api huma.API) {
 			HealthcheckPath    *string `json:"healthcheck_path,omitempty" maxLength:"200"`
 			HealthcheckTimeout *int    `json:"healthcheck_timeout,omitempty" minimum:"5" maximum:"600"`
 			AutodeployPaused   *bool   `json:"autodeploy_paused,omitempty"`
+			Title              *string `json:"title,omitempty" maxLength:"200" doc:"Display name: at most 80 characters once trimmed; empty clears it."`
+			Description        *string `json:"description,omitempty" maxLength:"1000" doc:"At most 280 characters once trimmed; empty clears it."`
+			Color              *string `json:"color,omitempty" maxLength:"16" doc:"#RRGGBB; empty clears it."`
+			Icon               *string `json:"icon,omitempty" maxLength:"32" doc:"An icon key (the servers' list); empty clears it."`
 		}
 	}) (*appOut, error) {
 		out := &appOut{}
@@ -495,11 +508,22 @@ func (d *deps) registerApps(api huma.API) {
 			if b.AutodeployPaused != nil {
 				paused = *b.AutodeployPaused
 			}
-			updated, err := d.deploys().UpdateSettings(ctx, q, m.TeamID, webActor(id), a, branch, port, timeout, path, paused)
-			if err != nil {
-				return actionErr(err, "could not update the app")
+			look := deploy.AppearancePatch{Title: b.Title, Description: b.Description, Color: b.Color, Icon: b.Icon}
+			settings := b.Branch != nil || b.Port != nil || b.HealthcheckPath != nil || b.HealthcheckTimeout != nil || b.AutodeployPaused != nil
+			updated := a
+			// Settings are a git app's (an imported one is refused); appearance is any app's. One
+			// transaction: a refusal of either leaves both unchanged.
+			if settings || look.Empty() {
+				if updated, err = d.deploys().UpdateSettings(ctx, q, m.TeamID, webActor(id), a, branch, port, timeout, path, paused); err != nil {
+					return actionErr(err, "could not update the app")
+				}
 			}
-			out.Body = toAppOut(updated, "")
+			if !look.Empty() {
+				if updated, err = d.deploys().UpdateAppearance(ctx, q, m.TeamID, webActor(id), updated, look); err != nil {
+					return actionErr(err, "could not update the app")
+				}
+			}
+			out.Body = appOutWithLogo(ctx, q, m.TeamID, updated, "")
 			return nil
 		})
 		return out, err

@@ -83,6 +83,12 @@ export type App = Imported & {
   healthcheck_path: string
   healthcheck_timeout: number
   autodeploy_paused: boolean
+  /** Appearance (site settings): all optional. */
+  title?: string | null
+  description?: string | null
+  color?: string | null
+  icon?: string | null
+  logo_url?: string | null
   status: AppStatus
   current_release_id: string | null
   created_at: string

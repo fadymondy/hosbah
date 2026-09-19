@@ -2,7 +2,10 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { DatabaseIcon, PlusIcon } from "lucide-react"
+import { DatabaseIcon, PlusIcon, Trash2Icon } from "lucide-react"
+
+import { ConfirmButton } from "@/components/confirm-button"
+import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
@@ -47,6 +50,8 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
   const base = `/${locale}/t/${team.slug}`
   const [services, setServices] = useState<DataService[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [q, setQ] = useState("")
+  const shown = (services ?? []).filter((s) => matches(q, s.name, s.kind, s.version, s.status, s.host, s.port))
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +91,9 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
           {add}
         </Empty>
       ) : (
+        <>
+        <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchDatabases")} shown={shown.length} total={services.length} />
+        {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
         <TableBand>
           <Table>
             <TableHeader>
@@ -94,10 +102,11 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
                 <TableHead>{t("databases.kind")}</TableHead>
                 <TableHead>{t("databases.status")}</TableHead>
                 <TableHead>{t("databases.endpoint")}</TableHead>
+                {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((s) => (
+              {shown.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell>
                     <Link href={`${base}/databases/${s.name}`} className="font-medium hover:underline">
@@ -117,11 +126,38 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
                   <TableCell dir="ltr" className="text-muted-foreground">
                     {s.host && s.port ? `${s.host}:${s.port}` : "—"}
                   </TableCell>
+                  {manage ? (
+                    <TableCell>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
+                          {t("lists.manage")}
+                        </Button>
+                        {isImported(s) ? null : (
+                          <ConfirmButton
+                            icon={<Trash2Icon />}
+                            label={t("common.delete")}
+                            title={t("lists.deleteDatabase", { name: s.name })}
+                            description={t("lists.deleteDatabaseBody")}
+                            confirmLabel={t("common.delete")}
+                            onConfirm={async () => {
+                              try {
+                                await apiFetch(`/api/teams/${team.slug}/data-services/${s.name}`, { method: "DELETE" })
+                              } catch (err) {
+                                throw new Error(errorText(err))
+                              }
+                              await load()
+                            }}
+                          />
+                        )}
+                      </div>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableBand>
+        </>
       )}
     </section>
   )

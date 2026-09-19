@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { NetworkIcon, PlusIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { EditDialog, ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
@@ -38,6 +39,8 @@ export function ServerProxy({ serverId }: { serverId: string }) {
   const [hosts, setHosts] = useState<ProxyHost[] | null>(null)
   const [servers, setServers] = useState<Server[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [q, setQ] = useState("")
+  const shown = (hosts ?? []).filter((h) => matches(q, h.hostname, h.upstream, h.tls))
 
   const load = useCallback(async () => {
     try {
@@ -85,6 +88,9 @@ export function ServerProxy({ serverId }: { serverId: string }) {
           </EmptyHeader>
         </Empty>
       ) : (
+        <>
+        <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchProxy")} shown={shown.length} total={hosts.length} />
+        {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
         <TableBand>
           <Table>
             <TableHeader>
@@ -97,7 +103,7 @@ export function ServerProxy({ serverId }: { serverId: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {hosts.map((h) => (
+              {shown.map((h) => (
                 <TableRow key={h.id}>
                   <TableCell>
                     <span dir="ltr" className="font-medium">
@@ -134,6 +140,7 @@ export function ServerProxy({ serverId }: { serverId: string }) {
                             {t("proxy.verify")}
                           </Button>
                         ) : null}
+                        <EditProxy host={h} team={team.slug} onSaved={load} />
                         <Button size="sm" variant="outline" onClick={() => act(h.id, "PATCH", { enabled: !h.enabled })}>
                           {h.enabled ? t("proxy.disable") : t("proxy.enable")}
                         </Button>
@@ -159,6 +166,7 @@ export function ServerProxy({ serverId }: { serverId: string }) {
             </TableBody>
           </Table>
         </TableBand>
+        </>
       )}
     </section>
   )
@@ -296,5 +304,54 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Edit a proxy host: where it sends traffic, its TLS mode and websockets. The hostname is fixed. */
+function EditProxy({ host, team, onSaved }: { host: ProxyHost; team: string; onSaved: () => Promise<void> }) {
+  const { t } = useI18n()
+  const [upstream, setUpstream] = useState("")
+  const [tls, setTls] = useState<(typeof TLS_MODES)[number]>("auto")
+  const [ws, setWs] = useState(false)
+  return (
+    <EditDialog
+      title={host.hostname}
+      description={t("lists.editProxyHint")}
+      onOpen={() => {
+        setUpstream(host.upstream)
+        setTls(host.tls as (typeof TLS_MODES)[number])
+        setWs(!!(host as { websockets?: boolean }).websockets)
+      }}
+      onSave={async () => {
+        await apiFetch(`/api/teams/${team}/proxy-hosts/${host.id}`, { method: "PATCH", body: { upstream: upstream.trim(), tls, websockets: ws } })
+        await onSaved()
+      }}
+    >
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="ep-up">{t("proxy.upstream")}</FieldLabel>
+          <Input id="ep-up" dir="ltr" required value={upstream} onChange={(e) => setUpstream(e.target.value)} />
+        </Field>
+        <Field>
+          <FieldLabel>{t("proxy.tls")}</FieldLabel>
+          <Select value={tls} onValueChange={(v) => v && setTls(v as (typeof TLS_MODES)[number])}>
+            <SelectTrigger aria-label={t("proxy.tls")}>
+              <SelectValue>{(v: string) => t(`proxy.tlsModes.${v}`)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {TLS_MODES.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {t(`proxy.tlsModes.${m}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox checked={ws} onCheckedChange={(v) => setWs(v === true)} />
+          {t("lists.websockets")}
+        </label>
+      </FieldGroup>
+    </EditDialog>
   )
 }

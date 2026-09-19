@@ -80,10 +80,12 @@ UPDATE deployments SET last_seq = last_seq + 1 WHERE id = $1 RETURNING last_seq,
 -- Team scope: the team's deployments across every app, newest first, keyset-paginated on
 -- (created_at, id). triggered_by_email is the account that asked (null when created_by is not
 -- an account: a deploy hook or a GitHub push).
-SELECT d.id, d.number, d.app_id, a.name AS app_name, d.server_id, s.name AS server_name, d.status, d.ref,
+SELECT d.id, d.number, d.app_id, a.name AS app_name, a.title AS app_title, a.description AS app_description, a.color AS app_color,
+    a.icon AS app_icon, l.etag AS app_logo_etag, d.server_id, s.name AS server_name, d.status, d.ref,
     d.commit_sha, d.commit_message, d.trigger, d.kind, u.email AS triggered_by_email, d.created_at, d.finished_at
 FROM deployments d
 JOIN apps a ON a.id = d.app_id AND a.team_id = d.team_id
+LEFT JOIN app_logos l ON l.app_id = a.id AND l.team_id = a.team_id
 LEFT JOIN servers s ON s.id = d.server_id AND s.team_id = d.team_id
 LEFT JOIN users u ON u.id = d.created_by
 WHERE d.team_id = sqlc.arg('team_id')

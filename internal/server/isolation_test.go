@@ -112,6 +112,11 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps", map[string]any{"name": "alpha-app-" + suffix[len(suffix)-6:], "server": srvA,
 		"repo_url": "https://github.com/example/app", "deploy": true}, 201, &appA)
 	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/env/SECRET_A", map[string]any{"value": "a-env-" + suffix}, 204, nil)
+	// A look and an uploaded logo, so the swept PATCH and …/apps/{app}/logo routes have something to leak.
+	ua.mustJSON("PATCH", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID, map[string]any{"title": "Alpha", "icon": "rocket"}, 200, nil)
+	if resp, b := ua.raw("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/logo", "image/png", []byte("\x89PNG\r\n\x1a\nalpha")); resp.StatusCode != 200 {
+		t.Fatalf("app logo: %d %s", resp.StatusCode, b)
+	}
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 
@@ -286,7 +291,7 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_proxy_host": {"proxy": proxyA.ID},
 		"list_sites": {"server": srvA},
 		"enable_tunnel": {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
-		"update_app": {"app": appA.App.ID, "branch": "x"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
+		"update_app": {"app": appA.App.ID, "branch": "x", "title": "stolen", "color": "#000000"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
 		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},
 		"update_member_role": {"member": memberA, "role": "viewer"}, "delete_credential": {"credential": credA.ID, "confirm": "pve-a"},
 		"github_status": {"server": srvA, "refresh": true}, "github_connect": {"server": srvA, "token": "ghp_sweep"},

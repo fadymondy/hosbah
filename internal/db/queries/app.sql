@@ -40,6 +40,13 @@ UPDATE apps SET branch = sqlc.arg('branch')::text, port = sqlc.arg('port'), heal
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
 RETURNING *;
 
+-- name: UpdateAppAppearance :one
+-- Git and imported apps alike. name is not touched: it is the slug of URLs, containers and hostnames.
+UPDATE apps SET title = sqlc.narg('title'), description = sqlc.narg('description'), color = sqlc.narg('color'),
+    icon = sqlc.narg('icon'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
+RETURNING *;
+
 -- name: SetAppAutodeployPaused :exec
 UPDATE apps SET autodeploy_paused = $3, updated_at = now() WHERE id = $1 AND team_id = $2;
 

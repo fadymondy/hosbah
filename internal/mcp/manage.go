@@ -226,12 +226,18 @@ func ManageTools() []Tool {
 		// ---- apps ----
 		{
 			Name: "update_app", Scope: scopes.Write,
-			Description: "Change an app's branch, port, health-check path/timeout or auto-deploy pause. Takes effect on the next deploy.",
+			Description: "Change an app's branch, port, health-check path/timeout or auto-deploy pause (git apps; takes effect on the next deploy), " +
+				"and its appearance (any app, imported too): title (display name, at most 80 characters), description (at most 280), color (#RRGGBB), icon (" +
+				strings.Join(deploy.AppIcons(), ", ") + "). Omit a field to leave it; an empty string clears title, description, color or icon. The name cannot be changed.",
 			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "branch": str("Branch"),
 				"port":                map[string]any{"type": "integer"},
 				"healthcheck_path":    str("Health-check path"),
 				"healthcheck_timeout": map[string]any{"type": "integer", "description": "Seconds, 5–600"},
-				"autodeploy_paused":   map[string]any{"type": "boolean"}}),
+				"autodeploy_paused":   map[string]any{"type": "boolean"},
+				"title":               str("Display name (at most 80 characters), or empty to clear"),
+				"description":         str("A short note (at most 280 characters), or empty to clear"),
+				"color":               str("#RRGGBB, or empty to clear"),
+				"icon":                map[string]any{"type": "string", "enum": append([]string{""}, deploy.AppIcons()...), "description": "Icon key, or empty to clear"}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -256,11 +262,34 @@ func ManageTools() []Tool {
 				}
 				port := args.Int("port", int(a.Port), 1, 65535)
 				timeout := args.Int("healthcheck_timeout", int(a.HealthcheckTimeout), 5, 600)
-				u, err := s.UpdateSettings(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, branch, port, timeout, path, paused)
-				if err != nil {
-					return "", err
+				opt := func(k string) *string {
+					if _, ok := args[k]; !ok {
+						return nil
+					}
+					v := args.Str(k)
+					return &v
 				}
-				return fmt.Sprintf("%s: branch %s, port %d, health %s (%ds), auto-deploy paused %v.\n", u.Name, deploy.BranchOf(u), u.Port, u.HealthcheckPath, u.HealthcheckTimeout, u.AutodeployPaused), nil
+				look := deploy.AppearancePatch{Title: opt("title"), Description: opt("description"), Color: opt("color"), Icon: opt("icon")}
+				settings := false
+				for _, k := range []string{"branch", "port", "healthcheck_path", "healthcheck_timeout", "autodeploy_paused"} {
+					_, ok := args[k]
+					settings = settings || ok
+				}
+				u, out := a, ""
+				// Settings are a git app's (an imported one is refused); appearance is any app's.
+				if settings || look.Empty() {
+					if u, err = s.UpdateSettings(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, branch, port, timeout, path, paused); err != nil {
+						return "", err
+					}
+					out = fmt.Sprintf("%s: branch %s, port %d, health %s (%ds), auto-deploy paused %v.\n", u.Name, deploy.BranchOf(u), u.Port, u.HealthcheckPath, u.HealthcheckTimeout, u.AutodeployPaused)
+				}
+				if !look.Empty() {
+					if u, err = s.UpdateAppearance(ctx, env.Q, env.Caller.TeamID, mcpActor(env), u, look); err != nil {
+						return "", err
+					}
+					out += fmt.Sprintf("%s: title %s · description %s · color %s · icon %s\n", u.Name, orDash(u.Title), orDash(u.Description), orDash(u.Color), orDash(u.Icon))
+				}
+				return out, nil
 			},
 		},
 		{

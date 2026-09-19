@@ -173,7 +173,7 @@ export default function SiteCanvasPage() {
                 ))
               )}
               {manage ? (
-                <CardLink href={`${base}/apps/${app.id}#domains`} icon={<PlusIcon />}>
+                <CardLink href={`${base}/apps/${app.name}/proxy`} icon={<PlusIcon />}>
                   {t("sites.addDomain")}
                 </CardLink>
               ) : null}
