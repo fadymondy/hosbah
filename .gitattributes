@@ -1,0 +1,6 @@
+# Migrations are checksummed (schema_migrations and atlas.sum record LF content). A Windows
+# checkout with core.autocrlf=true would write CRLF and every applied migration would read as
+# "edited after it was applied", so these are always LF in the working tree.
+db/atlas/migrations/** text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
