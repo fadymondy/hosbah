@@ -14,6 +14,7 @@ import { ReportDialog, type FeedbackSubmission } from "@/lib/feedback/react"
 import { apiFetch, ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useOptionalTeam } from "@/lib/team"
+import { openMahaamFeedback } from "@/components/feedback/mahaam-feedback"
 
 // The fields the Hosbah API contract names for POST /api/feedback.
 const CONTRACT_FIELDS = ["title", "body", "issue_type", "page_url", "route", "user_agent", "viewport"] as const
@@ -48,7 +49,8 @@ export function ReportProblem() {
         variant="outline"
         size="sm"
         className="hidden sm:inline-flex"
-        onClick={() => setOpen(true)}
+        // Mahaam's widget when it is configured and loaded; the in-app dialog otherwise.
+        onClick={() => openMahaamFeedback() || setOpen(true)}
         aria-label={t("feedback.launcher")}
       >
         <MessageSquareWarningIcon />
@@ -61,7 +63,7 @@ export function ReportProblem() {
         types={["bug", "feature"]}
         typeLabels={{ bug: t("feedback.types.bug"), feature: t("feedback.types.feature") }}
         onSubmit={send}
-        idPrefix="cloudy-feedback"
+        idPrefix="hosbah-feedback"
       />
     </>
   )
