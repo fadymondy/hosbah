@@ -19,6 +19,13 @@ import (
 // Marker identifies proxy hosts Hosbah owns.
 const Marker = "# managed by Hosbah"
 
+// legacyMarker marks proxy hosts created before the rename from Cloudy; they are still ours.
+const legacyMarker = "# managed by Cloudy"
+
+func owned(h *ProxyHost) bool {
+	return strings.Contains(h.AdvancedConfig, Marker) || strings.Contains(h.AdvancedConfig, legacyMarker)
+}
+
 // Client talks to one NPM instance.
 type Client struct {
 	base, email, password string
@@ -152,7 +159,7 @@ func (c *Client) Route(ctx context.Context, domain, forwardHost string, forwardP
 		want.CertificateID = 0
 	}
 	if cur := hostFor(hs, domain); cur != nil {
-		if !strings.Contains(cur.AdvancedConfig, Marker) {
+		if !owned(cur) {
 			return fmt.Errorf("npm: %s already has a proxy host Hosbah did not create (#%d); not touching it", domain, cur.ID)
 		}
 		return c.do(ctx, http.MethodPut, fmt.Sprintf("/api/nginx/proxy-hosts/%d", cur.ID), want, nil)
@@ -167,7 +174,7 @@ func (c *Client) Unroute(ctx context.Context, domain string) error {
 		return err
 	}
 	cur := hostFor(hs, domain)
-	if cur == nil || !strings.Contains(cur.AdvancedConfig, Marker) {
+	if cur == nil || !owned(cur) {
 		return nil
 	}
 	return c.do(ctx, http.MethodDelete, fmt.Sprintf("/api/nginx/proxy-hosts/%d", cur.ID), nil, nil)

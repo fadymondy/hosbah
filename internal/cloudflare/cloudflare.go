@@ -260,6 +260,11 @@ func (c *Client) PointHost(ctx context.Context, host, ip string, proxied bool) (
 // ManagedComment marks the records Hosbah created; only those are ever deleted.
 const ManagedComment = "managed by Hosbah"
 
+// legacyManagedComment marks records created before the rename from Cloudy; they are still ours.
+const legacyManagedComment = "managed by Cloudy"
+
+func managed(comment string) bool { return comment == ManagedComment || comment == legacyManagedComment }
+
 // DeleteManaged removes the records at name that Hosbah created, leaving the user's own alone.
 func (c *Client) DeleteManaged(ctx context.Context, zoneID, name string) error {
 	rs, err := c.Records(ctx, zoneID, name, "")
@@ -267,7 +272,7 @@ func (c *Client) DeleteManaged(ctx context.Context, zoneID, name string) error {
 		return err
 	}
 	for _, r := range rs {
-		if r.Comment != ManagedComment {
+		if !managed(r.Comment) {
 			continue
 		}
 		if _, err := c.do(ctx, http.MethodDelete, "/zones/"+url.PathEscape(zoneID)+"/dns_records/"+url.PathEscape(r.ID), nil, nil, nil); err != nil {
