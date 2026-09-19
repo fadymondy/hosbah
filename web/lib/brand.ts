@@ -1,12 +1,12 @@
 import type { MarkSpec } from "@/app/grid/grid-marks"
 
 /**
- * Cloudy's cube mark. These cells move to the GENERATED app/grid/grid-marks.ts
+ * Hosbah's cube mark. These cells move to the GENERATED app/grid/grid-marks.ts
  * (import it from there and delete this constant) once fadymondy.com-v2's
- * web/lib/brand/marks.ts carries a `cloudy` entry and the grid is re-synced.
+ * web/lib/brand/marks.ts carries a `hosbah` entry and the grid is re-synced.
  */
 export const CLOUDY_MARK: MarkSpec = {
-  name: "Cloudy",
+  name: "Hosbah",
   cells: [
     [1, 0],
     [3, 0],

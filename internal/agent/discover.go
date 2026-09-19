@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Discovery: what an existing server already runs, so connecting it imports its workloads instead

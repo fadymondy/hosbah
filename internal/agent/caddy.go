@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 /*

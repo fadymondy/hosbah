@@ -14,7 +14,7 @@ CREATE TABLE tunnels (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a server's way in from outside. frp: the agent runs frpc and exposes the server's Caddy (:80)
+-- Hosbah: a server's way in from outside. frp: the agent runs frpc and exposes the server's Caddy (:80)
 -- on remote_port of the team's frps; the edge (NPM) and DNS then point domains at it. tailscale: the
 -- agent joins the team's tailnet; address is its tailnet IP. One tunnel of each kind per server.
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_kind_check CHECK (kind IN ('frp', 'tailscale'));

@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteInvitation :exec
 DELETE FROM invitations WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertInvitation :one
 INSERT INTO invitations (team_id, email, role, token_hash, status, invited_by, expires_at)
 VALUES ($1, $2, $3, $4, 'pending', $5, $6)

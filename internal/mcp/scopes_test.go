@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fadymondy/cloudy/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/scopes"
 )
 
 // Every tool on both servers declares a scope, and only one its server grants. This is the

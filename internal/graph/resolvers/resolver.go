@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	graphgen "github.com/fadymondy/cloudy/internal/graph/gen"
+	"github.com/fadymondy/hosbah/internal/app"
+	graphgen "github.com/fadymondy/hosbah/internal/graph/gen"
 )
 
 // Resolver is the GraphQL root, holding the app container (DB, hooks, log).

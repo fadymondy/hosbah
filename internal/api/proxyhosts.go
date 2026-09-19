@@ -9,9 +9,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/deploy"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ProxyHostOut is one proxy host of the Caddy proxy manager.
@@ -162,7 +162,7 @@ func (d *deps) registerProxyHosts(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{OperationID: "delete-proxy-host", Method: http.MethodDelete, Path: "/api/teams/{team}/proxy-hosts/{proxy}",
-		DefaultStatus: http.StatusNoContent, Tags: tags, Summary: "Remove a proxy host from Caddy and Cloudy (owner or admin)",
+		DefaultStatus: http.StatusNoContent, Tags: tags, Summary: "Remove a proxy host from Caddy and Hosbah (owner or admin)",
 	}, func(ctx context.Context, in *ProxyHostPath) (*struct{}, error) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			p, err := deploy.ProxyHostByRef(ctx, q, m.TeamID, in.Proxy)

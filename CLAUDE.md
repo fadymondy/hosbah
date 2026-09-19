@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Cloudy is server management and app hosting (Proxmox, Docker, clouds) built on the **togo** framework: Go API (chi + Huma REST/OpenAPI, gqlgen, sqlc, Atlas, pgx/Postgres) with a Next.js frontend in `web/`. README.md is the detailed spec for each phase (P0 tenancy, P1 servers and agent, P2 deploys, P3 databases and backups). HOW-TO-TEST.md has the manual click-paths. Clean-room project: never copy code or templates from Eddy (AGPL).
+Hosbah is server management and app hosting (Proxmox, Docker, clouds) built on the **togo** framework: Go API (chi + Huma REST/OpenAPI, gqlgen, sqlc, Atlas, pgx/Postgres) with a Next.js frontend in `web/`. README.md is the detailed spec for each phase (P0 tenancy, P1 servers and agent, P2 deploys, P3 databases and backups). HOW-TO-TEST.md has the manual click-paths. Clean-room project: never copy code or templates from Eddy (AGPL).
 
 ## Commands
 
@@ -40,9 +40,9 @@ Proxmox live tests only run with `CLOUDY_PROXMOX_LIVE=1` plus `PVE_*` env vars (
 - **Data services and backups**: `internal/dbsvc` (databases, users, restic backups).
 - **MCP** (`internal/mcp`): team server `/api/mcp` (`cld_…` tokens) and admin server `/api/admin/mcp` (`cla_…`). Every tool must declare a scope; `internal/mcp/scopes_test.go` enforces this.
 - Logs reach the browser through team-scoped SSE endpoints, never through the global `/events`.
-- **Connecting servers**: `internal/provisioning/add.go` (`AddServer`) is shared by the REST API and MCP. The `server.connect` control-plane op (`connect.go`) logs in over SSH once, installs Cloudy's key and the agent, and can register a Proxmox node as a credential.
+- **Connecting servers**: `internal/provisioning/add.go` (`AddServer`) is shared by the REST API and MCP. The `server.connect` control-plane op (`connect.go`) logs in over SSH once, installs Hosbah's key and the agent, and can register a Proxmox node as a credential.
 - **Domains**: the apps domain (`CLOUDY_APPS_DOMAIN`, `internal/deploy/appsdomain.go`), team Cloudflare credentials (`internal/cloudflare`, `teamdns.go`), and the Caddy proxy manager (`proxyhosts.go` plus the agent `proxy.set` op). App domains and proxy hosts share one hostname namespace, checked in system scope by `HostnameTaken`.
-- **SDKs and CLI** (`pkg/cloudy`, `sdk/{node,python,php}`, `cmd/cloudy`) wrap the team MCP endpoint. A new feature needs an MCP tool to reach them. The isolation sweep (`internal/server/isolation_test.go`) must be taught every new path parameter and team-scoped MCP tool.
+- **SDKs and CLI** (`pkg/hosbah`, `sdk/{node,python,php}`, `cmd/hosbah`) wrap the team MCP endpoint. A new feature needs an MCP tool to reach them. The isolation sweep (`internal/server/isolation_test.go`) must be taught every new path parameter and team-scoped MCP tool.
 
 ## Migrations
 

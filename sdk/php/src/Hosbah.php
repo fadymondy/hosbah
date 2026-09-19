@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Cloudy;
+namespace Hosbah;
 
 /**
- * Cloudy SDK for PHP 8.1+ (framework-free; Laravel integration in Cloudy\Laravel).
+ * Hosbah SDK for PHP 8.1+ (framework-free; Laravel integration in Hosbah\Laravel).
  *
- * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Cloudy tool is
+ * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Hosbah tool is
  * available through call(), with the token's scopes, the audit log and destructive-action approvals.
  *
- *   $cloudy = new \Cloudy\Cloudy(getenv('CLOUDY_URL'), getenv('CLOUDY_TOKEN'));
- *   $cloudy->deploy('shop', wait: true);
+ *   $hosbah = new \Hosbah\Hosbah(getenv('CLOUDY_URL'), getenv('CLOUDY_TOKEN'));
+ *   $hosbah->deploy('shop', wait: true);
  */
-final class Cloudy
+final class Hosbah
 {
     private string $url;
     private string $token;
@@ -29,7 +29,7 @@ final class Cloudy
         $this->url = rtrim($url, '/');
         $this->token = trim($token);
         if ($this->token === '') {
-            throw new \InvalidArgumentException('cloudy: no token (mint one under MCP tokens)');
+            throw new \InvalidArgumentException('hosbah: no token (mint one under MCP tokens)');
         }
         $this->transport = $transport ?? [$this, 'httpPost'];
     }
@@ -135,7 +135,7 @@ final class ToolError extends \RuntimeException
 {
     public function __construct(public readonly string $tool, string $message)
     {
-        parent::__construct("cloudy: {$tool}: {$message}");
+        parent::__construct("hosbah: {$tool}: {$message}");
     }
 }
 
@@ -144,6 +144,6 @@ final class ApiError extends \RuntimeException
 {
     public function __construct(public readonly int $status, string $message)
     {
-        parent::__construct("cloudy: {$message} (HTTP {$status})");
+        parent::__construct("hosbah: {$message} (HTTP {$status})");
     }
 }

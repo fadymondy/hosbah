@@ -20,7 +20,7 @@ CREATE TABLE backups (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: one backup run of a data service. kind is 'manual' (Back up now / MCP backup_now) or
+-- Hosbah: one backup run of a data service. kind is 'manual' (Back up now / MCP backup_now) or
 -- 'scheduled'. The agent runs pg_dump -Fc / mysqldump / a Redis RDB save and pushes it into a restic
 -- repository on the target; snapshot_id is restic's, size_bytes the dump size. restore_tested_at is
 -- set only after a restore into a throwaway container verified the dump restores (restore_status

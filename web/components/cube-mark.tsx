@@ -2,7 +2,7 @@ import type { MarkSpec } from "@/app/grid/grid-marks"
 import { CLOUDY_MARK } from "@/lib/brand"
 
 /**
- * A cube-lattice mark drawn from its cells, normalised to the cells' OWN bounding box (Cloudy's
+ * A cube-lattice mark drawn from its cells, normalised to the cells' OWN bounding box (Hosbah's
  * cells start at column 1 — measuring from 0 would push it off-centre). Same approach as
  * fadymondy.com-v2's web/components/marks/cube-mark.tsx.
  */

@@ -7,9 +7,9 @@ import (
 
 	"github.com/togo-framework/faker"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/models"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/models"
 )
 
 // ServerFactory builds fake Server records.

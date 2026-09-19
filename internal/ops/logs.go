@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // LogLine is one stored operation event, as the API and the SSE stream return it.

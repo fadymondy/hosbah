@@ -1,4 +1,4 @@
-// Package api is Cloudy's hand-written, team-scoped REST surface (Huma → OpenAPI).
+// Package api is Hosbah's hand-written, team-scoped REST surface (Huma → OpenAPI).
 //
 // Generated CRUD (internal/rest, from make:resource) is deliberately not mounted:
 // it lists and edits every row of a table with no notion of a team. Everything
@@ -23,10 +23,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 type deps struct {
@@ -34,7 +34,7 @@ type deps struct {
 	ops *ops.Service
 }
 
-// Register mounts every Cloudy route. a and svc may be nil (OpenAPI export only).
+// Register mounts every Hosbah route. a and svc may be nil (OpenAPI export only).
 func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d := &deps{a: a, ops: svc}
 	d.registerServers(api)

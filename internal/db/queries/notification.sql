@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteNotification :exec
 DELETE FROM notifications WHERE id = $1;
 
--- Cloudy queries.
+-- Hosbah queries.
 -- name: InsertNotification :exec
 INSERT INTO notifications (team_id, user_id, kind, title, body, subject_type, subject_id)
 VALUES ($1, sqlc.narg('user_id'), $2, $3, sqlc.narg('body'), sqlc.narg('subject_type'), sqlc.narg('subject_id'));

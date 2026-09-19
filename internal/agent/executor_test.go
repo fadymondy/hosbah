@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 type sink struct {

@@ -12,7 +12,7 @@ CREATE TABLE credentials (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: provider credentials. config holds the non-secret settings (API URL, node, storage);
+-- Hosbah: provider credentials. config holds the non-secret settings (API URL, node, storage);
 -- secret_sealed is the secret, sealed with the team DEK and bound to "credential:<id>".
 ALTER TABLE credentials ADD CONSTRAINT credentials_provider_check CHECK (provider IN ('proxmox', 'cloudflare', 'frp', 'npm', 'tailscale'));
 CREATE UNIQUE INDEX credentials_team_name_key ON credentials (team_id, name);

@@ -1,4 +1,4 @@
--- Cloudy queries over the togo auth plugin's tables.
+-- Hosbah queries over the togo auth plugin's tables.
 -- name: UserByID :one
 SELECT id, email, roles, created_at FROM users WHERE id = $1;
 

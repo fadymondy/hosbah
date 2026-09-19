@@ -14,7 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Agent is one enrolled agent's connection loop.

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/dbsvc"
-	"github.com/fadymondy/cloudy/internal/scopes"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // DatabaseTools are the P3 managed-data-service tools. Like the app tools they call the same dbsvc

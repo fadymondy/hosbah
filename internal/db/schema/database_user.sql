@@ -14,7 +14,7 @@ CREATE TABLE database_users (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a role/user on a data service, optionally scoped to one database with a grant level.
+-- Hosbah: a role/user on a data service, optionally scoped to one database with a grant level.
 -- password_sealed is sealed with the team DEK bound to "dbuser:<id>"; the connection string built
 -- from it is what an attach injects into an app as a sealed DATABASE_URL / REDIS_URL. name goes into
 -- the agent's fixed argv (CREATE USER / GRANT), so it is constrained like a database name.

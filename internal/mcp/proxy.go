@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/deploy"
-	"github.com/fadymondy/cloudy/internal/scopes"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ProxyTools are the Caddy proxy manager: a hostname in front of any upstream a server can reach.
@@ -121,7 +121,7 @@ func ProxyTools() []Tool {
 		},
 		{
 			Name: "remove_proxy_host", Scope: scopes.Write,
-			Description: "Remove a proxy host from its server's Caddy and from Cloudy (and the DNS record Cloudy created for it, if any).",
+			Description: "Remove a proxy host from its server's Caddy and from Hosbah (and the DNS record Hosbah created for it, if any).",
 			InputSchema: schema([]string{"proxy"}, map[string]any{"proxy": proxyArg}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {

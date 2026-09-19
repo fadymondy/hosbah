@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/fadymondy/cloudy/internal/providers"
+	"github.com/fadymondy/hosbah/internal/providers"
 )
 
 // Key is the provider key this driver registers under.
@@ -456,7 +456,7 @@ func (d *Driver) Delete(ctx context.Context, id string) error {
 		if isNotFound(err) {
 			return nil
 		}
-		// With a pool-scoped token every guest Cloudy creates is in the pool and visible. A guest it
+		// With a pool-scoped token every guest Hosbah creates is in the pool and visible. A guest it
 		// may not even audit was never created by it (a create refused before allocation, say): gone.
 		if d.pool != "" && invisibleGuest(err) {
 			return nil

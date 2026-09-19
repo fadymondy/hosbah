@@ -17,7 +17,7 @@ CREATE TABLE releases (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: an image that passed the health gate and took traffic. live = serving now (one per app),
+-- Hosbah: an image that passed the health gate and took traffic. live = serving now (one per app),
 -- standby = kept image a rollback can re-point to in seconds, pruned = image removed (keep 5).
 ALTER TABLE releases ADD CONSTRAINT releases_status_check CHECK (status IN ('live', 'standby', 'pruned'));
 CREATE UNIQUE INDEX releases_app_version_key ON releases (app_id, version);

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fadymondy/cloudy/internal/server"
+	"github.com/fadymondy/hosbah/internal/server"
 )
 
 func main() {

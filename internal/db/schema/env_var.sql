@@ -10,7 +10,7 @@ CREATE TABLE env_vars (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: values are sealed with the team DEK, bound to "env:<app_id>:<name>" — the check refuses a
+-- Hosbah: values are sealed with the team DEK, bound to "env:<app_id>:<name>" — the check refuses a
 -- plaintext value outright. Lists return names only; the value leaves the database through the
 -- audited reveal path, or sealed to the target agent's own key inside a signed operation.
 ALTER TABLE env_vars ADD CONSTRAINT env_vars_name_check CHECK (name ~ '^[A-Za-z_][A-Za-z0-9_]{0,127}$');

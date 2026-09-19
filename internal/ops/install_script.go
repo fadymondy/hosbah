@@ -23,7 +23,7 @@ func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'
 func installScript(v installVars) string {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\n")
-	b.WriteString("# Cloudy agent installer for server " + oneLine(v.ServerName) + ".\n")
+	b.WriteString("# Hosbah agent installer for server " + oneLine(v.ServerName) + ".\n")
 	b.WriteString("# Generated for ONE enrolment: the token below works once and expires at " + v.ExpiresAt + ".\n")
 	b.WriteString("set -eu\n")
 	b.WriteString("CLOUDY_URL=" + shq(v.ControlPlane) + "\n")
@@ -42,7 +42,7 @@ fail() { echo "cloudy: $*" >&2; exit 1; }
 say() { echo "==> $*"; }
 
 [ "$(id -u)" = 0 ] || fail "run this as root (pipe it to 'sudo sh')"
-[ "$(uname -s)" = Linux ] || fail "the Cloudy agent runs on Linux only"
+[ "$(uname -s)" = Linux ] || fail "the Hosbah agent runs on Linux only"
 case "$(uname -m)" in
   x86_64|amd64) ARCH=amd64; SUM=$SHA256_AMD64 ;;
   aarch64|arm64) ARCH=arm64; SUM=$SHA256_ARM64 ;;
@@ -66,7 +66,7 @@ say "enrolling (running the enrolment checks)"
 if [ -d /run/systemd/system ]; then
   cat > /etc/systemd/system/cloudy-agent.service <<'UNIT'
 [Unit]
-Description=Cloudy agent
+Description=Hosbah agent
 Documentation=https://cloudy.fadymondy.com
 After=network-online.target
 Wants=network-online.target
@@ -89,5 +89,5 @@ else
   nohup /usr/local/bin/cloudy-agent run >>/var/log/cloudy-agent.log 2>&1 &
   say "log: /var/log/cloudy-agent.log"
 fi
-say "done — the server shows as online in Cloudy within a few seconds"
+say "done — the server shows as online in Hosbah within a few seconds"
 `

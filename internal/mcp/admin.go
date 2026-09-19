@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 // ScopeAdmin is the admin server's one scope. Every admin token carries it; it exists so the
@@ -19,7 +19,7 @@ import (
 // narrower admin scopes can be split out later without touching the transport.
 const ScopeAdmin = "admin"
 
-// AdminServer is the platform-administration MCP at /api/admin/mcp: triage Cloudy's own issues
+// AdminServer is the platform-administration MCP at /api/admin/mcp: triage Hosbah's own issues
 // (reports + report_comments, filed through "Report a problem") and manage teams and users.
 // Tokens live in admin_mcp_tokens, and a call is refused the moment the minting account is no
 // longer a platform admin.
@@ -121,7 +121,7 @@ func AdminTools() []Tool {
 	return []Tool{
 		{
 			Name:        "list_issues",
-			Description: "List Cloudy's issues (reports filed through Report a problem, or created here). Filter by status, state, issue_type or a title search.",
+			Description: "List Hosbah's issues (reports filed through Report a problem, or created here). Filter by status, state, issue_type or a title search.",
 			Scope:       ScopeAdmin,
 			InputSchema: schema(nil, map[string]any{
 				"status": str("backlog, todo, in_progress, waiting_approval, in_review, done"), "state": str("open or closed"),
@@ -189,7 +189,7 @@ func AdminTools() []Tool {
 		},
 		{
 			Name:        "create_issue",
-			Description: "Open a new issue on Cloudy's tracker. Returns the assigned key (CLD-n).",
+			Description: "Open a new issue on Hosbah's tracker. Returns the assigned key (CLD-n).",
 			Scope:       ScopeAdmin,
 			InputSchema: schema([]string{"title"}, map[string]any{
 				"title": str(""), "body": str("Markdown"),

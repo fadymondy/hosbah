@@ -1,20 +1,20 @@
-# fadymondy/cloudy-sdk (PHP + Laravel)
+# fadymondy/hosbah-sdk (PHP + Laravel)
 
 ```bash
-composer require fadymondy/cloudy-sdk
+composer require fadymondy/hosbah-sdk
 ```
 
 ```php
 // Laravel: set CLOUDY_URL and CLOUDY_TOKEN in .env — the provider and facade are auto-discovered.
-use Cloudy\Laravel\Facades\Cloudy;
+use Hosbah\Laravel\Facades\Hosbah;
 
-Cloudy::deploy('shop', wait: true);
-Cloudy::addProxyHost('edge', 'nas.example.com', '10.0.0.5:5000');
-Cloudy::call('list_databases');          // any tool — see Cloudy::tools()
+Hosbah::deploy('shop', wait: true);
+Hosbah::addProxyHost('edge', 'nas.example.com', '10.0.0.5:5000');
+Hosbah::call('list_databases');          // any tool — see Hosbah::tools()
 
 // Plain PHP
-$cloudy = new \Cloudy\Cloudy(getenv('CLOUDY_URL'), getenv('CLOUDY_TOKEN'));
+$hosbah = new \Hosbah\Hosbah(getenv('CLOUDY_URL'), getenv('CLOUDY_TOKEN'));
 ```
 
 The token is a team MCP token (`cld_…`); its scopes decide what the SDK may do. Publish the config with
-`php artisan vendor:publish --tag=cloudy-config`. Tests: `php tests/sdk_test.php`.
+`php artisan vendor:publish --tag=hosbah-config`. Tests: `php tests/sdk_test.php`.

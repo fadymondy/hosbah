@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteOperationLog :exec
 DELETE FROM operation_logs WHERE id = $1;
 
--- Cloudy queries.
+-- Hosbah queries.
 -- name: InsertOperationLog :execrows
 -- A replayed (operation_id, seq) is dropped: resume after reconnect cannot duplicate a line.
 INSERT INTO operation_logs (team_id, server_id, operation_id, seq, stream, line_sealed)

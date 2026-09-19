@@ -42,9 +42,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ApprovalTTL is how long an approval request stays actionable. Short on purpose: it is a
@@ -232,7 +232,7 @@ its output is a mistake, and this turns that mistake into a redaction instead of
 It is a backstop, not the design — the tools are written not to echo values in the first place.
 */
 var secretShaped = []*regexp.Regexp{
-	// Cloudy's own token families: MCP (cld_/cla_), enrolment (cle_), deploy hook (cdh_).
+	// Hosbah's own token families: MCP (cld_/cla_), enrolment (cle_), deploy hook (cdh_).
 	regexp.MustCompile(`\bc(?:ld|la|le|dh)_[A-Za-z0-9]{16,}`),
 	// Sealed envelopes, which must never be transported outside a signed operation.
 	regexp.MustCompile(`\bcsv1:[A-Za-z0-9+/=._-]{8,}`),

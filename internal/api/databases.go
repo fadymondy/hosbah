@@ -10,9 +10,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/dbsvc"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ---- contract ------------------------------------------------------------------------------------

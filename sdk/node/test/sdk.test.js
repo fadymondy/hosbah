@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { Cloudy, CloudyToolError, CloudyApiError } from "../dist/index.js"
+import { Hosbah, HosbahToolError, HosbahApiError } from "../dist/index.js"
 
 function fakeFetch(handler) {
   return async (url, init) => {
@@ -18,10 +18,10 @@ test("call, helpers and errors", async () => {
       return { body: { result: { content: [{ type: "text", text: "Deployment #3 succeeded." }] } } }
     return { body: { result: { content: [{ type: "text", text: "app not found" }], isError: true } } }
   })
-  const c = new Cloudy({ url: "https://c.test/", token: "cld_ok", fetch })
+  const c = new Hosbah({ url: "https://c.test/", token: "cld_ok", fetch })
   assert.equal(await c.deploy("shop", { wait: true }), "Deployment #3 succeeded.")
-  await assert.rejects(c.deploy("nope"), (e) => e instanceof CloudyToolError && e.message.includes("app not found"))
-  const bad = new Cloudy({ url: "https://c.test", token: "cld_bad", fetch })
-  await assert.rejects(bad.apps(), (e) => e instanceof CloudyApiError && e.status === 401)
-  assert.throws(() => new Cloudy({ url: "https://c.test", token: "" }))
+  await assert.rejects(c.deploy("nope"), (e) => e instanceof HosbahToolError && e.message.includes("app not found"))
+  const bad = new Hosbah({ url: "https://c.test", token: "cld_bad", fetch })
+  await assert.rejects(bad.apps(), (e) => e instanceof HosbahApiError && e.status === 401)
+  assert.throws(() => new Hosbah({ url: "https://c.test", token: "" }))
 })

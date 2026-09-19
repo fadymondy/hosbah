@@ -1,5 +1,5 @@
 /**
- * The one way the browser talks to the Cloudy API. Everything is same-origin
+ * The one way the browser talks to the Hosbah API. Everything is same-origin
  * (/api/* is rewritten to the Go API by next.config.mjs), so the togo session
  * cookie travels by itself. Unsafe methods carry X-CSRF-Token, read from the
  * JS-readable `togo_csrf` cookie, fetched once from /api/auth/csrf if missing.

@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteAgentEnrollment :exec
 DELETE FROM agent_enrollments WHERE id = $1;
 
--- Cloudy queries.
+-- Hosbah queries.
 -- name: InsertEnrollment :one
 INSERT INTO agent_enrollments (team_id, server_id, token_hash, expires_at, created_by)
 VALUES ($1, $2, $3, $4, $5)

@@ -1,4 +1,4 @@
-# How to test Cloudy (owner walkthrough)
+# How to test Hosbah (owner walkthrough)
 
 Everything below runs against the **live** demo. Sign in and click through it.
 
@@ -16,7 +16,7 @@ by stopping every local piece (`cloudy-target`, `cloudy-git`, the git HTTP serve
 | Piece | Where | What it is |
 |---|---|---|
 | Control plane (`cloudy-api`, `cloudy-web`) | LXC 117, 10.10.10.117 | `/opt/cloudy/docker-compose.yml`, `restart: unless-stopped` |
-| Database | pg-shared, LXC 102 | database `cloudy` |
+| Database | pg-shared, LXC 102 | database `hosbah` |
 | Managed server **demo-1** | LXC 120, 10.10.10.120 | Debian 13, Docker CE, the `cloudy-agent` under systemd |
 | Sample git repos | LXC 117 `:3791` | Gitea, `cloudy/sample-{go,node,python,php}`, public |
 | Edge | NPM host 61 → 10.10.10.117:3710 | Cloudflare in front |
@@ -113,7 +113,7 @@ Leave the setting **off** afterwards if you want the demo back to its default.
   domains only. The demo uses `*.cloudy.localhost` with `tls: off`.
 - **S3 backup credentials** — the remote backup target is disabled and labelled
   *"S3 — not configured"*; the demo uses a local restic repository on demo-1.
-- **Proxmox pool-scoped API token** — Cloudy can create guests through its Proxmox
+- **Proxmox pool-scoped API token** — Hosbah can create guests through its Proxmox
   driver, but no credential is wired, so demo-1 was added as bring-your-own. The
   provider-driven "create a server" path is untested against the real PVE.
 - **`drop_database` over MCP** — not implemented; it needs an agent operation that

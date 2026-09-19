@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteCredential :exec
 DELETE FROM credentials WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertCredential :one
 INSERT INTO credentials (id, team_id, provider, name, config, secret_sealed, created_by, last_validated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

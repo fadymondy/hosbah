@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteDeploymentLog :exec
 DELETE FROM deployment_logs WHERE id = $1;
 
--- Cloudy queries.
+-- Hosbah queries.
 -- name: InsertDeploymentLog :exec
 INSERT INTO deployment_logs (team_id, server_id, app_id, deployment_id, operation_id, op_seq, seq, stream, line_sealed)
 VALUES ($1, $2, $3, $4, sqlc.narg('operation_id'), sqlc.narg('op_seq'), $5, $6, $7);

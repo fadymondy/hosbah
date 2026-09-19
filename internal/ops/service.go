@@ -27,8 +27,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // Config is where agents reach the control plane and where agent builds live.

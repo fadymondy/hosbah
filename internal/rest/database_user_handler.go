@@ -8,9 +8,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/validation"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/models"
-	"github.com/fadymondy/cloudy/internal/resources"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/models"
+	"github.com/fadymondy/hosbah/internal/resources"
 )
 
 // RegisterDatabaseUserRoutes mounts CRUD endpoints for database_users.

@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/scopes"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 // UserServer is the team MCP at /api/mcp. A token belongs to one team and acts as the user who
@@ -23,7 +23,7 @@ import (
 // and a viewer's token cannot invite even if it carries `write`.
 func UserServer() *Server {
 	return &Server{
-		Name:          "cloudy",
+		Name:          "hosbah",
 		Version:       "0.1.0",
 		Tools:         append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...),
 		AllowedScopes: scopes.All,

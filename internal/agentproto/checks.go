@@ -50,7 +50,7 @@ type Service struct {
 	DiskBytes uint64 `json:"disk_bytes,omitempty"`
 }
 
-// Platform is what Cloudy manages the host as: proxmox (a hypervisor), docker (an engine is
+// Platform is what Hosbah manages the host as: proxmox (a hypervisor), docker (an engine is
 // running) or linux (plain; docker.install will add the engine).
 func (f Facts) Platform() string {
 	switch {
@@ -95,7 +95,7 @@ const (
 	CheckFail = "fail"
 )
 
-// PortsToCheck are the ports Cloudy's edge will need (Caddy HTTP/HTTPS and its admin API).
+// PortsToCheck are the ports Hosbah's edge will need (Caddy HTTP/HTTPS and its admin API).
 var PortsToCheck = []string{"80", "443", "2019"}
 
 // MinMemBytes: the plan's "at least 1 GB RAM". A 1 GB VM reports ~960 MiB after the kernel's
@@ -123,7 +123,7 @@ type EnrollResponse struct {
 // EvaluateChecks turns facts into the enrolment checks. The control plane runs it again on the
 // facts it received, so the verdict is the server's, not whatever the agent claimed.
 //
-// fail = enrolment is refused (Cloudy cannot manage this host); warn = enrolled, with a caveat the
+// fail = enrolment is refused (Hosbah cannot manage this host); warn = enrolled, with a caveat the
 // UI shows.
 func EvaluateChecks(f Facts) []Check {
 	var out []Check
@@ -175,7 +175,7 @@ func EvaluateChecks(f Facts) []Check {
 	if len(busy) == 0 {
 		add("ports", CheckPass, "80, 443 and 2019 are free")
 	} else {
-		add("ports", CheckWarn, "in use: "+strings.Join(busy, ", ")+" — Cloudy's Caddy will need them for deploys")
+		add("ports", CheckWarn, "in use: "+strings.Join(busy, ", ")+" — Hosbah's Caddy will need them for deploys")
 	}
 
 	d := f.Docker

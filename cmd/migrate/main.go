@@ -1,4 +1,4 @@
-// Command migrate applies Cloudy's versioned migrations through the ledger in
+// Command migrate applies Hosbah's versioned migrations through the ledger in
 // internal/migrate. Usage: go run ./cmd/migrate [status]   (also: togo migrate)
 package main
 
@@ -11,8 +11,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 	"github.com/togo-framework/togo"
 
-	"github.com/fadymondy/cloudy/internal/config"
-	"github.com/fadymondy/cloudy/internal/migrate"
+	"github.com/fadymondy/hosbah/internal/config"
+	"github.com/fadymondy/hosbah/internal/migrate"
 )
 
 func main() {

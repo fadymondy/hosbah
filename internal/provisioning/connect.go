@@ -13,21 +13,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/providers/sshboot"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/providers/sshboot"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // Connecting a server the user already has: they give an address and a login (root or a sudo user,
-// with a password or a private key); Cloudy logs in once, looks at what the host is (plain Linux,
+// with a password or a private key); Hosbah logs in once, looks at what the host is (plain Linux,
 // Docker, Proxmox VE), installs its own per-server key and the agent, and waits for the agent to
 // enrol. The agent's facts then carry the platform and the services already running (import).
 //
 // The user's password or key is sealed with the team key only for the life of the operation, and
-// forgotten when it ends, whatever the outcome. From then on Cloudy uses its own key.
+// forgotten when it ends, whatever the outcome. From then on Hosbah uses its own key.
 
 // ConnectSpec is servers.spec.connect.
 type ConnectSpec struct {
@@ -36,7 +36,7 @@ type ConnectSpec struct {
 	User string `json:"user"`
 	Auth string `json:"auth"` // password | key
 	// RegisterProxmox: when the host turns out to be a Proxmox VE node, also create an API token
-	// on it and save it as a team credential, so Cloudy can create VMs/LXCs there.
+	// on it and save it as a team credential, so Hosbah can create VMs/LXCs there.
 	RegisterProxmox bool   `json:"register_proxmox"`
 	SecretSealed    string `json:"secret_sealed,omitempty"`
 }
@@ -187,7 +187,7 @@ func connect(ctx context.Context, a *app.App, svc *ops.Service, op db.Operation,
 		return nil, fmt.Errorf("%s is not root and cannot sudo without a password — use root, or allow passwordless sudo for this user", c.User)
 	}
 
-	// Cloudy's own key: installed for root, so the user's login is never needed again.
+	// Hosbah's own key: installed for root, so the user's login is never needed again.
 	pub, privPEM, err := sshboot.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -198,14 +198,14 @@ func connect(ctx context.Context, a *app.App, svc *ops.Service, op db.Operation,
 	}
 	addKey := fmt.Sprintf(`%ssh -c 'umask 077; mkdir -p /root/.ssh && touch /root/.ssh/authorized_keys && grep -qxF "%s" /root/.ssh/authorized_keys || echo "%s" >> /root/.ssh/authorized_keys'`, sudo, pub, pub)
 	if err := client.Stream(ctx, addKey, &lineLogger{log: func(l string) { logf("stdout", l) }}); err != nil {
-		return nil, fmt.Errorf("install Cloudy's key: %w", err)
+		return nil, fmt.Errorf("install Hosbah's key: %w", err)
 	}
 	if err := system(ctx, a, func(q *db.Queries) error {
 		return q.SetServerSSHKey(ctx, db.SetServerSSHKeyParams{ID: srv.ID, TeamID: srv.TeamID, SshPublicKey: &pub, SshPrivateKeySealed: &sealedKey})
 	}); err != nil {
-		return nil, fmt.Errorf("store Cloudy's key: %w", err)
+		return nil, fmt.Errorf("store Hosbah's key: %w", err)
 	}
-	info("installed Cloudy's own SSH key for root")
+	info("installed Hosbah's own SSH key for root")
 
 	result := map[string]any{"platform": platform, "os": p.osID, "os_version": p.osVersion}
 	if p.proxmox && c.RegisterProxmox {
@@ -262,7 +262,7 @@ func connect(ctx context.Context, a *app.App, svc *ops.Service, op db.Operation,
 func registerProxmox(ctx context.Context, a *app.App, client *sshboot.Client, srv db.Server, op db.Operation,
 	host string, p probe, sudo string, dek []byte, info func(string, ...any)) (string, error) {
 	tokenName := "cloudy-" + srv.ID[:8]
-	script := sudo + `sh -c 'pveum user add cloudy@pve --comment Cloudy >/dev/null 2>&1; ` +
+	script := sudo + `sh -c 'pveum user add cloudy@pve --comment Hosbah >/dev/null 2>&1; ` +
 		`pveum acl modify / --users cloudy@pve --roles PVEAdmin >/dev/null && ` +
 		`pveum user token remove cloudy@pve ` + tokenName + ` >/dev/null 2>&1; ` +
 		`pveum user token add cloudy@pve ` + tokenName + ` --privsep 0 --output-format json && echo && ` +

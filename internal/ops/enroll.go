@@ -21,10 +21,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 // EnrolTTL is how long an enrolment token (and the install command carrying it) works.
@@ -76,8 +76,8 @@ func (s *Service) handleInstall(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = io.WriteString(w, "This Cloudy install link is not valid: it expired, was already used, or never existed.\n"+
-			"Create a new one on the server's page in Cloudy.\n")
+		_, _ = io.WriteString(w, "This Hosbah install link is not valid: it expired, was already used, or never existed.\n"+
+			"Create a new one on the server's page in Hosbah.\n")
 	}
 	if !strings.HasPrefix(token, enrolPrefix) || len(token) > 128 {
 		notValid()
@@ -247,7 +247,7 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	})
 	switch {
 	case errors.Is(err, errBlocked):
-		writeJSON(http.StatusUnprocessableEntity, map[string]any{"error": "this server does not meet Cloudy's requirements", "checks": checks})
+		writeJSON(http.StatusUnprocessableEntity, map[string]any{"error": "this server does not meet Hosbah's requirements", "checks": checks})
 	case errors.Is(err, errBadToken):
 		writeJSON(http.StatusUnauthorized, map[string]string{"error": errBadToken.Error()})
 	case err != nil:

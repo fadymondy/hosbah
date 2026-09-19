@@ -11,7 +11,7 @@ CREATE TABLE databases (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a logical database inside a data service (a Postgres/MySQL database; for Redis a logical
+-- Hosbah: a logical database inside a data service (a Postgres/MySQL database; for Redis a logical
 -- db number is not modelled — Redis services carry no databases row). name is the identifier used
 -- verbatim in the agent's fixed argv (createdb / CREATE DATABASE), so it is constrained tightly.
 ALTER TABLE databases ADD CONSTRAINT databases_status_check CHECK (status IN ('new', 'creating', 'ready', 'failed', 'dropping'));

@@ -10,11 +10,11 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/providers/sshboot"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/providers/sshboot"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // Adding a server is one function shared by the REST API and the MCP tools, so both offer the same

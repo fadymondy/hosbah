@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // P3 operations: managed data services and restic backups. Fixed argv for docker / restic; the only

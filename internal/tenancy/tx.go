@@ -1,4 +1,4 @@
-// Package tenancy is how Cloudy touches tenant data.
+// Package tenancy is how Hosbah touches tenant data.
 //
 // Every read or write of a tenant row goes through Tx: one database transaction
 // whose first statement pins the request's identity with set_config(..., true)
@@ -22,7 +22,7 @@ import (
 	"database/sql"
 	"errors"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // Scope is the identity a transaction runs as.

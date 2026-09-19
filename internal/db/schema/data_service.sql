@@ -18,7 +18,7 @@ CREATE TABLE data_services (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a managed data service is one Postgres/MySQL/Redis container on one server of its team,
+-- Hosbah: a managed data service is one Postgres/MySQL/Redis container on one server of its team,
 -- bound to the server's private interface only. name is a DNS-label-like slug — it becomes the
 -- container name (cloudy-db-<name>) and the named volume (cloudy-dbdata-<name>). root_sealed is the
 -- root/superuser credential, sealed with the team DEK bound to "dbroot:<id>"; it never leaves the

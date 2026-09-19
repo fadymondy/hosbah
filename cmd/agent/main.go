@@ -1,4 +1,4 @@
-// Command cloudy-agent runs on every server Cloudy manages.
+// Command cloudy-agent runs on every server Hosbah manages.
 //
 //	cloudy-agent enroll --url https://cloudy.example --token <one-time token> [--state /etc/cloudy/agent.json]
 //	cloudy-agent run [--state /etc/cloudy/agent.json]
@@ -20,8 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agent"
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agent"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 var version = "dev"
@@ -70,7 +70,7 @@ func enroll(args []string) int {
 		fmt.Fprintln(os.Stderr, "✗", err)
 		var ee *agent.EnrollError
 		if errors.As(err, &ee) && ee.Status == 422 {
-			fmt.Fprintln(os.Stderr, "  Fix the failed checks above, then ask Cloudy for a new install command.")
+			fmt.Fprintln(os.Stderr, "  Fix the failed checks above, then ask Hosbah for a new install command.")
 		}
 		return 1
 	}

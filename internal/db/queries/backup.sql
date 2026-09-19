@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteBackup :exec
 DELETE FROM backups WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertBackup :one
 INSERT INTO backups (id, team_id, data_service_id, schedule_id, kind, status, target, restore_status, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

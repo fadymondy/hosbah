@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteTunnel :exec
 DELETE FROM tunnels WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: ListTunnelsOfTeam :many
 SELECT t.*, s.name AS server_name FROM tunnels t JOIN servers s ON s.id = t.server_id WHERE t.team_id = $1 ORDER BY s.name, t.kind;
 

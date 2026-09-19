@@ -13,12 +13,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 /*
@@ -346,7 +346,7 @@ func (s *Service) SetEnv(ctx context.Context, q *db.Queries, teamID string, acto
 		return invalid("variable names are letters, digits and _, not starting with a digit")
 	}
 	if name == "PORT" {
-		return invalid("PORT is set by Cloudy to the app's port — change the port instead")
+		return invalid("PORT is set by Hosbah to the app's port — change the port instead")
 	}
 	if len(value) > maxEnvValue || strings.ContainsRune(value, 0) || !utf8.ValidString(value) {
 		return invalid("values are UTF-8 text up to 32 KiB")
@@ -377,7 +377,7 @@ func (s *Service) UnsetEnv(ctx context.Context, q *db.Queries, teamID string, ac
 	return tenancy.Record(ctx, q, teamID, actor.UserID, "env.unset", "app", a.ID, actor.audit(map[string]any{"name": name}))
 }
 
-// RevealEnv opens one value — the only path by which a stored value leaves Cloudy toward a person —
+// RevealEnv opens one value — the only path by which a stored value leaves Hosbah toward a person —
 // and audits it in the same transaction.
 func (s *Service) RevealEnv(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, name string) (string, error) {
 	v, err := q.EnvVarInApp(ctx, db.EnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: name})
@@ -435,7 +435,7 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	d, err := q.InsertDomain(ctx, db.InsertDomainParams{TeamID: teamID, AppID: a.ID, Hostname: hostname, Tls: tls, VerifyToken: "cloudy-verify=" + hex.EncodeToString(tok)})
 	if err != nil {
 		if strings.Contains(err.Error(), "domains_hostname_key") {
-			return db.Domain{}, conflict("that hostname is already routed to an app in Cloudy")
+			return db.Domain{}, conflict("that hostname is already routed to an app in Hosbah")
 		}
 		return db.Domain{}, err
 	}

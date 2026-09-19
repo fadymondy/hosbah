@@ -3,9 +3,9 @@
 // Installed plugins are blank-imported here so their init() registers them
 // with the kernel for auto-discovery. Managed by `togo install`.
 //
-// Cloudy: auth-dev and dashboard were removed by hand (the CLI has no uninstall).
+// Hosbah: auth-dev and dashboard were removed by hand (the CLI has no uninstall).
 // auth-dev mounts POST /api/auth/dev/login, which hands out an admin session for
-// an empty body; dashboard is replaced by Cloudy's own web/. auth-mfa is
+// an empty body; dashboard is replaced by Hosbah's own web/. auth-mfa is
 // deliberately NOT installed: v0.1.0 takes user_id from the request body on
 // unauthenticated routes (recovery/generate + recovery/verify = account
 // takeover) and its magic-link endpoint echoes a login token (FM-81).

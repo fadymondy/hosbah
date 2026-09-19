@@ -14,7 +14,7 @@ CREATE TABLE deployment_logs (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a deployment's log across all its operations, in one seq order, sealed with the team DEK
+-- Hosbah: a deployment's log across all its operations, in one seq order, sealed with the team DEK
 -- bound to the deployment. A line an agent emitted keeps (operation_id, op_seq), so its replay after
 -- a reconnect cannot land twice; control-plane lines have no operation.
 CREATE UNIQUE INDEX deployment_logs_deployment_seq_key ON deployment_logs (deployment_id, seq);

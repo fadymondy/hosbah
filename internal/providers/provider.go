@@ -1,6 +1,6 @@
-// Package providers defines the driver contract through which Cloudy obtains servers from an
+// Package providers defines the driver contract through which Hosbah obtains servers from an
 // infrastructure provider (Proxmox VE, clouds). Docker is the runtime on every server; a driver's
-// only job is to create, inspect, power and destroy the machine itself, and to get the Cloudy agent
+// only job is to create, inspect, power and destroy the machine itself, and to get the Hosbah agent
 // onto it — either by cloud-init user-data (see AgentUserData) or, where the provider cannot
 // deliver user-data, by the SSH bootstrap in package sshboot.
 //

@@ -5,7 +5,7 @@ package agent
 import (
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Sampler is a stub off Linux (see facts_other.go): heartbeats carry a timestamp only.

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/scopes"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // InfraTools: adding servers (install command, SSH connect, Proxmox) and provider credentials
@@ -23,7 +23,7 @@ func InfraTools() []Tool {
 		{
 			Name: "add_server", Scope: scopes.Write,
 			Description: "Add a server. method=install returns a one-time install command to run on it. method=connect logs in over SSH " +
-				"(root or a passwordless-sudo user, password or private key), detects plain Linux / Docker / Proxmox VE, installs Cloudy's key " +
+				"(root or a passwordless-sudo user, password or private key), detects plain Linux / Docker / Proxmox VE, installs Hosbah's key " +
 				"and the agent, and imports what already runs; the login is used once and forgotten. method=proxmox creates a VM or LXC " +
 				"with one of the team's Proxmox credentials. Follow progress with get_server / list_operations.",
 			InputSchema: schema([]string{"name", "method"}, map[string]any{

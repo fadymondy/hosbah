@@ -1,13 +1,13 @@
-// Package cloudy is the Go SDK for Cloudy. It talks to a team's MCP endpoint (POST /api/mcp) with a
+// Package cloudy is the Go SDK for Hosbah. It talks to a team's MCP endpoint (POST /api/mcp) with a
 // team-bound token (cld_…, minted under MCP tokens), so everything the dashboard can do is reachable
-// with the same scopes, audit trail and destructive-action approvals — and new Cloudy features are
+// with the same scopes, audit trail and destructive-action approvals — and new Hosbah features are
 // available through Call before a typed helper exists for them.
 //
-//	c := cloudy.New("https://cloudy-app.fadymondy.com", os.Getenv("CLOUDY_TOKEN"))
-//	out, err := c.Deploy(ctx, "shop", cloudy.Wait())
+//	c := hosbah.New("https://cloudy-app.fadymondy.com", os.Getenv("CLOUDY_TOKEN"))
+//	out, err := c.Deploy(ctx, "shop", hosbah.Wait())
 //
 // It depends on the standard library only.
-package cloudy
+package hosbah
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-// Client calls one Cloudy team with one token.
+// Client calls one Hosbah team with one token.
 type Client struct {
 	baseURL string
 	token   string
@@ -30,7 +30,7 @@ type Client struct {
 	id      atomic.Int64
 }
 
-// New returns a client for baseURL (the Cloudy origin, e.g. https://cloudy-app.fadymondy.com).
+// New returns a client for baseURL (the Hosbah origin, e.g. https://cloudy-app.fadymondy.com).
 func New(baseURL, token string, opts ...Option) *Client {
 	c := &Client{baseURL: strings.TrimRight(baseURL, "/"), token: strings.TrimSpace(token), http: &http.Client{Timeout: 10 * time.Minute}}
 	for _, o := range opts {
@@ -45,10 +45,10 @@ type Option func(*Client)
 // WithHTTPClient replaces the HTTP client (timeouts, proxies, tests).
 func WithHTTPClient(h *http.Client) Option { return func(c *Client) { c.http = h } }
 
-// ToolError is a refusal from a tool (not found, missing scope, validation…). Its text is Cloudy's.
+// ToolError is a refusal from a tool (not found, missing scope, validation…). Its text is Hosbah's.
 type ToolError struct{ Tool, Message string }
 
-func (e *ToolError) Error() string { return "cloudy: " + e.Tool + ": " + e.Message }
+func (e *ToolError) Error() string { return "hosbah: " + e.Tool + ": " + e.Message }
 
 // APIError is a transport or protocol failure (bad token, server error).
 type APIError struct {
@@ -56,7 +56,7 @@ type APIError struct {
 	Message string
 }
 
-func (e *APIError) Error() string { return fmt.Sprintf("cloudy: %s (HTTP %d)", e.Message, e.Status) }
+func (e *APIError) Error() string { return fmt.Sprintf("hosbah: %s (HTTP %d)", e.Message, e.Status) }
 
 // Tool describes one callable tool.
 type Tool struct {
@@ -75,7 +75,7 @@ type rpcResponse struct {
 
 func (c *Client) rpc(ctx context.Context, method string, params any, out any) error {
 	if c.token == "" {
-		return errors.New("cloudy: no token (mint one under MCP tokens)")
+		return errors.New("hosbah: no token (mint one under MCP tokens)")
 	}
 	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": c.id.Add(1), "method": method, "params": params})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/mcp", bytes.NewReader(body))
@@ -87,7 +87,7 @@ func (c *Client) rpc(ctx context.Context, method string, params any, out any) er
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("cloudy: %w", err)
+		return fmt.Errorf("hosbah: %w", err)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 32<<20))

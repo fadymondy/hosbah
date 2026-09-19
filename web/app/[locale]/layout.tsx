@@ -9,8 +9,8 @@ import ar from "@/lang/ar.json"
 import { dirFor, isLocale, LOCALES } from "@/lib/i18n-config"
 
 export const metadata: Metadata = {
-  title: { default: "Cloudy", template: "%s · Cloudy" },
-  description: "Cloudy — servers and apps, managed.",
+  title: { default: "Hosbah", template: "%s · Hosbah" },
+  description: "Hosbah — servers and apps, managed.",
 }
 
 export function generateStaticParams() {

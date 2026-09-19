@@ -5,7 +5,7 @@ package resources
 import (
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // NotificationResponse is the JSON shape returned by the Notification API.

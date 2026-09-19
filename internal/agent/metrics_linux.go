@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Sampler reads the heartbeat metrics. CPU is the busy share since the previous sample (the

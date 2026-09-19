@@ -11,6 +11,6 @@ CREATE TABLE operation_logs (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: every event an operation emits, in seq order, sealed with the team DEK. (operation_id,
+-- Hosbah: every event an operation emits, in seq order, sealed with the team DEK. (operation_id,
 -- seq) is unique: an agent replaying after a reconnect cannot duplicate a line.
 CREATE UNIQUE INDEX operation_logs_op_seq_key ON operation_logs (operation_id, seq);

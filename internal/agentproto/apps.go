@@ -69,7 +69,7 @@ type DetectResult struct {
 	Runtime      string `json:"runtime"`            // dockerfile | railpack
 	Provider     string `json:"provider,omitempty"` // railpack's detected provider: golang, node, python, php…
 	StartCommand string `json:"start_command,omitempty"`
-	CloudyToml   string `json:"cloudy_toml,omitempty"` // raw file (≤64 KiB); the control plane parses it
+	HosbahToml   string `json:"cloudy_toml,omitempty"` // raw file (≤64 KiB); the control plane parses it
 }
 
 // BuildParams / BuildResult: app.build.
@@ -190,7 +190,7 @@ const (
 	MaxLogTail          = 1000
 	MaxLogFollowSeconds = 300
 	MaxLogLines         = 5000
-	MaxCloudyToml       = 64 << 10
+	MaxHosbahToml       = 64 << 10
 	DefaultKeepImages   = 5
 )
 

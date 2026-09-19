@@ -25,11 +25,11 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/api"
-	"github.com/fadymondy/cloudy/internal/config"
-	"github.com/fadymondy/cloudy/internal/migrate"
-	"github.com/fadymondy/cloudy/internal/ops"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/api"
+	"github.com/fadymondy/hosbah/internal/config"
+	"github.com/fadymondy/hosbah/internal/migrate"
+	"github.com/fadymondy/hosbah/internal/ops"
 )
 
 /*
@@ -360,7 +360,7 @@ func TestIsolationSweep(t *testing.T) {
 	}
 }
 
-// A report filed through the UI's endpoint lands in Cloudy's own tracker and the admin MCP
+// A report filed through the UI's endpoint lands in Hosbah's own tracker and the admin MCP
 // lists it; a team token is refused there, and a non-admin cannot mint an admin token.
 func TestFeedbackReachesAdminMCP(t *testing.T) {
 	ts, cleanup := bootTestServer(t)

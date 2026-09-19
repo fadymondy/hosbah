@@ -3,7 +3,7 @@ import json
 import unittest
 import urllib.error
 
-from cloudy import Cloudy, CloudyApiError, CloudyToolError
+from hosbah import Hosbah, HosbahApiError, HosbahToolError
 
 
 class FakeResp(io.BytesIO):
@@ -31,15 +31,15 @@ class FakeOpener:
 
 class SDKTest(unittest.TestCase):
     def test_calls(self):
-        c = Cloudy("https://c.test/", "cld_ok", opener=FakeOpener())
+        c = Hosbah("https://c.test/", "cld_ok", opener=FakeOpener())
         self.assertEqual(c.deploy("shop", wait=True), "Deployment #3 succeeded.")
-        with self.assertRaises(CloudyToolError):
+        with self.assertRaises(HosbahToolError):
             c.deploy("nope")
-        with self.assertRaises(CloudyApiError) as e:
-            Cloudy("https://c.test", "cld_bad", opener=FakeOpener()).apps()
+        with self.assertRaises(HosbahApiError) as e:
+            Hosbah("https://c.test", "cld_bad", opener=FakeOpener()).apps()
         self.assertEqual(e.exception.status, 401)
         with self.assertRaises(ValueError):
-            Cloudy("https://c.test", "")
+            Hosbah("https://c.test", "")
 
 
 if __name__ == "__main__":

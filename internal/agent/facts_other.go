@@ -6,7 +6,7 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // The agent targets Linux. These stubs let the package build and its protocol, signing and

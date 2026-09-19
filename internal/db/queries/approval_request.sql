@@ -8,7 +8,7 @@ SELECT * FROM approval_requests ORDER BY created_at DESC LIMIT $1 OFFSET $2;
 -- name: DeleteApprovalRequest :exec
 DELETE FROM approval_requests WHERE id = $1;
 
--- Cloudy tenant queries (P4). Always run inside tenancy.Tx; every statement names team_id as
+-- Hosbah tenant queries (P4). Always run inside tenancy.Tx; every statement names team_id as
 -- well, and the RLS policies in *_p4_row_level_security.sql hold when one is forgotten.
 
 -- OpenApprovalRequest is the one-shot capability lookup AND the filer, in a single statement.

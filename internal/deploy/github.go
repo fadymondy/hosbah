@@ -22,7 +22,7 @@ import (
 )
 
 /*
-The GitHub App integration, behind an interface so Cloudy runs without it.
+The GitHub App integration, behind an interface so Hosbah runs without it.
 
 What the owner must supply (nothing is configured yet):
   CLOUDY_GITHUB_APP_ID                the App's numeric id
@@ -30,7 +30,7 @@ What the owner must supply (nothing is configured yet):
   CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE  the App's private key (.pem), readable only by the service
   CLOUDY_GITHUB_WEBHOOK_SECRET        the webhook secret set on the App
 
-With them, Cloudy mints a short-lived app JWT (RS256, 9 minutes), exchanges it for a 1-hour
+With them, Hosbah mints a short-lived app JWT (RS256, 9 minutes), exchanges it for a 1-hour
 installation token per clone, and verifies every webhook delivery's X-Hub-Signature-256 HMAC.
 Without them, the UI says "GitHub App not configured" and /hooks/github answers 503; public git
 URLs and the per-app deploy hook work either way.
@@ -39,7 +39,7 @@ URLs and the per-app deploy hook work either way.
 // ErrGitHubNotConfigured: the App's credentials are not set.
 var ErrGitHubNotConfigured = errors.New("GitHub App not configured")
 
-// GitHubApp is what Cloudy needs from GitHub.
+// GitHubApp is what Hosbah needs from GitHub.
 type GitHubApp interface {
 	Configured() bool
 	Slug() string

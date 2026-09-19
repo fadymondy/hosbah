@@ -5,7 +5,7 @@ package resources
 import (
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // ApprovalRequestResponse is the JSON shape returned by the ApprovalRequest API.

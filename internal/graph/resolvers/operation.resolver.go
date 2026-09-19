@@ -4,9 +4,9 @@ package resolvers
 import (
 	"context"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	graphgen "github.com/fadymondy/cloudy/internal/graph/gen"
-	"github.com/fadymondy/cloudy/internal/models"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	graphgen "github.com/fadymondy/hosbah/internal/graph/gen"
+	"github.com/fadymondy/hosbah/internal/models"
 )
 
 func (r *queryResolver) Operation(ctx context.Context, id string) (*db.Operation, error) {

@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteDatabaseUser :exec
 DELETE FROM database_users WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertDatabaseUser :one
 INSERT INTO database_users (id, team_id, data_service_id, database_id, name, grants, password_sealed, status, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

@@ -1,4 +1,4 @@
-# Cloudy's own local Postgres. Host port 55491 (5432 and the 55432-55450 range are taken on the
+# Hosbah's own local Postgres. Host port 55491 (5432 and the 55432-55450 range are taken on the
 # dev machine). The app never connects as `postgres`: db/docker/init.sql creates the
 # non-superuser role cloudy_app, which owns the databases — row-level security does not bind a
 # superuser, so connecting as one would make the tenancy backstop decorative.

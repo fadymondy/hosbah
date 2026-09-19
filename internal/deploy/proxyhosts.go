@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // The Caddy proxy manager: proxy hosts put any upstream a server can reach behind a hostname with
 // TLS, like Nginx Proxy Manager's "proxy hosts", on the Caddy the agent already runs. They share the
-// hostname space with app domains (one hostname routes to one thing in Cloudy), the same TLS modes,
+// hostname space with app domains (one hostname routes to one thing in Hosbah), the same TLS modes,
 // and the same verification rule: a public certificate only once the hostname is proven — by the
 // _cloudy-verify TXT record, or at once when the team's Cloudflare holds the zone.
 
@@ -57,7 +57,7 @@ func (s *Service) CreateProxyHost(ctx context.Context, q *db.Queries, teamID str
 		return db.ProxyHost{}, conflict("that server's agent has not enrolled yet")
 	}
 	if s.hostnameTaken(ctx, host) {
-		return db.ProxyHost{}, conflict("that hostname is already routed in Cloudy")
+		return db.ProxyHost{}, conflict("that hostname is already routed in Hosbah")
 	}
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
@@ -66,7 +66,7 @@ func (s *Service) CreateProxyHost(ctx context.Context, q *db.Queries, teamID str
 		CreatedBy: actor.UserID})
 	if err != nil {
 		if strings.Contains(err.Error(), "proxy_hosts_hostname_key") {
-			return db.ProxyHost{}, conflict("that hostname is already routed in Cloudy")
+			return db.ProxyHost{}, conflict("that hostname is already routed in Hosbah")
 		}
 		return db.ProxyHost{}, err
 	}
@@ -108,7 +108,7 @@ func (s *Service) UpdateProxyHost(ctx context.Context, q *db.Queries, teamID str
 	return u, s.applyProxyHost(ctx, q, teamID, actor, u, in.SkipVerify)
 }
 
-// DeleteProxyHost removes it from Caddy, its Cloudflare record (only one Cloudy made) and Cloudy.
+// DeleteProxyHost removes it from Caddy, its Cloudflare record (only one Hosbah made) and Hosbah.
 func (s *Service) DeleteProxyHost(ctx context.Context, q *db.Queries, teamID string, actor Actor, p db.ProxyHost) error {
 	raw, _ := json.Marshal(agentproto.ProxyParams{ProxyID: p.ID, Remove: true})
 	if _, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: p.ServerID, Kind: agentproto.KindProxySet, Params: raw, CreatedBy: actor.UserID}); err != nil {

@@ -14,9 +14,9 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // handleWS is GET /agent/ws: challenge, verify, then heartbeats and events in, signed ops out.
@@ -277,7 +277,7 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 			}
 			_, err = q.FinishOperation(ctx, db.FinishOperationParams{Status: ev.Status, Result: res, ExitCode: code,
 				Error: errText, ID: op.ID, ServerID: ac.serverID})
-			// A fresh system.info refreshes what Cloudy shows for the server (its discovered services and
+			// A fresh system.info refreshes what Hosbah shows for the server (its discovered services and
 			// guests, which become its sites), not only the operation's log.
 			if err == nil && op.Kind == agentproto.KindSystemInfo && ev.Status == agentproto.StatusOK && res != nil {
 				var r struct {

@@ -1,4 +1,4 @@
-# Cloudy
+# Hosbah
 
 Server management and app hosting on Proxmox, Docker and the major clouds — one-click Go, Python,
 Node and PHP deploys. **Phase P1: in development, local only.** Plan:
@@ -6,7 +6,7 @@ Node and PHP deploys. **Phase P1: in development, local only.** Plan:
 
 P0 is the multi-tenant foundation: teams, members, invitations, default-deny authorization,
 row-level security, envelope encryption, audit, sign-in with TOTP 2FA, the user and admin MCP
-servers, and Cloudy's own issue tracker fed by "Report a problem".
+servers, and Hosbah's own issue tracker fed by "Report a problem".
 
 P2 adds one-click app deploys (below). P1 added servers: the `cloudy-agent`, bring-your-own install with a one-liner, signed typed
 operations with live logs, and the Proxmox driver (tested against a fake PVE API only). No deploys
@@ -58,7 +58,7 @@ docker exec cloudy-target sh -c 'curl -fsSL http://host.docker.internal:8710/ins
 
 **Servers → Add server → Connect with SSH**: an address, root (or a passwordless-sudo user) and a
 password or private key. The control-plane operation `server.connect` (`internal/provisioning/connect.go`)
-logs in once, probes the OS and whether it is plain Linux, Docker or Proxmox VE, installs Cloudy's
+logs in once, probes the OS and whether it is plain Linux, Docker or Proxmox VE, installs Hosbah's
 own per-server key for root, installs the agent and waits for it to enrol. The login is sealed with
 the team key only while the operation runs and is forgotten afterwards, whatever the outcome. On a
 Proxmox node it can also create a `cloudy@pve` API token and save it as a team credential
@@ -72,7 +72,7 @@ and the RHEL family (CentOS Stream, RHEL, Rocky and Alma 9–10, via dnf) are su
 cloud-init template (full clone) or create an unprivileged LXC with `nesting=1,keyctl=1`. The
 agent is delivered by cloud-init user-data when a snippets directory is mounted
 (`snippets_storage` + `snippets_dir`), because the PVE API cannot upload snippets. Otherwise
-Cloudy bootstraps it over SSH with a per-server ed25519 key, sealed with the team key.
+Hosbah bootstraps it over SSH with a per-server ed25519 key, sealed with the team key.
 
 Tests use an in-process fake of the PVE endpoints listed in `internal/providers/proxmox/doc.go`.
 The live test only runs when you ask for it:
@@ -91,7 +91,7 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
   `internal/deploy/toolchain.go`) through its BuildKit frontend image. Images are
   `cloudy/<app>:<deployment_id>`; the newest 5 are kept, so a rollback needs no rebuild.
 - **`cloudy.toml`** (optional, repository root) sets `port`, `release`, `[healthcheck]` and
-  `[processes]`, and wins over the app's settings in Cloudy. Examples: `deploy/samples/*`.
+  `[processes]`, and wins over the app's settings in Hosbah. Examples: `deploy/samples/*`.
 - **Zero-downtime pipeline**: provision → build → release (a one-off container) → start `web` on an
   ephemeral `127.0.0.1` port → **health gate** (2xx within N seconds) → start workers → switch the
   Caddy upstream → drain the old containers. Any failure before the switch leaves the previous
@@ -118,18 +118,18 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
   `CLOUDY_GITHUB_APP_SLUG`, `CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE` and `CLOUDY_GITHUB_WEBHOOK_SECRET`
   to enable it; until then `/hooks/github` answers 503 and the UI says "GitHub App not configured".
 - **Apps domain**: set `CLOUDY_APPS_DOMAIN` (e.g. `fadymondy.com`) and every new app gets `<CLOUDY_APPS_PREFIX><app>.<domain>`
-  (default prefix `cloudy-app-`), created already verified. With `CLOUDY_CLOUDFLARE_TOKEN` Cloudy also creates and
-  deletes its A/AAAA record (only records it made, marked "managed by Cloudy"). Unset = off. Moving to a dedicated
+  (default prefix `cloudy-app-`), created already verified. With `CLOUDY_CLOUDFLARE_TOKEN` Hosbah also creates and
+  deletes its A/AAAA record (only records it made, marked "managed by Hosbah"). Unset = off. Moving to a dedicated
   domain later is only an `.env` change.
 - **Caddy proxy manager** (`internal/deploy/proxyhosts.go`, agent `proxy.set`): a *proxy host* puts any upstream a server
   can reach (`host:port`, `http://…`, `https://…` with optional skip-verify) behind a hostname on that server's Caddy.
-  Like Nginx Proxy Manager, but on the Caddy Cloudy already runs. Hostnames share one namespace with app domains, use
+  Like Nginx Proxy Manager, but on the Caddy Hosbah already runs. Hostnames share one namespace with app domains, use
   the same TLS modes, and get a public certificate only once verified (TXT, or at once through the team's
   Cloudflare). Web: **Proxy hosts**; API: `/api/teams/{team}/proxy-hosts`; MCP: `list_proxy_hosts`, `add_proxy_host`,
   `update_proxy_host`, `verify_proxy_host`, `remove_proxy_host`.
 - **Team Cloudflare**: a team can save a `cloudflare` credential (API token with Zone:Read + DNS:Edit). A custom
   domain in one of its zones then gets its DNS record created and is verified at once, with no TXT step.
-  Removing the domain removes only the records Cloudy created.
+  Removing the domain removes only the records Hosbah created.
 
 The team MCP adds `list_apps`, `get_app`, `list_deployments`, `get_deployment`, `deploy_logs`,
 `list_env`, `list_domains` (read), `deploy_app` (with `wait`), `cancel_deployment`, `rollback_app`,
@@ -158,11 +158,11 @@ point an app at any public repository, then: **Apps → New app** → repository
 
 For servers without a public address: a customer box behind NAT, a laptop, a Docker Desktop target.
 
-- **frp**: a team `frp` credential names the frps (`server_addr`, `server_port`, the port range Cloudy may
+- **frp**: a team `frp` credential names the frps (`server_addr`, `server_port`, the port range Hosbah may
   allocate, `public_ip` where DNS points, `edge_host` where the edge reaches the frps ports) and holds its auth token.
   `enable_tunnel` makes the agent run a pinned `frpc` (v0.65.0, sha256-checked) exposing the server's Caddy on an
   allocated port. Every domain and proxy host on that server is then published: a proxied Cloudflare record at
-  `public_ip` (team `cloudflare` credential) and an NPM proxy host to `edge_host:port` (team `npm` credential; Cloudy
+  `public_ip` (team `cloudflare` credential) and an NPM proxy host to `edge_host:port` (team `npm` credential; Hosbah
   only changes proxy hosts it created). The server's Caddy routes by Host.
 - **Tailscale**: a team `tailscale` credential (reusable auth key); `enable_tunnel` joins the server to the tailnet and
   records its tailnet IP.
@@ -170,8 +170,8 @@ For servers without a public address: a customer box behind NAT, a laptop, a Doc
 
 ## SDKs, CLI and mobile
 
-See `sdk/README.md`. The Go (`pkg/cloudy`), Node, Python and PHP/Laravel SDKs and the `cloudy` CLI
-(`cmd/cloudy`, `make cli` builds it for Windows, macOS and Linux) call the team MCP endpoint with a `cld_…` token.
+See `sdk/README.md`. The Go (`pkg/hosbah`), Node, Python and PHP/Laravel SDKs and the `hosbah` CLI
+(`cmd/hosbah`, `make cli` builds it for Windows, macOS and Linux) call the team MCP endpoint with a `cld_…` token.
 A mobile app uses the REST API with the Bearer token `POST /api/auth/login` returns.
 
 ## Ports (local)
@@ -180,7 +180,7 @@ A mobile app uses the REST API with the Bearer token `POST /api/auth/login` retu
 |---|---|
 | API (Go) | **8710** — REST `/api`, docs `/docs`, MCP `/api/mcp` + `/api/admin/mcp` |
 | Web (Next.js) | **3710** — proxies `/api/*` to 8710 |
-| Postgres (container `cloudy-postgres`) | **55491** — databases `cloudy`, `cloudy_test`, `cloudy_atlas_dev` |
+| Postgres (container `cloudy-postgres`) | **55491** — databases `hosbah`, `cloudy_test`, `cloudy_atlas_dev` |
 
 ## Run it
 
@@ -261,6 +261,6 @@ togo migrate
 
 The fadymondy.com grid, synced — never edited here: `web/app/grid/` (`npm run grid:sync` /
 `grid:check`). Brand `data-brand="cloudy"` (body #2E6F9E, accent #C9A227) lives in
-`web/app/grid/brand-cloudy.css` until fadymondy.com-v2's `marks.ts` carries `cloudy`.
+`web/app/grid/brand-cloudy.css` until fadymondy.com-v2's `marks.ts` carries `hosbah`.
 The Feedback SDK is the generated copy in `web/lib/feedback/` (`npm run feedback:sync` / `feedback:check`).
 en + ar (RTL), light + dark.

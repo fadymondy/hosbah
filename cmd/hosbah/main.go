@@ -1,10 +1,10 @@
-// Command cloudy is Cloudy's CLI (Windows, macOS, Linux). It speaks to a team's MCP endpoint with a
-// team token through the Go SDK (pkg/cloudy), so every tool the team token may call is a command:
+// Command cloudy is Hosbah's CLI (Windows, macOS, Linux). It speaks to a team's MCP endpoint with a
+// team token through the Go SDK (pkg/hosbah), so every tool the team token may call is a command:
 //
-//	cloudy login --url https://cloudy-app.fadymondy.com --token cld_…
-//	cloudy tools                          # what this token can do
-//	cloudy help deploy_app                # a tool's arguments
-//	cloudy deploy shop --wait             # shortcut for deploy_app
+//	hosbah login --url https://cloudy-app.fadymondy.com --token cld_…
+//	hosbah tools                          # what this token can do
+//	hosbah help deploy_app                # a tool's arguments
+//	hosbah deploy shop --wait             # shortcut for deploy_app
 //	cloudy add_proxy_host server=edge hostname=nas.example.com upstream=10.0.0.5:5000
 //
 // CLOUDY_URL and CLOUDY_TOKEN override the saved login (CI).
@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fadymondy/cloudy/pkg/cloudy"
+	"github.com/fadymondy/hosbah/pkg/hosbah"
 )
 
 var version = "dev"
@@ -38,7 +38,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "cloudy", "config.json"), nil
+	return filepath.Join(dir, "hosbah", "config.json"), nil
 }
 
 func loadConfig() config {
@@ -112,9 +112,9 @@ func run(ctx context.Context, argv []string, out io.Writer) error {
 			c.Token = v
 		}
 		if c.URL == "" || c.Token == "" {
-			return errors.New("usage: cloudy login --url https://cloudy.example.com --token cld_…")
+			return errors.New("usage: hosbah login --url https://cloudy.example.com --token cld_…")
 		}
-		who, err := cloudy.New(c.URL, c.Token).Whoami(ctx)
+		who, err := hosbah.New(c.URL, c.Token).Whoami(ctx)
 		if err != nil {
 			return fmt.Errorf("the token did not work, nothing was saved: %w", err)
 		}
@@ -128,9 +128,9 @@ func run(ctx context.Context, argv []string, out io.Writer) error {
 
 	c := loadConfig()
 	if c.URL == "" || c.Token == "" {
-		return errors.New("not logged in: run `cloudy login --url … --token …` (or set CLOUDY_URL and CLOUDY_TOKEN)")
+		return errors.New("not logged in: run `hosbah login --url … --token …` (or set CLOUDY_URL and CLOUDY_TOKEN)")
 	}
-	client := cloudy.New(c.URL, c.Token)
+	client := hosbah.New(c.URL, c.Token)
 
 	switch cmd {
 	case "tools":
@@ -178,7 +178,7 @@ func run(ctx context.Context, argv []string, out io.Writer) error {
 				return nil
 			}
 		}
-		return fmt.Errorf("no tool %q (see `cloudy tools`)", rest[0])
+		return fmt.Errorf("no tool %q (see `hosbah tools`)", rest[0])
 	}
 
 	tool := cmd
@@ -271,12 +271,12 @@ func orEmpty(v any) string {
 }
 
 func usage(out io.Writer) {
-	fmt.Fprint(out, `cloudy — manage Cloudy from the terminal
+	fmt.Fprint(out, `cloudy — manage Hosbah from the terminal
 
-  cloudy login --url <cloudy url> --token <cld_… team token>
-  cloudy tools                         list what the token can do
-  cloudy help <tool>                   a tool's arguments
-  cloudy <tool> key=value …            run any tool (e.g. add_proxy_host server=edge hostname=… upstream=…)
+  hosbah login --url <cloudy url> --token <cld_… team token>
+  hosbah tools                         list what the token can do
+  hosbah help <tool>                   a tool's arguments
+  hosbah <tool> key=value …            run any tool (e.g. add_proxy_host server=edge hostname=… upstream=…)
 
 shortcuts: whoami, servers, server <s>, apps, app <a>, deploy <a> [--wait], logs <a>, env <a>, proxies, dbs
 environment: CLOUDY_URL, CLOUDY_TOKEN override the saved login.

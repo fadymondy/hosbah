@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteServer :exec
 DELETE FROM servers WHERE id = $1;
 
--- Cloudy tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
+-- Hosbah tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
 -- name: InsertServer :one
 INSERT INTO servers (id, team_id, name, provider, kind, status, credential_id, spec, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

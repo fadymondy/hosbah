@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteProxyHost :exec
 DELETE FROM proxy_hosts WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: ListProxyHostsOfTeam :many
 SELECT p.*, s.name AS server_name FROM proxy_hosts p JOIN servers s ON s.id = p.server_id
 WHERE p.team_id = $1 ORDER BY p.hostname;

@@ -24,7 +24,7 @@ CREATE TABLE operations (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: the operation queue and state machine, pending -> sent -> running -> ok | failed | timeout.
+-- Hosbah: the operation queue and state machine, pending -> sent -> running -> ok | failed | timeout.
 -- id IS the op_id the control plane signs, so a retried enqueue and a re-sent op are the same row.
 ALTER TABLE operations ADD CONSTRAINT operations_status_check CHECK (status IN ('pending', 'sent', 'running', 'ok', 'failed', 'timeout'));
 ALTER TABLE operations ADD CONSTRAINT operations_executor_check CHECK (executor IN ('agent', 'control_plane'));

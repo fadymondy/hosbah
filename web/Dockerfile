@@ -1,4 +1,4 @@
-# Cloudy web — production Next.js (real `next build` + `next start`, not `next dev`).
+# Hosbah web — production Next.js (real `next build` + `next start`, not `next dev`).
 # Building inside the container sidesteps the host Turbopack out-of-root symlink
 # failure. Do NOT set NODE_ENV=production before `npm ci` — it drops devDependencies
 # (tailwind/postcss) and the build fails. `next build` is production regardless.

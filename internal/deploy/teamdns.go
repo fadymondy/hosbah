@@ -5,14 +5,14 @@ import (
 	"errors"
 	"net"
 
-	"github.com/fadymondy/cloudy/internal/cloudflare"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/cloudflare"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/provisioning"
 )
 
 // A team that saved a Cloudflare credential gets its custom domains wired for it: when the hostname
-// is in one of its zones, Cloudy creates the A/AAAA record to the app's server and, since holding a
+// is in one of its zones, Hosbah creates the A/AAAA record to the app's server and, since holding a
 // token for the zone proves control of it, marks the domain verified without the TXT step.
 
 // teamZone finds the team's Cloudflare credential whose account holds hostname.
@@ -83,7 +83,7 @@ func (s *Service) wireTeamDNSTo(ctx context.Context, q *db.Queries, teamID strin
 	return true
 }
 
-// unwireTeamDNS removes the records Cloudy created for a custom domain.
+// unwireTeamDNS removes the records Hosbah created for a custom domain.
 func (s *Service) unwireTeamDNS(ctx context.Context, q *db.Queries, teamID, hostname string) {
 	cf, z, err := s.teamZone(ctx, q, teamID, hostname)
 	if err != nil {

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // P2 provisioning steps: what a server needs to build and serve apps. Each checks first and says
@@ -39,7 +39,7 @@ The case that bit us: a server with Docker CE from download.docker.com carries b
 `docker-buildx-plugin`, which owns /usr/libexec/docker/cli-plugins/docker-buildx. Debian's
 `docker-buildx` ships the same path, so dpkg refuses to unpack it ("trying to overwrite …,
 which is also in package docker-buildx-plugin") and apt-get exits 100. dpkg-query alone cannot
-see this, because it only ever asks about the name Cloudy chose.
+see this, because it only ever asks about the name Hosbah chose.
 
 So the capability decides, not the package name: if the tool already runs, there is nothing to
 install. Only a package whose capability is genuinely absent is handed to apt-get.
@@ -97,7 +97,7 @@ const (
 // is the file the agent rewrites on every route change (so a restart comes back with the current
 // routes); live changes go through the admin API on localhost:2019.
 const caddyUnitFile = `[Unit]
-Description=Caddy (managed by Cloudy)
+Description=Caddy (managed by Hosbah)
 After=network-online.target
 Wants=network-online.target
 
@@ -123,7 +123,7 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 		return nil, 2, errors.New("caddy.install needs a pinned version, url and sha512")
 	}
 	if !systemdRunning() {
-		return nil, 2, errors.New("Cloudy runs Caddy under systemd; this server has no systemd")
+		return nil, 2, errors.New("Hosbah runs Caddy under systemd; this server has no systemd")
 	}
 	if p.AskURL != "" {
 		if err := setAskURL(p.AskURL); err != nil {
@@ -144,7 +144,7 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 	if !strings.HasPrefix(have, "v"+p.Tool.Version) {
 		for _, port := range []string{"80", "443", "2019"} {
 			if !portFree(port) && !serviceActive(oc.Ctx, caddyUnit) {
-				return nil, 1, fmt.Errorf("port %s is in use by something other than Cloudy's Caddy — free it first", port)
+				return nil, 1, fmt.Errorf("port %s is in use by something other than Hosbah's Caddy — free it first", port)
 			}
 		}
 		oc.Info("installing Caddy %s from %s", p.Tool.Version, p.Tool.URL)

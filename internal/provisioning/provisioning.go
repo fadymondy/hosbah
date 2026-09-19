@@ -1,4 +1,4 @@
-// Package provisioning connects the provider drivers (internal/providers) to Cloudy's data: it
+// Package provisioning connects the provider drivers (internal/providers) to Hosbah's data: it
 // opens sealed credentials, validates them, deletes machines, and runs the control-plane
 // operation provider.create — create the machine, wait for an address, deliver the agent (cloud-init
 // user-data when the driver can, otherwise an SSH bootstrap with the per-server key), and wait for
@@ -17,16 +17,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/cloudflare"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/npm"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/providers"
-	_ "github.com/fadymondy/cloudy/internal/providers/proxmox" // registers "proxmox"
-	"github.com/fadymondy/cloudy/internal/providers/sshboot"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/cloudflare"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/npm"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/providers"
+	_ "github.com/fadymondy/hosbah/internal/providers/proxmox" // registers "proxmox"
+	"github.com/fadymondy/hosbah/internal/providers/sshboot"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // SSHKeyContext / CredentialContext bind sealed values to their row and field.
@@ -38,7 +38,7 @@ var configKeys = map[string][]string{
 	"proxmox": {"api_url", "token_id", "node", "storage", "bridge", "pool", "template_vmid", "lxc_template",
 		"snippets_storage", "snippets_dir", "tls_fingerprint", "insecure_tls", "lxc_features"},
 	"cloudflare": {"account_id"},
-	// frp: the frps the agents dial (server_addr:server_port), the remote-port range Cloudy may allocate,
+	// frp: the frps the agents dial (server_addr:server_port), the remote-port range Hosbah may allocate,
 	// the public IP DNS points at, and the host the edge (NPM) reaches the frps listeners on.
 	"frp": {"server_addr", "server_port", "port_from", "port_to", "public_ip", "edge_host"},
 	// npm: Nginx Proxy Manager as the public edge; certificate_id is the NPM certificate to use (0: none).

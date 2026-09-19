@@ -9,11 +9,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
-// ReportKeyPrefix is the human key prefix of Cloudy's own issues: CLD-1, CLD-2…
+// ReportKeyPrefix is the human key prefix of Hosbah's own issues: CLD-1, CLD-2…
 const ReportKeyPrefix = "CLD"
 
 // FeedbackIn is what the "Report a problem" widget sends. The reporter is the session's user,
@@ -43,7 +43,7 @@ func (d *deps) registerFeedback(api huma.API) {
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "file-feedback", Method: http.MethodPost, Path: "/api/feedback",
-		DefaultStatus: http.StatusCreated, Summary: "Report a problem — lands in Cloudy's own issue tracker",
+		DefaultStatus: http.StatusCreated, Summary: "Report a problem — lands in Hosbah's own issue tracker",
 		Tags: []string{"Feedback"}, MaxBodyBytes: 5 << 20,
 	}, func(ctx context.Context, in *struct{ Body FeedbackIn }) (*feedbackCreatedOut, error) {
 		id, err := current(ctx)

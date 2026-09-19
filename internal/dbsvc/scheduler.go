@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // The backup scheduler: a single loop that wakes every 30s, claims due schedules (next_run_at in the

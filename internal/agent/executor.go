@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Handler runs one kind of operation. It logs through oc and returns a JSON-able result.

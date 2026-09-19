@@ -1,9 +1,9 @@
-// Package sshboot installs the Cloudy agent over SSH on a freshly created server whose provider
+// Package sshboot installs the Hosbah agent over SSH on a freshly created server whose provider
 // cannot deliver cloud-init user-data (Proxmox LXC, or a Proxmox VM without a snippet store).
 //
 // The control plane generates a per-server key with GenerateKey, has the provider put the public
 // half on the guest, and then calls Run with the install command. After the agent has enrolled the
-// key can be discarded; SSH is not how Cloudy manages servers day to day.
+// key can be discarded; SSH is not how Hosbah manages servers day to day.
 package sshboot
 
 import (
@@ -53,7 +53,7 @@ func GenerateKey() (authorizedKey string, privatePEM []byte, err error) {
 // With Pinned empty, Run trusts on first use: it accepts whatever key the server presents on the
 // first successful handshake, requires the same key on any reconnect within the same Run, and
 // reports its fingerprint through Observed. This is a deliberate trade-off: the guest was created a
-// minute ago by Cloudy itself, and neither Proxmox nor most clouds expose a new guest's host key
+// minute ago by Hosbah itself, and neither Proxmox nor most clouds expose a new guest's host key
 // through their API, so there is nothing to pin against. The window for a man in the middle is the
 // first connection on the operator's own network; callers should store the observed fingerprint
 // and pin it on every later connection (break-glass access).

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 func collectPlatform(ctx context.Context, f *agentproto.Facts) {

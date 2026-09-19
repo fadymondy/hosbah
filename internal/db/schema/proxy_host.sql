@@ -15,9 +15,9 @@ CREATE TABLE proxy_hosts (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: the Caddy proxy manager. A proxy host routes a hostname on one of the team's servers to
+-- Hosbah: the Caddy proxy manager. A proxy host routes a hostname on one of the team's servers to
 -- any upstream (host:port or http(s)://host:port), like an Nginx Proxy Manager "proxy host". The
--- hostname is unique across Cloudy together with domains (checked on insert in system scope), and
+-- hostname is unique across Hosbah together with domains (checked on insert in system scope), and
 -- gets a public certificate only once verified, exactly like an app domain.
 ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_tls_check CHECK (tls IN ('auto', 'internal', 'off'));
 ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_hostname_check CHECK (

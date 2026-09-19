@@ -33,10 +33,10 @@ export function AuthFrame({
     <div className="relative isolate flex min-h-dvh flex-col">
       <header className="sticky top-0 z-50 max-w-screen overflow-x-clip bg-background px-2">
         <div className="grid-screen-line-top grid-screen-line-bottom mx-auto flex h-14 max-w-[860px] items-center gap-2 border-x ps-4 pe-2 sm:gap-4">
-          <Link href={`/${locale}`} className="flex items-center gap-2 font-medium" aria-label="Cloudy">
+          <Link href={`/${locale}`} className="flex items-center gap-2 font-medium" aria-label="Hosbah">
             <ThemedCubeMark size={22} />
             <span dir="ltr" className="text-base tracking-tight">
-              Cloudy
+              Hosbah
             </span>
           </Link>
           <div className="flex-1" />

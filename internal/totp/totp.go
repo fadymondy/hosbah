@@ -3,7 +3,7 @@
 //
 // It exists because the plugin enrolls and verifies TOTP but its login never asks
 // for it: an account with 2FA "enabled" still signed in with a password alone.
-// Cloudy's login wrapper (internal/server/login_2fa.go) uses this to require it.
+// Hosbah's login wrapper (internal/server/login_2fa.go) uses this to require it.
 package totp
 
 import (

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/scopes"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ServerTools are the P1 read tools. All `read`: they never return secrets, key material, sealed
@@ -157,7 +157,7 @@ func ServerTools() []Tool {
 		// ---- destructive ----
 		{
 			Name: "delete_server", Scope: scopes.Destructive, Destructive: true, ResourceType: "server",
-			Description: "Remove a server from the team. A Proxmox machine Cloudy created is destroyed first; a bring-your-own server is only forgotten (nothing on it is touched except that its agent stops being trusted). Apps must be deleted first. confirm must equal the server's name.",
+			Description: "Remove a server from the team. A Proxmox machine Hosbah created is destroyed first; a bring-your-own server is only forgotten (nothing on it is touched except that its agent stops being trusted). Apps must be deleted first. confirm must equal the server's name.",
 			InputSchema: schema([]string{"server", "confirm"}, map[string]any{
 				"server":  str("Server id or name"),
 				"confirm": str("The server's name, exactly"),

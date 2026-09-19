@@ -12,9 +12,9 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/fadymondy/cloudy/internal/config"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/migrate"
+	"github.com/fadymondy/hosbah/internal/config"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/migrate"
 )
 
 // The row-level-security backstop, tested at the database with no handler in the way: this is

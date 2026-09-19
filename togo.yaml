@@ -9,8 +9,8 @@ database:
     url: ${DATABASE_URL}
 frontend:
     dir: web
-module: github.com/fadymondy/cloudy
-name: cloudy
+module: github.com/fadymondy/hosbah
+name: hosbah
 plugins:
     - github.com/togo-framework/auth
     - github.com/togo-framework/audit

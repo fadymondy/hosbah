@@ -40,7 +40,7 @@ func ValidDBKind(s string) bool { return s == "postgres" || s == "mysql" || s ==
 // BucketName maps a database name (lower snake) to an S3 bucket name (no underscores allowed).
 func BucketName(db string) string { return strings.ReplaceAll(db, "_", "-") }
 
-// MinIORootUser is the fixed root access key of a Cloudy MinIO service (the secret is generated).
+// MinIORootUser is the fixed root access key of a Hosbah MinIO service (the secret is generated).
 const MinIORootUser = "cloudy-root"
 
 // ValidDBName: a database or role identifier — lower snake, so it is safe verbatim in the fixed argv

@@ -14,20 +14,20 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/togo-framework/togo"
 
-	"github.com/fadymondy/cloudy/internal/api"
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/config"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	"github.com/fadymondy/cloudy/internal/dbsvc"
-	"github.com/fadymondy/cloudy/internal/deploy"
-	"github.com/fadymondy/cloudy/internal/mcp"
-	"github.com/fadymondy/cloudy/internal/ops"
-	_ "github.com/fadymondy/cloudy/internal/plugins" // blank-imports installed plugins (togo install)
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/api"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/config"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/mcp"
+	"github.com/fadymondy/hosbah/internal/ops"
+	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
-// Boot builds the kernel + app and mounts Cloudy's routes. It does not listen.
+// Boot builds the kernel + app and mounts Hosbah's routes. It does not listen.
 //
 // What is deliberately NOT mounted:
 //   - internal/rest (generated CRUD from make:resource) and /graphql (generated resolvers):
@@ -89,14 +89,14 @@ func Boot() *app.App {
 
 	k.Router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"cloudy","phase":"P5","togo":%q}`, togoVersion())
+		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"hosbah","phase":"P5","togo":%q}`, togoVersion())
 	})
 	return a
 }
 
 func humaConfig() huma.Config {
-	cfg := huma.DefaultConfig("Cloudy API", "0.1.0")
-	cfg.Info.Description = "Cloudy control plane (P0: teams, members, invitations, MCP tokens, audit, feedback). " +
+	cfg := huma.DefaultConfig("Hosbah API", "0.1.0")
+	cfg.Info.Description = "Hosbah control plane (P0: teams, members, invitations, MCP tokens, audit, feedback). " +
 		"Team data is path-scoped under /api/teams/{team}; a team you are not in answers 404."
 	return cfg
 }

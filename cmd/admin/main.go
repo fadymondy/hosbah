@@ -17,10 +17,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/togo-framework/togo"
 
-	"github.com/fadymondy/cloudy/internal/config"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/config"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 func main() {

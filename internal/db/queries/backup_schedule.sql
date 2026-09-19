@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteBackupSchedule :exec
 DELETE FROM backup_schedules WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertBackupSchedule :one
 INSERT INTO backup_schedules (id, team_id, data_service_id, cron, retention, target, restore_test, paused, next_run_at, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

@@ -1,4 +1,4 @@
-// Package cloudflare is Cloudy's small, dependency-free client for the Cloudflare v4 API: verify a
+// Package cloudflare is Hosbah's small, dependency-free client for the Cloudflare v4 API: verify a
 // token, find the zone a hostname belongs to, and manage DNS records idempotently. It is used for
 // the platform's own apps domain (every app gets <prefix><app>.<domain>) and for teams that connect
 // their Cloudflare account, so custom domains get their DNS and verification records automatically.
@@ -257,10 +257,10 @@ func (c *Client) PointHost(ctx context.Context, host, ip string, proxied bool) (
 	return z, r, err
 }
 
-// ManagedComment marks the records Cloudy created; only those are ever deleted.
-const ManagedComment = "managed by Cloudy"
+// ManagedComment marks the records Hosbah created; only those are ever deleted.
+const ManagedComment = "managed by Hosbah"
 
-// DeleteManaged removes the records at name that Cloudy created, leaving the user's own alone.
+// DeleteManaged removes the records at name that Hosbah created, leaving the user's own alone.
 func (c *Client) DeleteManaged(ctx context.Context, zoneID, name string) error {
 	rs, err := c.Records(ctx, zoneID, name, "")
 	if err != nil {

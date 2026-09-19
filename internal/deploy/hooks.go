@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
-	"github.com/fadymondy/cloudy/internal/tokens"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 // MountPublic adds the routes outside /api, each authenticated by its own means (never a session):
@@ -151,7 +151,7 @@ func (s *Service) queueForTeam(ctx context.Context, a db.App) error {
 }
 
 // handleTLSAllow is Caddy's `ask`: 200 only for a hostname that is routed to an app, set to auto
-// TLS, and verified — so nobody can make a Cloudy server request certificates for names they point
+// TLS, and verified — so nobody can make a Hosbah server request certificates for names they point
 // at it without proving they control them.
 func (s *Service) handleTLSAllow(w http.ResponseWriter, r *http.Request) {
 	host := NormalizeHostname(r.URL.Query().Get("domain"))

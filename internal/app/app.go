@@ -16,8 +16,8 @@ import (
 	// this app's go.mod or app.go (microkernel: drivers are plugins).
 	_ "modernc.org/sqlite"
 
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // App holds the shared services handed to controllers, resolvers, actions, seeders.
@@ -38,7 +38,7 @@ type App struct {
 	// which refuses to start without it.
 	Keys *crypto.Keyring
 
-	// Stop ends Cloudy's own background workers (the agent hub, the operations dispatcher and
+	// Stop ends Hosbah's own background workers (the agent hub, the operations dispatcher and
 	// sweeper). The togo kernel has no shutdown hooks, so server.Boot sets this and whoever
 	// owns the process calls it before Kernel.Close.
 	Stop func()

@@ -3,12 +3,12 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cloudy-sdk"
+name = "hosbah-sdk"
 version = "0.1.0"
-description = "Cloudy SDK for Python — manage servers, apps, domains and proxy hosts from your app."
+description = "Hosbah SDK for Python — manage servers, apps, domains and proxy hosts from your app."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 
 [tool.setuptools]
-packages = ["cloudy"]
+packages = ["hosbah"]

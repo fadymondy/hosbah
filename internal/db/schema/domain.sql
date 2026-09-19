@@ -11,7 +11,7 @@ CREATE TABLE domains (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a hostname routes to exactly one app anywhere in Cloudy (unique across teams), because
+-- Hosbah: a hostname routes to exactly one app anywhere in Hosbah (unique across teams), because
 -- Caddy's on-demand TLS asks /internal/tls/allow by hostname alone. tls: auto = a public
 -- certificate once verified (_cloudy-verify TXT), internal = Caddy's local CA, off = plain HTTP.
 ALTER TABLE domains ADD CONSTRAINT domains_tls_check CHECK (tls IN ('auto', 'internal', 'off'));

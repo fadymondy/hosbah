@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteDeployment :exec
 DELETE FROM deployments WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertDeployment :one
 INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, target_release_id, created_by)
 VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('server_id'),

@@ -1,15 +1,15 @@
 {
-    "name": "fadymondy/cloudy-sdk",
-    "description": "Cloudy SDK for PHP and Laravel — manage servers, apps, domains and proxy hosts from your app.",
+    "name": "fadymondy/hosbah-sdk",
+    "description": "Hosbah SDK for PHP and Laravel — manage servers, apps, domains and proxy hosts from your app.",
     "type": "library",
     "license": "MIT",
     "require": { "php": ">=8.1", "ext-json": "*" },
-    "suggest": { "illuminate/support": "Laravel integration (service provider + Cloudy facade)" },
-    "autoload": { "psr-4": { "Cloudy\\": "src/" }, "files": ["src/Cloudy.php"] },
+    "suggest": { "illuminate/support": "Laravel integration (service provider + Hosbah facade)" },
+    "autoload": { "psr-4": { "Hosbah\\": "src/" }, "files": ["src/Hosbah.php"] },
     "extra": {
         "laravel": {
-            "providers": ["Cloudy\Laravel\CloudyServiceProvider"],
-            "aliases": { "Cloudy": "Cloudy\Laravel\Facades\Cloudy" }
+            "providers": ["Hosbah\Laravel\HosbahServiceProvider"],
+            "aliases": { "Hosbah": "Hosbah\Laravel\Facades\Hosbah" }
         }
     }
 }

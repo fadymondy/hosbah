@@ -1,7 +1,7 @@
 {
-  "name": "@cloudy/sdk",
+  "name": "@hosbah/sdk",
   "version": "0.1.0",
-  "description": "Cloudy SDK for Node.js and TypeScript — manage servers, apps, domains and proxy hosts from your app.",
+  "description": "Hosbah SDK for Node.js and TypeScript — manage servers, apps, domains and proxy hosts from your app.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -10,19 +10,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/npm"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/npm"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 /*
 Tunnels: servers without a public address (a customer box behind NAT, a laptop, Docker Desktop).
 
-  frp        the agent runs frpc and exposes the server's Caddy (:80) on a port Cloudy allocates on
+  frp        the agent runs frpc and exposes the server's Caddy (:80) on a port Hosbah allocates on
              the team's frps. Every domain routed on that server then gets, through the team's other
              credentials, a proxied Cloudflare record at the frps public IP and an NPM proxy host
              forwarding the domain to edge_host:port. The server's own Caddy routes it by Host.
@@ -285,7 +285,7 @@ func (s *Service) publishHost(ctx context.Context, q *db.Queries, teamID, server
 	return true
 }
 
-// unpublishHost removes what publishHost made (only Cloudy's own records and proxy hosts).
+// unpublishHost removes what publishHost made (only Hosbah's own records and proxy hosts).
 func (s *Service) unpublishHost(ctx context.Context, q *db.Queries, teamID, hostname string) {
 	if c, _ := s.teamNPM(ctx, q, teamID); c != nil {
 		go func() {

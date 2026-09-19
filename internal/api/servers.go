@@ -12,11 +12,11 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ServerOut is a server as the API shows it. Never the agent's key material or the sealed SSH key.
@@ -250,7 +250,7 @@ func (d *deps) registerServers(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "delete-server", Method: http.MethodDelete, Path: "/api/teams/{team}/servers/{server}",
 		DefaultStatus: http.StatusNoContent, Tags: []string{"Servers"},
-		Summary: "Remove a server (owner or admin). A Proxmox machine Cloudy created is destroyed first; a bring-your-own server is only forgotten.",
+		Summary: "Remove a server (owner or admin). A Proxmox machine Hosbah created is destroyed first; a bring-your-own server is only forgotten.",
 	}, func(ctx context.Context, in *ServerPath) (*struct{}, error) {
 		var removed string
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
@@ -292,7 +292,7 @@ func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membe
 }
 
 // ConnectIn is how to log in to a server the user already has. The password or key is sealed with
-// the team key for the connect operation only, then forgotten; Cloudy installs its own key.
+// the team key for the connect operation only, then forgotten; Hosbah installs its own key.
 type ConnectIn struct {
 	Host            string `json:"host" minLength:"1" maxLength:"253" doc:"IP address or hostname."`
 	Port            int    `json:"port,omitempty" minimum:"1" maximum:"65535" doc:"Default 22."`

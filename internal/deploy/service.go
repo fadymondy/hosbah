@@ -29,13 +29,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/cloudflare"
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/cloudflare"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // Service runs deployments.
@@ -564,7 +564,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 	r.publish()
 
-	cfg, err := ParseConfig(built.CloudyToml)
+	cfg, err := ParseConfig(built.HosbahToml)
 	if err != nil {
 		return nil, err
 	}

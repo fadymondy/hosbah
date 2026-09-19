@@ -1,4 +1,4 @@
-// Package agentproto is the wire contract between the Cloudy control plane and cloudy-agent.
+// Package agentproto is the wire contract between the Hosbah control plane and cloudy-agent.
 // Both sides import it, so a message shape or a signature layout cannot drift between them.
 //
 // Transport: one WebSocket per agent, dialled OUT by the agent to /agent/ws. Every message is a

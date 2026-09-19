@@ -11,5 +11,5 @@ CREATE TABLE admin_mcp_tokens (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: platform-admin MCP tokens (not tenant rows). Only the SHA-256 is stored.
+-- Hosbah: platform-admin MCP tokens (not tenant rows). Only the SHA-256 is stored.
 CREATE UNIQUE INDEX admin_mcp_tokens_token_hash_key ON admin_mcp_tokens (token_hash);

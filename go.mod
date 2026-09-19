@@ -1,4 +1,4 @@
-module github.com/fadymondy/cloudy
+module github.com/fadymondy/hosbah
 
 go 1.26.4
 

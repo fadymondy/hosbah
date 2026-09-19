@@ -8,7 +8,7 @@ CREATE TABLE team_members (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: one membership per (team, user); memberships die with their team.
+-- Hosbah: one membership per (team, user); memberships die with their team.
 ALTER TABLE team_members ADD CONSTRAINT team_members_role_check CHECK (role IN ('owner', 'admin', 'deployer', 'viewer'));
 CREATE UNIQUE INDEX team_members_team_user_key ON team_members (team_id, user_id);
 CREATE INDEX team_members_user_idx ON team_members (user_id);

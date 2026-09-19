@@ -30,5 +30,5 @@ cli: ## The cloudy CLI for Windows, macOS and Linux (amd64 + arm64) into bin/cli
 	mkdir -p bin/cli
 	for os in linux darwin windows; do for arch in amd64 arm64; do \
 		ext=""; [ $$os = windows ] && ext=".exe"; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "-s -w -X main.version=$(AGENT_VERSION)" -o bin/cli/cloudy-$$os-$$arch$$ext ./cmd/cloudy || exit 1; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "-s -w -X main.version=$(AGENT_VERSION)" -o bin/cli/hosbah-$$os-$$arch$$ext ./cmd/hosbah || exit 1; \
 	done; done

@@ -1,7 +1,7 @@
 // Package config loads the project's .env into the process environment.
 //
 // togo.LoadConfig reads only real environment variables — the kernel never
-// opens .env itself (the togo CLI does, for `togo serve`). Every Cloudy
+// opens .env itself (the togo CLI does, for `togo serve`). Every Hosbah
 // entrypoint calls LoadDotEnv first so `go run ./cmd/api`, `go run ./cmd/migrate`,
 // tests and the admin CLI all see the same configuration. Variables already set
 // in the environment win, so production can inject real secrets without a file.

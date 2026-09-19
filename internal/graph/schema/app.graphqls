@@ -38,7 +38,7 @@ input CreateAppInput {
   createdBy: String!
 }
 
-# Cloudy: `appById`, not togo's default `app` — gqlgen turns `app` into a queryResolver.App method,
+# Hosbah: `appById`, not togo's default `app` — gqlgen turns `app` into a queryResolver.App method,
 # which shadows the embedded Resolver.App (*app.App) field every resolver calls (togo bug: a
 # resource named App breaks all resolvers).
 extend type Query {

@@ -21,14 +21,14 @@
     "dark": "Dark theme"
   },
   "errors": {
-    "apiUnavailable": "Cloudy's API is not answering.",
+    "apiUnavailable": "Hosbah's API is not answering.",
     "forbidden": "Your role does not allow this.",
     "forbiddenTitle": "Not allowed",
     "notFound": "That no longer exists.",
     "rateLimited": "Too many attempts. Wait a moment and try again.",
     "server": "Something went wrong on our side. Try again.",
     "generic": "That did not work",
-    "network": "Could not reach Cloudy. Check your connection.",
+    "network": "Could not reach Hosbah. Check your connection.",
     "teamNotFound": "Team not found",
     "teamNotFoundHint": "It does not exist, or you are not a member of it.",
     "api": {
@@ -40,8 +40,8 @@
     "email": "Email",
     "password": "Password",
     "code": "6-digit code",
-    "devNotice": "Cloudy is in development",
-    "eyebrow": "Cloudy control plane",
+    "devNotice": "Hosbah is in development",
+    "eyebrow": "Hosbah control plane",
     "nav": "Account",
     "footerTagline": "Servers and apps, managed.",
     "footerStatus": "Status",
@@ -49,12 +49,12 @@
     "footerProduct": "Product",
     "footerProductValue": "Proxmox, Docker and bring-your-own servers",
     "notFoundTitle": "Page not found",
-    "notFoundHint": "That address does not exist in Cloudy.",
+    "notFoundHint": "That address does not exist in Hosbah.",
     "login": {
       "title": "Sign in",
-      "description": "Sign in to your Cloudy account.",
+      "description": "Sign in to your Hosbah account.",
       "codeTitle": "Two-factor code",
-      "codeDescription": "Open your authenticator app and enter the 6-digit code for Cloudy.",
+      "codeDescription": "Open your authenticator app and enter the 6-digit code for Hosbah.",
       "noAccount": "No account yet?",
       "submit": "Sign in",
       "verify": "Verify and sign in",
@@ -62,7 +62,7 @@
     },
     "register": {
       "title": "Create account",
-      "description": "Create a Cloudy account with your email.",
+      "description": "Create a Hosbah account with your email.",
       "haveAccount": "Already have an account?",
       "submit": "Create account",
       "passwordShort": "The password needs at least 8 characters.",
@@ -72,7 +72,7 @@
   "onboarding": {
     "title": "Create your first team",
     "newTitle": "Create a team",
-    "description": "Everything in Cloudy belongs to a team. You can invite people once it exists.",
+    "description": "Everything in Hosbah belongs to a team. You can invite people once it exists.",
     "newDescription": "A new team, with you as its owner.",
     "teamName": "Team name",
     "teamHint": "You can rename it later.",
@@ -80,7 +80,7 @@
   },
   "invite": {
     "title": "Team invitation",
-    "description": "You have been invited to join a team on Cloudy.",
+    "description": "You have been invited to join a team on Hosbah.",
     "signInFirst": "Sign in or create an account to accept this invitation. You will come straight back here.",
     "invalid": "This invitation link is not valid. Ask for a new one.",
     "team": "Team",
@@ -96,7 +96,7 @@
     "viewer": "Viewer"
   },
   "shell": {
-    "devBanner": "Cloudy is in development — servers and app deploys work, but expect rough edges.",
+    "devBanner": "Hosbah is in development — servers and app deploys work, but expect rough edges.",
     "switchTeam": "Switch team",
     "toggleSidebar": "Show or hide the sidebar",
     "noTeam": "No team selected",
@@ -146,7 +146,7 @@
     "running": "Running"
   },
   "servers": {
-    "description": "Servers this team manages through the Cloudy agent.",
+    "description": "Servers this team manages through the Hosbah agent.",
     "add": "Add server",
     "emptyTitle": "No servers yet",
     "emptyHint": "Install the agent on a server you already have, or create one on Proxmox.",
@@ -185,14 +185,14 @@
     },
     "new": {
       "title": "Add a server",
-      "description": "Cloudy manages a server through a small agent that connects out to Cloudy — no inbound SSH needed.",
+      "description": "Hosbah manages a server through a small agent that connects out to Hosbah — no inbound SSH needed.",
       "source": "Where is the server?",
       "byoTitle": "A server I already have",
       "byoHint": "Any Ubuntu 22.04/24.04, Debian 12/13 or CentOS Stream/RHEL/Rocky/Alma 9–10 machine with internet access. You run one command on it.",
       "proxmoxTitle": "Create one on Proxmox",
       "proxmoxHint": "A VM cloned from a cloud-init template, or an unprivileged LXC container.",
       "notConfiguredTitle": "Proxmox is not configured for this team",
-      "notConfiguredHint": "Add a Proxmox credential (API URL, token, node and storage) before Cloudy can create machines.",
+      "notConfiguredHint": "Add a Proxmox credential (API URL, token, node and storage) before Hosbah can create machines.",
       "notConfiguredViewer": "Ask an owner or admin of this team to add a Proxmox credential.",
       "addCredential": "Add a Proxmox credential",
       "nameHint": "Letters, digits, dot, dash and underscore. Unique in this team.",
@@ -215,11 +215,11 @@
       "enrolledHint": "{name} is connected. The enrolment checks are below.",
       "open": "Open server",
       "howTitle": "How it works",
-      "how1": "Cloudy gives you a one-time install command. It works once and expires after 15 minutes.",
+      "how1": "Hosbah gives you a one-time install command. It works once and expires after 15 minutes.",
       "how2": "The installer checks the agent download against its SHA-256, runs the enrolment checks and starts the agent under systemd.",
-      "how3": "The agent dials out to Cloudy, proves who it is with its own key, and only runs operations Cloudy has signed.",
+      "how3": "The agent dials out to Hosbah, proves who it is with its own key, and only runs operations Hosbah has signed.",
       "connectTitle": "Connect with SSH",
-      "connectHint": "Give Cloudy the address and a root (or passwordless-sudo) login. It detects plain Linux, Docker or Proxmox, installs the agent and imports what already runs.",
+      "connectHint": "Give Hosbah the address and a root (or passwordless-sudo) login. It detects plain Linux, Docker or Proxmox, installs the agent and imports what already runs.",
       "host": "IP address or hostname",
       "port": "SSH port",
       "user": "User",
@@ -230,9 +230,9 @@
       "password": "Password",
       "privateKey": "Private key",
       "privateKeyHint": "OpenSSH or PEM, without a passphrase.",
-      "secretHint": "Used once to install Cloudy's own key and the agent, then forgotten. Cloudy never stores it.",
+      "secretHint": "Used once to install Hosbah's own key and the agent, then forgotten. Hosbah never stores it.",
       "registerProxmox": "If this is a Proxmox VE node, also add it as a Proxmox provider",
-      "registerProxmoxHint": "Cloudy creates an API token for cloudy@pve on the node so it can create VMs and LXCs there.",
+      "registerProxmoxHint": "Hosbah creates an API token for cloudy@pve on the node so it can create VMs and LXCs there.",
       "createConnect": "Connect server",
       "ipconfig": "Static address (optional)",
       "ipconfigHint": "For networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1. Leave empty to use DHCP.",
@@ -257,12 +257,12 @@
       "pendingExpired": "There is no valid install command. Create a new one.",
       "newInstall": "New install command",
       "provisioningTitle": "Provisioning",
-      "provisioningHint": "Cloudy is creating the machine and installing the agent. Follow the log below.",
+      "provisioningHint": "Hosbah is creating the machine and installing the agent. Follow the log below.",
       "failedTitle": "Provisioning failed",
       "delete": "Remove server",
       "deleteTitle": "Remove this server?",
-      "deleteHintByo": "Cloudy forgets {name} and its history; the agent on it can no longer connect. Nothing on the server itself is deleted.",
-      "deleteHintProxmox": "The Proxmox machine behind {name} is destroyed, then Cloudy forgets it.",
+      "deleteHintByo": "Hosbah forgets {name} and its history; the agent on it can no longer connect. Nothing on the server itself is deleted.",
+      "deleteHintProxmox": "The Proxmox machine behind {name} is destroyed, then Hosbah forgets it.",
       "live": "Live",
       "reconnecting": "Reconnecting…"
     },
@@ -281,7 +281,7 @@
     },
     "ops": {
       "title": "Operations",
-      "description": "Typed operations only. Each one is signed by Cloudy and checked by the agent before it runs.",
+      "description": "Typed operations only. Each one is signed by Hosbah and checked by the agent before it runs.",
       "empty": "No operations yet. Run one above.",
       "kind": "Operation",
       "status": "Status",
@@ -324,7 +324,7 @@
     },
     "discovered": {
       "title": "Found on this server",
-      "hint": "Found at enrolment. Expose a container with a published port behind a hostname — Cloudy adds a proxy host for it.",
+      "hint": "Found at enrolment. Expose a container with a published port behind a hostname — Hosbah adds a proxy host for it.",
       "platform": "Platform",
       "platforms": {
         "linux": "Linux",
@@ -344,7 +344,7 @@
     "description": "Apps this team deploys from a Git repository to its servers.",
     "add": "New app",
     "emptyTitle": "No apps yet",
-    "emptyHint": "Point Cloudy at a Git repository and a server; it builds the image there and serves it through Caddy.",
+    "emptyHint": "Point Hosbah at a Git repository and a server; it builds the image there and serves it through Caddy.",
     "name": "Name",
     "status": "Status",
     "server": "Server",
@@ -354,7 +354,7 @@
     "neverDeployed": "Not deployed yet",
     "domains": {
       "empty": "No domains yet.",
-      "noAppsDomain": "Cloudy has no shared apps domain yet, so an app is reached through its own domains.",
+      "noAppsDomain": "Hosbah has no shared apps domain yet, so an app is reached through its own domains.",
       "hostname": "Hostname",
       "tlsLabel": "TLS",
       "tls": {
@@ -454,12 +454,12 @@
     },
     "new": {
       "title": "New app",
-      "description": "Cloudy clones the repository on your server, builds it with its Dockerfile or Railpack, and serves it behind Caddy.",
+      "description": "Hosbah clones the repository on your server, builds it with its Dockerfile or Railpack, and serves it behind Caddy.",
       "nameHint": "Lowercase letters, digits and dashes. Unique in this team.",
       "repoHint": "A public https or git URL.",
       "chooseServer": "Choose a server",
       "noServersTitle": "No enrolled server",
-      "noServersHint": "Apps run on a server with the Cloudy agent. Add one first.",
+      "noServersHint": "Apps run on a server with the Hosbah agent. Add one first.",
       "detectTitle": "Runtime",
       "detectHint": "Optional: check how the repository would build before creating the app.",
       "detect": "Detect runtime",
@@ -483,7 +483,7 @@
     "hook": {
       "title": "Deploy hook",
       "hint": "A POST to this URL deploys the app's branch — use it from CI.",
-      "once": "Copy it now. It is shown only once; Cloudy keeps only its hash.",
+      "once": "Copy it now. It is shown only once; Hosbah keeps only its hash.",
       "rotate": "Rotate deploy hook",
       "rotateHint": "The current URL stops working immediately."
     },
@@ -537,19 +537,19 @@
       "githubConfigured": "The GitHub App is configured.",
       "githubInstall": "Install it on a repository",
       "githubMissing": "GitHub App not configured",
-      "githubMissingHint": "Push-to-deploy through GitHub is not available on this Cloudy yet. Use the deploy hook from CI.",
+      "githubMissingHint": "Push-to-deploy through GitHub is not available on this Hosbah yet. Use the deploy hook from CI.",
       "deleteTitle": "Delete this app",
-      "deleteHint": "Removes its route, containers and images from the server, and its history from Cloudy.",
+      "deleteHint": "Removes its route, containers and images from the server, and its history from Hosbah.",
       "delete": "Delete app",
       "deleteConfirm": "Type {name} to confirm."
     },
     "domainsLabel": "Domains"
   },
   "credentials": {
-    "description": "Provider accounts Cloudy uses: Proxmox to create machines, Cloudflare to manage DNS. Secrets are encrypted with the team key and never shown in lists.",
+    "description": "Provider accounts Hosbah uses: Proxmox to create machines, Cloudflare to manage DNS. Secrets are encrypted with the team key and never shown in lists.",
     "readOnly": "Only owners and admins can see and manage provider credentials.",
     "add": "Add credential",
-    "addHint": "Use tokens limited to what Cloudy needs — a Proxmox token scoped to a Cloudy pool (never root@pam), a Cloudflare token with Zone:Read and DNS:Edit.",
+    "addHint": "Use tokens limited to what Hosbah needs — a Proxmox token scoped to a Hosbah pool (never root@pam), a Cloudflare token with Zone:Read and DNS:Edit.",
     "emptyTitle": "No credentials",
     "emptyHint": "Add a Proxmox credential to create servers on Proxmox, or a Cloudflare token so custom domains and proxy hosts get their DNS automatically.",
     "name": "Name",
@@ -564,10 +564,10 @@
     "templateVmid": "VM template ID",
     "lxcTemplate": "LXC template",
     "fingerprint": "TLS certificate fingerprint (SHA-256)",
-    "fingerprintHint": "Proxmox uses a self-signed certificate; Cloudy trusts only this one.",
+    "fingerprintHint": "Proxmox uses a self-signed certificate; Hosbah trusts only this one.",
     "optional": "optional",
     "validate": "Check it against Proxmox before saving",
-    "validateHint": "Cloudy calls the API URL above with this token. Leave off to save without contacting Proxmox.",
+    "validateHint": "Hosbah calls the API URL above with this token. Leave off to save without contacting Proxmox.",
     "save": "Save credential",
     "validated": "Checked",
     "notValidated": "Not checked",
@@ -577,7 +577,7 @@
     "revealConfirm": "Reveal",
     "delete": "Delete",
     "deleteTitle": "Delete credential?",
-    "deleteHint": "Servers created with “{name}” are kept, but Cloudy can no longer manage their machines.",
+    "deleteHint": "Servers created with “{name}” are kept, but Hosbah can no longer manage their machines.",
     "accountId": "Account ID",
     "apiToken": "API token",
     "cloudflareHint": "With this token, a domain or proxy host in one of its zones gets its DNS record created and is verified at once.",
@@ -601,7 +601,7 @@
     "hintFor": {
       "cloudflare": "With this token, a domain or proxy host in one of its zones gets its DNS record created and is verified at once.",
       "frp": "Servers without a public address expose their Caddy on a port of this frp server; their domains are published at the public IP.",
-      "npm": "Nginx Proxy Manager as the public edge: Cloudy adds a proxy host for every domain on a tunnelled server, and only ever changes its own.",
+      "npm": "Nginx Proxy Manager as the public edge: Hosbah adds a proxy host for every domain on a tunnelled server, and only ever changes its own.",
       "tailscale": "A reusable auth key: servers you open a Tailscale tunnel for join your tailnet."
     }
   },
@@ -623,7 +623,7 @@
     "createdTitle": "Invitation created",
     "createdHint": "Copy this link now — it is shown only once.",
     "noEmailTitle": "No email is sent",
-    "noEmailHint": "Cloudy does not deliver email in local development. Send this link to the person yourself.",
+    "noEmailHint": "Hosbah does not deliver email in local development. Send this link to the person yourself.",
     "emptyTitle": "No invitations",
     "emptyHint": "Invitations you create appear here until they are accepted, revoked or expire.",
     "statusLabel": "Status",
@@ -737,7 +737,7 @@
   "admin": {
     "title": "Platform admin",
     "description": "Platform-wide MCP tokens. They act across every team — keep them few and short-lived.",
-    "forbidden": "This area is for Cloudy platform administrators."
+    "forbidden": "This area is for Hosbah platform administrators."
   },
   "notifications": {
     "title": "Notifications",
@@ -861,7 +861,7 @@
     "tls": "TLS",
     "tlsModes": {
       "auto": "Public certificate",
-      "internal": "Cloudy's internal CA",
+      "internal": "Hosbah's internal CA",
       "off": "Off (plain HTTP)"
     },
     "skipVerify": "The upstream uses a self-signed certificate",

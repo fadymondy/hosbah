@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // TunnelResponse is the JSON shape returned by the Tunnel API.

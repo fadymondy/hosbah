@@ -8,8 +8,8 @@ package models
 import (
 	"github.com/togo-framework/orm"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 // OperationLogs starts a query against the operation_logs table.

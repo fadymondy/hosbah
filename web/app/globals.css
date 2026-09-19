@@ -13,7 +13,7 @@
 @import "./grid/grid.css";
 @import "./grid/grid-tailwind.css";
 
-/* Repo-owned: Cloudy's brand block until grid-tokens.css carries it. */
+/* Repo-owned: Hosbah's brand block until grid-tokens.css carries it. */
 @import "./grid/brand-cloudy.css";
 
 @custom-variant dark (&:where(.dark, .dark *));

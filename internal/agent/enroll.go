@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // EnrollError is a refused enrolment, with the control plane's verdict on each check.

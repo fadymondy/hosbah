@@ -3,7 +3,7 @@ package deploy
 import (
 	"fmt"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 /*

@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // proxySet applies or removes one proxy host (the Caddy proxy manager). Like route.set it goes

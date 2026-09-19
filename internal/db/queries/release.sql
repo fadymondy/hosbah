@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteRelease :exec
 DELETE FROM releases WHERE id = $1;
 
--- Cloudy queries. Written by the deploy worker (system scope); read by the team.
+-- Hosbah queries. Written by the deploy worker (system scope); read by the team.
 -- name: InsertRelease :one
 INSERT INTO releases (id, team_id, app_id, deployment_id, version, image, commit_sha, port, host_port, containers, config, status, activated_at)
 VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('deployment_id'),

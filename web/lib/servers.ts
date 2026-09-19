@@ -59,7 +59,7 @@ export type DiscoveredService = {
   disk_bytes?: number
 }
 
-/** What Cloudy manages the host as — mirrors agentproto.Facts.Platform. */
+/** What Hosbah manages the host as — mirrors agentproto.Facts.Platform. */
 export function platformOf(f: Facts | undefined): "proxmox" | "docker" | "linux" | null {
   if (!f) return null
   if (f.proxmox?.installed) return "proxmox"

@@ -46,12 +46,12 @@ export function useI18n(): I18n {
   return ctx
 }
 
-/** Sets document.title as "<page> · Cloudy". */
+/** Sets document.title as "<page> · Hosbah". */
 export function useDocumentTitle(title: string | null | undefined) {
   useEffect(() => {
-    const wanted = title ? `${title} · Cloudy` : "Cloudy"
+    const wanted = title ? `${title} · Hosbah` : "Hosbah"
     document.title = wanted
-    // Next's metadata <title> ("Cloudy") can be committed AFTER this effect — measured on /login
+    // Next's metadata <title> ("Hosbah") can be committed AFTER this effect — measured on /login
     // in the dark theme — so re-assert whenever something else rewrites the title while mounted.
     const observer = new MutationObserver(() => {
       if (document.title !== wanted) document.title = wanted

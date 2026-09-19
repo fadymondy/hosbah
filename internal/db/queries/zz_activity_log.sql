@@ -1,4 +1,4 @@
--- Cloudy audit queries over togo audit's activity_log (+ team_id). Run inside tenancy.Tx.
+-- Hosbah audit queries over togo audit's activity_log (+ team_id). Run inside tenancy.Tx.
 -- name: InsertActivity :exec
 INSERT INTO activity_log (id, action, subject_type, subject_id, causer_id, changes, ip, user_agent, created_at, team_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);

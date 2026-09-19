@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/providers"
-	"github.com/fadymondy/cloudy/internal/providers/sshboot"
+	"github.com/fadymondy/hosbah/internal/providers"
+	"github.com/fadymondy/hosbah/internal/providers/sshboot"
 )
 
 // TestLive runs against a real Proxmox VE. It is skipped unless CLOUDY_PROXMOX_LIVE=1.

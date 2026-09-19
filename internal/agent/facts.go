@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // CollectFacts gathers what enrolment and system.info report about this host.
@@ -43,7 +43,7 @@ func portFree(port string) bool {
 	return !strings.Contains(msg, "address already in use") && !strings.Contains(msg, "only one usage")
 }
 
-// dockerInfo is the part of `docker info --format '{{json .}}'` Cloudy reads.
+// dockerInfo is the part of `docker info --format '{{json .}}'` Hosbah reads.
 type dockerInfo struct {
 	ServerVersion     string     `json:"ServerVersion"`
 	Driver            string     `json:"Driver"`

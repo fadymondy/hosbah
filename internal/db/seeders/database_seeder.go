@@ -4,8 +4,8 @@ package seeders
 import (
 	"context"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	"github.com/fadymondy/cloudy/internal/factories"
+	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/factories"
 )
 
 // SeedDatabase inserts fake Databases via the factory.

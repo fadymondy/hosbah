@@ -1,5 +1,5 @@
-// Package npm is Cloudy's client for Nginx Proxy Manager, used as the public edge in front of
-// tunnelled servers: for every domain routed to a server behind an frp tunnel, Cloudy keeps one NPM
+// Package npm is Hosbah's client for Nginx Proxy Manager, used as the public edge in front of
+// tunnelled servers: for every domain routed to a server behind an frp tunnel, Hosbah keeps one NPM
 // proxy host forwarding that domain to the tunnel's port. It only changes or deletes proxy hosts it
 // created (marked in their advanced config), never the operator's own.
 package npm
@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// Marker identifies proxy hosts Cloudy owns.
-const Marker = "# managed by Cloudy"
+// Marker identifies proxy hosts Hosbah owns.
+const Marker = "# managed by Hosbah"
 
 // Client talks to one NPM instance.
 type Client struct {
@@ -34,7 +34,7 @@ func New(base, email, password string) *Client {
 // WithHTTPClient replaces the HTTP client (tests).
 func (c *Client) WithHTTPClient(h *http.Client) *Client { c.http = h; return c }
 
-// ProxyHost is the part of an NPM proxy host Cloudy reads and writes.
+// ProxyHost is the part of an NPM proxy host Hosbah reads and writes.
 type ProxyHost struct {
 	ID                    int      `json:"id,omitempty"`
 	DomainNames           []string `json:"domain_names"`
@@ -138,8 +138,8 @@ func hostFor(hs []ProxyHost, domain string) *ProxyHost {
 }
 
 // Route makes domain forward to http://forwardHost:forwardPort with the given certificate. It
-// creates a Cloudy-managed proxy host or updates the one Cloudy already made; a proxy host for the
-// domain that Cloudy did not create is left alone and reported.
+// creates a Hosbah-managed proxy host or updates the one Hosbah already made; a proxy host for the
+// domain that Hosbah did not create is left alone and reported.
 func (c *Client) Route(ctx context.Context, domain, forwardHost string, forwardPort int, certificateID int) error {
 	hs, err := c.ProxyHosts(ctx)
 	if err != nil {
@@ -153,14 +153,14 @@ func (c *Client) Route(ctx context.Context, domain, forwardHost string, forwardP
 	}
 	if cur := hostFor(hs, domain); cur != nil {
 		if !strings.Contains(cur.AdvancedConfig, Marker) {
-			return fmt.Errorf("npm: %s already has a proxy host Cloudy did not create (#%d); not touching it", domain, cur.ID)
+			return fmt.Errorf("npm: %s already has a proxy host Hosbah did not create (#%d); not touching it", domain, cur.ID)
 		}
 		return c.do(ctx, http.MethodPut, fmt.Sprintf("/api/nginx/proxy-hosts/%d", cur.ID), want, nil)
 	}
 	return c.do(ctx, http.MethodPost, "/api/nginx/proxy-hosts", want, nil)
 }
 
-// Unroute deletes the Cloudy-managed proxy host for domain (nothing to do if there is none).
+// Unroute deletes the Hosbah-managed proxy host for domain (nothing to do if there is none).
 func (c *Client) Unroute(ctx context.Context, domain string) error {
 	hs, err := c.ProxyHosts(ctx)
 	if err != nil {

@@ -80,10 +80,10 @@ func TestRouteUnrouteOnlyTouchesItsOwn(t *testing.T) {
 		t.Fatalf("hosts = %+v", f.hosts)
 	}
 	if err := c.Route(ctx, "app.example.com", "10.10.10.1", 47003, 2); err == nil {
-		t.Fatal("must not take over a proxy host Cloudy did not create")
+		t.Fatal("must not take over a proxy host Hosbah did not create")
 	}
 	if err := c.Unroute(ctx, "app.example.com"); err != nil || len(f.hosts) != 2 {
-		t.Fatal("must not delete a proxy host Cloudy did not create")
+		t.Fatal("must not delete a proxy host Hosbah did not create")
 	}
 	if err := c.Unroute(ctx, "demo.example.com"); err != nil || len(f.hosts) != 1 {
 		t.Fatalf("unroute: %v %v", err, f.hosts)

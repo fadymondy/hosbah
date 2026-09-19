@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/cloudflare"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/cloudflare"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 /*
@@ -22,7 +22,7 @@ not code, so moving to a dedicated domain later is an .env change:
   CLOUDY_APPS_DOMAIN        the base domain (unset: the feature is off)
   CLOUDY_APPS_PREFIX        prepended to the app name (default "cloudy-app-"; "" gives <app>.<domain>)
   CLOUDY_APPS_TLS           auto (default) | internal | off
-  CLOUDY_CLOUDFLARE_TOKEN   an API token with DNS:Edit on the domain's zone; without it Cloudy only
+  CLOUDY_CLOUDFLARE_TOKEN   an API token with DNS:Edit on the domain's zone; without it Hosbah only
                             routes the hostname and the DNS (e.g. a wildcard) is the operator's job
   CLOUDY_APPS_PROXIED       true to put the records behind Cloudflare's proxy (orange cloud)
 
@@ -35,7 +35,7 @@ type AppsDomain struct {
 	Prefix  string
 	TLS     string
 	Proxied bool
-	DNS     *cloudflare.Client // nil: DNS is managed outside Cloudy
+	DNS     *cloudflare.Client // nil: DNS is managed outside Hosbah
 }
 
 // AppsDomainFromEnv reads the configuration; Domain is "" when the feature is off.
@@ -90,7 +90,7 @@ func (s *Service) addAppsHostname(ctx context.Context, q *db.Queries, teamID str
 	if host == "" {
 		return
 	}
-	// Hostnames are unique across Cloudy and RLS hides other teams' rows, so ask in system scope
+	// Hostnames are unique across Hosbah and RLS hides other teams' rows, so ask in system scope
 	// (a failed insert would abort the caller's transaction). Taken: add a short team suffix.
 	if s.hostnameTaken(ctx, host) {
 		host = s.apps.Hostname(a.Name + "-" + teamID[:6])

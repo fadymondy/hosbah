@@ -1,4 +1,4 @@
-// Package mcp is Cloudy's Model Context Protocol transport and its two servers:
+// Package mcp is Hosbah's Model Context Protocol transport and its two servers:
 //
 //	POST /api/mcp        the USER server — team-bound tokens (mcp_tokens, "cld_…")
 //	POST /api/admin/mcp  the ADMIN server — platform-admin tokens (admin_mcp_tokens, "cla_…")
@@ -27,9 +27,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fadymondy/cloudy/internal/app"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/app"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // Protocol revisions this server speaks, newest first. initialize echoes the client's

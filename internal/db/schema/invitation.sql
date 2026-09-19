@@ -14,7 +14,7 @@ CREATE TABLE invitations (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: invitations are team rows; only the token's SHA-256 is stored.
+-- Hosbah: invitations are team rows; only the token's SHA-256 is stored.
 ALTER TABLE invitations ADD CONSTRAINT invitations_role_check CHECK (role IN ('admin', 'deployer', 'viewer'));
 ALTER TABLE invitations ADD CONSTRAINT invitations_status_check CHECK (status IN ('pending', 'accepted', 'revoked'));
 CREATE UNIQUE INDEX invitations_token_hash_key ON invitations (token_hash);

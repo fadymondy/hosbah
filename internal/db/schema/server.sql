@@ -30,7 +30,7 @@ CREATE TABLE servers (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a server belongs to one team. status is its lifecycle; "online" is derived from
+-- Hosbah: a server belongs to one team. status is its lifecycle; "online" is derived from
 -- last_seen_at (heartbeats), so a control-plane crash never leaves a stale "online" flag behind.
 -- agent_public_key is the ed25519 key the agent generated at enrolment; it signs every auth
 -- challenge. ssh_private_key_sealed is the per-server bootstrap key, sealed with the team DEK.

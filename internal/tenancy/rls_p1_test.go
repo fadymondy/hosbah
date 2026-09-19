@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/config"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/migrate"
+	"github.com/fadymondy/hosbah/internal/config"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/migrate"
 )
 
 // P1's tables under row-level security, including the two new contexts: an agent's ServerID

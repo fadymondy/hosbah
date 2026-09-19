@@ -1,8 +1,8 @@
 "use client"
 
-// Cloudy's host adapter for the feedback SDK. The SDK itself is the GENERATED copy in
+// Hosbah's host adapter for the feedback SDK. The SDK itself is the GENERATED copy in
 // lib/feedback (npm run feedback:sync, from fadymondy.com-v2/packages/feedback-sdk) — never
-// edit it here. This file only supplies Cloudy's strings, its /api/feedback JSON transport and
+// edit it here. This file only supplies Hosbah's strings, its /api/feedback JSON transport and
 // the current team.
 
 import { useState } from "react"
@@ -15,7 +15,7 @@ import { apiFetch, ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useOptionalTeam } from "@/lib/team"
 
-// The fields the Cloudy API contract names for POST /api/feedback.
+// The fields the Hosbah API contract names for POST /api/feedback.
 const CONTRACT_FIELDS = ["title", "body", "issue_type", "page_url", "route", "user_agent", "viewport"] as const
 
 export function ReportProblem() {

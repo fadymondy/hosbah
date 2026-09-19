@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteApp :exec
 DELETE FROM apps WHERE id = $1;
 
--- Cloudy tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
+-- Hosbah tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
 -- name: InsertApp :one
 INSERT INTO apps (id, team_id, server_id, name, repo_url, branch, port, healthcheck_path, healthcheck_timeout,
     autodeploy_paused, deploy_hook_hash, status, created_by)

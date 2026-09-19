@@ -1,4 +1,4 @@
--- Cloudy: the togo auth plugin's tables that Cloudy reads, declared here so the migration
+-- Hosbah: the togo auth plugin's tables that Hosbah reads, declared here so the migration
 -- ledger owns them and sqlc can type queries against them.
 --
 -- The auth plugin (github.com/togo-framework/auth v0.8.0) creates these itself at boot with
@@ -15,7 +15,7 @@ CREATE TABLE users (
     created_at text NOT NULL
 );
 
--- TOTP secrets from POST /api/auth/2fa/enroll. Cloudy's login wrapper reads them to require
+-- TOTP secrets from POST /api/auth/2fa/enroll. Hosbah's login wrapper reads them to require
 -- the second factor (the plugin's own login never checks it).
 CREATE TABLE auth_totp (
     subject text PRIMARY KEY,

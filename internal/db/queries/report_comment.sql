@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteReportComment :exec
 DELETE FROM report_comments WHERE id = $1;
 
--- Cloudy issue-tracker queries.
+-- Hosbah issue-tracker queries.
 -- name: InsertReportComment :one
 INSERT INTO report_comments (report_id, author_id, author_kind, body) VALUES ($1, $2, $3, $4) RETURNING *;
 

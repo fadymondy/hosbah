@@ -10,7 +10,7 @@ import (
 // The Caddy proxy manager: a proxy host routes one hostname on a server to any upstream that
 // server can reach — another container, a NAS, a printer, a legacy VM — the way Nginx Proxy Manager
 // does it, but on the Caddy the agent already owns. App routes (route.set) stay as they are: those
-// are local ports Cloudy itself started, so they are limited to 127.0.0.1.
+// are local ports Hosbah itself started, so they are limited to 127.0.0.1.
 
 // KindProxySet applies or removes one proxy host.
 const KindProxySet = "proxy.set"

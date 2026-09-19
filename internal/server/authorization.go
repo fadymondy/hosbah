@@ -15,9 +15,9 @@ Default-deny authorization, modelled on fadymondy.com-v2's internal/server/autho
 
 fadymondy.com learned this the hard way: generated REST resources and GraphQL were mounted
 with no authentication, and anonymous GET /api/mcp_tokens and DELETE /api/notes/{id} worked in
-production. Cloudy starts where that fix ended — everything under /api is closed unless named:
+production. Hosbah starts where that fix ended — everything under /api is closed unless named:
 
-	blocked   — framework routes Cloudy does not use and must not expose; 404 for everyone
+	blocked   — framework routes Hosbah does not use and must not expose; 404 for everyone
 	public    — anonymous; enumerated in isPublic
 	token     — the two MCP transports; they authenticate their own bearer tokens
 	member    — any signed-in account; enumerated in memberPrefixes. Row ownership is the
@@ -66,8 +66,8 @@ const RolePlatformAdmin = "admin"
 Framework routes closed to everyone, admins included.
 
   - /api/auth/tokens: togo personal access tokens. A PAT identity carries no email and no roles
-    and Cloudy's handlers do not enforce PAT abilities, so a PAT would act as its user across
-    every team. Cloudy's machine access is the team-bound MCP token instead.
+    and Hosbah's handlers do not enforce PAT abilities, so a PAT would act as its user across
+    every team. Hosbah's machine access is the team-bound MCP token instead.
   - /api/auth/otp, /api/auth/pin: email OTP and lock-screen PIN, unused; smaller surface.
   - /api/auth/dev, /api/auth/mfa: auth-dev (admin session for an empty body) and auth-mfa
     (magic-link token echo, FM-81; user_id taken from the request body) are not installed.
@@ -99,7 +99,7 @@ func isPublic(r *http.Request) bool {
 	case "/api/health",
 		"/api/auth/csrf",
 		"/api/auth/methods",
-		"/api/auth/register", // public sign-up (Cloudy is headed for public SaaS)
+		"/api/auth/register", // public sign-up (Hosbah is headed for public SaaS)
 		"/api/auth/login",    // wrapped by requireSecondFactor (login_2fa.go)
 		"/api/auth/logout":
 		return true
@@ -148,7 +148,7 @@ func sessionOnly(next http.Handler) http.Handler {
 }
 
 // csrf enforces the plugin's double-submit token (cookie togo_csrf == header X-CSRF-Token) on
-// unsafe, cookie-authenticated requests to Cloudy's own routes — the plugin applies it only to
+// unsafe, cookie-authenticated requests to Hosbah's own routes — the plugin applies it only to
 // its own. Bearer requests are not cookie-driven and are exempt.
 func csrf(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

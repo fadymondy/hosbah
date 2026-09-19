@@ -1,15 +1,15 @@
 /**
- * Cloudy SDK for Node.js / TypeScript (Node 18+, Bun, Deno, edge runtimes — anything with fetch).
+ * Hosbah SDK for Node.js / TypeScript (Node 18+, Bun, Deno, edge runtimes — anything with fetch).
  *
- * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Cloudy tool is
+ * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Hosbah tool is
  * available through `call`, with the token's scopes, the audit log and destructive-action approvals.
  *
- *   import { Cloudy } from "@cloudy/sdk"
- *   const cloudy = new Cloudy({ url: process.env.CLOUDY_URL!, token: process.env.CLOUDY_TOKEN! })
- *   await cloudy.deploy("shop", { wait: true })
+ *   import { Hosbah } from "@hosbah/sdk"
+ *   const hosbah = new Hosbah({ url: process.env.CLOUDY_URL!, token: process.env.CLOUDY_TOKEN! })
+ *   await hosbah.deploy("shop", { wait: true })
  */
 
-export interface CloudyOptions {
+export interface HosbahOptions {
   url: string
   token: string
   fetch?: typeof fetch
@@ -22,40 +22,40 @@ export interface Tool {
 }
 
 /** A tool refused (not found, missing scope, validation…). */
-export class CloudyToolError extends Error {
+export class HosbahToolError extends Error {
   constructor(
     public tool: string,
     message: string,
   ) {
-    super(`cloudy: ${tool}: ${message}`)
-    this.name = "CloudyToolError"
+    super(`hosbah: ${tool}: ${message}`)
+    this.name = "HosbahToolError"
   }
 }
 
 /** Transport or protocol failure (bad token, server error). */
-export class CloudyApiError extends Error {
+export class HosbahApiError extends Error {
   constructor(
     public status: number,
     message: string,
   ) {
-    super(`cloudy: ${message} (HTTP ${status})`)
-    this.name = "CloudyApiError"
+    super(`hosbah: ${message} (HTTP ${status})`)
+    this.name = "HosbahApiError"
   }
 }
 
 type Args = Record<string, unknown>
 
-export class Cloudy {
+export class Hosbah {
   private url: string
   private token: string
   private fetchImpl: typeof fetch
   private id = 0
 
-  constructor(opts: CloudyOptions) {
+  constructor(opts: HosbahOptions) {
     this.url = opts.url.replace(/\/+$/, "")
     this.token = (opts.token ?? "").trim()
     this.fetchImpl = opts.fetch ?? globalThis.fetch
-    if (!this.token) throw new Error("cloudy: no token (mint one under MCP tokens)")
+    if (!this.token) throw new Error("hosbah: no token (mint one under MCP tokens)")
   }
 
   private async rpc<T>(method: string, params: unknown): Promise<T> {
@@ -69,10 +69,10 @@ export class Cloudy {
     try {
       body = JSON.parse(text)
     } catch {
-      throw new CloudyApiError(res.status, text.slice(0, 200) || res.statusText)
+      throw new HosbahApiError(res.status, text.slice(0, 200) || res.statusText)
     }
-    if (body.error) throw new CloudyApiError(res.status, body.error.message)
-    if (!res.ok) throw new CloudyApiError(res.status, res.statusText)
+    if (body.error) throw new HosbahApiError(res.status, body.error.message)
+    if (!res.ok) throw new HosbahApiError(res.status, res.statusText)
     return body.result as T
   }
 
@@ -82,11 +82,11 @@ export class Cloudy {
     return r.tools
   }
 
-  /** Run any tool; resolves to its text output, rejects with CloudyToolError on a refusal. */
+  /** Run any tool; resolves to its text output, rejects with HosbahToolError on a refusal. */
   async call(tool: string, args: Args = {}): Promise<string> {
     const r = await this.rpc<{ content: { text: string }[]; isError?: boolean }>("tools/call", { name: tool, arguments: args })
     const text = (r.content ?? []).map((c) => c.text).join("")
-    if (r.isError) throw new CloudyToolError(tool, text)
+    if (r.isError) throw new HosbahToolError(tool, text)
     return text
   }
 
@@ -116,4 +116,4 @@ export class Cloudy {
   }
 }
 
-export default Cloudy
+export default Hosbah

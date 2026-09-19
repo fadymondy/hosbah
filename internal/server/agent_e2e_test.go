@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agent"
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agent"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // The real agent (internal/agent, the code cmd/agent runs) against the real control plane:

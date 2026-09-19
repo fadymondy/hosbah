@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteOperation :exec
 DELETE FROM operations WHERE id = $1;
 
--- Cloudy: the queue. Team-scoped reads name team_id; agent-scoped ones name server_id.
+-- Hosbah: the queue. Team-scoped reads name team_id; agent-scoped ones name server_id.
 -- name: InsertOperation :one
 -- Idempotent by op_id: a repeated enqueue with the same id inserts nothing (the caller then reads it).
 INSERT INTO operations (id, team_id, server_id, kind, executor, params, params_hash, status, created_by, timeout_seconds, expires_at, deployment_id)

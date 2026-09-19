@@ -5,14 +5,14 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Broker is an in-process wake-up bus: publishers say "topic X changed", subscribers re-read
 // from the database. It carries no data, deliberately — every SSE stream reads through its own
 // team-scoped transaction, so a stream can only ever show what row-level security lets its team
 // see, and a lost or coalesced wake-up costs latency, never correctness (streams also poll).
-// This is also why Cloudy never uses togo's global /events broadcast.
+// This is also why Hosbah never uses togo's global /events broadcast.
 type Broker struct {
 	mu   sync.Mutex
 	subs map[string]map[chan struct{}]struct{}

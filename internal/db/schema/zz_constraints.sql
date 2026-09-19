@@ -1,4 +1,4 @@
--- Cloudy: cross-table foreign keys (hand-written schema fragment).
+-- Hosbah: cross-table foreign keys (hand-written schema fragment).
 -- Atlas reads this directory in file-name order, and togo names fragments after their
 -- resource, so a foreign key declared in invitation.sql would be read before team.sql
 -- creates teams. Keeping every cross-table reference here — sorted last — avoids that.

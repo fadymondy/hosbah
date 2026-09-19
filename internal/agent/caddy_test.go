@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {

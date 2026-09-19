@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // App operations (P2). Everything here is a fixed argv for git / docker / railpack, or Caddy JSON —
@@ -96,10 +96,10 @@ func gitOut(oc *OpContext, dir string, args ...string) (string, error) {
 func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
 	if b, err := os.ReadFile(filepath.Join(src, "cloudy.toml")); err == nil { //#nosec G304 -- inside our checkout
-		if len(b) > agentproto.MaxCloudyToml {
+		if len(b) > agentproto.MaxHosbahToml {
 			return r, 1, errors.New("cloudy.toml is larger than 64 KiB")
 		}
-		r.CloudyToml = string(b)
+		r.HosbahToml = string(b)
 		oc.Info("found cloudy.toml")
 	}
 	if st, err := os.Stat(filepath.Join(src, "Dockerfile")); err == nil && st.Mode().IsRegular() {

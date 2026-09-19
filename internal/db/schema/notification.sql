@@ -13,6 +13,6 @@ CREATE TABLE notifications (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: in-app notifications (a failed deploy, an automatic rollback). user_id NULL = the whole
+-- Hosbah: in-app notifications (a failed deploy, an automatic rollback). user_id NULL = the whole
 -- team. Email / push / Slack delivery arrives with P3's notification channels.
 CREATE INDEX notifications_team_idx ON notifications (team_id, created_at);

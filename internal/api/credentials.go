@@ -11,10 +11,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	"github.com/fadymondy/cloudy/internal/crypto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/provisioning"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/crypto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // CredentialOut is a provider credential without its secret. The secret is sealed with the team's
@@ -132,7 +132,7 @@ func (d *deps) registerCredentials(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "delete-credential", Method: http.MethodDelete, Path: "/api/teams/{team}/credentials/{credential}",
 		DefaultStatus: http.StatusNoContent, Tags: []string{"Credentials"},
-		Summary: "Delete a credential (owner or admin). Servers created with it are kept, but Cloudy can no longer manage their machines.",
+		Summary: "Delete a credential (owner or admin). Servers created with it are kept, but Hosbah can no longer manage their machines.",
 	}, func(ctx context.Context, in *CredentialPath) (*struct{}, error) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			c, err := q.CredentialInTeam(ctx, db.CredentialInTeamParams{ID: in.Credential, TeamID: m.TeamID})

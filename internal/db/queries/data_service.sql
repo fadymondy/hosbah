@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteDataService :exec
 DELETE FROM data_services WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertDataService :one
 INSERT INTO data_services (id, team_id, server_id, name, kind, version, status, root_sealed, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

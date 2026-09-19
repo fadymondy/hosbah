@@ -1,12 +1,12 @@
--- Cloudy: togo audit's activity_log, declared here so it is part of the desired schema.
+-- Hosbah: togo audit's activity_log, declared here so it is part of the desired schema.
 --
 -- The togo audit plugin creates this table itself at boot (CREATE TABLE IF NOT EXISTS, same
 -- columns). Declaring it here means (1) the migration ledger owns it, so it exists — with
 -- row-level security — before the plugin ever runs, and (2) a later `atlas migrate diff`
 -- does not see a table missing from the desired state and emit DROP TABLE for it.
 --
--- team_id is Cloudy's addition. The plugin has no tenant column, and its Log() writes through
--- the pool outside any transaction, so Cloudy writes entries in the same shape itself
+-- team_id is Hosbah's addition. The plugin has no tenant column, and its Log() writes through
+-- the pool outside any transaction, so Hosbah writes entries in the same shape itself
 -- (internal/tenancy/audit.go) inside the tenant transaction — the audit row commits or rolls
 -- back with the change it describes. Append-only is enforced by RLS: there is no UPDATE or
 -- DELETE policy.

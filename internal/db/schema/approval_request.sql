@@ -16,7 +16,7 @@ CREATE TABLE approval_requests (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy (P4): a destructive MCP call held for a human.
+-- Hosbah (P4): a destructive MCP call held for a human.
 --
 -- When the team has require_destructive_approval on, a destructive tool does not act. It records
 -- what it WOULD have done and answers in-band with the request id; an owner or admin then approves

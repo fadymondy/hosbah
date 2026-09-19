@@ -4,7 +4,7 @@ package seeders
 import (
 	"context"
 
-	"github.com/fadymondy/cloudy/internal/app"
+	"github.com/fadymondy/hosbah/internal/app"
 )
 
 // SeedAll runs every resource seeder. Regenerated from togo.resources.yaml.

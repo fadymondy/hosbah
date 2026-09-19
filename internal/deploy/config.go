@@ -8,7 +8,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 /*
@@ -25,7 +25,7 @@ cloudy.toml — optional, at the repository root. Everything in it is optional t
 	web = "node server.js"              # overrides the image's start command
 	"worker:queue" = "node worker.js"   # workers: no port, restarted with every deploy
 
-Precedence: what the repository says wins (config as code); the app's settings in Cloudy are the
+Precedence: what the repository says wins (config as code); the app's settings in Hosbah are the
 defaults when it says nothing. Unknown keys are an error, so a typo does not silently do nothing.
 */
 
@@ -80,7 +80,7 @@ func ParseConfig(raw string) (AppConfig, error) {
 	return c, nil
 }
 
-// Defaults are the app's own settings (from Cloudy), used where cloudy.toml says nothing.
+// Defaults are the app's own settings (from Hosbah), used where cloudy.toml says nothing.
 type Defaults struct {
 	Port          int
 	HealthPath    string

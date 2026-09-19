@@ -15,7 +15,7 @@ CREATE TABLE backup_schedules (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: a per-service backup schedule run by the togo scheduler. target is the restic repository
+-- Hosbah: a per-service backup schedule run by the togo scheduler. target is the restic repository
 -- location: 'local' (a filesystem repo on the server, the demo default) or 'minio' (a local
 -- S3-compatible container); 's3' needs owner-gated credentials and the UI says "S3 not configured"
 -- until they exist. retention is how many snapshots restic keeps. restore_test asks the scheduler to

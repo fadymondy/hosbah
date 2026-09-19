@@ -14,7 +14,7 @@ CREATE TABLE mcp_tokens (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: user MCP tokens are team-bound; only the SHA-256 is stored.
+-- Hosbah: user MCP tokens are team-bound; only the SHA-256 is stored.
 ALTER TABLE mcp_tokens ALTER COLUMN allowlist TYPE jsonb USING allowlist::jsonb;
 CREATE UNIQUE INDEX mcp_tokens_token_hash_key ON mcp_tokens (token_hash);
 CREATE INDEX mcp_tokens_team_idx ON mcp_tokens (team_id, created_at);

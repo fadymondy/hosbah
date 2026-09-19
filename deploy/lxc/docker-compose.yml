@@ -1,4 +1,4 @@
-# Cloudy control plane on Proxmox LXC 117 (10.10.10.117). Images built on the
+# Hosbah control plane on Proxmox LXC 117 (10.10.10.117). Images built on the
 # workstation and loaded via `docker load`. NPM host 61 forwards
 # cloudy-app.fadymondy.com -> 10.10.10.117:3710 (web). web proxies /api -> api.
 # The managed server "target-1" (cloudy-target agent) stays on the workstation and

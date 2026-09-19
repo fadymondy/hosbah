@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	db "github.com/fadymondy/cloudy/internal/db/gen"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
 
 /*
@@ -68,7 +68,7 @@ func MetaFrom(ctx context.Context) RequestMeta {
 //
 // Deliberately RemoteAddr, not X-Forwarded-For: togo audit's own middleware trusts the
 // X-Forwarded-For and X-User-Id headers, which any client can set — a spoofable causer. When
-// Cloudy runs behind a proxy, the proxy's address is what is recorded until a trusted-proxy
+// Hosbah runs behind a proxy, the proxy's address is what is recorded until a trusted-proxy
 // setting exists.
 func MetaMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

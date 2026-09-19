@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Cloudy\Laravel\Facades;
+namespace Hosbah\Laravel\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
@@ -15,10 +15,10 @@ use Illuminate\Support\Facades\Facade;
  * @method static string addProxyHost(string $server, string $hostname, string $upstream, array $args = [])
  * @method static string connectServer(string $name, string $host, array $login)
  */
-final class Cloudy extends Facade
+final class Hosbah extends Facade
 {
     protected static function getFacadeAccessor(): string
     {
-        return \Cloudy\Cloudy::class;
+        return \Hosbah\Hosbah::class;
     }
 }

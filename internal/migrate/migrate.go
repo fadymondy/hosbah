@@ -1,4 +1,4 @@
-// Package migrate is Cloudy's migration ledger.
+// Package migrate is Hosbah's migration ledger.
 //
 // It applies the versioned files in db/atlas/migrations and records each one in
 // schema_migrations. togo 0.2.31's stock migrate re-executed every schema

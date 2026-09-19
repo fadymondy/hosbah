@@ -11,7 +11,7 @@ CREATE TABLE agent_enrollments (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: one-time enrolment tokens (15 minutes). Only the SHA-256 is stored; used_at makes it
+-- Hosbah: one-time enrolment tokens (15 minutes). Only the SHA-256 is stored; used_at makes it
 -- single-use.
 CREATE UNIQUE INDEX agent_enrollments_token_hash_key ON agent_enrollments (token_hash);
 CREATE INDEX agent_enrollments_server_idx ON agent_enrollments (server_id, created_at);

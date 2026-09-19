@@ -12,11 +12,11 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	db "github.com/fadymondy/cloudy/internal/db/gen"
-	"github.com/fadymondy/cloudy/internal/deploy"
-	"github.com/fadymondy/cloudy/internal/ops"
-	"github.com/fadymondy/cloudy/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/deploy"
+	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 // ---- contract ------------------------------------------------------------------------------------
@@ -1052,14 +1052,14 @@ func (d *deps) registerApps(api huma.API) {
 				InstallURL string `json:"install_url,omitempty"`
 			} `json:"github_app"`
 			AppsDomain struct {
-				Configured bool `json:"configured" doc:"A Cloudy-owned apex for default app hostnames (<app>-<team>.<apex>). Not decided yet: apps use their own domains."`
+				Configured bool `json:"configured" doc:"A Hosbah-owned apex for default app hostnames (<app>-<team>.<apex>). Not decided yet: apps use their own domains."`
 			} `json:"apps_domain"`
 			RailpackVersion string `json:"railpack_version"`
 			CaddyVersion    string `json:"caddy_version"`
 		}
 	}
 	huma.Register(api, huma.Operation{OperationID: "get-integrations", Method: http.MethodGet, Path: "/api/teams/{team}/integrations",
-		Summary: "What this Cloudy can do for the team's apps: the GitHub App, a default apps domain, tool versions", Tags: tags,
+		Summary: "What this Hosbah can do for the team's apps: the GitHub App, a default apps domain, tool versions", Tags: tags,
 	}, func(ctx context.Context, in *TeamPath) (*integrationsOut, error) {
 		out := &integrationsOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(*db.Queries, *sql.Tx, *auth.Identity, *tenancy.Membership) error {

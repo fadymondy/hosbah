@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
-	"github.com/fadymondy/cloudy/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/scopes"
 )
 
-// SiteTools: a server's sites — the apps Cloudy deploys on it, and what it found already running
+// SiteTools: a server's sites — the apps Hosbah deploys on it, and what it found already running
 // there (a Proxmox node's guests, a Docker host's containers), each with its details.
 func SiteTools() []Tool {
 	return []Tool{{
 		Name: "list_sites", Scope: scopes.Read,
-		Description: "A server's sites: Cloudy apps deployed on it, plus imported workloads it already runs — Proxmox guests " +
+		Description: "A server's sites: Hosbah apps deployed on it, plus imported workloads it already runs — Proxmox guests " +
 			"(vmid, type, address, vCPU, memory, disk, status) and Docker containers. Run run_server_step kind=system.info to refresh.",
 		InputSchema: schema([]string{"server"}, map[string]any{"server": str("Server name or id")}),
 		Run: func(ctx context.Context, env *Env, args Args) (string, error) {

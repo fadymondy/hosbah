@@ -1,9 +1,9 @@
 <?php
 // Run: php tests/sdk_test.php   (no PHPUnit needed)
 declare(strict_types=1);
-require __DIR__ . '/../src/Cloudy.php';
+require __DIR__ . '/../src/Hosbah.php';
 
-use Cloudy\{ApiError, Cloudy, ToolError};
+use Hosbah\{ApiError, Hosbah, ToolError};
 
 $transport = function (string $url, array $headers, string $body): array {
     assert($url === 'https://c.test/api/mcp');
@@ -21,9 +21,9 @@ $transport = function (string $url, array $headers, string $body): array {
 $fail = 0;
 $check = function (bool $ok, string $what) use (&$fail) { echo ($ok ? 'ok   ' : 'FAIL ') . $what . PHP_EOL; $fail += $ok ? 0 : 1; };
 
-$c = new Cloudy('https://c.test/', 'cld_ok', $transport);
+$c = new Hosbah('https://c.test/', 'cld_ok', $transport);
 $check($c->deploy('shop', wait: true) === 'Deployment #3 succeeded.', 'deploy');
 try { $c->deploy('nope'); $check(false, 'tool error'); } catch (ToolError $e) { $check(str_contains($e->getMessage(), 'app not found'), 'tool error'); }
-try { (new Cloudy('https://c.test', 'cld_bad', $transport))->apps(); $check(false, 'api error'); } catch (ApiError $e) { $check($e->status === 401, 'api error'); }
-try { new Cloudy('https://c.test', ''); $check(false, 'no token'); } catch (InvalidArgumentException) { $check(true, 'no token'); }
+try { (new Hosbah('https://c.test', 'cld_bad', $transport))->apps(); $check(false, 'api error'); } catch (ApiError $e) { $check($e->status === 401, 'api error'); }
+try { new Hosbah('https://c.test', ''); $check(false, 'no token'); } catch (InvalidArgumentException) { $check(true, 'no token'); }
 exit($fail ? 1 : 0);

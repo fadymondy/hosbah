@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteTeamMember :exec
 DELETE FROM team_members WHERE id = $1;
 
--- Cloudy tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
+-- Hosbah tenant queries (team-scoped: every statement names team_id; RLS is the backstop).
 -- name: InsertTeamMember :one
 INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, $3) RETURNING *;
 

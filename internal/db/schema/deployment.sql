@@ -26,7 +26,7 @@ CREATE TABLE deployments (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: one run of the pipeline. At most one runs and at most one waits per app (a newer
+-- Hosbah: one run of the pipeline. At most one runs and at most one waits per app (a newer
 -- request supersedes the waiting one). last_seq allocates deployment_logs.seq under the row lock.
 -- kind rollback/restart skip the build and start target_release_id / the live release's image.
 ALTER TABLE deployments ADD CONSTRAINT deployments_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'));

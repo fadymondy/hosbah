@@ -3,10 +3,10 @@ package agent
 import (
 	"strings"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
-// pkgManager hides apt versus dnf. Cloudy names packages the Debian way; rpmNames maps the ones
+// pkgManager hides apt versus dnf. Hosbah names packages the Debian way; rpmNames maps the ones
 // that differ on the RHEL family (an empty name means "nothing to install there").
 type pkgManager struct{ rpm bool }
 

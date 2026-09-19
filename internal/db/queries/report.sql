@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteReport :exec
 DELETE FROM reports WHERE id = $1;
 
--- Cloudy issue-tracker queries.
+-- Hosbah issue-tracker queries.
 -- name: NextReportNumber :one
 SELECT nextval('reports_number_seq')::bigint AS number;
 

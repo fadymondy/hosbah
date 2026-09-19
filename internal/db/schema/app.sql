@@ -20,7 +20,7 @@ CREATE TABLE apps (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: an app runs on one server of its team. name is a DNS-label-like slug because it becomes
+-- Hosbah: an app runs on one server of its team. name is a DNS-label-like slug because it becomes
 -- the image repository (cloudy/<name>) and the container prefix (cloudy-<name>-…) on the server.
 -- deploy_hook_hash is the SHA-256 of the per-app deploy-hook token; the token itself is shown once.
 -- runtime is what the last build detected (dockerfile, or railpack:<provider>).

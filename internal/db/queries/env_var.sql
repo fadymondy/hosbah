@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteEnvVar :exec
 DELETE FROM env_vars WHERE id = $1;
 
--- Cloudy tenant queries. Values stay sealed; the API maps rows to names only.
+-- Hosbah tenant queries. Values stay sealed; the API maps rows to names only.
 -- name: UpsertEnvVar :one
 INSERT INTO env_vars (team_id, app_id, name, value_sealed, updated_by) VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (app_id, name) DO UPDATE SET value_sealed = EXCLUDED.value_sealed, updated_by = EXCLUDED.updated_by, updated_at = now()

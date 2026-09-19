@@ -43,7 +43,7 @@ CREATE TABLE reports (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: the product's own issue tracker (platform data; team_id is reporter context).
+-- Hosbah: the product's own issue tracker (platform data; team_id is reporter context).
 CREATE UNIQUE INDEX reports_key_key ON reports (key);
 CREATE UNIQUE INDEX reports_number_key ON reports (number);
 CREATE INDEX reports_status_idx ON reports (status, sort_order);

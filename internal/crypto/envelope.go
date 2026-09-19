@@ -1,4 +1,4 @@
-// Package crypto is Cloudy's envelope encryption.
+// Package crypto is Hosbah's envelope encryption.
 //
 // One key-encryption key (KEK) per deployment, loaded from CLOUDY_KEK (base64, 32
 // bytes) or CLOUDY_KEK_FILE (a service-only file holding the same). It never

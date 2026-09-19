@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/providers"
+	"github.com/fadymondy/hosbah/internal/providers"
 )
 
 const (

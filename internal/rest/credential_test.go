@@ -9,7 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/togo-framework/togo"
 
-	"github.com/fadymondy/cloudy/internal/app"
+	"github.com/fadymondy/hosbah/internal/app"
 )
 
 // TestCredentialAPI exercises the credentials endpoints. Set

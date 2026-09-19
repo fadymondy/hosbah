@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteMcpToken :exec
 DELETE FROM mcp_tokens WHERE id = $1;
 
--- Cloudy tenant queries.
+-- Hosbah tenant queries.
 -- name: InsertMcpToken :one
 INSERT INTO mcp_tokens (team_id, user_id, name, token_hash, scopes, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)

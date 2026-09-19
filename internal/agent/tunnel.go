@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fadymondy/cloudy/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // Tunnels (tunnel.frp / tunnel.tailscale): a way in for a server with no public address. Both are
@@ -23,7 +23,7 @@ const (
 )
 
 const frpcUnitFile = `[Unit]
-Description=Cloudy tunnel (frpc)
+Description=Hosbah tunnel (frpc)
 After=network-online.target
 Wants=network-online.target
 
@@ -45,7 +45,7 @@ func tunnelFrp(oc *OpContext) (any, int, error) {
 		return nil, 2, err
 	}
 	if !systemdRunning() {
-		return nil, 2, errors.New("Cloudy runs frpc under systemd; this server has no systemd")
+		return nil, 2, errors.New("Hosbah runs frpc under systemd; this server has no systemd")
 	}
 	if p.Remove {
 		_, _ = oc.Run("systemctl", "disable", "--now", frpcUnit)
@@ -68,7 +68,7 @@ func tunnelFrp(oc *OpContext) (any, int, error) {
 	}
 	oc.Progress(2, 3)
 	// The token is a TOML basic string; strconv.Quote yields a valid one for printable input.
-	conf := fmt.Sprintf(`# Written by Cloudy (tunnel %s). Changes are overwritten.
+	conf := fmt.Sprintf(`# Written by Hosbah (tunnel %s). Changes are overwritten.
 serverAddr = %s
 serverPort = %d
 auth.method = "token"

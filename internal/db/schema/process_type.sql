@@ -9,7 +9,7 @@ CREATE TABLE process_types (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Cloudy: the app's processes, from cloudy.toml [processes] (web always exists). command NULL = the
+-- Hosbah: the app's processes, from cloudy.toml [processes] (web always exists). command NULL = the
 -- image's own start command. Rewritten by every successful build.
 ALTER TABLE process_types ADD CONSTRAINT process_types_name_check CHECK (name ~ '^(web|worker:[a-z0-9_-]{1,32})$');
 CREATE UNIQUE INDEX process_types_app_name_key ON process_types (app_id, name);

@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteTeam :exec
 DELETE FROM teams WHERE id = $1;
 
--- Cloudy tenant queries. Always run inside tenancy.Tx (RLS: app.team_id / app.user_id set).
+-- Hosbah tenant queries. Always run inside tenancy.Tx (RLS: app.team_id / app.user_id set).
 -- name: InsertTeam :one
 INSERT INTO teams (id, name, slug, owner_id, dek_wrapped)
 VALUES ($1, $2, $3, $4, $5)

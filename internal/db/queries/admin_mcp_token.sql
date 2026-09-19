@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteAdminMcpToken :exec
 DELETE FROM admin_mcp_tokens WHERE id = $1;
 
--- Cloudy platform-admin queries (run with app.platform_admin = on, or app.token_hash set).
+-- Hosbah platform-admin queries (run with app.platform_admin = on, or app.token_hash set).
 -- name: InsertAdminMcpToken :one
 INSERT INTO admin_mcp_tokens (user_id, name, token_hash, expires_at) VALUES ($1, $2, $3, $4) RETURNING *;
 
