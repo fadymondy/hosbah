@@ -1,5 +1,6 @@
 {
   "common": {
+    "brand": "Hosbah",
     "loading": "Loading",
     "retry": "Try again",
     "working": "Working…",

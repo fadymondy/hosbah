@@ -48,8 +48,10 @@ export function useI18n(): I18n {
 
 /** Sets document.title as "<page> · Hosbah". */
 export function useDocumentTitle(title: string | null | undefined) {
+  const { t } = useI18n()
+  const brand = t("common.brand")
   useEffect(() => {
-    const wanted = title ? `${title} · Hosbah` : "Hosbah"
+    const wanted = title ? `${title} · ${brand}` : brand
     document.title = wanted
     // Next's metadata <title> ("Hosbah") can be committed AFTER this effect — measured on /login
     // in the dark theme — so re-assert whenever something else rewrites the title while mounted.
@@ -58,7 +60,7 @@ export function useDocumentTitle(title: string | null | undefined) {
     })
     observer.observe(document.head, { subtree: true, childList: true, characterData: true })
     return () => observer.disconnect()
-  }, [title])
+  }, [title, brand])
 }
 
 /** Formats an ISO date for the current locale (the caller wraps it dir="ltr"). */

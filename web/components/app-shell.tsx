@@ -314,7 +314,7 @@ function TeamSwitcher() {
               <CubeMark size={18} onDark className="hidden dark:block" />
             </div>
             <div className="grid flex-1 text-start text-sm leading-tight">
-              <span className="truncate font-medium">{active?.name ?? "Hosbah"}</span>
+              <span className="truncate font-medium">{active?.name ?? t("common.brand")}</span>
               <span className="truncate text-xs text-muted-foreground">
                 {active ? t(`roles.${active.role}`) : t("shell.noTeam")}
               </span>

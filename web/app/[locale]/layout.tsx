@@ -8,9 +8,13 @@ import en from "@/lang/en.json"
 import ar from "@/lang/ar.json"
 import { dirFor, isLocale, LOCALES } from "@/lib/i18n-config"
 
-export const metadata: Metadata = {
-  title: { default: "Hosbah", template: "%s · Hosbah" },
-  description: "Hosbah — servers and apps, managed.",
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
+  const brand = locale === "ar" ? ar.common.brand : en.common.brand
+  return {
+    title: { default: brand, template: `%s · ${brand}` },
+    description: locale === "ar" ? "حوسبة — خوادمك وتطبيقاتك، مُدارة." : "Hosbah — servers and apps, managed.",
+  }
 }
 
 export function generateStaticParams() {
