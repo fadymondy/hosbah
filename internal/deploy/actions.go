@@ -443,10 +443,23 @@ func validEnvName(s string) bool {
 // NormalizeHostname lowercases and drops a trailing dot.
 func NormalizeHostname(h string) string { return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".") }
 
-// AddDomain routes a hostname to the app (at once, if a release is live).
-func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, hostname, tls string) (db.Domain, error) {
-	if err := refuseImported(a); err != nil {
-		return db.Domain{}, err
+// AddDomain routes a hostname to the app (at once, if a release is live). An imported app is routed
+// through a proxy route on its server to where the workload listens: port is the container's
+// published port (0 = the first) or, for a Proxmox guest, the port its site listens on (required).
+func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, hostname, tls string, port int) (db.Domain, error) {
+	upstream := ""
+	if IsImported(a) {
+		w := WorkloadOfApp(a)
+		if _, err := s.check(ctx, q, teamID, w); err != nil {
+			return db.Domain{}, err
+		}
+		up, err := importedUpstream(w, port)
+		if err != nil {
+			return db.Domain{}, err
+		}
+		upstream = up
+	} else if port != 0 {
+		return db.Domain{}, invalid("port applies to imported apps; a Hosbah-built app is routed to its live release")
 	}
 	hostname = NormalizeHostname(hostname)
 	if tls == "" {
@@ -461,6 +474,9 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if s.apps.Owns(hostname) {
 		return db.Domain{}, invalid("hostnames under "+s.apps.Domain+" are given to apps automatically")
 	}
+	if upstream != "" && s.hostnameTaken(ctx, hostname) {
+		return db.Domain{}, conflict("that hostname is already routed in Hosbah")
+	}
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
 	d, err := q.InsertDomain(ctx, db.InsertDomainParams{TeamID: teamID, AppID: a.ID, Hostname: hostname, Tls: tls, VerifyToken: "cloudy-verify=" + hex.EncodeToString(tok)})
@@ -470,7 +486,17 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 		}
 		return db.Domain{}, err
 	}
-	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.added", "app", a.ID, actor.audit(map[string]any{"hostname": hostname, "tls": tls})); err != nil {
+	if upstream != "" {
+		if err := q.SetDomainUpstream(ctx, db.SetDomainUpstreamParams{Upstream: &upstream, ID: d.ID, TeamID: teamID}); err != nil {
+			return db.Domain{}, err
+		}
+		d.Upstream = &upstream
+	}
+	extra := map[string]any{"hostname": hostname, "tls": tls}
+	if upstream != "" {
+		extra["upstream"] = upstream
+	}
+	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.added", "app", a.ID, actor.audit(extra)); err != nil {
 		return db.Domain{}, err
 	}
 	if s.publishTunnelled(ctx, q, teamID, a.ServerID, hostname) || s.wireTeamDNS(ctx, q, teamID, a, hostname) {
@@ -478,6 +504,9 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 			now := time.Now()
 			d.VerifiedAt = &now
 		}
+	}
+	if upstream != "" {
+		return d, s.routeImported(ctx, q, teamID, actor, a, d, false)
 	}
 	return d, s.SyncRoutes(ctx, q, teamID, a)
 }
@@ -495,9 +524,6 @@ func DomainByRef(ctx context.Context, q *db.Queries, teamID string, a db.App, re
 
 // RemoveDomain stops routing a hostname.
 func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) error {
-	if err := refuseImported(a); err != nil {
-		return err
-	}
 	if d.VerifyToken == "platform" {
 		return invalid("the app's platform hostname cannot be removed")
 	}
@@ -509,6 +535,9 @@ func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string
 	}
 	s.unwireTeamDNS(ctx, q, teamID, d.Hostname)
 	s.unpublishHost(ctx, q, teamID, d.Hostname)
+	if d.Upstream != nil {
+		return s.routeImported(ctx, q, teamID, actor, a, d, true)
+	}
 	return s.SyncRoutes(ctx, q, teamID, a)
 }
 
@@ -520,9 +549,6 @@ var LookupTXT = func(ctx context.Context, name string) ([]string, error) {
 // VerifyDomain checks the _cloudy-verify TXT record. Verification gates public certificates (the
 // on-demand TLS ask), not routing.
 func (s *Service) VerifyDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) (bool, string, error) {
-	if err := refuseImported(a); err != nil {
-		return false, "", err
-	}
 	if d.VerifiedAt != nil {
 		return true, d.Hostname + " is already verified.", nil
 	}
@@ -550,7 +576,7 @@ func (s *Service) VerifyDomain(ctx context.Context, q *db.Queries, teamID string
 // deploys). Nothing live: nothing to route yet — the next deploy's switch includes them.
 func (s *Service) SyncRoutes(ctx context.Context, q *db.Queries, teamID string, a db.App) error {
 	if IsImported(a) {
-		return nil // Hosbah does not route an imported workload
+		return nil // an imported app's domains are proxy routes, applied when each domain is added
 	}
 	live, err := q.LiveReleaseOfApp(ctx, a.ID)
 	if err != nil || live.HostPort == nil || live.TeamID != teamID {
@@ -603,8 +629,8 @@ func (s *Service) Detect(ctx context.Context, q *db.Queries, teamID string, acto
 
 // RuntimeLogs queues app.logs: the process's recent lines, then following for a while.
 func (s *Service) RuntimeLogs(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, process string, tail, follow int) (db.Operation, error) {
-	if err := refuseImported(a); err != nil {
-		return db.Operation{}, err
+	if IsImported(a) { // an imported container's own logs (it has no processes of Hosbah's)
+		return s.WorkloadLogs(ctx, q, teamID, actor, WorkloadOfApp(a), tail, "", follow)
 	}
 	if process == "" {
 		process = "web"

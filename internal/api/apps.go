@@ -37,7 +37,7 @@ type AppOut struct {
 	AutodeployPaused   bool           `json:"autodeploy_paused"`
 	Status             string         `json:"status" enum:"new,deploying,running,failed,stopped"`
 	CurrentReleaseID   *string        `json:"current_release_id"`
-	Source             string          `json:"source" enum:"git,imported" doc:"imported: found running on the server; Hosbah shows it but never deploys or changes it"`
+	Source             string          `json:"source" enum:"git,imported" doc:"imported: found running on the server; controlled through power, stats, logs, snapshots, resize, backup, recreate, destroy and domains, never deployed from git"`
 	OriginKind         *string         `json:"origin_kind" doc:"imported only: container, systemd or guest"`
 	Origin             *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
 	ImportedState      *string         `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
@@ -101,6 +101,7 @@ type DomainOut struct {
 	VerifiedAt  *time.Time `json:"verified_at"`
 	VerifyName  string     `json:"verify_name" doc:"TXT record name that proves control of the hostname"`
 	VerifyValue string     `json:"verify_value"`
+	Upstream    *string    `json:"upstream" doc:"Imported apps: where Hosbah's Caddy on the app's server proxies the hostname (a container's 127.0.0.1:<port>, a guest's http://<address>:<port>); null for a Hosbah-built app."`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
@@ -150,20 +151,27 @@ func originOf(raw *string) *importer.Origin {
 	return &o
 }
 
-// importedErr is the 409 an imported workload's refusal becomes: {"code":"imported_workload","message":…}.
-type importedErr struct {
+// codedErr is a refusal with a machine-readable code: {"code":"imported_workload","message":…} —
+// imported_workload (a git-only action on an imported app), credentials_required, unsupported_origin,
+// hosbah_owned, workload_missing, not_imported, credentials_rejected, operation_failed…
+type codedErr struct {
+	Status  int    `json:"-"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-func (e *importedErr) Error() string  { return e.Message }
-func (e *importedErr) GetStatus() int { return http.StatusConflict }
+func (e *codedErr) Error() string  { return e.Message }
+func (e *codedErr) GetStatus() int { return e.Status }
 
-// asImported turns a deploy.ActionError carrying deploy.ImportedCode into importedErr.
+// asImported turns a deploy.ActionError that carries a code into codedErr.
 func asImported(err error) error {
 	var ae *deploy.ActionError
-	if errors.As(err, &ae) && ae.Code == deploy.ImportedCode {
-		return &importedErr{Code: ae.Code, Message: ae.Msg}
+	if errors.As(err, &ae) && ae.Code != "" {
+		st := ae.Status
+		if st == 0 {
+			st = http.StatusConflict
+		}
+		return &codedErr{Status: st, Code: ae.Code, Message: ae.Msg}
 	}
 	return nil
 }
@@ -182,7 +190,7 @@ func toReleaseOut(r db.Release) ReleaseOut {
 
 func toDomainOut(d db.Domain) DomainOut {
 	return DomainOut{ID: d.ID, Hostname: d.Hostname, TLS: d.Tls, Verified: d.VerifiedAt != nil, VerifiedAt: d.VerifiedAt,
-		VerifyName: "_cloudy-verify." + d.Hostname, VerifyValue: d.VerifyToken, CreatedAt: d.CreatedAt}
+		VerifyName: "_cloudy-verify." + d.Hostname, VerifyValue: d.VerifyToken, Upstream: d.Upstream, CreatedAt: d.CreatedAt}
 }
 
 // AppPath addresses one app of a team (id or name).
@@ -499,13 +507,18 @@ func (d *deps) registerApps(api huma.API) {
 
 	huma.Register(api, huma.Operation{OperationID: "delete-app", Method: http.MethodDelete, Path: "/api/teams/{team}/apps/{app}",
 		DefaultStatus: http.StatusNoContent, Tags: tags,
-		Summary: "Delete an app (owner or admin; confirm = its name): its route, containers and images on the server go too",
+		Summary: "Delete an app (owner or admin; confirm = its name): its route, containers and images on the server go too. " +
+			"An imported app: without destroy only Hosbah's record goes (tombstoned; the workload keeps running); with ?destroy=true " +
+			"the real guest or container is destroyed (202 with the operation) and the record goes once the agent reports it gone.",
 	}, func(ctx context.Context, in *struct {
 		AppPath
-		Body struct {
+		Destroy bool `query:"destroy" doc:"Imported apps: destroy the real workload (a guest is stopped and destroyed, a container removed), then the record."`
+		Body    struct {
 			Confirm string `json:"confirm" minLength:"1" maxLength:"64" doc:"The app's name, exactly."`
+			Purge   bool   `json:"purge,omitempty" doc:"With destroy: also purge the guest from backup jobs, replication and HA (pvesh --purge), or remove a container's anonymous volumes."`
 		}
-	}) (*struct{}, error) {
+	}) (*workloadOpOut, error) {
+		out := &workloadOpOut{Status: http.StatusNoContent}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			a, err := appIn(ctx, q, m, in.App)
 			if err != nil {
@@ -514,9 +527,20 @@ func (d *deps) registerApps(api huma.API) {
 			if in.Body.Confirm != a.Name {
 				return huma.Error422UnprocessableEntity("confirm must equal the app's name — nothing was deleted")
 			}
+			if in.Destroy {
+				op, err := d.deploys().Destroy(ctx, q, m.TeamID, webActor(id), deploy.WorkloadOfApp(a), in.Body.Purge)
+				if err != nil {
+					return actionErr(err, "could not destroy the workload")
+				}
+				out.Status, out.Body = http.StatusAccepted, &workloadOpBody{Operation: toOperationOut(op)}
+				return nil
+			}
+			if in.Body.Purge {
+				return huma.Error422UnprocessableEntity("purge applies with destroy=true")
+			}
 			return actionErr(d.deploys().DeleteApp(ctx, q, m.TeamID, webActor(id), a), "could not delete the app")
 		})
-		return nil, err
+		return out, err
 	})
 
 	type hookOut struct {
@@ -906,6 +930,7 @@ func (d *deps) registerApps(api huma.API) {
 		Body struct {
 			Hostname string `json:"hostname" minLength:"3" maxLength:"253"`
 			TLS      string `json:"tls,omitempty" enum:"auto,internal,off" doc:"auto: public certificate once verified; internal: Caddy's local CA; off: plain HTTP."`
+			Port     int    `json:"port,omitempty" minimum:"0" maximum:"65535" doc:"Imported apps only: the port to route to — a container's published host port (default: the first one), or the port a Proxmox guest's site listens on (required for a guest)."`
 		}
 	}) (*domainOut, error) {
 		out := &domainOut{}
@@ -914,7 +939,7 @@ func (d *deps) registerApps(api huma.API) {
 			if err != nil {
 				return err
 			}
-			dm, err := d.deploys().AddDomain(ctx, q, m.TeamID, webActor(id), a, in.Body.Hostname, in.Body.TLS)
+			dm, err := d.deploys().AddDomain(ctx, q, m.TeamID, webActor(id), a, in.Body.Hostname, in.Body.TLS, in.Body.Port)
 			if err != nil {
 				return actionErr(err, "could not add the domain")
 			}
@@ -930,9 +955,6 @@ func (d *deps) registerApps(api huma.API) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			a, err := appIn(ctx, q, m, in.App)
 			if err != nil {
-				return err
-			}
-			if err := refuseImportedApp(a); err != nil {
 				return err
 			}
 			dm, err := deploy.DomainByRef(ctx, q, m.TeamID, a, in.Domain)
@@ -958,9 +980,6 @@ func (d *deps) registerApps(api huma.API) {
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			a, err := appIn(ctx, q, m, in.App)
 			if err != nil {
-				return err
-			}
-			if err := refuseImportedApp(a); err != nil {
 				return err
 			}
 			dm, err := deploy.DomainByRef(ctx, q, m.TeamID, a, in.Domain)
@@ -1173,15 +1192,7 @@ func (d *deps) registerApps(api huma.API) {
 // a deployment), so the refusal does not depend on what an imported app happens not to have.
 func refuseImportedApp(a db.App) error {
 	if deploy.IsImported(a) {
-		return &importedErr{Code: deploy.ImportedCode, Message: deploy.ImportedMessage(a.Name)}
-	}
-	return nil
-}
-
-// refuseImportedService is the same for a data service.
-func refuseImportedService(s db.DataService) error {
-	if s.Source == deploy.SourceImported {
-		return &importedErr{Code: deploy.ImportedCode, Message: deploy.ImportedMessage(s.Name)}
+		return &codedErr{Status: http.StatusConflict, Code: deploy.ImportedCode, Message: deploy.ImportedMessage(a.Name)}
 	}
 	return nil
 }

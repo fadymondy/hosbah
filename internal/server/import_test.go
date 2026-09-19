@@ -22,13 +22,22 @@ import (
 /*
 Imported workloads, end to end: what a connected server already runs becomes imported apps
 (sites) and imported data services, idempotently; something that disappears goes missing (never
-deleted); something the user deletes stays deleted; and Hosbah refuses every change to an imported
-workload with 409 imported_workload — without ever queueing an agent operation.
+deleted); something the user deletes stays deleted; importing never queues an agent operation; git-only
+actions answer 409 imported_workload and database features 409 credentials_required, also without
+queueing one. The controls themselves are in imported_control_test.go.
 */
 
 // enrolWithServices adds a BYO server and enrols it with the given discovered services (the
 // server.connect import path: the agent's enrolment facts carry what it found).
 func enrolWithServices(t *testing.T, c *client, base, teamID, name string, services []agentproto.Service) string {
+	t.Helper()
+	id, _ := enrolWithServicesKey(t, c, base, teamID, name, "10.9.8.7", services)
+	return id
+}
+
+// enrolWithServicesKey is enrolWithServices reporting primaryIP, returning the agent's private key
+// (so a fakeAgent can connect as it).
+func enrolWithServicesKey(t *testing.T, c *client, base, teamID, name, primaryIP string, services []agentproto.Service) (string, ed25519.PrivateKey) {
 	t.Helper()
 	var created struct {
 		Server  struct{ ID string }
@@ -36,10 +45,10 @@ func enrolWithServices(t *testing.T, c *client, base, teamID, name string, servi
 	}
 	c.mustJSON("POST", "/api/teams/"+teamID+"/servers", map[string]any{"name": name, "provider": "byo"}, 201, &created)
 	token := created.Install.URL[strings.LastIndex(created.Install.URL, "/")+1:]
-	pub, _, _ := ed25519.GenerateKey(nil)
+	pub, priv, _ := ed25519.GenerateKey(nil)
 	body, _ := json.Marshal(agentproto.EnrollRequest{Token: token, PublicKey: base64.StdEncoding.EncodeToString(pub), AgentVersion: "test",
 		Facts: agentproto.Facts{Hostname: name, OSID: "ubuntu", OSVersion: "24.04", Arch: "amd64", CPUs: 2, MemTotalBytes: 2 << 30,
-			Systemd: true, PrimaryIP: "10.9.8.7", Services: services}})
+			Systemd: true, PrimaryIP: primaryIP, Services: services}})
 	resp, err := http.Post(base+"/agent/enroll", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +57,7 @@ func enrolWithServices(t *testing.T, c *client, base, teamID, name string, servi
 	if resp.StatusCode != 201 {
 		t.Fatalf("enrol %s: %d", name, resp.StatusCode)
 	}
-	return created.Server.ID
+	return created.Server.ID, priv
 }
 
 type importedApp struct {
@@ -276,7 +285,7 @@ func TestImportedWorkloads(t *testing.T) {
 	appPath := "/api/teams/" + team.ID + "/apps/" + web.ID
 	svcPath := "/api/teams/" + team.ID + "/data-services/" + pg.ID
 
-	t.Run("every mutation of an imported app or service is 409 imported_workload, with no operation", func(t *testing.T) {
+	t.Run("git-only actions are 409 imported_workload and database features need credentials, with no operation", func(t *testing.T) {
 		opsBefore := operationsOf(t, sqlDB, team.ID)
 		for _, c := range []struct {
 			method, path string
@@ -290,13 +299,20 @@ func TestImportedWorkloads(t *testing.T) {
 			{"POST", appPath + "/deploy-hook", nil},
 			{"PUT", appPath + "/env/FOO", map[string]any{"value": "bar"}},
 			{"DELETE", appPath + "/env/FOO", nil},
-			{"POST", appPath + "/domains", map[string]any{"hostname": "imp-" + suffix + ".example.test", "tls": "off"}},
-			{"DELETE", appPath + "/domains/imp.example.test", nil},
-			{"POST", appPath + "/domains/imp.example.test/verify", nil},
 			{"POST", appPath + "/deployments/1/cancel", nil},
-			{"POST", appPath + "/logs", map[string]any{}},
+		} {
+			status, text := owner.do(c.method, c.path, c.body)
+			var e struct{ Code, Message string }
+			_ = json.Unmarshal([]byte(text), &e)
+			if status != 409 || e.Code != "imported_workload" || !strings.Contains(e.Message, "is imported; deploy from git applies to Hosbah-built apps") {
+				t.Errorf("%s %s -> %d %s (want 409 imported_workload)", c.method, c.path, status, text)
+			}
+		}
+		for _, c := range []struct {
+			method, path string
+			body         any
+		}{
 			{"POST", svcPath + "/databases", map[string]any{"name": "app"}},
-			{"POST", svcPath + "/attach", map[string]any{"app": web.ID}},
 			{"POST", svcPath + "/reveal-url", map[string]any{}},
 			{"POST", svcPath + "/backups", nil},
 			{"POST", svcPath + "/backups/00000000-0000-4000-8000-0000000000b1/restore-test", nil},
@@ -305,22 +321,27 @@ func TestImportedWorkloads(t *testing.T) {
 			status, text := owner.do(c.method, c.path, c.body)
 			var e struct{ Code, Message string }
 			_ = json.Unmarshal([]byte(text), &e)
-			if status != 409 || e.Code != "imported_workload" || !strings.Contains(e.Message, "is imported: Hosbah shows it but does not deploy or change it") {
-				t.Errorf("%s %s -> %d %s (want 409 imported_workload)", c.method, c.path, status, text)
+			if status != 409 || e.Code != "credentials_required" {
+				t.Errorf("%s %s -> %d %s (want 409 credentials_required)", c.method, c.path, status, text)
 			}
 		}
 		for tool, args := range map[string]map[string]any{
 			"deploy_app": {"app": web.ID}, "restart_app": {"app": web.ID}, "rollback_app": {"app": web.ID},
 			"pause_autodeploy": {"app": web.ID}, "set_env": {"app": web.ID, "name": "X", "value": "y"},
-			"unset_env": {"app": web.ID, "name": "X"}, "add_domain": {"app": web.ID, "hostname": "m-" + suffix + ".example.test"},
-			"update_app": {"app": web.ID, "port": 9000}, "rotate_deploy_hook": {"app": web.ID},
-			"backup_now": {"database": pg.ID}, "create_db": {"database": pg.ID, "name": "x"}, "reveal_db_url": {"database": pg.ID},
-			"attach_database": {"app": web.ID, "database": pg.ID}, "set_backup_schedule": {"database": pg.ID, "cron": "0 3 * * *"},
-			"drop_database": {"database": pg.ID, "name": "x", "confirm": "x"},
+			"unset_env": {"app": web.ID, "name": "X"}, "update_app": {"app": web.ID, "port": 9000}, "rotate_deploy_hook": {"app": web.ID},
 		} {
 			res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, tool, args)
-			if !res.IsError || !strings.Contains(res.Text, "is imported") {
+			if !res.IsError || !strings.Contains(res.Text, "is imported; deploy from git applies to Hosbah-built apps") {
 				t.Errorf("MCP %s on an imported workload: isError=%v %q", tool, res.IsError, res.Text)
+			}
+		}
+		for tool, args := range map[string]map[string]any{
+			"backup_now": {"database": pg.ID}, "create_db": {"database": pg.ID, "name": "x"}, "reveal_db_url": {"database": pg.ID},
+			"set_backup_schedule": {"database": pg.ID, "cron": "0 3 * * *"}, "drop_database": {"database": pg.ID, "name": "x", "confirm": "x"},
+		} {
+			res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, tool, args)
+			if !res.IsError || !strings.Contains(res.Text, "give Hosbah its credentials first") {
+				t.Errorf("MCP %s on an imported database without credentials: isError=%v %q", tool, res.IsError, res.Text)
 			}
 		}
 		if n := operationsOf(t, sqlDB, team.ID); n != opsBefore {

@@ -205,7 +205,7 @@ func (s *Service) provision(ctx context.Context, teamID string, svc db.DataServi
 
 // CreateDatabaseAndUser creates a database and a user with grants on a postgres/mysql service.
 func (s *Service) CreateDatabaseAndUser(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, dbName, userName, grants string) (db.Database, db.DatabaseUser, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return db.Database{}, db.DatabaseUser{}, err
 	}
 	if svc.Kind == "redis" {
@@ -288,7 +288,7 @@ func (s *Service) createInto(ctx context.Context, teamID string, svc db.DataServ
 
 // Backup queues a manual backup and runs it in the background.
 func (s *Service) Backup(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, kind string) (db.Backup, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return db.Backup{}, err
 	}
 	if svc.Status != "running" {
@@ -352,7 +352,7 @@ func (s *Service) runBackup(ctx context.Context, teamID string, svc db.DataServi
 // RestoreTest restores a backup into a throwaway container and stamps the result. The agent's
 // db.restore never touches the live service; it verifies the dump opens.
 func (s *Service) RestoreTest(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, b db.Backup) error {
-	if err := refuseImported(svc); err != nil {
+	if err := restorable(svc); err != nil {
 		return err
 	}
 	if b.Status != "succeeded" || b.SnapshotID == nil {
@@ -403,7 +403,7 @@ func (s *Service) runRestoreTest(ctx context.Context, teamID string, svc db.Data
 // Redis uses the service endpoint. The value is sealed with the team key via deploy.SetEnv and
 // applies from the app's next deploy or restart.
 func (s *Service) Attach(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, a db.App, userRef string) (string, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return "", err
 	}
 	if deploy.IsImported(a) {
@@ -433,7 +433,7 @@ func (s *Service) Attach(ctx context.Context, q *db.Queries, teamID string, acto
 
 // RevealURL returns a service's connection string (audited). secrets:read only.
 func (s *Service) RevealURL(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, userRef string) (string, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return "", err
 	}
 	_, connURL, err := s.connString(ctx, q, teamID, svc, userRef)
@@ -578,6 +578,14 @@ func (s *Service) spawn(fn func(context.Context)) {
 
 // sealRoot re-seals the service's root credential to the target agent's key.
 func (s *Service) sealRoot(agentKey string, dek []byte, teamID string, svc db.DataService) (string, error) {
+	if isImported(svc) {
+		// An imported service: the credentials a member gave (user, password, database), checked by db.probe.
+		root, err := importedRoot(dek, teamID, svc)
+		if err != nil {
+			return "", err
+		}
+		return agentproto.SealBox(agentKey, agentproto.DBSecretContext(svc.ID, "root"), mustJSON(root))
+	}
 	if svc.Kind == "redis" {
 		return "", nil
 	}
@@ -794,4 +802,12 @@ func nextFreePort(base int, used map[int]bool) int {
 		}
 	}
 	return base
+}
+
+func opsSpec(teamID, serverID, kind string, params []byte, actor Actor) ops.EnqueueSpec {
+	createdBy := actor.UserID
+	if createdBy == "" {
+		createdBy = "via:" + actor.Via
+	}
+	return ops.EnqueueSpec{TeamID: teamID, ServerID: serverID, Kind: kind, Params: params, CreatedBy: createdBy}
 }

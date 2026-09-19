@@ -96,6 +96,14 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindDBRestore:       dbRestore,
 		agentproto.KindDBRemove:        dbRemove,
 	}
+	wl := newWorkloads()
+	for kind, h := range map[string]Handler{
+		agentproto.KindWorkloadPower: wl.power, agentproto.KindWorkloadLogs: wl.logs, agentproto.KindWorkloadStats: wl.stats,
+		agentproto.KindGuestResize: wl.resize, agentproto.KindGuestSnapshot: wl.snapshot, agentproto.KindGuestBackup: wl.backup,
+		agentproto.KindContainerRecreate: wl.recreate, agentproto.KindWorkloadDestroy: wl.destroy, agentproto.KindDBProbe: wl.probe,
+	} {
+		e.handlers[kind] = h
+	}
 	return e
 }
 
@@ -204,8 +212,22 @@ func (e *Executor) Work(ctx context.Context) {
 // laneOf: "" runs concurrently; anything else runs one at a time within its lane.
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
-	case agentproto.KindAppLogs:
-		return ""
+	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe:
+		return "" // read-only: never queued behind a long action
+	case agentproto.KindWorkloadPower, agentproto.KindGuestResize, agentproto.KindGuestSnapshot, agentproto.KindGuestBackup,
+		agentproto.KindContainerRecreate, agentproto.KindWorkloadDestroy:
+		// One lane per workload: a restart never interleaves with a snapshot or a destroy of the same one.
+		var p struct {
+			VMID string `json:"vmid"`
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && (p.VMID != "" || p.Name != "") {
+			if p.VMID != "" {
+				return "guest:" + p.VMID
+			}
+			return "container:" + p.Name
+		}
+		return "workload:?"
 	case agentproto.KindAppDetect:
 		// Host lane: it needs git and Railpack, which the provisioning steps queued just before it
 		// (same lane, so in order) install on a fresh server.

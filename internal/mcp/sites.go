@@ -15,13 +15,13 @@ import (
 
 // SiteTools: a server's sites — the apps Hosbah deploys on it, and the workloads it found already
 // running there (imported apps and data services: Proxmox guests, Docker containers), each with its
-// details. Imported ones are Hosbah records that Hosbah shows but never deploys or changes.
+// details. Imported ones are controlled with the workload tools (workloads.go), never deployed from git.
 func SiteTools() []Tool {
 	return []Tool{{
 		Name: "list_sites", Scope: scopes.Read,
 		Description: "A server's sites: Hosbah apps deployed on it, plus imported workloads it already runs (marked imported) — Proxmox guests " +
-			"(vmid, type, address, vCPU, memory, disk, status), Docker containers and their databases. Hosbah never deploys or changes " +
-			"an imported workload. Run run_server_step kind=system.info to refresh.",
+			"(vmid, type, address, vCPU, memory, disk, status), Docker containers and their databases. Control an imported one with the workload tools " +
+			"(workload_power, workload_stats, workload_logs, snapshots, resize_guest, backup_guest, recreate_container, destroy_app). Run run_server_step kind=system.info to refresh.",
 		InputSchema: schema([]string{"server"}, map[string]any{"server": str("Server name or id")}),
 		Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 			srv, err := findServer(ctx, env, args)

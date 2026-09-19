@@ -69,3 +69,12 @@ WHERE id = $1 AND team_id = $2 AND source = 'imported' AND imported_state IS DIS
 
 -- name: DeleteImportedDataServicesOnServer :exec
 DELETE FROM data_services WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
+
+-- name: SetImportedDataServiceCredentials :exec
+-- An imported service's credentials, validated by db.probe, sealed with the team DEK like a managed root.
+UPDATE data_services SET root_sealed = sqlc.arg('root_sealed')::text, updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
+
+-- name: SetImportedDataServiceState :exec
+UPDATE data_services SET imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';

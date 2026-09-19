@@ -55,6 +55,16 @@ func Timeout(kind string) time.Duration {
 		return 30 * time.Minute
 	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop:
 		return 5 * time.Minute
+	case agentproto.KindWorkloadStats, agentproto.KindDBProbe:
+		return 2 * time.Minute
+	case agentproto.KindWorkloadLogs:
+		return 6 * time.Minute
+	case agentproto.KindWorkloadPower, agentproto.KindGuestResize, agentproto.KindWorkloadDestroy:
+		return 15 * time.Minute // a graceful guest shutdown may take minutes
+	case agentproto.KindGuestSnapshot, agentproto.KindContainerRecreate:
+		return 45 * time.Minute // a snapshot with RAM, a rollback, an image pull
+	case agentproto.KindGuestBackup:
+		return 6 * time.Hour // vzdump of a large guest
 	}
 	return 10 * time.Minute
 }

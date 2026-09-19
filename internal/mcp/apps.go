@@ -394,7 +394,8 @@ func AppTools() []Tool {
 			Name: "add_domain", Scope: scopes.Write,
 			Description: "Route a hostname to the app (re-routed at once if a release is live). tls: auto (public certificate once verified), internal (Caddy's CA) or off (plain HTTP).",
 			InputSchema: schema([]string{"app", "hostname"}, map[string]any{"app": appArg, "hostname": str("e.g. app.example.com"),
-				"tls": map[string]any{"type": "string", "enum": []string{"auto", "internal", "off"}, "default": "auto"}}),
+				"tls": map[string]any{"type": "string", "enum": []string{"auto", "internal", "off"}, "default": "auto"},
+				"port": map[string]any{"type": "integer", "minimum": 0, "maximum": 65535, "description": "Imported apps: a container's published port (default the first) or the port a Proxmox guest's site listens on (required)"}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -407,7 +408,7 @@ func AppTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				d, err := s.AddDomain(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, args.Str("hostname"), args.Str("tls"))
+				d, err := s.AddDomain(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, args.Str("hostname"), args.Str("tls"), args.Int("port", 0, 0, 65535))
 				if err != nil {
 					return "", err
 				}

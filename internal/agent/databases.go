@@ -271,16 +271,16 @@ func dbCreate(oc *OpContext) (any, int, error) {
 	}
 	switch p.Kind {
 	case "postgres":
-		return dbCreatePostgres(oc, p, root["password"], user["password"])
+		return dbCreatePostgres(oc, p, root, user["password"])
 	case "mysql":
-		return dbCreateMySQL(oc, p, root["password"], user["password"])
+		return dbCreateMySQL(oc, p, root, user["password"])
 	case "minio":
 		return dbCreateMinIO(oc, p, root["password"], user["password"])
 	}
 	return nil, 2, errors.New("unsupported kind")
 }
 
-func dbCreatePostgres(oc *OpContext, p agentproto.DBCreateParams, rootpw, userpw string) (any, int, error) {
+func dbCreatePostgres(oc *OpContext, p agentproto.DBCreateParams, root map[string]string, userpw string) (any, int, error) {
 	// The password travels on stdin as a SQL literal, never on an argv. Names are validated
 	// identifiers, quoted with " for safety. CREATE DATABASE is idempotent via \gexec; the role via a
 	// DO block; the grants re-applied every time.
@@ -310,12 +310,12 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO "%[2]s";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "%[2]s";`, p.Database, p.User)
 	}
 	oc.Info("creating database %q and role %q (%s)", p.Database, p.User, p.Grants)
-	if out, err := execIn(oc, []string{"PGPASSWORD=" + rootpw}, sql, p.Container, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres"); err != nil {
+	if out, err := execIn(oc, []string{"PGPASSWORD=" + root["password"]}, sql, p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)...); err != nil {
 		oc.Info("%s", strings.TrimSpace(out))
 		return nil, 1, errors.New("could not create the database and role")
 	}
 	if inner != "" {
-		if out, err := execIn(oc, []string{"PGPASSWORD=" + rootpw}, inner+"\n", p.Container, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", p.Database); err != nil {
+		if out, err := execIn(oc, []string{"PGPASSWORD=" + root["password"]}, inner+"\n", p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, p.Database)...)...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return nil, 1, errors.New("could not apply the grants")
 		}
@@ -323,7 +323,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "%[2]s";`, p
 	return agentproto.DBCreateResult{Database: p.Database, User: p.User}, 0, nil
 }
 
-func dbCreateMySQL(oc *OpContext, p agentproto.DBCreateParams, rootpw, userpw string) (any, int, error) {
+func dbCreateMySQL(oc *OpContext, p agentproto.DBCreateParams, root map[string]string, userpw string) (any, int, error) {
 	priv := "ALL PRIVILEGES"
 	switch p.Grants {
 	case "readwrite":
@@ -337,7 +337,7 @@ func dbCreateMySQL(oc *OpContext, p agentproto.DBCreateParams, rootpw, userpw st
 		"GRANT %[4]s ON `%[1]s`.* TO '%[2]s'@'%%';\nFLUSH PRIVILEGES;\n",
 		p.Database, p.User, pgQuoteLiteral(userpw), priv)
 	oc.Info("creating database %q and user %q (%s)", p.Database, p.User, p.Grants)
-	if out, err := execIn(oc, []string{"MYSQL_PWD=" + rootpw}, sql, p.Container, "mysql", "-u", "root"); err != nil {
+	if out, err := execIn(oc, []string{"MYSQL_PWD=" + root["password"]}, sql, p.Container, append([]string{"mysql"}, mysqlLogin(root)...)...); err != nil {
 		oc.Info("%s", strings.TrimSpace(out))
 		return nil, 1, errors.New("could not create the database and user")
 	}
@@ -407,7 +407,7 @@ func dbBackup(oc *OpContext) (any, int, error) {
 	}
 
 	// The dump command streams to stdout; restic reads it from stdin. Nothing hits the disk between.
-	dumpArgs, dumpEnv := dbDumpCommand(p.Kind, p.Database, root["password"], p.Container)
+	dumpArgs, dumpEnv := dbDumpCommand(p.Kind, p.Database, root, p.Container)
 	filename := p.BackupID + dumpSuffix(p.Kind)
 	oc.Progress(2, 2)
 	oc.Info("backing up %s → restic (%s)", orAll(p.Database), p.Repo.Target)
@@ -445,24 +445,28 @@ func orAll(db string) string {
 }
 
 // dbDumpCommand returns the docker-exec argv and its environment for dumping to stdout.
-func dbDumpCommand(kind, db, rootpw, container string) (args, env []string) {
+func dbDumpCommand(kind, db string, root map[string]string, container string) (args, env []string) {
+	rootpw := root["password"]
 	switch kind {
 	case "postgres":
 		if db == "" {
-			return []string{"docker", "exec", "-i", "-e", "PGPASSWORD", container, "pg_dumpall", "-U", "postgres"}, []string{"PGPASSWORD=" + rootpw}
+			return append([]string{"docker", "exec", "-i", "-e", "PGPASSWORD", container, "pg_dumpall"}, pgLogin(root, "")...), []string{"PGPASSWORD=" + rootpw}
 		}
-		return []string{"docker", "exec", "-i", "-e", "PGPASSWORD", container, "pg_dump", "-U", "postgres", "-Fc", db}, []string{"PGPASSWORD=" + rootpw}
+		return append(append([]string{"docker", "exec", "-i", "-e", "PGPASSWORD", container, "pg_dump"}, pgLogin(root, db)...), "-Fc"), []string{"PGPASSWORD=" + rootpw}
 	case "mysql":
 		src := []string{"--all-databases"}
 		if db != "" {
 			src = []string{db}
 		}
-		return append([]string{"docker", "exec", "-i", "-e", "MYSQL_PWD", container, "mysqldump", "-u", "root", "--single-transaction"}, src...), []string{"MYSQL_PWD=" + rootpw}
+		return append(append(append([]string{"docker", "exec", "-i", "-e", "MYSQL_PWD", container, "mysqldump"}, mysqlLogin(root)...), "--single-transaction"), src...), []string{"MYSQL_PWD=" + rootpw}
 	case "minio":
 		// docker cp streams the data directory as a tar; the MinIO image has no tar of its own. A copy
 		// of a live directory is crash-consistent per object, not a point-in-time snapshot.
 		return []string{"docker", "cp", container + ":/data/.", "-"}, nil
 	default: // redis
+		if rootpw != "" {
+			return []string{"docker", "exec", "-i", "-e", "REDISCLI_AUTH", container, "redis-cli", "--rdb", "-"}, []string{"REDISCLI_AUTH=" + rootpw}
+		}
 		return []string{"docker", "exec", "-i", container, "redis-cli", "--rdb", "-"}, nil
 	}
 }
@@ -553,10 +557,10 @@ func dbRestore(oc *OpContext) (any, int, error) {
 
 	// Always clean up the throwaway.
 	defer func() {
-		_ = exec.Command("docker", "rm", "-f", p.Container).Run()          //#nosec G204 -- cleanup
-		_ = exec.Command("docker", "volume", "rm", "-f", p.Volume).Run()   //#nosec G204 -- cleanup
+		_ = exec.Command("docker", "rm", "-f", p.Container).Run()        //#nosec G204 -- cleanup
+		_ = exec.Command("docker", "volume", "rm", "-f", p.Volume).Run() //#nosec G204 -- cleanup
 	}()
-	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", p.Container).Run() //#nosec G204 -- idempotent
+	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", p.Container).Run()        //#nosec G204 -- idempotent
 	_ = exec.CommandContext(oc.Ctx, "docker", "volume", "rm", "-f", p.Volume).Run() //#nosec G204
 
 	oc.Progress(1, 3)
@@ -738,7 +742,6 @@ func dbRemove(oc *OpContext) (any, int, error) {
 	return map[string]any{"container": p.Container, "volume_removed": removed}, 0, nil
 }
 
-
 // dbCreateMinIO creates a bucket and an access key for it with mc inside the MinIO container. The
 // root and user secrets reach mc through the environment (MC_HOST_local, U, S), never an argv.
 // Policies are MinIO's built-in ones (readwrite / readonly), which span the service's buckets.
@@ -790,13 +793,13 @@ func dbDrop(oc *OpContext) (any, int, error) {
 		for _, u := range p.Users {
 			sql += fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";\n", u)
 		}
-		out, err = execIn(oc, []string{"PGPASSWORD=" + rootpw}, sql, p.Container, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres")
+		out, err = execIn(oc, []string{"PGPASSWORD=" + rootpw}, sql, p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)...)
 	case "mysql":
 		sql := fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;\n", p.Database)
 		for _, u := range p.Users {
 			sql += fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';\n", u)
 		}
-		out, err = execIn(oc, []string{"MYSQL_PWD=" + rootpw}, sql, p.Container, "mysql", "-u", "root")
+		out, err = execIn(oc, []string{"MYSQL_PWD=" + rootpw}, sql, p.Container, append([]string{"mysql"}, mysqlLogin(root)...)...)
 	case "minio":
 		env := []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000"}
 		out, err = execIn(oc, env, "", p.Container, "mc", "rb", "--force", "local/"+agentproto.BucketName(p.Database))
@@ -815,4 +818,34 @@ func dbDrop(oc *OpContext) (any, int, error) {
 	}
 	oc.Info("dropped %s %q and %d user(s)", p.Kind, p.Database, len(p.Users))
 	return map[string]any{"database": p.Database, "users": p.Users}, 0, nil
+}
+
+// pgLogin is how the agent logs in to a Postgres service as its administrator: a managed service's
+// superuser over the container's socket, or — an imported service, whose sealed credentials name
+// their own user — that user over TCP to 127.0.0.1 (so the password is really checked), into the
+// given database, else the one the credentials named, else postgres. A pg_dump's database is the
+// -d here too.
+func pgLogin(root map[string]string, db string) []string {
+	user := root["user"]
+	if user == "" {
+		if db == "" {
+			return []string{"-U", "postgres"}
+		}
+		return []string{"-U", "postgres", "-d", db}
+	}
+	if db == "" {
+		db = root["database"]
+	}
+	if db == "" {
+		db = "postgres"
+	}
+	return []string{"-h", "127.0.0.1", "-U", user, "-d", db}
+}
+
+// mysqlLogin is the same for MySQL/MariaDB: root over the socket, or an imported service's user over TCP.
+func mysqlLogin(root map[string]string) []string {
+	if user := root["user"]; user != "" {
+		return []string{"-h", "127.0.0.1", "-u", user}
+	}
+	return []string{"-u", "root"}
 }

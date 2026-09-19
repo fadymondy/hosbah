@@ -2,9 +2,10 @@
 // Proxmox guests — agentproto.Service in its system.info facts) into Hosbah records: apps with
 // source "imported" (sites) and data services with source "imported" (databases).
 //
-// Imported records are read-only to Hosbah: it shows them and never deploys, restarts, stops,
-// reconfigures or removes the workload (deploy and dbsvc refuse with 409 imported_workload).
-// Sync is idempotent; a workload that is no longer discovered is marked missing, never deleted; a
+// Importing never acts on a workload: it only records it. Control (power, stats, logs, snapshots,
+// resize, backup, recreate, destroy, domains, database credentials) happens only when a member asks,
+// through typed agent operations (internal/deploy/workloads.go); git-only actions (deploy, rollback,
+// env, build settings, deploy hook) are refused with 409 imported_workload. Sync is idempotent; a workload that is no longer discovered is marked missing, never deleted; a
 // record the user deleted is tombstoned in import_ignores and stays gone.
 package importer
 
@@ -124,11 +125,9 @@ func classifyOne(s agentproto.Service) (Item, bool) {
 
 // IsHosbahOwned: Hosbah's own containers and units — app processes (cloudy-<app>-<process>-<id>),
 // release and restore-test runs, data services (cloudy-db-*), Caddy (cloudy-caddy), frpc
-// (cloudy-frpc), the agent — all start with "cloudy-"; "hosbah-" is reserved the same way.
-func IsHosbahOwned(name string) bool {
-	n := strings.ToLower(strings.TrimPrefix(name, "/"))
-	return strings.HasPrefix(n, "cloudy-") || strings.HasPrefix(n, "hosbah-") || n == "cloudy" || n == "hosbah"
-}
+// (cloudy-frpc), the agent — all start with "cloudy-"; "hosbah-" is reserved the same way. The same
+// check the agent applies to every imported-workload operation (agentproto.IsHosbahOwned).
+func IsHosbahOwned(name string) bool { return agentproto.IsHosbahOwned(name) }
 
 // baseDaemons are units of the operating system or of the host's own plumbing, never a site.
 var baseDaemons = []string{"sshd", "ssh", "cron", "crond", "dbus", "chrony", "chronyd", "rsyslog", "syslog", "snapd",
@@ -233,6 +232,33 @@ func ImageTag(image string) string {
 		return img[i+1:]
 	}
 	return "latest"
+}
+
+// Published is one host-published port: its bind address ("" = every interface) and host port.
+type Published struct {
+	Host string
+	Port int
+}
+
+// PublishedPorts is every host-published port in Docker's Ports column, in order, without repeats
+// (Docker lists 0.0.0.0 and :: separately for one binding).
+func PublishedPorts(ports []string) []Published {
+	var out []Published
+	seen := map[Published]bool{}
+	for _, p := range ports {
+		for _, part := range strings.Split(p, ",") {
+			h, n := FirstPublished([]string{part})
+			if n == 0 {
+				continue
+			}
+			pp := Published{Host: h, Port: n}
+			if !seen[pp] {
+				seen[pp] = true
+				out = append(out, pp)
+			}
+		}
+	}
+	return out
 }
 
 // FirstPublished is the first host-published port in Docker's Ports column

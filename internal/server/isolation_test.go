@@ -185,6 +185,7 @@ func TestIsolationSweep(t *testing.T) {
 		"credential": func(string) []string { return []string{credA.ID} },
 		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
 		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
+		"snapshot":   func(string) []string { return []string{"pre-up"} },
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
@@ -307,6 +308,12 @@ func TestIsolationSweep(t *testing.T) {
 		"get_app": {"app": impAppID}, "delete_app": {"app": impAppID, "confirm": "imp-site"}, "deploy_app": {"app": "imp-site"},
 		"get_database": {"database": impSvcID}, "delete_data_service": {"database": "imp-pg", "confirm": "imp-pg"},
 		"backup_now": {"database": impSvcID},
+		"workload_power": {"app": impAppID, "action": "stop"}, "workload_stats": {"app": impAppID}, "workload_logs": {"app": "imp-site"},
+		"recreate_container": {"app": impAppID}, "resize_guest": {"app": impAppID, "cores": 2}, "list_snapshots": {"app": impAppID},
+		"create_snapshot": {"app": impAppID, "name": "snap1"}, "rollback_snapshot": {"app": impAppID, "name": "snap1"},
+		"delete_snapshot": {"app": impAppID, "name": "snap1", "confirm": "imp-site"}, "backup_guest": {"app": impAppID},
+		"destroy_app": {"app": impAppID, "confirm": "imp-site"}, "destroy_data_service": {"database": impSvcID, "confirm": "imp-pg"},
+		"set_database_credentials": {"database": "imp-pg", "username": "u", "password": "p"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") {

@@ -90,3 +90,8 @@ WHERE id = $1 AND team_id = $2 AND source = 'imported' AND imported_state IS DIS
 -- name: DeleteImportedAppsOnServer :exec
 -- Removing a server forgets the workloads imported from it (records only; nothing runs on the host).
 DELETE FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
+
+-- name: SetImportedAppState :exec
+-- An imported app's state as a power action on it just left it (the next discovery confirms it).
+UPDATE apps SET imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';

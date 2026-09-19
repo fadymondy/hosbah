@@ -59,7 +59,9 @@ const (
 var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, KindAgentUpdate,
 	KindAppDetect, KindAppBuild, KindAppRelease, KindAppStart, KindRouteSet, KindAppDrain,
 	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel,
-	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove, KindProxySet, KindDBDrop, KindTunnelFrp, KindTunnelTailscale}
+	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove, KindProxySet, KindDBDrop, KindTunnelFrp, KindTunnelTailscale,
+	KindWorkloadPower, KindWorkloadLogs, KindWorkloadStats, KindGuestResize, KindGuestSnapshot, KindGuestBackup,
+	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.

@@ -25,7 +25,7 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "hosbah",
 		Version:       "0.1.0",
-		Tools:         append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...),
+		Tools:         append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...),
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {

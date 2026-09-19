@@ -17,7 +17,7 @@ import (
 // `failed` with the error, so the control plane never forgets a database that still exists on the
 // server, and its name stays taken until it really is gone. Dropping again retries.
 func (s *Service) DropDatabase(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, ref string) (db.Database, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return db.Database{}, err
 	}
 	if svc.Kind == "redis" {

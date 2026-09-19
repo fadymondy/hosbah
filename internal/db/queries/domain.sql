@@ -40,3 +40,6 @@ SELECT ((SELECT count(*) FROM domains d WHERE d.hostname = $1 AND d.tls = 'auto'
 -- name: HostnameTaken :one
 -- System scope: is this hostname routed anywhere in Hosbah (any team)?
 SELECT ((SELECT count(*) FROM domains d WHERE d.hostname = $1) + (SELECT count(*) FROM proxy_hosts p WHERE p.hostname = $1))::bigint AS n;
+
+-- name: SetDomainUpstream :exec
+UPDATE domains SET upstream = sqlc.narg('upstream'), updated_at = now() WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');

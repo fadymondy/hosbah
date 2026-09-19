@@ -28,7 +28,7 @@ type ScheduleInput struct {
 
 // SetSchedule creates or updates a service's single backup schedule.
 func (s *Service) SetSchedule(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, in ScheduleInput) (db.BackupSchedule, error) {
-	if err := refuseImported(svc); err != nil {
+	if err := usable(svc); err != nil {
 		return db.BackupSchedule{}, err
 	}
 	in.Cron = strings.TrimSpace(in.Cron)

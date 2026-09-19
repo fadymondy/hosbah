@@ -7,6 +7,7 @@ CREATE TABLE domains (
     tls text NOT NULL DEFAULT 'auto',
     verify_token text NOT NULL,
     verified_at timestamptz,
+    upstream text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -20,3 +21,9 @@ ALTER TABLE domains ADD CONSTRAINT domains_hostname_check CHECK (
     AND hostname ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
 CREATE UNIQUE INDEX domains_hostname_key ON domains (hostname);
 CREATE INDEX domains_app_idx ON domains (app_id);
+
+-- Imported apps: Hosbah did not start the workload, so the hostname is routed by a proxy.set route on
+-- the app's server (its Caddy) to where the workload listens: a container's published port
+-- ("127.0.0.1:8081") or a Proxmox guest's address and the port the user gave ("http://10.0.0.11:80").
+-- NULL for a Hosbah-built app, whose route follows the live release.
+ALTER TABLE domains ADD CONSTRAINT domains_upstream_check CHECK (upstream IS NULL OR length(upstream) <= 300);

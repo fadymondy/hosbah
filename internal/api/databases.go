@@ -12,6 +12,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
+	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -20,29 +21,30 @@ import (
 
 // DataServiceOut is a managed data service. Never the sealed root credential.
 type DataServiceOut struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	Kind      string     `json:"kind" enum:"postgres,mysql,redis,minio,mongodb" doc:"mongodb only for imported services"`
-	Version   string     `json:"version"`
-	Status    string     `json:"status" enum:"new,provisioning,running,failed,stopped"`
-	ServerID  string     `json:"server_id"`
-	Host      *string    `json:"host"`
-	Port      *int64     `json:"port"`
-	Error     *string    `json:"error"`
-	Container *string    `json:"container" doc:"The container name (managed, or an imported container)"`
-	Source        string           `json:"source" enum:"managed,imported" doc:"imported: found running on the server; Hosbah holds no credential and never backs it up or changes it"`
-	OriginKind    *string          `json:"origin_kind" doc:"imported only: container or guest"`
-	Origin        *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
-	ImportedState *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
-	LastSeenAt    *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Kind           string           `json:"kind" enum:"postgres,mysql,redis,minio,mongodb" doc:"mongodb only for imported services"`
+	Version        string           `json:"version"`
+	Status         string           `json:"status" enum:"new,provisioning,running,failed,stopped"`
+	ServerID       string           `json:"server_id"`
+	Host           *string          `json:"host"`
+	Port           *int64           `json:"port"`
+	Error          *string          `json:"error"`
+	Container      *string          `json:"container" doc:"The container name (managed, or an imported container)"`
+	Source         string           `json:"source" enum:"managed,imported" doc:"imported: found running on the server; controllable (power, stats, logs, destroy) and, once it has credentials, a normal database"`
+	OriginKind     *string          `json:"origin_kind" doc:"imported only: container or guest"`
+	Origin         *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
+	ImportedState  *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt     *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
+	HasCredentials bool             `json:"has_credentials" doc:"Whether Hosbah holds credentials for it (always for a managed service). An imported one gets them through POST …/credentials; until then databases, users and backups answer 409 credentials_required."`
+	CreatedAt      time.Time        `json:"created_at"`
 }
 
 // DatabaseOut / DatabaseUserOut / BackupOut / ScheduleOut are the detail page's rows.
 type DatabaseOut struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Status string  `json:"status"`
 	Error  *string `json:"error"`
 }
 type DatabaseUserOut struct {
@@ -89,7 +91,8 @@ type DataServiceDetailOut struct {
 func toDataServiceOut(s db.DataService) DataServiceOut {
 	return DataServiceOut{ID: s.ID, Name: s.Name, Kind: s.Kind, Version: s.Version, Status: s.Status,
 		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt, Container: s.Container,
-		Source: s.Source, OriginKind: s.OriginKind, Origin: originOf(s.Origin), ImportedState: s.ImportedState, LastSeenAt: s.LastSeenAt}
+		Source: s.Source, OriginKind: s.OriginKind, Origin: originOf(s.Origin), ImportedState: s.ImportedState, LastSeenAt: s.LastSeenAt,
+		HasCredentials: dbsvc.HasCredentials(s)}
 }
 func toBackupOut(b db.Backup) BackupOut {
 	return BackupOut{ID: b.ID, Kind: b.Kind, Status: b.Status, Target: b.Target, SizeBytes: b.SizeBytes,
@@ -222,15 +225,37 @@ func (d *deps) registerDatabases(api huma.API) {
 
 	huma.Register(api, huma.Operation{OperationID: "delete-data-service", Method: http.MethodDelete, Path: "/api/teams/{team}/data-services/{service}",
 		DefaultStatus: http.StatusNoContent, Tags: tags,
-		Summary: "Delete a data service, removing its container and volume from the server (owner or admin)",
-	}, func(ctx context.Context, in *ServicePath) (*struct{}, error) {
-		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+		Summary: "Delete a data service, removing its container and volume from the server (owner or admin). An imported one: only Hosbah's " +
+			"record goes (tombstoned), unless ?destroy=true with confirm = its name — then the real container or guest is destroyed (202 with " +
+			"the operation) and the record goes once the agent reports it gone.",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Destroy bool `query:"destroy" doc:"Imported services: destroy the real workload, then the record."`
+		Body    *struct {
+			Confirm string `json:"confirm,omitempty" maxLength:"64" doc:"With destroy: the service's name, exactly."`
+			Purge   bool   `json:"purge,omitempty" doc:"With destroy: pvesh --purge for a guest; a container's anonymous volumes too."`
+		}
+	}) (*workloadOpOut, error) {
+		out := &workloadOpOut{Status: http.StatusNoContent}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
 			svc, err := serviceIn(ctx, q, m, in.Service)
 			if err != nil {
 				return err
 			}
+			if in.Destroy {
+				if in.Body == nil || in.Body.Confirm != svc.Name {
+					return huma.Error422UnprocessableEntity("confirm must equal the service's name — nothing was destroyed")
+				}
+				op, err := d.deploys().Destroy(ctx, q, m.TeamID, webActor(id), deploy.WorkloadOfService(svc), in.Body.Purge)
+				if err != nil {
+					return actionErr(err, "could not destroy the workload")
+				}
+				out.Status, out.Body = http.StatusAccepted, &workloadOpBody{Operation: toOperationOut(op)}
+				return nil
+			}
 			return dbErr(d.dbs().DeleteService(ctx, q, m.TeamID, webActor(id), svc), "could not delete the data service")
 		})
+		return out, err
 	})
 
 	type dsDbCreatedOut struct {
@@ -386,8 +411,8 @@ func (d *deps) registerDatabases(api huma.API) {
 			if err != nil {
 				return err
 			}
-			if err := refuseImportedService(svc); err != nil {
-				return err
+			if err := dbsvc.CheckRestorable(svc); err != nil {
+				return dbErr(err, "could not start the restore-test")
 			}
 			b, err := q.BackupInTeam(ctx, db.BackupInTeamParams{ID: in.Backup, TeamID: m.TeamID})
 			if err != nil || b.DataServiceID != svc.ID {
