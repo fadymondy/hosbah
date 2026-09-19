@@ -161,3 +161,10 @@ func TestInitializeNegotiatesVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestArgsStrAcceptsNumbers(t *testing.T) {
+	a := Args{"deployment": float64(12), "s": " x ", "b": true, "big": float64(47001)}
+	if a.Str("deployment") != "12" || a.Str("s") != "x" || a.Str("b") != "true" || a.Str("big") != "47001" || a.Str("none") != "" {
+		t.Fatalf("got %q %q %q %q", a.Str("deployment"), a.Str("s"), a.Str("b"), a.Str("big"))
+	}
+}

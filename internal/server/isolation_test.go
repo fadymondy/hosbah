@@ -252,6 +252,7 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
 		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
 		"remove_proxy_host": {"proxy": proxyA.ID},
+		"list_sites": {"server": srvA},
 		"enable_tunnel": {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
 		"update_app": {"app": appA.App.ID, "branch": "x"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
 		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},

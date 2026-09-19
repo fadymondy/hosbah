@@ -277,6 +277,16 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 			}
 			_, err = q.FinishOperation(ctx, db.FinishOperationParams{Status: ev.Status, Result: res, ExitCode: code,
 				Error: errText, ID: op.ID, ServerID: ac.serverID})
+			// A fresh system.info refreshes what Cloudy shows for the server (its discovered services and
+			// guests, which become its sites), not only the operation's log.
+			if err == nil && op.Kind == agentproto.KindSystemInfo && ev.Status == agentproto.StatusOK && res != nil {
+				var r struct {
+					Facts json.RawMessage `json:"facts"`
+				}
+				if json.Unmarshal([]byte(*res), &r) == nil && len(r.Facts) > 2 {
+					err = q.RefreshServerFacts(ctx, db.RefreshServerFactsParams{Facts: string(r.Facts), ID: ac.serverID})
+				}
+			}
 		}
 		return err
 	})

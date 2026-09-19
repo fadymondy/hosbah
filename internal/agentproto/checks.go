@@ -41,6 +41,13 @@ type Service struct {
 	Image  string   `json:"image,omitempty"`
 	Status string   `json:"status"`
 	Ports  []string `json:"ports,omitempty"`
+	// Guests (Proxmox): the details that make each one a site.
+	ID        string `json:"id,omitempty"`   // vmid
+	Type      string `json:"type,omitempty"` // lxc | qemu
+	Address   string `json:"address,omitempty"`
+	CPUs      int    `json:"cpus,omitempty"`
+	MemBytes  uint64 `json:"mem_bytes,omitempty"`
+	DiskBytes uint64 `json:"disk_bytes,omitempty"`
 }
 
 // Platform is what Cloudy manages the host as: proxmox (a hypervisor), docker (an engine is

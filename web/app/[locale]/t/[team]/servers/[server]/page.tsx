@@ -218,7 +218,7 @@ export default function ServerPage() {
       ) : null}
 
       {server.status === "enrolled" ? <ServerTunnels serverId={server.id} manage={manage} /> : null}
-      {server.status === "enrolled" ? <Sites serverId={server.id} base={`/${locale}/t/${team.slug}`} manage={manage} /> : null}
+      {server.status === "enrolled" ? <Sites serverId={server.id} base={`/${locale}/t/${team.slug}`} manage={manage} imported={(server.facts?.services ?? []).filter((s) => s.kind === "guest" || s.kind === "container")} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="facts-h" className="flex flex-col gap-2">
@@ -546,7 +546,17 @@ function Discovered({ services, serverId, manage }: { services: DiscoveredServic
 }
 
 /** The server's sites (apps) and proxy hosts: the way into each site's canvas. */
-function Sites({ serverId, base, manage }: { serverId: string; base: string; manage: boolean }) {
+function Sites({
+  serverId,
+  base,
+  manage,
+  imported,
+}: {
+  serverId: string
+  base: string
+  manage: boolean
+  imported: DiscoveredService[]
+}) {
   const { t } = useI18n()
   const { team } = useTeam()
   const [apps, setApps] = useState<App[] | null>(null)
@@ -579,7 +589,7 @@ function Sites({ serverId, base, manage }: { serverId: string; base: string; man
       </div>
       {apps === null ? (
         <Skeleton className="h-20 w-full" />
-      ) : apps.length === 0 && proxies.length === 0 ? (
+      ) : apps.length === 0 && proxies.length === 0 && imported.length === 0 ? (
         <p className="border p-4 text-sm text-muted-foreground">{t("sites.empty")}</p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -596,6 +606,26 @@ function Sites({ serverId, base, manage }: { serverId: string; base: string; man
                   {a.domains?.[0]?.hostname ?? a.repo_url}
                 </span>
               </Link>
+            </li>
+          ))}
+          {imported.map((s) => (
+            <li key={`${s.kind}:${s.id ?? s.name}`} data-testid="imported-site">
+              <div className="flex h-full flex-col gap-2 border border-dotted p-4">
+                <span className="flex items-center justify-between gap-2">
+                  <span dir="ltr" className="font-medium">
+                    {s.name}
+                  </span>
+                  <span className="grid-micro text-muted-foreground">
+                    {s.kind === "guest" ? `${(s.type ?? "").toUpperCase()} ${s.id ?? ""}` : t("servers.discovered.kinds.container")}
+                  </span>
+                </span>
+                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
+                  {[s.address, s.cpus ? `${s.cpus} vCPU` : "", s.mem_bytes ? formatBytes(s.mem_bytes) : "", s.disk_bytes ? formatBytes(s.disk_bytes) : "", s.image && s.kind === "container" ? s.image : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                <span className="text-xs text-muted-foreground">{s.status}</span>
+              </div>
             </li>
           ))}
           {proxies.map((p) => (

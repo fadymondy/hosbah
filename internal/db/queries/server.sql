@@ -85,3 +85,7 @@ WHERE s.id = $1;
 -- name: ForgetServerConnectSecret :exec
 -- server.connect is done (either way): drop the sealed password/key; keep host, port and user.
 UPDATE servers SET spec = spec #- '{connect,secret_sealed}', updated_at = now() WHERE id = sqlc.arg('id')::text;
+
+-- name: RefreshServerFacts :exec
+-- Agent scope: a completed system.info replaces the server's facts (discovered services, guests…).
+UPDATE servers SET facts = sqlc.arg('facts')::jsonb, updated_at = now() WHERE id = sqlc.arg('id')::text;

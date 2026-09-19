@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,29 +111,62 @@ func unitExists(ctx context.Context, u string) bool {
 	return strings.TrimSpace(string(b)) != ""
 }
 
-// guests lists a Proxmox node's VMs and LXCs.
+// guests lists a Proxmox node's VMs and LXCs with the details that make each one a site: vmid,
+// type, cores, memory, disk, status, and its configured address.
 func guests(ctx context.Context) []agentproto.Service {
+	b, err := run(ctx, "pvesh", "get", "/cluster/resources", "--type", "vm", "--output-format", "json")
+	if err != nil {
+		return nil
+	}
+	var rs []struct {
+		VMID    int     `json:"vmid"`
+		Name    string  `json:"name"`
+		Type    string  `json:"type"`
+		Status  string  `json:"status"`
+		Node    string  `json:"node"`
+		MaxCPU  float64 `json:"maxcpu"`
+		MaxMem  uint64  `json:"maxmem"`
+		MaxDisk uint64  `json:"maxdisk"`
+	}
+	if json.Unmarshal(b, &rs) != nil {
+		return nil
+	}
+	host, _ := os.Hostname()
 	var out []agentproto.Service
-	for _, g := range []struct{ cmd, kind string }{{"qm", "vm"}, {"pct", "lxc"}} {
-		b, err := run(ctx, g.cmd, "list")
-		if err != nil {
+	for _, r := range rs {
+		if r.Node != "" && host != "" && r.Node != host {
+			continue // a cluster: only this node's guests belong to this server
+		}
+		id := strconv.Itoa(r.VMID)
+		s := agentproto.Service{Kind: "guest", Name: r.Name, Status: r.Status, ID: id, Type: r.Type,
+			CPUs: int(r.MaxCPU), MemBytes: r.MaxMem, DiskBytes: r.MaxDisk, Image: r.Type + " " + id}
+		s.Address = guestAddress(ctx, r.Type, id)
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { a, _ := strconv.Atoi(out[i].ID); b, _ := strconv.Atoi(out[j].ID); return a < b })
+	return out
+}
+
+// guestAddress reads a guest's configured IPv4 (ip= in an LXC's net0, a VM's cloud-init ipconfig0).
+func guestAddress(ctx context.Context, typ, id string) string {
+	tool, key := "pct", "net0"
+	if typ == "qemu" {
+		tool, key = "qm", "ipconfig0"
+	}
+	b, err := run(ctx, tool, "config", id)
+	if err != nil {
+		return ""
+	}
+	for _, l := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(l, key+":") {
 			continue
 		}
-		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
-		for _, l := range lines[min(1, len(lines)):] { // skip the header
-			f := strings.Fields(l)
-			if len(f) < 2 {
-				continue
+		for _, kv := range strings.Split(strings.TrimSpace(strings.TrimPrefix(l, key+":")), ",") {
+			if v, ok := strings.CutPrefix(kv, "ip="); ok && v != "dhcp" {
+				ip, _, _ := strings.Cut(v, "/")
+				return ip
 			}
-			// qm list: VMID NAME STATUS …   pct list: VMID Status [Lock] Name
-			s := agentproto.Service{Kind: "guest", Image: g.kind + " " + f[0]}
-			if g.kind == "vm" && len(f) >= 3 {
-				s.Name, s.Status = f[1], f[2]
-			} else {
-				s.Name, s.Status = f[len(f)-1], f[1]
-			}
-			out = append(out, s)
 		}
 	}
-	return out
+	return ""
 }

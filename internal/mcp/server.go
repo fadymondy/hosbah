@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/fadymondy/cloudy/internal/app"
@@ -340,10 +341,16 @@ func decodeArgs(raw json.RawMessage) Args {
 	return out
 }
 
-// Str returns a trimmed string argument ("" if absent or not a string).
+// Str returns a trimmed string argument ("" if absent). A number or bool is accepted too: clients
+// (the CLI, SDKs, LLMs) send "deployment": 12 as readily as "12".
 func (a Args) Str(k string) string {
-	if v, ok := a[k].(string); ok {
+	switch v := a[k].(type) {
+	case string:
 		return strings.TrimSpace(v)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(v)
 	}
 	return ""
 }

@@ -51,6 +51,12 @@ export type DiscoveredService = {
   image?: string
   status: string
   ports?: string[]
+  id?: string
+  type?: string
+  address?: string
+  cpus?: number
+  mem_bytes?: number
+  disk_bytes?: number
 }
 
 /** What Cloudy manages the host as — mirrors agentproto.Facts.Platform. */
