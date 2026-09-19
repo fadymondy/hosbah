@@ -35,7 +35,7 @@ func CredentialContext(id string) string   { return "credential:" + id }
 // configKeys are the non-secret settings each provider accepts.
 var configKeys = map[string][]string{
 	"proxmox": {"api_url", "token_id", "node", "storage", "bridge", "pool", "template_vmid", "lxc_template",
-		"snippets_storage", "snippets_dir", "tls_fingerprint", "insecure_tls"},
+		"snippets_storage", "snippets_dir", "tls_fingerprint", "insecure_tls", "lxc_features"},
 	"cloudflare": {"account_id"},
 }
 

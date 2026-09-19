@@ -40,6 +40,7 @@ type Driver struct {
 	pool         string
 	templateVMID int
 	lxcTemplate  string
+	lxcFeatures  string // features for new LXCs; "nesting=1,keyctl=1" by default (keyctl needs a root@pam token)
 	snippets     SnippetStore
 }
 
@@ -93,6 +94,7 @@ func NewWithSnippetStore(cred providers.Credential, store SnippetStore) (*Driver
 		bridgeSet:   cfg("bridge") != "",
 		pool:        cfg("pool"),
 		lxcTemplate: cfg("lxc_template"),
+		lxcFeatures: cfg("lxc_features"),
 		snippets:    store,
 	}
 	if !d.bridgeSet {
@@ -328,7 +330,10 @@ func (d *Driver) createVM(ctx context.Context, node string, vmid int, name, temp
 }
 
 func (d *Driver) createLXC(ctx context.Context, node string, vmid int, name, template string, size providers.Size, netCfg string, s providers.CreateSpec) error {
-	features := "nesting=1,keyctl=1" // Docker in an unprivileged container needs both
+	features := "nesting=1,keyctl=1" // Docker in an unprivileged container wants both
+	if d.lxcFeatures != "" {
+		features = d.lxcFeatures // a non-root token may only set nesting (Proxmox reserves the rest for root@pam)
+	}
 	if f := s.Options["features"]; f != "" {
 		features = f
 	}
@@ -355,10 +360,15 @@ func (d *Driver) createLXC(ctx context.Context, node string, vmid int, name, tem
 	if d.pool != "" {
 		p.Set("pool", d.pool)
 	}
-	if tags := pveTags(s.Tags); tags != "" {
-		p.Set("tags", tags)
+	if err := d.c.startTask(ctx, http.MethodPost, "/nodes/"+url.PathEscape(node)+"/lxc", p); err != nil {
+		return err
 	}
-	return d.c.startTask(ctx, http.MethodPost, "/nodes/"+url.PathEscape(node)+"/lxc", p)
+	// Tags after the fact: at create time Proxmox checks them against /vms/<id>, which a pool-scoped
+	// token only gets once the guest is in the pool. Best effort: a tag is not worth failing over.
+	if tags := pveTags(s.Tags); tags != "" {
+		_ = d.c.do(ctx, http.MethodPut, "/nodes/"+url.PathEscape(node)+"/lxc/"+strconv.Itoa(vmid)+"/config", url.Values{"tags": {tags}}, nil)
+	}
+	return nil
 }
 
 // Get reports a guest's status and, when it is running, its addresses. A VM's addresses come from
@@ -444,6 +454,11 @@ func (d *Driver) Delete(ctx context.Context, id string) error {
 	}
 	if err := d.c.do(ctx, http.MethodGet, base+"/status/current", nil, &st); err != nil {
 		if isNotFound(err) {
+			return nil
+		}
+		// With a pool-scoped token every guest Cloudy creates is in the pool and visible. A guest it
+		// may not even audit was never created by it (a create refused before allocation, say): gone.
+		if d.pool != "" && invisibleGuest(err) {
 			return nil
 		}
 		return err
@@ -692,4 +707,11 @@ func pickIPs(addrs []ifaceAddr) (ipv4, ipv6, private string) {
 		ipv4 = private
 	}
 	return ipv4, ipv6, private
+}
+
+// invisibleGuest reports a 403 on the guest's own path (VM.Audit on /vms/<id>): the token cannot see
+// that guest at all, as opposed to a bad token (401) or a missing node privilege.
+func invisibleGuest(err error) bool {
+	msg := err.Error()
+	return errors.Is(err, ErrUnauthorized) && strings.Contains(msg, "Permission check failed (/vms/") && strings.Contains(msg, "VM.Audit")
 }
