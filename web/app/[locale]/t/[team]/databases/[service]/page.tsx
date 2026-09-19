@@ -29,6 +29,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import { humanBytes, type DataServiceDetail } from "@/lib/databases"
+import { isImported } from "@/lib/apps"
+import { ImportedDatabaseView } from "@/components/imported-view"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -77,6 +79,8 @@ export default function DataServicePage() {
   }
 
   const s = detail.service
+  // An imported database is shown read-only: Hosbah has no credentials for it and never changes it.
+  if (isImported(s)) return <ImportedDatabaseView service={s} />
   const isRedis = s.kind === "redis"
 
   const actions = manage ? (

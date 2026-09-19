@@ -44,13 +44,38 @@ export type Domain = {
   created_at: string
 }
 
-export type App = {
+/**
+ * A workload Hosbah found already running on a connected server (a container, a Proxmox guest or
+ * a service) and imported as a record. Hosbah shows it but never deploys, changes or removes it.
+ */
+export type Imported = {
+  source?: "git" | "imported"
+  origin_kind?: "container" | "systemd" | "guest" | null
+  /** Stable identity on the server: the container or unit name, or "guest:<vmid>". */
+  origin_key?: string | null
+  origin?: {
+    image?: string
+    ports?: string[]
+    address?: string
+    guest_type?: "lxc" | "qemu" | string
+    cpus?: number
+    mem_bytes?: number
+    disk_bytes?: number
+    status?: string
+  } | null
+  imported_state?: "running" | "stopped" | "missing" | null
+  last_seen_at?: string | null
+}
+
+export const isImported = (x: { source?: string } | null | undefined) => x?.source === "imported"
+
+export type App = Imported & {
   id: string
   name: string
   server_id: string
   server_name?: string
-  repo_url: string
-  branch: string
+  repo_url: string | null
+  branch: string | null
   runtime: string | null
   port: number
   healthcheck_path: string

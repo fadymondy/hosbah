@@ -31,7 +31,7 @@ export function SettingsPanel({
   const { t } = useI18n()
   const errorText = useErrorText()
   const app = detail.app
-  const [branch, setBranch] = useState(app.branch)
+  const [branch, setBranch] = useState(app.branch ?? "")
   const [port, setPort] = useState(String(app.port))
   const [healthPath, setHealthPath] = useState(app.healthcheck_path)
   const [healthTimeout, setHealthTimeout] = useState(String(app.healthcheck_timeout))

@@ -25,6 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import type { DataService, DataServiceKind } from "@/lib/databases"
+import { isImported } from "@/lib/apps"
+import { ImportedBadge } from "@/components/imported"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import type { Server } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
@@ -106,7 +108,11 @@ export default function DatabasesPage() {
                     {s.kind} {s.version}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(s.status)}>{t(`databases.statuses.${s.status}`)}</Badge>
+                    {isImported(s) ? (
+                      <ImportedBadge item={s} />
+                    ) : (
+                      <Badge variant={statusVariant(s.status)}>{t(`databases.statuses.${s.status}`)}</Badge>
+                    )}
                   </TableCell>
                   <TableCell dir="ltr" className="text-muted-foreground">
                     {s.host && s.port ? `${s.host}:${s.port}` : "—"}

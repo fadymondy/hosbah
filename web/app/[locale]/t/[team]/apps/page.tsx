@@ -6,13 +6,14 @@ import { BoxesIcon, PlusIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge, DeploymentStatusBadge } from "@/components/app-status"
+import { ImportedBadge, originSummary } from "@/components/imported"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
-import { runtimeLabel, shortSha, type App } from "@/lib/apps"
+import { isImported, runtimeLabel, shortSha, type App } from "@/lib/apps"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -94,11 +95,11 @@ export default function AppsPage() {
                         {a.name}
                       </Link>
                       <div dir="ltr" className="max-w-64 truncate text-start font-mono text-xs text-muted-foreground">
-                        {a.branch}
+                        {isImported(a) ? originSummary(a, t) : a.branch}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <AppStatusBadge status={a.status} />
+                      {isImported(a) ? <ImportedBadge item={a} /> : <AppStatusBadge status={a.status} />}
                     </TableCell>
                     <TableCell dir="ltr" className="text-start font-mono text-xs">
                       {a.server_name ? (
@@ -113,7 +114,9 @@ export default function AppsPage() {
                       {runtimeLabel(a.runtime) ?? "—"}
                     </TableCell>
                     <TableCell>
-                      {d ? (
+                      {isImported(a) ? (
+                        <span className="text-xs text-muted-foreground">{t("imported.notDeployed")}</span>
+                      ) : d ? (
                         <div className="flex flex-col items-start gap-1">
                           <div className="flex items-center gap-2">
                             <span dir="ltr" className="font-mono text-xs">

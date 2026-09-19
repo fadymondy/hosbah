@@ -1,9 +1,10 @@
+import type { Imported } from "@/lib/apps"
 // Types for the P3 managed-data-services surface, matching internal/api/databases.go.
 
-export type DataServiceKind = "postgres" | "mysql" | "redis" | "minio"
+export type DataServiceKind = "postgres" | "mysql" | "redis" | "minio" | "mongodb"
 export type DataServiceStatus = "new" | "provisioning" | "running" | "failed" | "stopped"
 
-export interface DataService {
+export interface DataService extends Imported {
   id: string
   name: string
   kind: DataServiceKind

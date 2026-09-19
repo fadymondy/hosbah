@@ -37,7 +37,8 @@ import {
   type Operation,
   type Server,
 } from "@/lib/servers"
-import type { App } from "@/lib/apps"
+import { isImported, type App } from "@/lib/apps"
+import { ImportedBadge, originSummary } from "@/components/imported"
 import { useTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
@@ -550,6 +551,10 @@ function Sites({
   const { team } = useTeam()
   const [apps, setApps] = useState<App[] | null>(null)
   const [proxies, setProxies] = useState<ProxyHost[]>([])
+  // Discovered workloads become imported records; the raw report is only shown for what has not
+  // been converted yet (for example before the first sync after connecting).
+  const recorded = new Set((apps ?? []).map((a) => a.origin_key).filter(Boolean))
+  const pending = imported.filter((s) => !recorded.has(s.kind === "guest" ? `guest:${s.id}` : s.name))
 
   useEffect(() => {
     apiFetch<{ apps: App[] }>(`/api/teams/${team.slug}/apps`)
@@ -577,29 +582,29 @@ function Sites({
       />
       {apps === null ? (
         <LoadingRows rows={2} />
-      ) : apps.length === 0 && proxies.length === 0 && imported.length === 0 ? (
+      ) : apps.length === 0 && proxies.length === 0 && pending.length === 0 ? (
         <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("sites.empty")}</p>
       ) : (
         <ul className="grid gap-px border-b border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
           {apps.map((a) => (
             <li key={a.id} className="bg-grid-bg">
               <Link
-                href={`${base}/servers/${serverId}/sites/${a.id}`}
+                href={isImported(a) ? `${base}/apps/${a.name}` : `${base}/servers/${serverId}/sites/${a.id}`}
                 className="flex h-full flex-col gap-2 px-6 py-4 hover:bg-grid-soft"
               >
                 <span className="flex items-center justify-between gap-2">
                   <span dir="ltr" className="font-medium text-grid-fg">
                     {a.name}
                   </span>
-                  <AppStatusBadge status={a.status} />
+                  {isImported(a) ? <ImportedBadge item={a} /> : <AppStatusBadge status={a.status} />}
                 </span>
                 <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
-                  {a.domains?.[0]?.hostname ?? a.repo_url}
+                  {isImported(a) ? originSummary(a, t) : (a.domains?.[0]?.hostname ?? a.repo_url)}
                 </span>
               </Link>
             </li>
           ))}
-          {imported.map((s) => (
+          {pending.map((s) => (
             <li key={`${s.kind}:${s.id ?? s.name}`} data-testid="imported-site" className="bg-grid-bg">
               <div className="flex h-full flex-col gap-2 bg-grid-soft/50 px-6 py-4">
                 <span className="flex items-center justify-between gap-2">

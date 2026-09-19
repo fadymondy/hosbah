@@ -1174,5 +1174,46 @@
       "failed": "Failed",
       "removing": "Closing…"
     }
+  },
+  "imported": {
+    "badge": "Imported",
+    "eyebrowApp": "Imported site",
+    "eyebrowDatabase": "Imported database",
+    "notDeployed": "Runs outside Hosbah",
+    "noticeTitle": "Found on this server",
+    "noticeApp": "Hosbah found this site already running and keeps it in sync with the server. It shows it here but never deploys, restarts, reconfigures or removes it.",
+    "noticeDatabase": "Hosbah found this database already running on the server. It lists it here but has no credentials for it, so it does not back it up, add users or change it.",
+    "remove": "Remove from Hosbah",
+    "removeTitle": "Remove the record",
+    "removeHint": "Hosbah stops showing it. The workload keeps running on the server, untouched.",
+    "removeConfirmTitle": "Remove {name} from Hosbah?",
+    "removeConfirmBody": "Only the record is removed; {name} keeps running on the server. Hosbah will not import it again.",
+    "states": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "missing": "Not seen on the server"
+    },
+    "kinds": {
+      "container": "Container",
+      "systemd": "Service",
+      "guest": "Guest"
+    },
+    "guest": {
+      "lxc": "LXC guest",
+      "qemu": "VM guest",
+      "guest": "Guest"
+    },
+    "facts": {
+      "kind": "Kind",
+      "state": "State",
+      "lastSeen": "Last seen",
+      "image": "Image",
+      "address": "Address",
+      "ports": "Ports",
+      "cpus": "vCPUs",
+      "memory": "Memory",
+      "disk": "Disk",
+      "endpoint": "Endpoint"
+    }
   }
 }

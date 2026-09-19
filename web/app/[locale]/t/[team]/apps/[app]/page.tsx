@@ -20,7 +20,8 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { apiFetch, ApiError } from "@/lib/api"
-import { appPath, isActive, runtimeLabel, shortSha, type AppDetail, type Deployment } from "@/lib/apps"
+import { appPath, isActive, isImported, runtimeLabel, shortSha, type AppDetail, type Deployment } from "@/lib/apps"
+import { ImportedAppView } from "@/components/imported-view"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { canOperate, useEventStream } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
@@ -105,6 +106,9 @@ export default function AppPage() {
       </PageBody>
     )
   }
+
+  // An imported workload is shown read-only: Hosbah never deploys or changes it.
+  if (isImported(app)) return <ImportedAppView app={app} apiPath={path} />
 
   const live = detail.live_release
   const prev = detail.previous_release
