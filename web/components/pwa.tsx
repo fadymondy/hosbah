@@ -10,7 +10,7 @@ export function RegisterServiceWorker() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return
     // Versioned URL: an edge cache may hold an old response for the bare /sw.js; bump with sw.js.
-    navigator.serviceWorker.register("/sw.js?v=1", { scope: "/" }).catch(() => {
+    navigator.serviceWorker.register("/sw.js?v=2", { scope: "/" }).catch(() => {
       // Not fatal: the app works the same without it, only without install/offline support.
     })
   }, [])

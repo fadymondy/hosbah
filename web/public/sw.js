@@ -6,15 +6,19 @@
   - Hashed build assets (/_next/static), icons and fonts are cache-first: they never change.
   Bump VERSION to drop every old cache on the next visit.
 */
-const VERSION = "hosbah-v1"
+const VERSION = "hosbah-v2"
 const STATIC = `${VERSION}-static`
 const OFFLINE = "/offline.html"
+
+// Each file is cached on its own: one that fails (an edge cache serving a stale 404, a network
+// blip) must not fail the install, or the browser drops the worker altogether.
+const PRECACHE = [OFFLINE, "/icons/icon-192.png"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(STATIC)
-      .then((c) => c.addAll([OFFLINE, "/icons/icon-192.png", "/icon.svg"]))
+      .then((c) => Promise.allSettled(PRECACHE.map((u) => c.add(u))))
       .then(() => self.skipWaiting()),
   )
 })
