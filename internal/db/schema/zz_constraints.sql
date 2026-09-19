@@ -43,3 +43,7 @@ ALTER TABLE tunnels ADD CONSTRAINT tunnels_server_fk FOREIGN KEY (server_id, tea
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_credential_fk FOREIGN KEY (credential_id) REFERENCES credentials (id) ON DELETE RESTRICT;
 -- Imported workloads: the tombstones of deleted imported records go with their server.
 ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+-- Server metrics history goes with its server.
+ALTER TABLE server_metrics ADD CONSTRAINT server_metrics_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+
+ALTER TABLE server_logos ADD CONSTRAINT server_logos_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;

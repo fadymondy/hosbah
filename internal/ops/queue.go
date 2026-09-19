@@ -65,6 +65,14 @@ func Timeout(kind string) time.Duration {
 		return 45 * time.Minute // a snapshot with RAM, a rollback, an image pull
 	case agentproto.KindGuestBackup:
 		return 6 * time.Hour // vzdump of a large guest
+	case agentproto.KindGitHubLogin:
+		return 17 * time.Minute // GitHub's device code lives 15 minutes
+	case agentproto.KindGitHubInstall:
+		return 10 * time.Minute
+	case agentproto.KindGitHubStatus, agentproto.KindGitHubLogout, agentproto.KindGitHubBranches:
+		return 2 * time.Minute
+	case agentproto.KindGitHubRepos:
+		return 3 * time.Minute
 	}
 	return 10 * time.Minute
 }

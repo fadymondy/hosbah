@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -108,9 +109,23 @@ func AppTools() []Tool {
 		},
 		{
 			Name: "list_deployments", Scope: scopes.Read,
-			Description: "An app's deployments, newest first: number, kind, status, step, commit, error.",
-			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "limit": map[string]any{"type": "integer", "default": 20, "maximum": 100}}),
+			Description: "Deployments, newest first. With app: that app's deployments (number, kind, status, step, commit, error). " +
+				"Without app: the team's latest deployments across every app, as JSON {deployments:[{id, number, app:{id,name}, server:{id,name}, status, kind, branch, " +
+				"commit_sha, commit_message, trigger, triggered_by:{email}|null, created_at, finished_at}], next_cursor} — pass next_cursor as before for the next page.",
+			InputSchema: schema(nil, map[string]any{"app": appArg, "limit": map[string]any{"type": "integer", "default": 20, "maximum": 100},
+				"before": str("Team feed only: next_cursor of the previous page")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if args.Str("app") == "" {
+					f, err := deploy.TeamFeed(ctx, env.Q, env.Caller.TeamID, args.Int("limit", 20, 1, 100), args.Str("before"))
+					if err != nil {
+						if errors.Is(err, deploy.ErrBadCursor) {
+							return "", err
+						}
+						return "", errors.New("could not list deployments")
+					}
+					b, _ := json.Marshal(f)
+					return string(b), nil
+				}
 				a, err := findApp(ctx, env, args)
 				if err != nil {
 					return "", err

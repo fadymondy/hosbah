@@ -191,6 +191,7 @@ func TestIsolationSweep(t *testing.T) {
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
+		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
 		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg"} }, // services B may not see (one of A's imported)
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
@@ -288,11 +289,18 @@ func TestIsolationSweep(t *testing.T) {
 		"update_app": {"app": appA.App.ID, "branch": "x"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
 		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},
 		"update_member_role": {"member": memberA, "role": "viewer"}, "delete_credential": {"credential": credA.ID, "confirm": "pve-a"},
+		"github_status": {"server": srvA, "refresh": true}, "github_connect": {"server": srvA, "token": "ghp_sweep"},
+		"github_disconnect": {"server": srvA}, "github_repos": {"server": srvA}, "github_branches": {"server": srvA, "repo": "octocat/api"},
+		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
 			t.Errorf("MCP %s as team B on team A's app should be not found: %+v", name, res)
 		}
+	}
+	// The team-wide deployment feed (list_deployments without an app) is B's own only.
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_deployments", nil); res.IsError || strings.Contains(res.Text, appA.App.ID) || strings.Contains(res.Text, appA.Deployment.ID) {
+		t.Errorf("list_deployments (team feed) as B leaked team A's deployments: %+v", res)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_proxy_hosts", nil); strings.Contains(res.Text, proxyA.Hostname) {
 		t.Errorf("list_proxy_hosts as B leaked team A's proxy host: %s", res.Text)

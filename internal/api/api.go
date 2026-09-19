@@ -39,13 +39,17 @@ type deps struct {
 // Register mounts every Hosbah route. a and svc may be nil (OpenAPI export only).
 func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d := &deps{a: a, ops: svc}
+	d.registerHome(api) // before registerServers: /servers/metrics is a literal, not a {server}
 	d.registerServers(api)
+	d.registerServerAppearance(api)
+	d.registerServerLogo(api)
 	d.registerOperations(api)
 	d.registerApps(api)
 	d.registerWorkloads(api)
 	d.registerDatabases(api)
 	d.registerProxyHosts(api)
 	d.registerTunnels(api)
+	d.registerGitHub(api)
 	d.registerCredentials(api)
 	d.registerMe(api)
 	d.registerTeams(api)

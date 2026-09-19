@@ -1,0 +1,11 @@
+/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,size=1631740k,mode=755 0 0
+overlay /var/lib/docker/overlay2/abc/merged overlay rw,relatime 0 0
+/dev/sda1 /var/lib/docker/volumes ext4 rw,relatime 0 0
+/dev/sdb1 /mnt/data\040disk xfs rw,relatime 0 0
+/dev/sda15 /boot/efi vfat rw,relatime 0 0
+rpool/ROOT/pve-1 /srv zfs rw,xattr 0 0
+rpool/data /rpool/data zfs rw,xattr 0 0
+cgroup2 /sys/fs/cgroup cgroup2 rw 0 0
+/dev/loop0 /snap/core/1 squashfs ro 0 0

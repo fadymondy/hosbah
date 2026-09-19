@@ -1,0 +1,4 @@
+00:00.0 "Host bridge" "Intel Corporation" "8th Gen Core Processor Host Bridge/DRAM Registers" -r07 "Dell" "Device 0869"
+00:02.0 "VGA compatible controller" "Intel Corporation" "UHD Graphics 630 (Desktop)" -p00 "Dell" "Device 0869"
+01:00.0 "3D controller" "Advanced Micro Devices, Inc. [AMD/ATI]" "Navi 21 [Radeon RX 6800]" -rc1 "" ""
+00:1f.3 "Audio device" "Intel Corporation" "Cannon Lake PCH cAVS" -r10 "Dell" "Device 0869"

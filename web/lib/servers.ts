@@ -83,6 +83,11 @@ export type Server = {
   arch: string | null
   kernel: string | null
   agent_version: string | null
+  /** Appearance set in the server settings (all optional). */
+  color?: string | null
+  icon?: string | null
+  logo_url?: string | null
+  tunnel?: { kind: string; status: string; address?: string | null } | null
   error: string | null
   metrics: Metrics | null
   checks: Check[]

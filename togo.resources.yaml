@@ -1568,6 +1568,21 @@ resources:
           gql: String
           pg: jsonb
           "null": true
+        - name: color
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: icon
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: logo_url
+          go: string
+          gql: String
+          pg: text
+          "null": true
         - name: error
           go: string
           gql: String
@@ -1588,6 +1603,80 @@ resources:
           gql: String
           pg: timestamptz
           "null": true
+      controller: true
+    - name: ServerMetric
+      table: server_metrics
+      fields:
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: step
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: samples
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: cpu_percent
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: mem_used
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: mem_total
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: disk_used
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: disk_total
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: load1
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: net_rx
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: net_tx
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: gpu
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
       controller: true
     - name: Team
       table: teams

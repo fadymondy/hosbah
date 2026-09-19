@@ -36,6 +36,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterReportRoutes(api, a)
 	RegisterReportCommentRoutes(api, a)
 	RegisterServerRoutes(api, a)
+	RegisterServerMetricRoutes(api, a)
 	RegisterTeamRoutes(api, a)
 	RegisterTeamMemberRoutes(api, a)
 	RegisterTunnelRoutes(api, a)

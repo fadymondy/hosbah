@@ -38,3 +38,4 @@ CREATE UNIQUE INDEX deployments_one_running ON deployments (app_id) WHERE status
 CREATE UNIQUE INDEX deployments_one_queued ON deployments (app_id) WHERE status = 'queued';
 CREATE INDEX deployments_queue_idx ON deployments (status, created_at) WHERE status IN ('queued', 'running');
 CREATE INDEX deployments_app_idx ON deployments (app_id, created_at);
+CREATE INDEX deployments_team_feed_idx ON deployments (team_id, created_at DESC, id DESC);

@@ -23,7 +23,10 @@ type Agent struct {
 	Version        string
 	Log            *slog.Logger
 	HeartbeatEvery time.Duration
-	Exec           *Executor
+	// MetricsEvery is the cadence of the light "metrics" readings between heartbeats (live
+	// charts). 0 sends none.
+	MetricsEvery time.Duration
+	Exec         *Executor
 
 	priv    ed25519.PrivateKey
 	sampler *Sampler
@@ -43,7 +46,7 @@ func New(st *State, version string, log *slog.Logger) (*Agent, error) {
 		log = slog.Default()
 	}
 	a := &Agent{
-		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second,
+		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second, MetricsEvery: 5 * time.Second,
 		priv: priv, sampler: NewSampler(), live: make(chan agentproto.Event, 4096),
 	}
 	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
@@ -162,6 +165,9 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 	// The first (immediate) beat skips the Docker probe so a reconnect is fast; later beats carry
 	// a fresh reading at a slower cadence, which the control plane merges into facts.docker.
 	nextDocker := time.Now().Add(a.HeartbeatEvery)
+	// NVIDIA GPUs are read once a minute; the beats between repeat the last reading.
+	var lastGPUs []agentproto.GPUMetric
+	nextGPU := time.Now()
 	heartbeat := func() error {
 		m := a.sampler.Sample()
 		if now := time.Now(); !now.Before(nextDocker) {
@@ -169,7 +175,20 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 			m.Docker = &d
 			nextDocker = now.Add(2 * time.Minute)
 		}
+		if now := time.Now(); !now.Before(nextGPU) {
+			lastGPUs = nvidiaMetrics(ctx)
+			nextGPU = now.Add(time.Minute)
+		}
+		m.GPUs = lastGPUs
 		return send(agentproto.Frame{Type: agentproto.TypeHeartbeat, Metrics: &m, AgentVersion: a.Version})
+	}
+	// Between heartbeats, light readings for live charts: CPU, memory, disk, load, network and the
+	// last GPU reading, no Docker probe. The control plane keeps one history row per minute.
+	var mt <-chan time.Time
+	if a.MetricsEvery > 0 {
+		t := time.NewTicker(a.MetricsEvery)
+		defer t.Stop()
+		mt = t.C
 	}
 	if err := heartbeat(); err != nil {
 		return err
@@ -180,6 +199,12 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 			return ctx.Err()
 		case <-hb.C:
 			if err := heartbeat(); err != nil {
+				return err
+			}
+		case <-mt:
+			m := a.sampler.Sample()
+			m.GPUs = lastGPUs
+			if err := send(agentproto.Frame{Type: agentproto.TypeMetrics, Metrics: &m}); err != nil {
 				return err
 			}
 		case ev := <-a.live:

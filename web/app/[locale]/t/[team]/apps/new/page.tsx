@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, ScanSearchIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
+import { RepoPicker } from "@/components/apps/repo-picker"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Notice } from "@/components/states"
@@ -185,8 +186,31 @@ export default function NewAppPage() {
               />
               <FieldDescription>{t("apps.new.nameHint")}</FieldDescription>
             </Field>
+            {server ? (
+              <Field>
+                <FieldLabel>{t("github.pickRepo")}</FieldLabel>
+                <RepoPicker
+                  team={team.slug}
+                  serverId={server}
+                  connected={!!(servers?.find((s) => s.id === server) as { github?: { connected?: boolean } } | undefined)?.github?.connected}
+                  base={`/${locale}/t/${team.slug}`}
+                  value={repo}
+                  onPick={(url, def) => {
+                    setRepo(url)
+                    if (def) setBranch(def)
+                    setDetectOp(null)
+                  }}
+                  branch={branch}
+                  onBranch={(b) => {
+                    setBranch(b)
+                    setDetectOp(null)
+                  }}
+                />
+                <FieldDescription>{t("github.pickRepoHint")}</FieldDescription>
+              </Field>
+            ) : null}
             <Field>
-              <FieldLabel htmlFor="app-repo">{t("apps.repo")}</FieldLabel>
+              <FieldLabel htmlFor="app-repo">{server ? t("github.typeUrl") : t("apps.repo")}</FieldLabel>
               <Input
                 id="app-repo"
                 dir="ltr"

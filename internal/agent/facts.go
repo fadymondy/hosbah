@@ -25,6 +25,10 @@ func CollectFacts(ctx context.Context) agentproto.Facts {
 	f.Docker = DockerInfo(ctx)
 	f.Proxmox = ProxmoxInfo(ctx)
 	f.Services = DiscoverServices(ctx, f.Docker.Running, f.Proxmox.Installed)
+	f.Hardware = collectHardware(ctx)
+	if f.Hardware.PublicIP == "" && isPublicIP(net.ParseIP(f.PrimaryIP)) {
+		f.Hardware.PublicIP = f.PrimaryIP
+	}
 	for _, p := range agentproto.PortsToCheck {
 		f.Ports[p] = portFree(p)
 	}

@@ -21,6 +21,10 @@ CREATE TABLE servers (
     facts jsonb,
     checks jsonb,
     metrics jsonb,
+    github jsonb,
+    color text,
+    icon text,
+    logo_url text,
     spec jsonb,
     error text,
     created_by text NOT NULL,
@@ -40,3 +44,15 @@ ALTER TABLE servers ADD CONSTRAINT servers_status_check CHECK (status IN ('pendi
 CREATE UNIQUE INDEX servers_team_name_key ON servers (team_id, name);
 CREATE UNIQUE INDEX servers_id_team_key ON servers (id, team_id);
 CREATE INDEX servers_team_idx ON servers (team_id, created_at);
+
+-- github: what the server's GitHub CLI (gh) connection last reported — {installed, version,
+-- connected, user, scopes, checked_at} and, while a device login waits for a human, pending
+-- {operation, user_code, verification_uri, expires_at}. Written from github.* operation results
+-- (agent scope); never a token (gh keeps its login on the server, in /etc/cloudy/gh).
+
+-- color / icon / logo_url: how the team styles the server (home page cards and elsewhere). color is
+-- #RRGGBB; icon is a key from the allowlist in internal/provisioning/appearance.go; logo_url is an
+-- https image shown instead of the icon. NULL is the default look.
+ALTER TABLE servers ADD CONSTRAINT servers_color_check CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$');
+ALTER TABLE servers ADD CONSTRAINT servers_icon_check CHECK (icon IS NULL OR icon IN ('server', 'database', 'globe', 'cloud', 'cpu', 'box', 'rocket', 'shield', 'code', 'terminal', 'layers', 'zap', 'flame', 'leaf', 'star', 'heart', 'briefcase', 'home', 'store', 'graduation-cap', 'building', 'gamepad', 'music', 'camera'));
+ALTER TABLE servers ADD CONSTRAINT servers_logo_url_check CHECK (logo_url IS NULL OR (logo_url LIKE 'https://%' AND length(logo_url) <= 500));

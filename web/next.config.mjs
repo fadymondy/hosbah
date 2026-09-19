@@ -4,7 +4,7 @@ const nextConfig = {
   agentRules: false,
   // cloudy-app.fadymondy.com is the progress preview: Cloudflare → NPM → SSH reverse tunnel → this dev
   // server. Next 16 dev won't hydrate a page served to an origin that isn't listed here.
-  allowedDevOrigins: ["127.0.0.1", "localhost", "cloudy-app.fadymondy.com"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "cloudy-app.fadymondy.com", "dev.hosbah.com"],
   // The browser only talks to this origin: /api/* is proxied to the Go API, so
   // the togo session cookie (HttpOnly) and CSRF cookie are first-party.
   async rewrites() {

@@ -45,6 +45,9 @@ const (
 	TypeEvent     = "event"
 	TypeHeartbeat = "heartbeat"
 	TypeError     = "error"
+	// TypeMetrics is a light, frequent reading (agent -> server, Metrics only) between heartbeats,
+	// for live charts. It does not count as a heartbeat; control planes that predate it ignore it.
+	TypeMetrics = "metrics"
 )
 
 // Operation kinds. Typed only: there is no free-form shell.
@@ -61,7 +64,8 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel,
 	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove, KindProxySet, KindDBDrop, KindTunnelFrp, KindTunnelTailscale,
 	KindWorkloadPower, KindWorkloadLogs, KindWorkloadStats, KindGuestResize, KindGuestSnapshot, KindGuestBackup,
-	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe}
+	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe,
+	KindGitHubInstall, KindGitHubLogin, KindGitHubStatus, KindGitHubLogout, KindGitHubRepos, KindGitHubBranches}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.
@@ -127,7 +131,10 @@ type Event struct {
 	ExitCode *int            `json:"exit_code,omitempty"`
 	Result   json.RawMessage `json:"result,omitempty"`
 	Error    string          `json:"error,omitempty"`
-	At       time.Time       `json:"at"`
+	// Data is a typed payload a client can act on while the operation runs (a JSON object with a
+	// "type", e.g. DataGitHubDeviceCode). Old agents never send it; old control planes drop it.
+	Data json.RawMessage `json:"data,omitempty"`
+	At   time.Time       `json:"at"`
 }
 
 // ResumeEntry: the server holds events of OpID up to LastSeq.
@@ -150,6 +157,13 @@ type Metrics struct {
 	// the server's facts.docker so it does not go stale after enrolment. Sampled at a slower
 	// cadence than the rest of the heartbeat, so it is nil on most beats.
 	Docker *DockerFacts `json:"docker,omitempty"`
+	// GPUs is the last NVIDIA reading (nvidia-smi, re-read on a slower cadence and repeated on
+	// the beats between). Empty without an NVIDIA GPU or from older agents.
+	GPUs []GPUMetric `json:"gpus,omitempty"`
+	// NetRxBytesPerSec / NetTxBytesPerSec: traffic since the previous beat over the host's
+	// non-virtual interfaces (/proc/net/dev deltas). Zero on the first beat.
+	NetRxBytesPerSec float64 `json:"net_rx_bytes_per_sec,omitempty"`
+	NetTxBytesPerSec float64 `json:"net_tx_bytes_per_sec,omitempty"`
 }
 
 // ---- signing ---------------------------------------------------------------------------------

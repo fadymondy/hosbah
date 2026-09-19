@@ -75,3 +75,18 @@ WHERE id = sqlc.arg('id') AND status = 'running';
 -- name: NextDeploymentLogSeq :one
 -- The row lock serialises concurrent writers (the agent's events and the worker's own lines).
 UPDATE deployments SET last_seq = last_seq + 1 WHERE id = $1 RETURNING last_seq, app_id;
+
+-- name: TeamDeploymentFeed :many
+-- Team scope: the team's deployments across every app, newest first, keyset-paginated on
+-- (created_at, id). triggered_by_email is the account that asked (null when created_by is not
+-- an account: a deploy hook or a GitHub push).
+SELECT d.id, d.number, d.app_id, a.name AS app_name, d.server_id, s.name AS server_name, d.status, d.ref,
+    d.commit_sha, d.commit_message, d.trigger, d.kind, u.email AS triggered_by_email, d.created_at, d.finished_at
+FROM deployments d
+JOIN apps a ON a.id = d.app_id AND a.team_id = d.team_id
+LEFT JOIN servers s ON s.id = d.server_id AND s.team_id = d.team_id
+LEFT JOIN users u ON u.id = d.created_by
+WHERE d.team_id = sqlc.arg('team_id')
+  AND (sqlc.narg('before_at')::timestamptz IS NULL OR (d.created_at, d.id) < (sqlc.narg('before_at')::timestamptz, sqlc.arg('before_id')::text))
+ORDER BY d.created_at DESC, d.id DESC
+LIMIT sqlc.arg('limit_rows');

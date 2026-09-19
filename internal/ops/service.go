@@ -81,6 +81,7 @@ type Service struct {
 	log    *slog.Logger
 	now    func() time.Time
 	dist   distCache
+	live   liveMetrics
 
 	runnersMu sync.RWMutex
 	runners   map[string]ControlPlaneRunner
@@ -114,10 +115,11 @@ func New(a *app.App, cfg Config) (*Service, error) {
 func (s *Service) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	s.wg.Add(3)
+	s.wg.Add(4)
 	go s.dispatchLoop(ctx)
 	go s.sweepLoop(ctx)
 	go s.controlPlaneLoop(ctx)
+	go s.metricsRetentionLoop(ctx)
 }
 
 // Stop is the counterpart of Start.

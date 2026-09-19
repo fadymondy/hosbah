@@ -247,7 +247,7 @@ func (d *deps) registerOperations(api huma.API) {
 	// re-sent whenever either changes (heartbeats included), checked like the operation stream.
 	huma.Register(api, huma.Operation{
 		OperationID: "stream-server", Method: http.MethodGet, Path: "/api/teams/{team}/servers/{server}/stream",
-		Summary: "Live server status, metrics and operations (text/event-stream: events server, operations)", Tags: []string{"Servers"},
+		Summary: "Live server status, metrics and operations (text/event-stream: events server, operations, metrics — a ~5 s reading shaped like a metrics point)", Tags: []string{"Servers"},
 	}, func(ctx context.Context, in *ServerPath) (*huma.StreamResponse, error) {
 		if err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
 			_, err := serverIn(ctx, q, m, in.Server)
@@ -260,6 +260,7 @@ func (d *deps) registerOperations(api huma.API) {
 			wake, unsub := d.ops.Broker().Subscribe(ops.ServerTopic(in.Server))
 			defer unsub()
 			var lastServer, lastOps []byte
+			var lastLive time.Time
 			for {
 				var srv ServerOut
 				opsList := []OperationOut{}
@@ -289,6 +290,11 @@ func (d *deps) registerOperations(api huma.API) {
 				if b, _ := json.Marshal(opsList); string(b) != string(lastOps) {
 					sse.raw("operations", "", b)
 					lastOps = b
+				}
+				// The latest ~5 s reading (the server was resolved in the team's scope just above).
+				if p, ok := d.ops.LivePoint(srv.ID); ok && !p.At.Equal(lastLive) {
+					sse.event("metrics", "", p)
+					lastLive = p.At
 				}
 				if !sse.wait(wake, 5*time.Second) {
 					return

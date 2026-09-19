@@ -5,10 +5,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import {
   BellIcon,
-  BoxesIcon,
   CheckIcon,
   ChevronsUpDownIcon,
-  DatabaseIcon,
   KeyRoundIcon,
   LayoutGridIcon,
   LockKeyholeIcon,
@@ -17,8 +15,9 @@ import {
   LogOutIcon,
   MailPlusIcon,
   MenuIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   MessageSquareWarningIcon,
-  NetworkIcon,
   PlusIcon,
   ScrollTextIcon,
   ServerIcon,
@@ -64,11 +63,34 @@ import { cn } from "@/lib/utils"
 export function AppShell({ children }: { children: ReactNode; title?: ReactNode }) {
   const { t, locale } = useI18n()
   const [navOpen, setNavOpen] = useState(false)
+  // The desktop sidebar can be minimised to its icons; the choice is kept on this device (Ctrl/⌘+B toggles).
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("hosbah.sidebar") === "min")
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault()
+        toggleNav()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  function toggleNav() {
+    setCollapsed((c) => {
+      localStorage.setItem("hosbah.sidebar", c ? "full" : "min")
+      return !c
+    })
+  }
 
   return (
-    <div className="grid-shell">
-      <aside className="grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-y-auto md:flex">
-        <div className="flex h-14 shrink-0 items-center border-b border-line px-4">
+    <div className="grid-shell" data-collapsed={collapsed}>
+      <aside
+        data-collapsed={collapsed}
+        className="group/nav grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
+      >
+        <div className="flex h-14 shrink-0 items-center border-b border-line px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
           <Brand />
         </div>
         <ShellNav />
@@ -85,6 +107,17 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
               onClick={() => setNavOpen(true)}
             >
               <MenuIcon />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="hidden md:inline-flex rtl:[&_svg]:-scale-x-100"
+              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              aria-pressed={collapsed}
+              title={`${collapsed ? t("shell.expandNav") : t("shell.collapseNav")} (Ctrl+B)`}
+              onClick={toggleNav}
+            >
+              {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
             </Button>
             <TeamSwitcher />
           </div>
@@ -145,7 +178,7 @@ function Brand() {
   return (
     <Link href={`/${locale}`} className="flex items-center gap-2.5" aria-label={t("common.brand")}>
       <ThemedCubeMark size={24} />
-      <span className="text-[15px] font-medium">{t("common.brand")}</span>
+      <span className="text-[15px] font-medium group-data-[collapsed=true]/nav:hidden">{t("common.brand")}</span>
     </Link>
   )
 }
@@ -170,21 +203,27 @@ function NavLink({
       href={href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
+      title={typeof children === "string" ? children : undefined}
       className={cn(
         "flex items-center gap-2.5 border-s-2 px-3 py-2 text-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0",
+        "group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0 group-data-[collapsed=true]/nav:py-2.5",
         active
           ? "border-grid-action bg-grid-soft font-medium text-grid-fg"
           : "border-transparent text-grid-body hover:bg-grid-soft hover:text-grid-fg",
       )}
     >
       {icon}
-      {children}
+      <span className="truncate group-data-[collapsed=true]/nav:hidden">{children}</span>
     </Link>
   )
 }
 
 function GroupLabel({ children }: { children: ReactNode }) {
-  return <p className="grid-micro mt-4 border-t border-line px-4 pt-4 pb-1">{children}</p>
+  return (
+    <p className="grid-micro mt-4 border-t border-line px-4 pt-4 pb-1 group-data-[collapsed=true]/nav:mt-2 group-data-[collapsed=true]/nav:p-0">
+      <span className="group-data-[collapsed=true]/nav:hidden">{children}</span>
+    </p>
+  )
 }
 
 /** The team's sections, then its settings, then the platform (admins only). Inside /admin the
@@ -238,18 +277,6 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
         <>
           <L href={base} exact icon={<LayoutGridIcon />}>
             {t("nav.overview")}
-          </L>
-          <L href={`${base}/servers`} icon={<ServerIcon />}>
-            {t("nav.servers")}
-          </L>
-          <L href={`${base}/apps`} icon={<BoxesIcon />}>
-            {t("nav.apps")}
-          </L>
-          <L href={`${base}/databases`} icon={<DatabaseIcon />}>
-            {t("nav.databases")}
-          </L>
-          <L href={`${base}/proxy-hosts`} icon={<NetworkIcon />}>
-            {t("nav.proxyHosts")}
           </L>
           <L href={`${base}/members`} icon={<UsersIcon />}>
             {t("nav.members")}

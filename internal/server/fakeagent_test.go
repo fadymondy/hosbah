@@ -27,6 +27,9 @@ type fakeAgent struct {
 	serverID string
 	priv     ed25519.PrivateKey
 	respond  func(op agentproto.SignedOp) (result any, errMsg string)
+	// events, when set, sends extra events of an op (their OpID and Seq are filled in) after its first
+	// log line and before respond is called — so a test can see them while the op is still running.
+	events func(op agentproto.SignedOp) []agentproto.Event
 
 	mu       sync.Mutex
 	ops      []agentproto.SignedOp
@@ -108,9 +111,20 @@ func startFakeAgent(t *testing.T, base, serverID string, priv ed25519.PrivateKey
 				go func(op agentproto.SignedOp) {
 					send(agentproto.Event{OpID: op.OpID, Seq: 1, Kind: agentproto.EventStatus, Status: agentproto.StatusRunning})
 					send(agentproto.Event{OpID: op.OpID, Seq: 2, Kind: agentproto.EventLog, Stream: "info", Line: "fake " + op.Kind})
+					seq := int64(3)
+					fa.mu.Lock()
+					extra := fa.events
+					fa.mu.Unlock()
+					if extra != nil {
+						for _, ev := range extra(op) {
+							ev.OpID, ev.Seq = op.OpID, seq
+							seq++
+							send(ev)
+						}
+					}
 					res, msg := fa.respond(op)
 					code := 0
-					ev := agentproto.Event{OpID: op.OpID, Seq: 3, Kind: agentproto.EventStatus, Status: agentproto.StatusOK, ExitCode: &code}
+					ev := agentproto.Event{OpID: op.OpID, Seq: seq, Kind: agentproto.EventStatus, Status: agentproto.StatusOK, ExitCode: &code}
 					if res != nil {
 						ev.Result, _ = json.Marshal(res)
 					}

@@ -154,6 +154,45 @@ func ServerTools() []Tool {
 			},
 		},
 
+		{
+			Name: "update_server", Scope: scopes.Write,
+			Description: "Rename or restyle a server (owner or admin): name, color (#RRGGBB), icon (" + strings.Join(provisioning.ServerIcons, ", ") +
+				") and logo_url (https, shown instead of the icon). Omit a field to leave it; an empty string clears color, icon or logo_url.",
+			InputSchema: schema([]string{"server"}, map[string]any{
+				"server":   str("Server id or name"),
+				"name":     str("New name: letters, digits, dot, dash, underscore; unique in the team"),
+				"color":    str("#RRGGBB, or empty to clear"),
+				"icon":     map[string]any{"type": "string", "enum": append([]string{""}, provisioning.ServerIcons...), "description": "Icon key, or empty to clear"},
+				"logo_url": str("https:// image URL (at most 500 characters), or empty to clear"),
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
+					return "", err
+				}
+				s, err := findServer(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				opt := func(k string) *string {
+					if _, ok := args[k]; !ok {
+						return nil
+					}
+					v := args.Str(k)
+					return &v
+				}
+				p := provisioning.ServerPatch{Name: opt("name"), Color: opt("color"), Icon: opt("icon"), LogoURL: opt("logo_url"),
+					Audit: auditChanges(env, nil)}
+				if p.Name == nil && p.Color == nil && p.Icon == nil && p.LogoURL == nil {
+					return "", errors.New("nothing to change: pass name, color, icon or logo_url")
+				}
+				row, err := provisioning.UpdateServer(ctx, env.Q, env.Caller.TeamID, actor(env), s, p)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Updated %s (id %s): color %s · icon %s · logo %s", row.Name, row.ID, orDash(row.Color), orDash(row.Icon), orDash(row.LogoUrl)), nil
+			},
+		},
+
 		// ---- destructive ----
 		{
 			Name: "delete_server", Scope: scopes.Destructive, Destructive: true, ResourceType: "server",

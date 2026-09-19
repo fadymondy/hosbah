@@ -28,6 +28,9 @@ type LogLine struct {
 	// Op names the step a deployment-log line came from (app.build, route.set…, or "pipeline" for
 	// the control plane's own lines). Empty in operation logs.
 	Op string `json:"op,omitempty"`
+	// Data is a typed payload the agent attached (agentproto.Event.Data), e.g. github.login's one-time
+	// code: {"type":"github.device_code","user_code","verification_uri","expires_at"}.
+	Data json.RawMessage `json:"data,omitempty"`
 }
 
 // Deployment logs are sealed like operation logs, bound to the deployment.
@@ -106,7 +109,7 @@ func OpenLog(dek []byte, teamID string, row db.OperationLog) (LogLine, error) {
 
 func lineFromEvent(ev agentproto.Event) LogLine {
 	l := LogLine{Seq: ev.Seq, Kind: ev.Kind, Stream: ev.Stream, Line: ev.Line, Step: ev.Step, Total: ev.Total,
-		Status: ev.Status, ExitCode: ev.ExitCode, Error: ev.Error, At: ev.At}
+		Status: ev.Status, ExitCode: ev.ExitCode, Error: ev.Error, At: ev.At, Data: ev.Data}
 	if l.At.IsZero() {
 		l.At = time.Now().UTC()
 	}

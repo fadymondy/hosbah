@@ -93,3 +93,16 @@ UPDATE servers SET facts = sqlc.arg('facts')::jsonb, updated_at = now() WHERE id
 -- name: ServersWithDiscoveredServices :many
 -- System scope (API boot): every server whose facts list discovered workloads, for the one-time import backfill.
 SELECT id, team_id, facts FROM servers WHERE facts IS NOT NULL AND jsonb_typeof(facts->'services') = 'array';
+
+-- name: MergeServerGitHub :exec
+-- Agent scope: a github.* operation's result (or the device code while a login waits) is merged
+-- into the server's GitHub connection state. A key set to JSON null clears it.
+UPDATE servers SET github = jsonb_strip_nulls(COALESCE(github, '{}'::jsonb) || sqlc.arg('patch')::jsonb), updated_at = now()
+WHERE id = sqlc.arg('id')::text;
+
+-- name: UpdateServerAppearance :one
+-- Team scope: rename and restyle a server. The caller passes the final values (NULL clears).
+UPDATE servers SET name = sqlc.arg('name'), color = sqlc.narg('color'), icon = sqlc.narg('icon'),
+    logo_url = sqlc.narg('logo_url'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
+RETURNING *;

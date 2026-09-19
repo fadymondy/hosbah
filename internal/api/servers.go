@@ -14,6 +14,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/provisioning"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -44,6 +45,11 @@ type ServerOut struct {
 	EnrolledAt   *time.Time          `json:"enrolled_at"`
 	CreatedAt    time.Time           `json:"created_at"`
 	Enrollment   *EnrollmentOut      `json:"enrollment,omitempty" doc:"Set while an install link is open. Never the token itself."`
+	GitHub       ServerGitHubOut     `json:"github" doc:"The server's own GitHub connection (the GitHub CLI on it), as last reported."`
+	Tunnel       *TunnelSummary      `json:"tunnel" doc:"The server's tunnel (an active frp one first), or null without one."`
+	Color        *string             `json:"color" doc:"#RRGGBB, or null for the default."`
+	Icon         *string             `json:"icon" doc:"An icon key (see PATCH), or null for the default."`
+	LogoURL      *string             `json:"logo_url" doc:"The image shown instead of the icon: the uploaded logo's relative URL (see PUT .../logo), else the external https logo_url, or null."`
 }
 
 // EnrollmentOut says when the open install link expires.
@@ -64,7 +70,9 @@ func toServerOut(s db.Server, now time.Time, detail bool) ServerOut {
 		Hostname: s.Hostname, IPAddress: s.IpAddress, OS: s.Os, OSVersion: s.OsVersion, Arch: s.Arch, Kernel: s.Kernel,
 		AgentVersion: s.AgentVersion, CredentialID: s.CredentialID, ProviderRef: s.ProviderRef, Error: s.Error,
 		LastSeenAt: s.LastSeenAt, EnrolledAt: s.EnrolledAt, CreatedAt: s.CreatedAt, Checks: []agentproto.Check{},
+		Color: s.Color, Icon: s.Icon, LogoURL: s.LogoUrl,
 	}
+	out.GitHub = toServerGitHubOut(deploy.GitHubStateOf(s, now))
 	if s.Metrics != nil {
 		var m agentproto.Metrics
 		if json.Unmarshal([]byte(*s.Metrics), &m) == nil {
@@ -128,6 +136,8 @@ func (d *deps) registerServers(api huma.API) {
 			for _, r := range rows {
 				out.Body.Servers = append(out.Body.Servers, toServerOut(r, now, false))
 			}
+			attachTunnels(ctx, q, m.TeamID, out.Body.Servers)
+			attachLogos(ctx, q, m.TeamID, out.Body.Servers)
 			out.Body.AgentVersion = d.ops.AvailableAgentVersion()
 			return nil
 		})
@@ -291,6 +301,10 @@ func (d *deps) registerServers(api huma.API) {
 // serverDetail is the detail view (also the SSE snapshot).
 func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membership, s db.Server) ServerOut {
 	out := toServerOut(s, time.Now(), true)
+	out.Tunnel = serverTunnel(ctx, q, m.TeamID, s.ID)
+	if etag, err := q.ServerLogoVersion(ctx, db.ServerLogoVersionParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil {
+		out.LogoURL = serverLogoURL(m.TeamID, s.ID, etag) // an uploaded logo wins over the external logo_url
+	}
 	if s.Status == "pending" || s.Status == "provisioning" {
 		if e, err := q.OpenEnrollmentForServer(ctx, db.OpenEnrollmentForServerParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil {
 			out.Enrollment = &EnrollmentOut{ExpiresAt: e.ExpiresAt}

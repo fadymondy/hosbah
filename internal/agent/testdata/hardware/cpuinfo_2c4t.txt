@@ -1,0 +1,26 @@
+processor	: 0
+vendor_id	: GenuineIntel
+model		: 158
+model name	: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+physical id	: 0
+core id		: 0
+cpu cores	: 2
+
+processor	: 1
+model		: 158
+model name	: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+physical id	: 0
+core id		: 1
+
+processor	: 2
+model		: 158
+model name	: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+physical id	: 0
+core id		: 0
+
+processor	: 3
+model		: 158
+model name	: Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz
+physical id	: 0
+core id		: 1
+

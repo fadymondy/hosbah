@@ -67,7 +67,10 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase()
   const headers: Record<string, string> = { Accept: "application/json" }
-  if (init.body !== undefined) headers["Content-Type"] = "application/json"
+  // A Blob/File goes as it is (an upload), with its own type; anything else is JSON.
+  const raw = typeof Blob !== "undefined" && init.body instanceof Blob ? init.body : null
+  if (raw) headers["Content-Type"] = raw.type || "application/octet-stream"
+  else if (init.body !== undefined) headers["Content-Type"] = "application/json"
   if (UNSAFE.has(method)) {
     const token = await csrfToken()
     if (token) headers["X-CSRF-Token"] = token
@@ -77,7 +80,7 @@ export async function apiFetch<T = unknown>(
     method,
     headers,
     credentials: "include",
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: raw ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
     signal: init.signal,
     cache: "no-store",
   })

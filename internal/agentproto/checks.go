@@ -26,6 +26,8 @@ type Facts struct {
 	// Services is what already runs on the host (containers, well-known systemd units), so an
 	// existing server can be imported with its workloads visible.
 	Services []Service `json:"services,omitempty"`
+	// Hardware is CPU model, disks, interfaces and GPUs. Nil from agents older than the field.
+	Hardware *Hardware `json:"hardware,omitempty"`
 }
 
 // ProxmoxFacts: the host is a Proxmox VE node (pveversion answers).

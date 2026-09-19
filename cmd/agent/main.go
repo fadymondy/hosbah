@@ -93,6 +93,7 @@ func run(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	state := fs.String("state", agent.DefaultStatePath, "the agent's identity (written by enroll)")
 	heartbeat := fs.Duration("heartbeat", 15*time.Second, "heartbeat interval")
+	metricsEvery := fs.Duration("metrics", 5*time.Second, "live metrics interval (0 turns the light readings off)")
 	_ = fs.Parse(args)
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -107,6 +108,7 @@ func run(args []string) int {
 		return 1
 	}
 	a.HeartbeatEvery = *heartbeat
+	a.MetricsEvery = *metricsEvery
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Info("cloudy-agent starting", "version", version, "server", st.ServerName, "control_plane", st.ControlPlane)

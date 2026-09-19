@@ -1,4 +1,4 @@
-h1:sMotSslOhKMM5OFXVFvPEybGY2PBxrNg/gJO8/yHr0I=
+h1:c31k1IR4xxsFBrQj5zW0yCHS5PZCJ4t090PpYodKWCc=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -23,3 +23,9 @@ h1:sMotSslOhKMM5OFXVFvPEybGY2PBxrNg/gJO8/yHr0I=
 20260919153943_import_workloads.sql h1:gaikVJxH6mTFVHmGjtZATwyU0Diy/4gaQ0rDB3U8/gY=
 20260919153953_import_workloads_row_level_security.sql h1:Nr8cNwOhCaOQEIl/HB8IdfrqXNwdJUede87TI3YA4js=
 20260919164140_imported_control.sql h1:Xdzm5C+JvXeMg6X1ATzfWu4eQ15CReohJ5EENtDFIkM=
+20260919183047_server_github.sql h1:QNQHn5SzdM5oFmKmj3BkJga6eryJPNdipbPj48XZZjw=
+20260919184634_server_metrics.sql h1:JRKMGrv+8fxYeIhdhxNuuMiIu+HX2xWHs5x1GOXwYKo=
+20260919184635_server_metrics_row_level_security.sql h1:0CarZLUGc4wrZBzIs+h9NK7+7t2orT5v0V2zlVp5V4M=
+20260919185856_server_appearance.sql h1:i5m/hes0D0D8vvzk9Cdlc7Q+XiCtuM2obenRa/ovQwo=
+20260919193442_server_logos.sql h1:boql1rk3fr5jWwyHccqQGwpM4u945VOS5uQV4XICUBI=
+20260919193443_server_logos_row_level_security.sql h1:P42hHjYMA9HPHJPgD7kpuDrJfmEFVuacHjvAkcltT2w=

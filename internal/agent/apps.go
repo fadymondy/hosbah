@@ -61,13 +61,28 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", 1, err
 	}
+	env, cred, ghRepo := gitEnv, []string(nil), agentproto.GitHubRepoOf(src.RepoURL)
+	helper := ""
+	if ghRepo != "" {
+		helper = ghCredentialHelper()
+	}
+	if helper != "" {
+		// A github.com repository and a gh login on this server: git asks gh for credentials, so a
+		// private repository the connected account can read clones. Nothing is written to disk.
+		cred = ghCredentialArgs(helper)
+		env = append(append([]string{}, gitEnv...), ghEnv()...)
+		oc.Info("using this server's GitHub connection (gh) for %s", ghRepo)
+	}
 	for _, argv := range [][]string{
 		{"init", "--quiet", dir},
 		{"-C", dir, "remote", "add", "origin", src.RepoURL},
 		{"-C", dir, "fetch", "--depth", "1", "--no-tags", "origin", src.Ref},
 		{"-C", dir, "checkout", "--quiet", "--detach", "FETCH_HEAD"},
 	} {
-		if code, err := oc.RunEnv(gitEnv, "git", gitArgs(argv...)...); err != nil {
+		if code, err := oc.RunEnv(env, "git", append(cred, gitArgs(argv...)...)...); err != nil {
+			if argv[2] == "fetch" && ghRepo != "" {
+				return "", "", code, ghFetchError(helper != "", src.Ref)
+			}
 			return "", "", code, fmt.Errorf("git %s failed", argv[len(argv)-2])
 		}
 	}

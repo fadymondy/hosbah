@@ -99,3 +99,18 @@
 .brand-loader-label { animation: brand-loader-fade 0.4s ease-out 0.6s both; }
 @keyframes brand-loader-fade { from { opacity: 0; } to { opacity: 1; } }
 
+
+/* The app shell's sidebar, minimised to its icons (the toggle in the top bar, or Ctrl/⌘+B). */
+@media (min-width: 768px) {
+  .grid-shell {
+    transition: grid-template-columns 0.18s ease;
+  }
+  .grid-shell[data-collapsed="true"] {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid-shell {
+    transition: none;
+  }
+}

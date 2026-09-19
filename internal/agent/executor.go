@@ -104,6 +104,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	} {
 		e.handlers[kind] = h
 	}
+	gh := newGHHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindGitHubInstall: gh.install, agentproto.KindGitHubLogin: gh.login, agentproto.KindGitHubStatus: gh.statusOp,
+		agentproto.KindGitHubLogout: gh.logout, agentproto.KindGitHubRepos: gh.repos, agentproto.KindGitHubBranches: gh.branches,
+	} {
+		e.handlers[kind] = h
+	}
 	return e
 }
 
@@ -214,6 +221,13 @@ func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe:
 		return "" // read-only: never queued behind a long action
+	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches:
+		return "" // read-only gh calls: a pending device login must not hold up the repository picker
+	case agentproto.KindGitHubInstall, agentproto.KindGitHubLogin, agentproto.KindGitHubLogout:
+		// Their own lane: a device login waits up to 15 minutes for a human and must not block
+		// provisioning; install then login (queued in that order) still run in order. apt's lock is
+		// shared with the host lane, so the install waits for it (DPkg::Lock::Timeout).
+		return "github"
 	case agentproto.KindWorkloadPower, agentproto.KindGuestResize, agentproto.KindGuestSnapshot, agentproto.KindGuestBackup,
 		agentproto.KindContainerRecreate, agentproto.KindWorkloadDestroy:
 		// One lane per workload: a restart never interleaves with a snapshot or a destroy of the same one.
@@ -304,7 +318,10 @@ func (e *Executor) run(ctx context.Context, rec *record) {
 
 	e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusRunning})
 	oc := &OpContext{
-		Ctx: octx, OpID: rec.op.OpID, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane, priv: e.priv,
+		Ctx: octx, OpID: rec.op.OpID, ServerID: e.serverID, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane, priv: e.priv,
+		notify: func(line string, data json.RawMessage) {
+			e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: "info", Line: line, Data: data})
+		},
 		log: func(stream, line string) {
 			e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: stream, Line: line})
 		},
@@ -383,12 +400,14 @@ func (e *Executor) remember(rec *record) {
 type OpContext struct {
 	Ctx          context.Context
 	OpID         string
+	ServerID     string
 	Params       json.RawMessage
 	Version      string
 	ControlPlane string
 	priv         ed25519.PrivateKey
 	log          func(stream, line string)
 	progress     func(step, total int)
+	notify       func(line string, data json.RawMessage)
 	restart      bool
 }
 
@@ -491,4 +510,15 @@ func shellQuote(argv []string) string {
 		}
 	}
 	return out
+}
+
+// Notify logs line on the "info" stream with a typed payload (agentproto.Event.Data) a client can
+// act on while the operation is still running — the device flow's one-time code, for one.
+func (o *OpContext) Notify(line string, data any) {
+	raw, err := json.Marshal(data)
+	if err != nil || o.notify == nil {
+		o.log("info", line)
+		return
+	}
+	o.notify(line, raw)
 }

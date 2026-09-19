@@ -42,6 +42,7 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 	s.hub.add(ac)
 	defer func() {
 		s.hub.remove(ac)
+		s.flushMetrics(ac)
 		s.broker.Publish(ServerTopic(ac.serverID))
 		s.log.Info("agent disconnected", "server", ac.serverID)
 	}()
@@ -84,6 +85,8 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 		switch f.Type {
 		case agentproto.TypeHeartbeat:
 			s.heartbeat(sctx, ac, f)
+		case agentproto.TypeMetrics:
+			s.liveMetricsFrame(sctx, ac, f)
 		case agentproto.TypeEvent:
 			if f.Event != nil {
 				s.recordEvent(sctx, ac, *f.Event)
@@ -193,6 +196,7 @@ func (s *Service) heartbeat(ctx context.Context, ac *agentConn, f agentproto.Fra
 	if err != nil {
 		s.log.Warn("heartbeat not stored", "server", ac.serverID, "err", err)
 	}
+	s.recordMetrics(ctx, ac, *f.Metrics)
 	s.broker.Publish(ServerTopic(ac.serverID))
 }
 
@@ -233,6 +237,7 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 			return nil
 		}
 
+		ev.Data = cleanEventData(ev.Data)
 		l := lineFromEvent(ev)
 		if ev.Kind == agentproto.EventStatus && ev.Status != agentproto.StatusRunning {
 			l.Line = statusLine(ev.Status, ev.ExitCode, ev.Error)
@@ -258,6 +263,14 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 		}
 		if err := q.AdvanceOperationSeq(ctx, db.AdvanceOperationSeqParams{Seq: ev.Seq, ID: op.ID, ServerID: ac.serverID}); err != nil {
 			return err
+		}
+		// github.* results (and a device login's one-time code) keep the server's GitHub state current.
+		if n == 1 {
+			if patch := githubPatch(op.Kind, op.ID, ev, time.Now()); patch != nil {
+				if err := q.MergeServerGitHub(ctx, db.MergeServerGitHubParams{Patch: string(patch), ID: ac.serverID}); err != nil {
+					return err
+				}
+			}
 		}
 		if ev.Kind != agentproto.EventStatus {
 			return nil

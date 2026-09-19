@@ -34,7 +34,7 @@ import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imp
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
-import { statusVariant } from "../page"
+import { statusVariant } from "@/components/server-tabs/databases"
 
 export default function DataServicePage() {
   const { service: ref } = useParams<{ service: string }>()

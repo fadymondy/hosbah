@@ -19,6 +19,10 @@ type Sampler struct {
 	mu          sync.Mutex
 	idle, total uint64
 	have        bool
+	net         netCounters
+	netAt       time.Time
+	at          time.Time // last full reading, and its figures
+	cpu, rx, tx float64
 }
 
 // NewSampler returns a sampler with no history.
@@ -29,16 +33,31 @@ func (s *Sampler) Sample() agentproto.Metrics {
 	m := agentproto.Metrics{At: time.Now().UTC()}
 
 	s.mu.Lock()
-	idle, total, ok := readCPU()
-	if ok && !s.have {
-		s.idle, s.total, s.have = idle, total, true
-		time.Sleep(250 * time.Millisecond)
-		idle, total, ok = readCPU()
-	}
-	if ok && total > s.total {
-		busy := 1 - float64(idle-s.idle)/float64(total-s.total)
-		m.CPUPercent = math.Round(busy*1000) / 10
-		s.idle, s.total = idle, total
+	// Two readings a moment apart (a heartbeat and a live reading on the same tick) would measure
+	// over almost no time: the second reuses the first's CPU and network figures instead.
+	if !s.at.IsZero() && time.Since(s.at) < time.Second {
+		m.CPUPercent, m.NetRxBytesPerSec, m.NetTxBytesPerSec = s.cpu, s.rx, s.tx
+	} else {
+		idle, total, ok := readCPU()
+		if ok && !s.have {
+			s.idle, s.total, s.have = idle, total, true
+			time.Sleep(250 * time.Millisecond)
+			idle, total, ok = readCPU()
+		}
+		if ok && total > s.total {
+			busy := 1 - float64(idle-s.idle)/float64(total-s.total)
+			m.CPUPercent = math.Round(busy*1000) / 10
+			s.idle, s.total = idle, total
+		}
+		if cur, ok := readNetDev(); ok {
+			now := time.Now()
+			if !s.netAt.IsZero() {
+				rx, tx := netRate(s.net, cur, now.Sub(s.netAt))
+				m.NetRxBytesPerSec, m.NetTxBytesPerSec = math.Round(rx), math.Round(tx)
+			}
+			s.net, s.netAt = cur, now
+		}
+		s.at, s.cpu, s.rx, s.tx = time.Now(), m.CPUPercent, m.NetRxBytesPerSec, m.NetTxBytesPerSec
 	}
 	s.mu.Unlock()
 
