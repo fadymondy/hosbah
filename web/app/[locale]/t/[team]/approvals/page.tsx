@@ -21,14 +21,13 @@ import { ShieldCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, SettingsRow, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch, type ApprovalRequest, type Team } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -118,15 +117,10 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <PageBody title={t("approvals.title")} description={t("approvals.description")}>
-      <FormError message={error} />
+    <PageBody title={t("approvals.title")} description={t("approvals.description")} bleed>
+      <ErrorBand message={error} />
 
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>{t("approvals.requireTitle")}</CardTitle>
-          <CardDescription>{t("approvals.requireHint")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <SettingsRow label={t("approvals.requireTitle")} hint={t("approvals.requireHint")}>
           <Field orientation="horizontal">
             <Checkbox
               id="require-approval"
@@ -141,13 +135,12 @@ export default function ApprovalsPage() {
               {!manage ? <FieldDescription>{t("approvals.viewerNote")}</FieldDescription> : null}
             </div>
           </Field>
-        </CardContent>
-      </Card>
+      </SettingsRow>
 
       {requests === null ? (
-        <Skeleton className="h-8 w-full" />
+        <LoadingRows />
       ) : requests.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <ShieldCheckIcon />
@@ -157,7 +150,7 @@ export default function ApprovalsPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -222,7 +215,7 @@ export default function ApprovalsPage() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )

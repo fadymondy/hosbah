@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from "react"
 import { PlusIcon, ServerIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { PresenceBadge } from "@/components/server-status"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -45,22 +45,19 @@ export default function ServersPage() {
   }, [load])
 
   const add = manage ? (
-    <Button size="sm" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+    <Button nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
       <PlusIcon />
       {t("servers.add")}
     </Button>
   ) : null
 
   return (
-    <PageBody title={t("nav.servers")} description={t("servers.description")} actions={add}>
-      <FormError message={error} />
+    <PageBody title={t("nav.servers")} description={t("servers.description")} actions={add} bleed>
+      <ErrorBand message={error} />
       {servers === null ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
+        <LoadingRows />
       ) : servers.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <ServerIcon />
@@ -71,7 +68,7 @@ export default function ServersPage() {
           {add}
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -119,7 +116,7 @@ export default function ServersPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )

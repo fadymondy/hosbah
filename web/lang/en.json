@@ -19,7 +19,8 @@
     "switchLanguage": "Switch language",
     "toggleTheme": "Toggle light and dark theme",
     "light": "Light theme",
-    "dark": "Dark theme"
+    "dark": "Dark theme",
+    "language": "Language"
   },
   "errors": {
     "apiUnavailable": "Hosbah's API is not answering.",
@@ -67,7 +68,11 @@
       "haveAccount": "Already have an account?",
       "submit": "Create account",
       "passwordShort": "The password needs at least 8 characters.",
-      "passwordHint": "At least 8 characters."
+      "passwordHint": "At least 8 characters.",
+      "closedTitle": "Sign-up is closed",
+      "closedBody": "New accounts are not being created right now. If you already have one, sign in.",
+      "inviteOnlyTitle": "Sign-up is by invitation",
+      "inviteOnlyBody": "Open the invitation link a team sent to your email to create your account."
     }
   },
   "onboarding": {
@@ -106,7 +111,10 @@
     "createTeam": "Create team",
     "account": "Account",
     "accountAnd2fa": "Account and 2FA",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "navigation": "Navigation",
+    "signedInAs": "Signed in as",
+    "chooseTeam": "Choose a team"
   },
   "nav": {
     "team": "Team",
@@ -123,7 +131,8 @@
     "apps": "Apps",
     "databases": "Databases",
     "approvals": "Approvals",
-    "proxyHosts": "Proxy hosts"
+    "proxyHosts": "Proxy hosts",
+    "teamSettings": "Team settings"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -144,7 +153,8 @@
     "servers": "Servers",
     "online": "Online",
     "apps": "Apps",
-    "running": "Running"
+    "running": "Running",
+    "devBadge": "In development"
   },
   "servers": {
     "description": "Servers this team manages through the Hosbah agent.",
@@ -738,6 +748,181 @@
   "admin": {
     "title": "Platform admin",
     "description": "Platform-wide MCP tokens. They act across every team — keep them few and short-lived.",
+    "overviewHint": "Everything on this Hosbah install: people, teams, servers and what ran in the last day.",
+    "overview": {
+      "admins": "{count} admins",
+      "online": "{count} online",
+      "offline": "Offline servers",
+      "apps": "Apps",
+      "deploys24h": "Deploys · 24h",
+      "operations24h": "Operations · 24h",
+      "failed": "{count} failed",
+      "recentSignups": "Recent sign-ups",
+      "allUsers": "All users"
+    },
+    "list": {
+      "search": "Search",
+      "noMatch": "Nothing matches that search.",
+      "unavailable": "The API is unavailable. Try again in a moment.",
+      "network": "Could not reach the API. Check your connection.",
+      "range": "{from}–{to} of {total}",
+      "previous": "Previous page",
+      "next": "Next page",
+      "all": "Every {what}"
+    },
+    "users": {
+      "hint": "Everyone with a Hosbah account. Promote admins, disable accounts, or remove them.",
+      "search": "Search by email",
+      "empty": "No users yet.",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "teams": "Teams",
+      "joined": "Joined",
+      "platformAdmin": "Platform admin",
+      "member": "User",
+      "active": "Active",
+      "disabled": "Disabled",
+      "notFound": "User not found",
+      "notSelf": "You cannot change your own account here.",
+      "promote": "Make platform admin",
+      "demote": "Remove platform admin",
+      "promoted": "They are now a platform admin.",
+      "demoted": "They are no longer a platform admin.",
+      "disable": "Disable account",
+      "enable": "Enable account",
+      "disabledDone": "Account disabled. Their sessions and tokens stopped working.",
+      "enabled": "Account enabled. They must sign in again.",
+      "disabledNote": "Disabled: signing in is refused, every session and MCP token they had is revoked for good, and re-enabling does not bring the tokens back.",
+      "delete": "Delete user",
+      "deleteTitle": "Delete this user?",
+      "deleteBody": "{email} loses access and leaves every team. This cannot be undone.",
+      "deleted": "User deleted.",
+      "mcpTokens": "Team MCP tokens",
+      "adminTokens": "Admin MCP tokens",
+      "noTeams": "Not in any team."
+    },
+    "teams": {
+      "hint": "Every team on the platform, with what it runs. Suspend a team to freeze it.",
+      "search": "Search by name or slug",
+      "empty": "No teams yet.",
+      "name": "Name",
+      "slug": "Slug",
+      "members": "Members",
+      "databases": "Databases",
+      "created": "Created",
+      "suspended": "Suspended",
+      "suspendedSince": "Suspended since",
+      "notFound": "Team not found",
+      "suspend": "Suspend team",
+      "suspendTitle": "Suspend this team?",
+      "suspendBody": "Everyone in {name} is locked out of the dashboard, API and MCP until it is reinstated. Its servers and running apps keep working.",
+      "suspendedDone": "Team suspended.",
+      "reinstate": "Reinstate team",
+      "reinstated": "Team reinstated.",
+      "noMembers": "No members.",
+      "noApps": "No apps."
+    },
+    "servers": {
+      "hint": "Every server across every team, with its agent and when it last checked in.",
+      "search": "Search by name, address or team",
+      "empty": "No servers.",
+      "name": "Name",
+      "team": "Team",
+      "server": "Server",
+      "provider": "Provider",
+      "address": "Address",
+      "agent": "Agent",
+      "lastSeen": "Last seen",
+      "online": "Online",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "enrolled": "Enrolled",
+        "provisioning": "Provisioning",
+        "pending": "Pending",
+        "failed": "Failed"
+      }
+    },
+    "operations": {
+      "hint": "What the control plane asked servers to do, newest first. Parameters and output are never shown here.",
+      "empty": "No operations yet.",
+      "kind": "Kind",
+      "error": "Error",
+      "started": "Queued",
+      "status": {
+        "pending": "Pending",
+        "sent": "Sent",
+        "running": "Running",
+        "ok": "Succeeded",
+        "failed": "Failed",
+        "timeout": "Timed out"
+      }
+    },
+    "audit": {
+      "hint": "Every platform-admin action: account changes, suspensions and settings.",
+      "empty": "No admin actions yet.",
+      "action": "Action",
+      "actor": "By",
+      "target": "On",
+      "details": "Details",
+      "when": "When",
+      "actions": {
+        "user_updated": "Updated a user",
+        "user_deleted": "Deleted a user",
+        "team_suspended": "Suspended a team",
+        "team_reinstated": "Reinstated a team",
+        "settings_updated": "Changed platform settings"
+      },
+      "targets": {
+        "user": "User",
+        "team": "Team",
+        "settings": "Settings",
+        "platform_settings": "Platform settings"
+      }
+    },
+    "settings": {
+      "hint": "Who can join, what every user is told, and how much a team may use.",
+      "saved": "Platform settings saved.",
+      "updated": "Last changed",
+      "access": "Access",
+      "accessHint": "How new people get an account.",
+      "signupMode": "Sign-up",
+      "signup": {
+        "open": "Open",
+        "invite_only": "Invite only",
+        "closed": "Closed",
+        "openHint": "Anyone can create an account.",
+        "invite_onlyHint": "Only people with a pending team invitation for their email can sign up.",
+        "closedHint": "Nobody can sign up. Existing accounts keep working."
+      },
+      "announcementTitle": "Announcement",
+      "announcementHint": "A banner at the top of every signed-in page. Leave it empty to hide it.",
+      "announcement": "Message",
+      "announcementPlaceholder": "Maintenance tonight 22:00–23:00 UTC; deploys may queue.",
+      "level": "Tone",
+      "levels": {
+        "info": "Information",
+        "warning": "Warning"
+      },
+      "supportTitle": "Support",
+      "supportEmail": "Support email",
+      "supportHint": "Shown to users when something needs a person.",
+      "limitsTitle": "Limits",
+      "limitsHint": "0 means unlimited.",
+      "maxTeams": "Teams a user may own",
+      "maxServers": "Servers per team"
+    },
+    "nav": {
+      "overview": "Overview",
+      "users": "Users",
+      "teams": "Teams",
+      "servers": "Servers",
+      "operations": "Operations",
+      "audit": "Audit log",
+      "settings": "Platform settings",
+      "tokens": "Admin MCP tokens"
+    },
     "forbidden": "This area is for Hosbah platform administrators."
   },
   "notifications": {

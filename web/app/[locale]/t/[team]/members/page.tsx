@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { RoleSelect } from "@/components/role-select"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch, type Member, type Role } from "@/lib/api"
 import { useFormatDate, useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -50,15 +50,12 @@ export default function MembersPage() {
   }
 
   return (
-    <PageBody title={t("nav.members")} description={manage ? t("members.description") : t("common.readOnly")}>
-      <FormError message={error} />
+    <PageBody title={t("nav.members")} description={manage ? t("members.description") : t("common.readOnly")} bleed>
+      <ErrorBand message={error} />
       {members === null ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
+        <LoadingRows />
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -114,7 +111,7 @@ export default function MembersPage() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )

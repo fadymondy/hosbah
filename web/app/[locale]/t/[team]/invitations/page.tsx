@@ -7,6 +7,7 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { RoleSelect } from "@/components/role-select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -23,7 +24,6 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch, type Invitation, type Role } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -58,12 +58,13 @@ export default function InvitationsPage() {
       title={t("nav.invitations")}
       description={manage ? t("invitations.description") : t("common.readOnly")}
       actions={manage ? <InviteDialog slug={team.slug} onInvited={load} /> : null}
+      bleed
     >
-      <FormError message={error} />
+      <ErrorBand message={error} />
       {items === null ? (
-        <Skeleton className="h-8 w-full" />
+        <LoadingRows />
       ) : items.length === 0 && !error ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <MailPlusIcon />
@@ -73,7 +74,7 @@ export default function InvitationsPage() {
           </EmptyHeader>
         </Empty>
       ) : items.length ? (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -121,7 +122,7 @@ export default function InvitationsPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       ) : null}
     </PageBody>
   )
@@ -171,7 +172,7 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
         if (!o) reset()
       }}
     >
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button />}>
         <PlusIcon />
         {t("invitations.invite")}
       </DialogTrigger>

@@ -22,6 +22,7 @@ import {
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge } from "@/components/app-status"
 import { FormError, useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows } from "@/components/states"
 import { PresenceBadge } from "@/components/server-status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,7 +36,6 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import { apiFetch } from "@/lib/api"
 import type { AppDetail, Deployment } from "@/lib/apps"
 import type { DataService, DataServiceKind } from "@/lib/databases"
@@ -100,9 +100,9 @@ export default function SiteCanvasPage() {
 
   if (!detail || !server) {
     return (
-      <PageBody title={t("sites.site")}>
-        <FormError message={error} />
-        <Skeleton className="h-96 w-full" />
+      <PageBody title={t("sites.site")} bleed>
+        <ErrorBand message={error} />
+        <LoadingRows rows={4} />
       </PageBody>
     )
   }
@@ -118,7 +118,7 @@ export default function SiteCanvasPage() {
     <PageBody
       title={
         <span className="flex flex-wrap items-center gap-2">
-          <span className="grid size-8 place-items-center border bg-primary/10 font-mono text-sm uppercase text-primary">
+          <span className="grid size-8 place-items-center border border-line bg-primary/10 font-mono text-sm uppercase text-primary">
             {app.name.slice(0, 1)}
           </span>
           <span dir="ltr">{app.name}</span>
@@ -137,17 +137,18 @@ export default function SiteCanvasPage() {
       }
       actions={
         manage ? (
-          <Button size="sm" disabled={busy} onClick={deploy}>
+          <Button disabled={busy} onClick={deploy}>
             <CloudUploadIcon />
             {busy ? t("common.working") : t("sites.deploy")}
           </Button>
         ) : null
       }
+      bleed
     >
-      <FormError message={error} />
+      <ErrorBand message={error} />
       <div
         data-testid="site-canvas"
-        className="relative overflow-x-auto border bg-muted/30 p-6 [background-image:radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:20px_20px]"
+        className="relative overflow-x-auto border-b border-line bg-grid-soft/40 p-6 [background-image:radial-gradient(var(--color-border)_1px,transparent_1px)] [background-size:20px_20px]"
       >
         <div className="grid min-w-[56rem] grid-cols-[1fr_1fr_1fr] items-start gap-10">
           {/* Network: edge and domains */}

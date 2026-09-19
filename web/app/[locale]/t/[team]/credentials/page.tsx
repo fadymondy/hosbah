@@ -7,7 +7,7 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -24,7 +24,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -57,22 +56,22 @@ export default function CredentialsPage() {
 
   if (!manage) {
     return (
-      <PageBody title={t("nav.credentials")} description={t("credentials.description")}>
-        <Alert>
-          <InfoIcon />
-          <AlertDescription>{t("credentials.readOnly")}</AlertDescription>
-        </Alert>
+      <PageBody title={t("nav.credentials")} description={t("credentials.description")} bleed>
+        <div role="note" className="flex items-start gap-3 border-b border-line bg-grid-soft px-6 py-4 text-sm text-grid-body">
+          <InfoIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+          <p>{t("credentials.readOnly")}</p>
+        </div>
       </PageBody>
     )
   }
 
   return (
-    <PageBody title={t("nav.credentials")} description={t("credentials.description")} actions={<AddCredential onSaved={load} />}>
-      <FormError message={error} />
+    <PageBody title={t("nav.credentials")} description={t("credentials.description")} actions={<AddCredential onSaved={load} />} bleed>
+      <ErrorBand message={error} />
       {creds === null ? (
-        <Skeleton className="h-16 w-full" />
+        <LoadingRows />
       ) : creds.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <LockKeyholeIcon />
@@ -82,7 +81,7 @@ export default function CredentialsPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -142,7 +141,7 @@ export default function CredentialsPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )
@@ -282,7 +281,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button />}>
         <PlusIcon />
         {t("credentials.add")}
       </DialogTrigger>

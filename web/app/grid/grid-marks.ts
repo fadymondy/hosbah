@@ -165,11 +165,11 @@ export const PRODUCT_MARKS: Record<string, MarkSpec> = {
     body: "#6FA8D6",
     accent: "#C9A227",
   },
-  // CaBrain — "the vault": a dome of six cubes over a solid nucleus, standing on two. The only
+  // Zekra — "the vault": a dome of six cubes over a solid nucleus, standing on two. The only
   // mark in the family whose centre is filled. From CaBrain Brand.dc.html, shifted one column
   // so every cell has odd (col + row); rendering normalises to the bounding box.
   cabrain: {
-    name: "CaBrain",
+    name: "Zekra",
     cells: [
       [3, 0],
       [2, 1],

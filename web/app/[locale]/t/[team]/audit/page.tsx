@@ -4,9 +4,9 @@ import { useEffect, useState } from "react"
 import { ScrollTextIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch, type AuditEntry } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -32,12 +32,12 @@ export default function AuditPage() {
   }, [team.slug])
 
   return (
-    <PageBody title={t("nav.audit")} description={t("audit.description")}>
-      <FormError message={error} />
+    <PageBody title={t("nav.audit")} description={t("audit.description")} bleed>
+      <ErrorBand message={error} />
       {entries === null ? (
-        <Skeleton className="h-8 w-full" />
+        <LoadingRows />
       ) : entries.length === 0 && !error ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <ScrollTextIcon />
@@ -47,7 +47,7 @@ export default function AuditPage() {
           </EmptyHeader>
         </Empty>
       ) : entries.length ? (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -98,7 +98,7 @@ export default function AuditPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       ) : null}
     </PageBody>
   )

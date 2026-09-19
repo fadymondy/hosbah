@@ -5,10 +5,9 @@ import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { apiFetch, type Team } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -44,44 +43,32 @@ export default function SettingsPage() {
   }
 
   return (
-    <PageBody title={t("nav.settings")} description={manage ? t("settings.description") : t("common.readOnly")}>
-      <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>{t("settings.general")}</CardTitle>
-          <CardDescription>{t("settings.renameHint")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit}>
-            <FieldGroup>
-              <FormError message={error} />
-              <Field>
-                <FieldLabel htmlFor="team-name">{t("onboarding.teamName")}</FieldLabel>
-                <Input
-                  id="team-name"
-                  required
-                  maxLength={80}
-                  value={name}
-                  readOnly={!manage}
-                  disabled={!manage}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                {!manage ? <FieldDescription>{t("settings.viewerNote")}</FieldDescription> : null}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="team-slug">{t("overview.slug")}</FieldLabel>
-                <Input id="team-slug" dir="ltr" className="font-mono" value={team.slug} readOnly disabled />
-              </Field>
-              {manage ? (
-                <Field orientation="horizontal">
-                  <Button type="submit" disabled={busy || !name.trim() || name.trim() === team.name}>
-                    {busy ? t("common.working") : t("common.save")}
-                  </Button>
-                </Field>
-              ) : null}
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
+    <PageBody title={t("nav.settings")} description={manage ? t("settings.description") : t("common.readOnly")} bleed>
+      <SectionTitle title={t("settings.general")} hint={t("settings.renameHint")} />
+      <form onSubmit={submit}>
+        <ErrorBand message={error} />
+        <SettingsRow label={t("onboarding.teamName")} htmlFor="team-name" hint={!manage ? t("settings.viewerNote") : undefined}>
+          <Input
+            id="team-name"
+            required
+            maxLength={80}
+            value={name}
+            readOnly={!manage}
+            disabled={!manage}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </SettingsRow>
+        <SettingsRow label={t("overview.slug")} htmlFor="team-slug">
+          <Input id="team-slug" dir="ltr" className="font-mono" value={team.slug} readOnly disabled />
+        </SettingsRow>
+        {manage ? (
+          <div className="flex justify-end border-b border-line px-6 py-4">
+            <Button type="submit" disabled={busy || !name.trim() || name.trim() === team.name}>
+              {busy ? t("common.working") : t("common.save")}
+            </Button>
+          </div>
+        ) : null}
+      </form>
     </PageBody>
   )
 }

@@ -6,10 +6,10 @@ import { BoxesIcon, PlusIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge, DeploymentStatusBadge } from "@/components/app-status"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { runtimeLabel, shortSha, type App } from "@/lib/apps"
@@ -45,22 +45,19 @@ export default function AppsPage() {
   }, [load])
 
   const add = manage ? (
-    <Button size="sm" nativeButton={false} render={<Link href={`${base}/apps/new`} />}>
+    <Button nativeButton={false} render={<Link href={`${base}/apps/new`} />}>
       <PlusIcon />
       {t("apps.add")}
     </Button>
   ) : null
 
   return (
-    <PageBody title={t("nav.apps")} description={t("apps.description")} actions={add}>
-      <FormError message={error} />
+    <PageBody title={t("nav.apps")} description={t("apps.description")} actions={add} bleed>
+      <ErrorBand message={error} />
       {apps === null ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
+        <LoadingRows />
       ) : apps.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <BoxesIcon />
@@ -71,7 +68,7 @@ export default function AppsPage() {
           {add}
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -140,7 +137,7 @@ export default function AppsPage() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )

@@ -7,6 +7,7 @@ import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, ScanSea
 import { PageBody } from "@/components/app-shell"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
+import { Notice } from "@/components/states"
 import { OperationLog } from "@/components/op-log"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -114,21 +115,18 @@ export default function NewAppPage() {
 
   if (!manage) {
     return (
-      <PageBody title={t("apps.new.title")} description={t("apps.new.description")}>
-        <Alert>
-          <InfoIcon />
-          <AlertDescription>{t("common.readOnly")}</AlertDescription>
-        </Alert>
+      <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
+        <Notice icon={<InfoIcon />}>{t("common.readOnly")}</Notice>
       </PageBody>
     )
   }
 
   if (created) {
     return (
-      <PageBody title={t("apps.new.title")} description={t("apps.new.description")}>
-        <section className="flex flex-col gap-4 border p-4" data-testid="created">
+      <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
+        <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="created">
           <div className="flex items-center gap-2 font-medium">
-            <CheckCircle2Icon className="size-5 text-primary" aria-hidden />
+            <CheckCircle2Icon className="size-5 text-grid-brand" aria-hidden />
             {t("apps.new.createdTitle", { name: created.app.name })}
           </div>
           <p className="text-sm text-muted-foreground">
@@ -156,9 +154,9 @@ export default function NewAppPage() {
   const noServers = servers !== null && servers.length === 0
 
   return (
-    <PageBody title={t("apps.new.title")} description={t("apps.new.description")}>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6">
+    <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
+      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-grid-bg px-6 py-6 [&>*]:max-w-2xl">
           {noServers ? (
             <Alert data-testid="no-servers">
               <InfoIcon />
@@ -239,7 +237,7 @@ export default function NewAppPage() {
               </Field>
             </div>
 
-            <section className="flex flex-col gap-3 border p-4" aria-labelledby="detect-h">
+            <section className="flex flex-col gap-3 border border-line p-4" aria-labelledby="detect-h">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-col gap-1">
                   <h2 id="detect-h" className="font-medium">
@@ -363,13 +361,13 @@ export default function NewAppPage() {
 function HowItWorks() {
   const { t } = useI18n()
   return (
-    <aside className="flex h-fit flex-col border" aria-labelledby="how-h">
-      <h2 id="how-h" className="grid-rule-bottom px-4 py-3 font-medium">
+    <aside className="flex flex-col bg-grid-bg" aria-labelledby="how-h">
+      <h2 id="how-h" className="border-b border-line px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
         {t("apps.new.howTitle")}
       </h2>
-      <ol className="flex flex-col divide-y text-sm">
+      <ol className="flex flex-col divide-y divide-line border-b border-line text-sm lg:border-b-0">
         {(["how1", "how2", "how3", "how4"] as const).map((k, i) => (
-          <li key={k} className="flex gap-3 px-4 py-3">
+          <li key={k} className="flex gap-3 px-6 py-3">
             <span className="font-mono text-muted-foreground tabular-nums">{String(i + 1).padStart(2, "0")}</span>
             <span className="text-muted-foreground">{t(`apps.new.${k}`)}</span>
           </li>

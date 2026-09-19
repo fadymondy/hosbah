@@ -8,6 +8,7 @@ import { CheckCircle2Icon, InfoIcon, LoaderIcon } from "lucide-react";
 import { PageBody } from "@/components/app-shell";
 import { CopyField } from "@/components/copy-field";
 import { FormError, useErrorText } from "@/components/form-error";
+import { Notice } from "@/components/states";
 import { CheckBadge } from "@/components/server-status";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -150,11 +151,8 @@ export default function NewServerPage() {
 
   if (!manage) {
     return (
-      <PageBody title={t("servers.new.title")} description={t("servers.new.description")}>
-        <Alert>
-          <InfoIcon />
-          <AlertDescription>{t("common.readOnly")}</AlertDescription>
-        </Alert>
+      <PageBody title={t("servers.new.title")} description={t("servers.new.description")} bleed>
+        <Notice icon={<InfoIcon />}>{t("common.readOnly")}</Notice>
       </PageBody>
     );
   }
@@ -163,11 +161,11 @@ export default function NewServerPage() {
     const server = live ?? created.server;
     const enrolled = server.status === "enrolled";
     return (
-      <PageBody title={t("servers.new.title")} description={t("servers.new.description")}>
+      <PageBody title={t("servers.new.title")} description={t("servers.new.description")} bleed>
         {enrolled ? (
-          <section className="flex flex-col gap-4 border p-4" data-testid="enrolled">
+          <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="enrolled">
             <div className="flex items-center gap-2 font-medium">
-              <CheckCircle2Icon className="size-5 text-primary" aria-hidden />
+              <CheckCircle2Icon className="size-5 text-grid-brand" aria-hidden />
               {t("servers.new.enrolledTitle")}
             </div>
             <p className="text-sm text-muted-foreground">
@@ -193,7 +191,7 @@ export default function NewServerPage() {
             </div>
           </section>
         ) : (
-          <section className="flex flex-col gap-4 border p-4" data-testid="install">
+          <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="install">
             <div className="flex flex-col gap-1">
               <h2 className="font-medium">{t("servers.new.installTitle")}</h2>
               <p className="text-sm text-muted-foreground">{t("servers.new.installHint")}</p>
@@ -217,9 +215,9 @@ export default function NewServerPage() {
   }
 
   return (
-    <PageBody title={t("servers.new.title")} description={t("servers.new.description")}>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6">
+    <PageBody title={t("servers.new.title")} description={t("servers.new.description")} bleed>
+      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-grid-bg px-6 py-6 [&>*]:max-w-2xl">
           <FieldSet>
             <FieldLegend variant="label">{t("servers.new.source")}</FieldLegend>
             <RadioGroup value={source} onValueChange={(v) => setSource(v as Source)}>
@@ -404,13 +402,13 @@ export default function NewServerPage() {
 function HowItWorks() {
   const { t } = useI18n();
   return (
-    <aside className="flex h-fit flex-col border" aria-labelledby="how-h">
-      <h2 id="how-h" className="grid-rule-bottom px-4 py-3 font-medium">
+    <aside className="flex flex-col bg-grid-bg" aria-labelledby="how-h">
+      <h2 id="how-h" className="border-b border-line px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
         {t("servers.new.howTitle")}
       </h2>
-      <ol className="flex flex-col divide-y text-sm">
+      <ol className="flex flex-col divide-y divide-line border-b border-line text-sm lg:border-b-0">
         {(["how1", "how2", "how3"] as const).map((k, i) => (
-          <li key={k} className="flex gap-3 px-4 py-3">
+          <li key={k} className="flex gap-3 px-6 py-3">
             <span className="font-mono text-muted-foreground tabular-nums">
               {String(i + 1).padStart(2, "0")}
             </span>

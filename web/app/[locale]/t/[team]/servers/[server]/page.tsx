@@ -10,10 +10,10 @@ import { AppStatusBadge } from "@/components/app-status"
 import { ServerTunnels } from "@/components/server-tunnels"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
-import { FormError, useErrorText } from "@/components/form-error"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
 import { OperationLog } from "@/components/op-log"
 import { CheckBadge, OpStatusBadge, PresenceBadge } from "@/components/server-status"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
@@ -110,19 +110,16 @@ export default function ServerPage() {
 
   if (missing) {
     return (
-      <PageBody title={t("nav.servers")}>
-        <Alert>
-          <AlertCircleIcon />
-          <AlertDescription>{t("errors.notFound")}</AlertDescription>
-        </Alert>
+      <PageBody title={t("nav.servers")} bleed>
+        <Notice icon={<AlertCircleIcon />} title={t("errors.notFound")} />
       </PageBody>
     )
   }
   if (!server) {
     return (
-      <PageBody title={<Skeleton className="h-8 w-48" />}>
-        <FormError message={error} />
-        <Skeleton className="h-24 w-full" />
+      <PageBody title={<Skeleton className="h-8 w-48" />} bleed>
+        <ErrorBand message={error} />
+        <LoadingRows rows={4} />
       </PageBody>
     )
   }
@@ -138,64 +135,55 @@ export default function ServerPage() {
       description={`${t(`servers.providers.${server.provider}`)} · ${t(`servers.kinds.${server.kind}`)}`}
       actions={
         <>
-          <span className="text-xs text-muted-foreground" aria-live="polite">
+          <span className="text-xs text-grid-muted" aria-live="polite">
             {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
           </span>
           <PresenceBadge server={server} />
         </>
       }
+      bleed
     >
-      <FormError message={error} />
+      <ErrorBand message={error} />
 
       {server.status === "pending" ? (
-        <Alert data-testid="pending">
-          <LoaderIcon className="animate-spin" />
-          <AlertTitle>{t("servers.detail.pendingTitle")}</AlertTitle>
-          <AlertDescription className="flex flex-col items-stretch gap-3">
-            <span>{t("servers.detail.pendingHint")}</span>
-            <span>
-              {server.enrollment
-                ? t("servers.detail.pendingExpires", { when: fmt(server.enrollment.expires_at) })
-                : t("servers.detail.pendingExpired")}
-            </span>
-            {install ? (
-              <>
-                <CopyField value={install.command} />
-                <CopyField value={install.command_root} />
-              </>
-            ) : null}
-            {manage ? (
-              <div>
-                <Button size="sm" variant="outline" onClick={newInstall}>
-                  {t("servers.detail.newInstall")}
-                </Button>
-              </div>
-            ) : null}
-          </AlertDescription>
-        </Alert>
+        <Notice data-testid="pending" icon={<LoaderIcon className="animate-spin" />} title={t("servers.detail.pendingTitle")}>
+          <span>{t("servers.detail.pendingHint")}</span>
+          <span>
+            {server.enrollment
+              ? t("servers.detail.pendingExpires", { when: fmt(server.enrollment.expires_at) })
+              : t("servers.detail.pendingExpired")}
+          </span>
+          {install ? (
+            <div className="flex max-w-3xl flex-col gap-3">
+              <CopyField value={install.command} />
+              <CopyField value={install.command_root} />
+            </div>
+          ) : null}
+          {manage ? (
+            <div>
+              <Button size="sm" variant="outline" onClick={newInstall}>
+                {t("servers.detail.newInstall")}
+              </Button>
+            </div>
+          ) : null}
+        </Notice>
       ) : null}
       {server.status === "provisioning" ? (
-        <Alert>
-          <LoaderIcon className="animate-spin" />
-          <AlertTitle>{t("servers.detail.provisioningTitle")}</AlertTitle>
-          <AlertDescription>{t("servers.detail.provisioningHint")}</AlertDescription>
-        </Alert>
+        <Notice icon={<LoaderIcon className="animate-spin" />} title={t("servers.detail.provisioningTitle")}>
+          {t("servers.detail.provisioningHint")}
+        </Notice>
       ) : null}
       {server.status === "failed" ? (
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertTitle>{t("servers.detail.failedTitle")}</AlertTitle>
-          <AlertDescription dir="auto">{server.error}</AlertDescription>
-        </Alert>
+        <Notice tone="danger" icon={<AlertCircleIcon />} title={t("servers.detail.failedTitle")}>
+          <span dir="auto">{server.error}</span>
+        </Notice>
       ) : null}
 
       {enrolled ? (
-        <section aria-labelledby="metrics-h" className="flex flex-col gap-2">
-          <h2 id="metrics-h" className="grid-micro">
-            {t("servers.detail.metrics")}
-          </h2>
+        <section aria-labelledby="metrics-h">
+          <SectionTitle id="metrics-h" title={t("servers.detail.metrics")} />
           {m ? (
-            <dl className="grid-cells grid sm:grid-cols-3 lg:grid-cols-6" data-testid="metrics">
+            <dl className="grid grid-cols-1 gap-px border-b border-line bg-line sm:grid-cols-3 lg:grid-cols-6" data-testid="metrics">
               <Meter label={t("servers.cpu")} value={Math.round(m.cpu_percent)} text={`${m.cpu_percent.toFixed(1)}%`} />
               <Meter
                 label={t("servers.memory")}
@@ -212,20 +200,31 @@ export default function ServerPage() {
               <Stat label={t("servers.lastSeen")} value={server.last_seen_at ? fmt(server.last_seen_at) : t("servers.never")} small />
             </dl>
           ) : (
-            <p className="text-sm text-muted-foreground">{t("servers.detail.noMetrics")}</p>
+            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("servers.detail.noMetrics")}</p>
           )}
         </section>
       ) : null}
 
-      {server.status === "enrolled" ? <ServerTunnels serverId={server.id} manage={manage} /> : null}
-      {server.status === "enrolled" ? <Sites serverId={server.id} base={`/${locale}/t/${team.slug}`} manage={manage} imported={(server.facts?.services ?? []).filter((s) => s.kind === "guest" || s.kind === "container")} /> : null}
+      {server.status === "enrolled" ? (
+        <div className="border-b border-line px-6 py-6 empty:hidden">
+          <ServerTunnels serverId={server.id} manage={manage} />
+        </div>
+      ) : null}
+      {server.status === "enrolled" ? (
+        <Sites
+          serverId={server.id}
+          base={`/${locale}/t/${team.slug}`}
+          manage={manage}
+          imported={(server.facts?.services ?? []).filter((s) => s.kind === "guest" || s.kind === "container")}
+        />
+      ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section aria-labelledby="facts-h" className="flex flex-col gap-2">
-          <h2 id="facts-h" className="grid-micro">
+      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-2">
+        <section aria-labelledby="facts-h" className="min-w-0 bg-grid-bg">
+          <h2 id="facts-h" className="px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
             {t("servers.detail.facts")}
           </h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border p-4 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-sm">
             <Fact
               label={t("servers.discovered.platform")}
               value={
@@ -255,19 +254,19 @@ export default function ServerPage() {
             />
           </dl>
         </section>
-        <section aria-labelledby="checks-h" className="flex flex-col gap-2">
-          <h2 id="checks-h" className="grid-micro">
+        <section aria-labelledby="checks-h" className="min-w-0 bg-grid-bg">
+          <h2 id="checks-h" className="px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
             {t("servers.detail.checks")}
           </h2>
           {server.checks.length === 0 ? (
-            <p className="border p-4 text-sm text-muted-foreground">{t("servers.detail.checksEmpty")}</p>
+            <p className="border-t border-line px-6 py-4 text-sm text-grid-muted">{t("servers.detail.checksEmpty")}</p>
           ) : (
-            <ul className="flex flex-col divide-y border text-sm" data-testid="checks">
+            <ul className="flex flex-col divide-y divide-line border-t border-line text-sm" data-testid="checks">
               {server.checks.map((c) => (
-                <li key={c.name} className="flex flex-wrap items-center gap-2 px-4 py-2">
+                <li key={c.name} className="flex flex-wrap items-center gap-2 px-6 py-2.5">
                   <CheckBadge status={c.status} />
                   <span className="font-medium">{t(`servers.check.names.${c.name}`, undefined, c.name)}</span>
-                  <span dir="auto" className="text-muted-foreground">
+                  <span dir="auto" className="text-grid-muted">
                     {c.detail}
                   </span>
                 </li>
@@ -279,22 +278,17 @@ export default function ServerPage() {
 
       {server.facts ? <Discovered services={server.facts.services ?? []} serverId={server.id} manage={manage} /> : null}
 
-      <section aria-labelledby="ops-h" className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 id="ops-h" className="font-medium">
-            {t("servers.ops.title")}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("servers.ops.description")}</p>
-        </div>
+      <section aria-labelledby="ops-h">
+        <SectionTitle id="ops-h" title={t("servers.ops.title")} hint={t("servers.ops.description")} />
 
         {!enrolled ? (
           server.status !== "provisioning" ? (
-            <p className="text-sm text-muted-foreground">{t("servers.ops.notEnrolled")}</p>
+            <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.notEnrolled")}</p>
           ) : null
         ) : !operate ? (
-          <p className="text-sm text-muted-foreground">{t("servers.ops.readOnly")}</p>
+          <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.readOnly")}</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2" data-testid="op-actions">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3" data-testid="op-actions">
             <Button size="sm" disabled={busy} onClick={() => run({ kind: "system.info" })}>
               <PlayIcon />
               {t("servers.ops.systemInfo")}
@@ -329,12 +323,14 @@ export default function ServerPage() {
             ) : null}
           </div>
         )}
-        {enrolled && !server.online ? <p className="text-sm text-muted-foreground">{t("servers.ops.offlineHint")}</p> : null}
+        {enrolled && !server.online ? (
+          <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.offlineHint")}</p>
+        ) : null}
 
-        <div className="grid gap-0 border lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <div className="min-w-0 lg:border-e">
+        <div className="grid border-b border-line lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="min-w-0 border-b border-line lg:border-e lg:border-b-0 [&_tr>*:first-child]:ps-6">
             {ops.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">{t("servers.ops.empty")}</p>
+              <p className="px-6 py-4 text-sm text-grid-muted">{t("servers.ops.empty")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -350,14 +346,14 @@ export default function ServerPage() {
                       key={o.id}
                       data-op={o.id}
                       aria-selected={o.id === selected}
-                      className={cn("cursor-pointer", o.id === selected && "bg-muted")}
+                      className={cn("cursor-pointer", o.id === selected && "bg-grid-soft")}
                       onClick={() => setSelected(o.id)}
                     >
                       <TableCell>
                         <button type="button" className="text-start font-medium" onClick={() => setSelected(o.id)}>
                           {t(`servers.ops.kinds.${opKey(o.kind)}`, undefined, o.kind)}
                           {o.kind === "provision.step" && typeof o.params.step === "string" ? (
-                            <span className="block text-xs font-normal text-muted-foreground">
+                            <span className="block text-xs font-normal text-grid-muted">
                               {t(`servers.ops.steps.${opKey(o.params.step)}`, undefined, o.params.step)}
                             </span>
                           ) : null}
@@ -380,7 +376,7 @@ export default function ServerPage() {
       </section>
 
       {manage ? (
-        <div>
+        <div className="flex justify-end border-b border-line px-6 py-5">
           <ConfirmButton
             label={t("servers.detail.delete")}
             title={t("servers.detail.deleteTitle")}
@@ -405,7 +401,7 @@ export default function ServerPage() {
 
 function Meter({ label, value, text }: { label: string; value: number; text: string }) {
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
       <dt className="grid-micro">{label}</dt>
       <dd className="flex flex-col gap-2">
         <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
@@ -419,7 +415,7 @@ function Meter({ label, value, text }: { label: string; value: number; text: str
 
 function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
       <dt className="grid-micro">{label}</dt>
       <dd dir="ltr" className={cn("text-start font-mono tabular-nums", small ? "text-xs" : "text-sm")}>
         {value}
@@ -431,7 +427,7 @@ function Stat({ label, value, small }: { label: string; value: string; small?: b
 function Fact({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="text-grid-muted">{label}</dt>
       <dd dir="ltr" className="min-w-0 text-start font-mono text-xs leading-5 break-all">
         {value || "—"}
       </dd>
@@ -442,7 +438,7 @@ function Fact({ label, value }: { label: string; value: string | null | undefine
 /** The host port a container publishes ("0.0.0.0:8080->80/tcp" → 8080), if any. */
 function publishedPort(ports?: string[]): number | null {
   for (const p of ports ?? []) {
-    const m = /:(d+)->/.exec(p)
+    const m = /:(\d+)->/.exec(p)
     if (m) return Number(m[1])
   }
   return null
@@ -472,38 +468,33 @@ function Discovered({ services, serverId, manage }: { services: DiscoveredServic
     }
   }
   return (
-    <section aria-labelledby="found-h" className="flex flex-col gap-2" data-testid="discovered">
-      <div className="flex flex-col gap-1">
-        <h2 id="found-h" className="grid-micro">
-          {t("servers.discovered.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground">{t("servers.discovered.hint")}</p>
-      </div>
-      <FormError message={error} />
+    <section aria-labelledby="found-h" data-testid="discovered">
+      <SectionTitle id="found-h" title={t("servers.discovered.title")} hint={t("servers.discovered.hint")} />
+      <ErrorBand message={error} />
       {services.length === 0 ? (
-        <p className="border p-4 text-sm text-muted-foreground">{t("servers.discovered.none")}</p>
+        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("servers.discovered.none")}</p>
       ) : (
-        <ul className="flex flex-col divide-y border text-sm">
+        <ul className="flex flex-col divide-y divide-line border-b border-line text-sm">
           {services.map((s) => (
-            <li key={`${s.kind}:${s.name}:${s.image ?? ""}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2">
-              <span className="grid-micro text-muted-foreground">{t(`servers.discovered.kinds.${s.kind}`)}</span>
+            <li key={`${s.kind}:${s.name}:${s.image ?? ""}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-2.5">
+              <span className="grid-micro text-grid-muted">{t(`servers.discovered.kinds.${s.kind}`)}</span>
               <span dir="ltr" className="font-medium">
                 {s.name}
               </span>
               {s.image ? (
-                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
+                <span dir="ltr" className="font-mono text-xs text-grid-muted">
                   {s.image}
                 </span>
               ) : null}
-              <span className="ms-auto text-muted-foreground">{s.status}</span>
+              <span className="ms-auto text-grid-muted">{s.status}</span>
               {s.ports?.length ? (
-                <span dir="ltr" className="w-full font-mono text-xs text-muted-foreground">
+                <span dir="ltr" className="w-full text-start font-mono text-xs text-grid-muted">
                   {s.ports.join(", ")}
                 </span>
               ) : null}
               {manage && s.kind === "container" && publishedPort(s.ports) ? (
                 done[s.name] ? (
-                  <span dir="ltr" className="w-full text-xs text-primary">
+                  <span dir="ltr" className="w-full text-start text-xs text-grid-brand">
                     → {done[s.name]}
                   </span>
                 ) : exposing === s.name ? (
@@ -572,72 +563,74 @@ function Sites({
   }, [team.slug, serverId])
 
   return (
-    <section aria-labelledby="sites-h" className="flex flex-col gap-3" data-testid="server-sites">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <h2 id="sites-h" className="font-medium">
-            {t("sites.title")}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("sites.hint")}</p>
-        </div>
-        {manage ? (
-          <Button size="sm" nativeButton={false} render={<Link href={`${base}/apps/new?server=${serverId}`} />}>
-            <PlusIcon />
-            {t("sites.new")}
-          </Button>
-        ) : null}
-      </div>
+    <section aria-labelledby="sites-h" data-testid="server-sites">
+      <SectionTitle
+        id="sites-h"
+        title={t("sites.title")}
+        hint={t("sites.hint")}
+        action={
+          manage ? (
+            <Button size="sm" nativeButton={false} render={<Link href={`${base}/apps/new?server=${serverId}`} />}>
+              <PlusIcon />
+              {t("sites.new")}
+            </Button>
+          ) : null
+        }
+      />
       {apps === null ? (
-        <Skeleton className="h-20 w-full" />
+        <LoadingRows rows={2} />
       ) : apps.length === 0 && proxies.length === 0 && imported.length === 0 ? (
-        <p className="border p-4 text-sm text-muted-foreground">{t("sites.empty")}</p>
+        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("sites.empty")}</p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-px border-b border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
           {apps.map((a) => (
-            <li key={a.id}>
-              <Link href={`${base}/servers/${serverId}/sites/${a.id}`} className="flex h-full flex-col gap-2 border p-4 hover:bg-muted/50">
+            <li key={a.id} className="bg-grid-bg">
+              <Link
+                href={`${base}/servers/${serverId}/sites/${a.id}`}
+                className="flex h-full flex-col gap-2 px-6 py-4 hover:bg-grid-soft"
+              >
                 <span className="flex items-center justify-between gap-2">
-                  <span dir="ltr" className="font-medium">
+                  <span dir="ltr" className="font-medium text-grid-fg">
                     {a.name}
                   </span>
                   <AppStatusBadge status={a.status} />
                 </span>
-                <span dir="ltr" className="truncate font-mono text-xs text-muted-foreground">
+                <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
                   {a.domains?.[0]?.hostname ?? a.repo_url}
                 </span>
               </Link>
             </li>
           ))}
           {imported.map((s) => (
-            <li key={`${s.kind}:${s.id ?? s.name}`} data-testid="imported-site">
-              <div className="flex h-full flex-col gap-2 border border-dotted p-4">
+            <li key={`${s.kind}:${s.id ?? s.name}`} data-testid="imported-site" className="bg-grid-bg">
+              <div className="flex h-full flex-col gap-2 bg-grid-soft/50 px-6 py-4">
                 <span className="flex items-center justify-between gap-2">
-                  <span dir="ltr" className="font-medium">
+                  <span dir="ltr" className="font-medium text-grid-fg">
                     {s.name}
                   </span>
-                  <span className="grid-micro text-muted-foreground">
+                  <span className="grid-micro text-grid-muted">
                     {s.kind === "guest" ? `${(s.type ?? "").toUpperCase()} ${s.id ?? ""}` : t("servers.discovered.kinds.container")}
                   </span>
                 </span>
-                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
+                <span dir="ltr" className="text-start font-mono text-xs text-grid-muted">
                   {[s.address, s.cpus ? `${s.cpus} vCPU` : "", s.mem_bytes ? formatBytes(s.mem_bytes) : "", s.disk_bytes ? formatBytes(s.disk_bytes) : "", s.image && s.kind === "container" ? s.image : ""]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
-                <span className="text-xs text-muted-foreground">{s.status}</span>
+                <span className="text-xs text-grid-muted">{s.status}</span>
               </div>
             </li>
           ))}
           {proxies.map((p) => (
-            <li key={p.id}>
-              <Link href={`${base}/proxy-hosts`} className="flex h-full flex-col gap-2 border border-dashed p-4 hover:bg-muted/50">
+            <li key={p.id} className="bg-grid-bg">
+              <Link href={`${base}/proxy-hosts`} className="flex h-full flex-col gap-2 px-6 py-4 hover:bg-grid-soft">
                 <span className="flex items-center justify-between gap-2">
-                  <span dir="ltr" className="font-medium">
+                  <span dir="ltr" className="font-medium text-grid-fg">
                     {p.hostname}
                   </span>
-                  <span className="grid-micro text-muted-foreground">{t("sites.proxyHost")}</span>
+                  <span className="grid-micro text-grid-muted">{t("sites.proxyHost")}</span>
                 </span>
-                <span dir="ltr" className="truncate font-mono text-xs text-muted-foreground">
+                <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
                   → {p.upstream}
                 </span>
               </Link>

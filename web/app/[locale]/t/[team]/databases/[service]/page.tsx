@@ -8,7 +8,8 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -24,7 +25,6 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
@@ -62,11 +62,16 @@ export default function DataServicePage() {
     return () => clearInterval(id)
   }, [load])
 
-  if (error && !detail) return <PageBody title={String(ref)}><FormError message={error} /></PageBody>
+  if (error && !detail)
+    return (
+      <PageBody title={String(ref)} bleed>
+        <ErrorBand message={error} />
+      </PageBody>
+    )
   if (!detail) {
     return (
-      <PageBody title={String(ref)}>
-        <Skeleton className="h-40 w-full" />
+      <PageBody title={String(ref)} bleed>
+        <LoadingRows rows={4} />
       </PageBody>
     )
   }
@@ -93,9 +98,10 @@ export default function DataServicePage() {
       title={s.name}
       description={`${s.kind} ${s.version}`}
       actions={actions}
+      bleed
     >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col">
+        <div className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-3">
           <Badge variant={statusVariant(s.status)}>{t(`databases.statuses.${s.status}`)}</Badge>
           {s.host && s.port ? (
             <span className="text-sm text-muted-foreground" dir="ltr">
@@ -104,60 +110,67 @@ export default function DataServicePage() {
           ) : null}
         </div>
         {s.status === "failed" && s.error ? (
-          <Alert variant="destructive">
-            <AlertTitle>{t("databases.provisionFailed")}</AlertTitle>
-            <AlertDescription dir="ltr">{s.error}</AlertDescription>
-          </Alert>
+          <Notice tone="danger" title={t("databases.provisionFailed")}>
+            <span dir="ltr">{s.error}</span>
+          </Notice>
         ) : null}
 
         {!isRedis ? (
           <Section title={t("databases.databasesTitle")} action={manage ? <CreateDbDialog teamSlug={team.slug} serviceRef={s.id} onDone={load} /> : null}>
             {detail.databases.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("databases.noDatabases")}</p>
+              <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noDatabases")}</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("databases.dbName")}</TableHead>
-                    <TableHead>{t("databases.status")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.databases.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell dir="ltr">{d.name}</TableCell>
-                      <TableCell>{d.status}</TableCell>
+              <TableBand>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("databases.dbName")}</TableHead>
+                      <TableHead>{t("databases.status")}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.databases.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell dir="ltr">{d.name}</TableCell>
+                        <TableCell>{d.status}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableBand>
             )}
             {detail.users.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("databases.user")}</TableHead>
-                    <TableHead>{t("databases.grants")}</TableHead>
-                    <TableHead>{t("databases.status")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.users.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell dir="ltr">{u.name}</TableCell>
-                      <TableCell>{u.grants}</TableCell>
-                      <TableCell>{u.status}</TableCell>
+              <TableBand>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("databases.user")}</TableHead>
+                      <TableHead>{t("databases.grants")}</TableHead>
+                      <TableHead>{t("databases.status")}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell dir="ltr">{u.name}</TableCell>
+                        <TableCell>{u.grants}</TableCell>
+                        <TableCell>{u.status}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableBand>
             ) : null}
           </Section>
         ) : null}
 
         {manage ? (
           <Section title={t("databases.connectionTitle")}>
-            <ConnectionPanel teamSlug={team.slug} serviceRef={s.id} canAttach={isRedis || detail.users.length > 0} />
+            <div className="border-b border-line px-6 py-5">
+              <div className="max-w-2xl">
+                <ConnectionPanel teamSlug={team.slug} serviceRef={s.id} canAttach={isRedis || detail.users.length > 0} />
+              </div>
+            </div>
           </Section>
         ) : null}
 
@@ -179,62 +192,68 @@ export default function DataServicePage() {
           }
         >
           {detail.backups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("databases.noBackups")}</p>
+            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noBackups")}</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("databases.backupKind")}</TableHead>
-                  <TableHead>{t("databases.status")}</TableHead>
-                  <TableHead>{t("databases.size")}</TableHead>
-                  <TableHead>{t("databases.restoreTest")}</TableHead>
-                  <TableHead>{t("databases.taken")}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detail.backups.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell>{t(`databases.backupKinds.${b.kind}`)}</TableCell>
-                    <TableCell>
-                      <Badge variant={b.status === "succeeded" ? "default" : b.status === "failed" ? "destructive" : "secondary"}>{b.status}</Badge>
-                    </TableCell>
-                    <TableCell dir="ltr">{humanBytes(b.size_bytes)}</TableCell>
-                    <TableCell>
-                      {b.restore_status && b.restore_status !== "untested" ? (
-                        <Badge variant={b.restore_status === "pass" ? "default" : b.restore_status === "fail" ? "destructive" : "secondary"}>
-                          {t(`databases.restoreStatuses.${b.restore_status}`)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{b.taken_at ? fmt(b.taken_at) : "—"}</TableCell>
-                    <TableCell className="text-end">
-                      {manage && b.status === "succeeded" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={b.restore_status === "testing"}
-                          onClick={async () => {
-                            await apiFetch(`/api/teams/${team.slug}/data-services/${s.id}/backups/${b.id}/restore-test`, { method: "POST" })
-                            await load()
-                          }}
-                        >
-                          {t("databases.runRestoreTest")}
-                        </Button>
-                      ) : null}
-                    </TableCell>
+            <TableBand>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("databases.backupKind")}</TableHead>
+                    <TableHead>{t("databases.status")}</TableHead>
+                    <TableHead>{t("databases.size")}</TableHead>
+                    <TableHead>{t("databases.restoreTest")}</TableHead>
+                    <TableHead>{t("databases.taken")}</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {detail.backups.map((b) => (
+                    <TableRow key={b.id}>
+                      <TableCell>{t(`databases.backupKinds.${b.kind}`)}</TableCell>
+                      <TableCell>
+                        <Badge variant={b.status === "succeeded" ? "default" : b.status === "failed" ? "destructive" : "secondary"}>{b.status}</Badge>
+                      </TableCell>
+                      <TableCell dir="ltr">{humanBytes(b.size_bytes)}</TableCell>
+                      <TableCell>
+                        {b.restore_status && b.restore_status !== "untested" ? (
+                          <Badge variant={b.restore_status === "pass" ? "default" : b.restore_status === "fail" ? "destructive" : "secondary"}>
+                            {t(`databases.restoreStatuses.${b.restore_status}`)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{b.taken_at ? fmt(b.taken_at) : "—"}</TableCell>
+                      <TableCell className="text-end">
+                        {manage && b.status === "succeeded" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={b.restore_status === "testing"}
+                            onClick={async () => {
+                              await apiFetch(`/api/teams/${team.slug}/data-services/${s.id}/backups/${b.id}/restore-test`, { method: "POST" })
+                              await load()
+                            }}
+                          >
+                            {t("databases.runRestoreTest")}
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableBand>
           )}
         </Section>
 
         {manage ? (
           <Section title={t("databases.scheduleTitle")}>
-            <ScheduleForm teamSlug={team.slug} serviceRef={s.id} schedule={detail.schedule} remoteAvailable={detail.remote_available} onDone={load} />
+            <div className="border-b border-line px-6 py-5">
+              <div className="max-w-2xl">
+                <ScheduleForm teamSlug={team.slug} serviceRef={s.id} schedule={detail.schedule} remoteAvailable={detail.remote_available} onDone={load} />
+              </div>
+            </div>
           </Section>
         ) : null}
       </div>
@@ -244,14 +263,16 @@ export default function DataServicePage() {
 
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 border p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-medium">
-          <DatabaseIcon className="size-4 text-muted-foreground" aria-hidden />
-          {title}
-        </h2>
-        {action}
-      </div>
+    <section>
+      <SectionTitle
+        title={
+          <span className="flex items-center gap-2">
+            <DatabaseIcon className="size-4 text-grid-muted" aria-hidden />
+            {title}
+          </span>
+        }
+        action={action}
+      />
       {children}
     </section>
   )
@@ -392,7 +413,7 @@ function ConnectionPanel({ teamSlug, serviceRef, canAttach }: { teamSlug: string
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2 border-t pt-4">
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
         <FieldLabel>{t("databases.attachTitle")}</FieldLabel>
         <p className="text-sm text-muted-foreground">{t("databases.attachHint")}</p>
         <div className="flex flex-wrap items-center gap-2">

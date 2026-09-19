@@ -6,6 +6,7 @@ import { DatabaseIcon, PlusIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { FormError, useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,7 +22,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import type { DataService, DataServiceKind } from "@/lib/databases"
@@ -68,15 +68,12 @@ export default function DatabasesPage() {
   const add = manage ? <CreateDialog teamSlug={team.slug} onCreated={load} /> : null
 
   return (
-    <PageBody title={t("nav.databases")} description={t("databases.description")} actions={add}>
-      <FormError message={error} />
+    <PageBody title={t("nav.databases")} description={t("databases.description")} actions={add} bleed>
+      <ErrorBand message={error} />
       {services === null ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
+        <LoadingRows />
       ) : services.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <DatabaseIcon />
@@ -87,7 +84,7 @@ export default function DatabasesPage() {
           {add}
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -118,7 +115,7 @@ export default function DatabasesPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )
@@ -166,7 +163,7 @@ function CreateDialog({ teamSlug, onCreated }: { teamSlug: string; onCreated: ()
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button />}>
         <PlusIcon />
         {t("databases.add")}
       </DialogTrigger>

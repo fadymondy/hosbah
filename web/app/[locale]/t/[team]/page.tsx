@@ -2,12 +2,11 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { PlusIcon, ServerIcon } from "lucide-react"
+import { BoxesIcon, DatabaseIcon, KeyRoundIcon, NetworkIcon, PlusIcon, ServerIcon, UsersIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { apiFetch, type Member } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -15,18 +14,20 @@ import type { App } from "@/lib/apps"
 import type { Server } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 
+type Loaded<T> = T | null | "error"
+
 export default function OverviewPage() {
   const { t, locale } = useI18n()
   const { team, manage } = useTeam()
   useDocumentTitle(`${t("nav.overview")} — ${team.name}`)
-  const [count, setCount] = useState<number | null | "error">(null)
-  const [servers, setServers] = useState<Server[] | null | "error">(null)
-  const [apps, setApps] = useState<App[] | null | "error">(null)
+  const [members, setMembers] = useState<Loaded<number>>(null)
+  const [servers, setServers] = useState<Loaded<Server[]>>(null)
+  const [apps, setApps] = useState<Loaded<App[]>>(null)
 
   useEffect(() => {
     apiFetch<{ members: Member[] }>(`/api/teams/${team.slug}/members`)
-      .then((r) => setCount(r.members?.length ?? 0))
-      .catch(() => setCount("error"))
+      .then((r) => setMembers(r.members?.length ?? 0))
+      .catch(() => setMembers("error"))
     apiFetch<{ servers: Server[] }>(`/api/teams/${team.slug}/servers`)
       .then((r) => setServers(r.servers ?? []))
       .catch(() => setServers("error"))
@@ -36,97 +37,92 @@ export default function OverviewPage() {
   }, [team.slug])
 
   const base = `/${locale}/t/${team.slug}`
-  const online = Array.isArray(servers) ? servers.filter((s) => s.online).length : 0
+  const figures: [string, Loaded<number>, string?][] = [
+    [
+      t("overview.servers"),
+      Array.isArray(servers) ? servers.length : servers,
+      Array.isArray(servers) ? `${servers.filter((s) => s.online).length} ${t("overview.online")}` : undefined,
+    ],
+    [
+      t("overview.apps"),
+      Array.isArray(apps) ? apps.length : apps,
+      Array.isArray(apps) ? `${apps.filter((a) => a.status === "running").length} ${t("overview.running")}` : undefined,
+    ],
+    [t("overview.members"), members],
+  ]
 
   return (
-    <PageBody title={team.name} description={t("overview.description")}>
-      <dl className="grid-cells grid sm:grid-cols-2 lg:grid-cols-5">
-        <div className="flex flex-col gap-1 p-4">
-          <dt className="grid-micro">{t("overview.yourRole")}</dt>
-          <dd>
-            <Badge variant="secondary">{t(`roles.${team.role}`)}</Badge>
-          </dd>
+    <PageBody
+      eyebrow={t("nav.overview")}
+      title={team.name}
+      actions={<Badge variant="outline">{t(`roles.${team.role}`)}</Badge>}
+      bleed
+    >
+      {/* The "in development" notice: a hairline-framed hatched band with the message on a card. */}
+      <div className="grid-hatch border-b border-line p-3" role="status">
+        <div className="border border-line bg-grid-card px-5 py-4">
+          <p className="grid-micro mb-2 text-grid-brand">{t("overview.devBadge")}</p>
+          <p className="text-base font-medium text-grid-fg">{t("auth.devNotice")}</p>
+          <p className="grid-body mt-1 text-sm">{t("shell.devBanner")}</p>
         </div>
-        <div className="flex flex-col gap-1 p-4">
-          <dt className="grid-micro">{t("overview.members")}</dt>
-          <dd className="font-mono text-2xl">
-            {count === null ? <Skeleton className="h-7 w-10" /> : count === "error" ? "—" : count}
-          </dd>
-        </div>
-        <div className="flex flex-col gap-1 p-4">
-          <dt className="grid-micro">{t("overview.servers")}</dt>
-          <dd className="font-mono text-2xl">
-            {servers === null ? (
-              <Skeleton className="h-7 w-10" />
-            ) : servers === "error" ? (
-              "—"
-            ) : (
-              <>
-                {servers.length}
-                <span className="ms-2 text-sm text-muted-foreground">
-                  {online} {t("overview.online")}
-                </span>
-              </>
-            )}
-          </dd>
-        </div>
-        <div className="flex flex-col gap-1 p-4">
-          <dt className="grid-micro">{t("overview.apps")}</dt>
-          <dd className="font-mono text-2xl">
-            {apps === null ? (
-              <Skeleton className="h-7 w-10" />
-            ) : apps === "error" ? (
-              "—"
-            ) : (
-              <>
-                {apps.length}
-                <span className="ms-2 text-sm text-muted-foreground">
-                  {apps.filter((a) => a.status === "running").length} {t("overview.running")}
-                </span>
-              </>
-            )}
-          </dd>
-        </div>
-        <div className="flex flex-col gap-1 p-4">
-          <dt className="grid-micro">{t("overview.slug")}</dt>
-          <dd dir="ltr" className="text-start font-mono text-sm">
-            {team.slug}
-          </dd>
-        </div>
-      </dl>
+      </div>
 
-      {Array.isArray(servers) && servers.length === 0 ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ServerIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("overview.serversTitle")}</EmptyTitle>
-            <EmptyDescription>{manage ? t("overview.serversHint") : t("common.readOnly")}</EmptyDescription>
-          </EmptyHeader>
-          {manage ? (
-            <Button size="sm" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
-              <PlusIcon />
-              {t("servers.add")}
-            </Button>
-          ) : null}
-        </Empty>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/apps`} />}>
+      <div className="flex flex-wrap gap-2 px-6 py-6">
+        {manage ? (
+          <Button nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+            <PlusIcon />
+            {t("servers.add")}
+          </Button>
+        ) : null}
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/apps`} />}>
+          <BoxesIcon />
           {t("nav.apps")}
         </Button>
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/servers`} />}>
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/servers`} />}>
+          <ServerIcon />
           {t("nav.servers")}
         </Button>
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/members`} />}>
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/databases`} />}>
+          <DatabaseIcon />
+          {t("nav.databases")}
+        </Button>
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/proxy-hosts`} />}>
+          <NetworkIcon />
+          {t("nav.proxyHosts")}
+        </Button>
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/members`} />}>
+          <UsersIcon />
           {t("nav.members")}
         </Button>
-        <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`${base}/tokens`} />}>
+        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/tokens`} />}>
+          <KeyRoundIcon />
           {t("nav.tokens")}
         </Button>
       </div>
+
+      <dl className="grid grid-cols-1 divide-y divide-line border-y border-line text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse">
+        {figures.map(([label, value, note]) => (
+          <div key={label} className="px-6 py-4">
+            <dt className="grid-micro mb-1">{label}</dt>
+            <dd className="flex items-baseline gap-2 text-grid-fg">
+              {value === null ? (
+                <Skeleton className="h-6 w-10" />
+              ) : (
+                <>
+                  <span className="font-mono text-xl tabular-nums">{value === "error" ? "—" : value}</span>
+                  {note ? <span className="text-xs text-grid-muted">{note}</span> : null}
+                </>
+              )}
+            </dd>
+          </div>
+        ))}
+        <div className="px-6 py-4">
+          <dt className="grid-micro mb-1">{t("overview.slug")}</dt>
+          <dd dir="ltr" className="text-start font-mono text-grid-fg">
+            /{team.slug}
+          </dd>
+        </div>
+      </dl>
     </PageBody>
   )
 }

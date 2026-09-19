@@ -9,7 +9,7 @@ import { useState } from "react"
 import { MessageSquareWarningIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { SidebarMenuButton } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
 import { ReportDialog, type FeedbackSubmission } from "@/lib/feedback/react"
 import { apiFetch, ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -44,10 +44,16 @@ export function ReportProblem() {
 
   return (
     <>
-      <SidebarMenuButton tooltip={t("feedback.launcher")} onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="hidden sm:inline-flex"
+        onClick={() => setOpen(true)}
+        aria-label={t("feedback.launcher")}
+      >
         <MessageSquareWarningIcon />
-        <span>{t("feedback.launcher")}</span>
-      </SidebarMenuButton>
+        <span className="hidden lg:inline">{t("feedback.launcher")}</span>
+      </Button>
       <ReportDialog
         open={open}
         onOpenChange={setOpen}

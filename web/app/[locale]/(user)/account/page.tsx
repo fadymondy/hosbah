@@ -9,7 +9,7 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -24,7 +24,7 @@ export default function AccountPage() {
   const { me } = useSession()
   useDocumentTitle(t("account.title"))
   return (
-    <PageBody title={t("account.title")} description={<span dir="ltr">{me.user.email}</span>}>
+    <PageBody title={t("account.title")} description={<span dir="ltr">{me.user.email}</span>} bleed>
       <TwoFactor />
       <MyReports />
     </PageBody>
@@ -118,20 +118,23 @@ function TwoFactor() {
   }
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShieldCheckIcon className="size-4" />
+    <section>
+      <SectionTitle
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            <ShieldCheckIcon className="size-4 text-grid-brand" />
           {t("account.twofa.title")}
           {enabled === null ? null : enabled ? (
             <Badge>{t("account.twofa.on")}</Badge>
           ) : (
             <Badge variant="outline">{t("account.twofa.off")}</Badge>
           )}
-        </CardTitle>
-        <CardDescription>{t("account.twofa.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+          </span>
+        }
+        hint={t("account.twofa.description")}
+      />
+      <div className="border-b border-line px-6 py-5">
+        <div className="flex max-w-xl flex-col gap-4">
         <FormError message={error} />
         {enabled === null && !error ? <Skeleton className="h-8 w-40" /> : null}
 
@@ -188,8 +191,9 @@ function TwoFactor() {
             </FieldGroup>
           </form>
         ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -211,13 +215,13 @@ function MyReports() {
   }, [])
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-base font-medium">{t("account.reports.title")}</h2>
-      <FormError message={error} />
+    <section>
+      <SectionTitle title={t("account.reports.title")} className="mt-6 border-t" />
+      <ErrorBand message={error} />
       {reports === null ? (
-        <Skeleton className="h-8 w-full" />
+        <LoadingRows />
       ) : reports.length === 0 && !error ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <InboxIcon />
@@ -227,7 +231,7 @@ function MyReports() {
           </EmptyHeader>
         </Empty>
       ) : reports.length ? (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -254,7 +258,7 @@ function MyReports() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       ) : null}
     </section>
   )

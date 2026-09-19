@@ -6,6 +6,7 @@ import { NetworkIcon, PlusIcon } from "lucide-react"
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -22,7 +23,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -74,12 +74,13 @@ export default function ProxyHostsPage() {
       title={t("proxy.title")}
       description={t("proxy.description")}
       actions={manage ? <AddProxyHost servers={servers} onSaved={load} /> : null}
+      bleed
     >
-      <FormError message={error} />
+      <ErrorBand message={error} />
       {hosts === null ? (
-        <Skeleton className="h-16 w-full" />
+        <LoadingRows />
       ) : hosts.length === 0 ? (
-        <Empty className="border">
+        <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <NetworkIcon />
@@ -89,7 +90,7 @@ export default function ProxyHostsPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="border">
+        <TableBand>
           <Table>
             <TableHeader>
               <TableRow>
@@ -162,7 +163,7 @@ export default function ProxyHostsPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </TableBand>
       )}
     </PageBody>
   )
@@ -207,7 +208,7 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button />}>
         <PlusIcon />
         {t("proxy.add")}
       </DialogTrigger>

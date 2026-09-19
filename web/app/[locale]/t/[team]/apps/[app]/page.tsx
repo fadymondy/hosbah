@@ -14,8 +14,8 @@ import { RuntimeLogsPanel } from "@/components/apps/runtime-logs"
 import { SettingsPanel } from "@/components/apps/settings"
 import { ConfirmButton } from "@/components/confirm-button"
 import { DeploymentLog } from "@/components/deployment-log"
-import { FormError, useErrorText } from "@/components/form-error"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useErrorText } from "@/components/form-error"
+import { ErrorBand, LoadingRows, Notice } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -92,19 +92,16 @@ export default function AppPage() {
 
   if (missing) {
     return (
-      <PageBody title={t("nav.apps")}>
-        <Alert>
-          <AlertCircleIcon />
-          <AlertDescription>{t("errors.notFound")}</AlertDescription>
-        </Alert>
+      <PageBody title={t("nav.apps")} bleed>
+        <Notice icon={<AlertCircleIcon />} title={t("errors.notFound")} />
       </PageBody>
     )
   }
   if (!detail || !app) {
     return (
-      <PageBody title={<Skeleton className="h-8 w-48" />}>
-        <FormError message={error} />
-        <Skeleton className="h-24 w-full" />
+      <PageBody title={<Skeleton className="h-8 w-48" />} bleed>
+        <ErrorBand message={error} />
+        <LoadingRows rows={4} />
       </PageBody>
     )
   }
@@ -179,12 +176,13 @@ export default function AppPage() {
         </span>
       }
       actions={actions}
+      bleed
     >
-      <FormError message={error} />
-      {!operate ? <p className="text-sm text-muted-foreground">{t("apps.viewerHint")}</p> : null}
-      {operate && !prev ? <p className="text-xs text-muted-foreground">{t("apps.actions.noPrevious")}</p> : null}
+      <ErrorBand message={error} />
+      {!operate ? <p className="border-b border-line bg-grid-soft px-6 py-3 text-sm text-grid-body">{t("apps.viewerHint")}</p> : null}
+      {operate && !prev ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("apps.actions.noPrevious")}</p> : null}
 
-      <dl className="grid-cells grid sm:grid-cols-2 lg:grid-cols-5" data-testid="app-summary">
+      <dl className="grid grid-cols-1 gap-px border-b border-line bg-line sm:grid-cols-2 lg:grid-cols-5" data-testid="app-summary">
         <Stat label={t("apps.liveRelease")}>
           {live ? (
             <span dir="ltr" className="font-mono text-sm">
@@ -235,9 +233,9 @@ export default function AppPage() {
         </Stat>
       </dl>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
-        <div className="overflow-x-auto">
-          <TabsList variant="line" className="max-w-full justify-start overflow-x-auto">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as string)} className="gap-0">
+        <div className="overflow-x-auto border-b border-line px-6 py-3">
+          <TabsList className="max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="deployments">{t("apps.tabs.deployments")}</TabsTrigger>
             <TabsTrigger value="logs">{t("apps.tabs.logs")}</TabsTrigger>
             <TabsTrigger value="env">{t("apps.tabs.env")}</TabsTrigger>
@@ -248,12 +246,12 @@ export default function AppPage() {
         </div>
 
         <TabsContent value="deployments">
-          <div className="grid gap-0 border lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" data-testid="deployments">
-            <div className="min-w-0 lg:border-e">
+          <div className="grid border-b border-line lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" data-testid="deployments">
+            <div className="min-w-0 border-b border-line lg:border-e lg:border-b-0">
               {deps.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">{t("apps.deploy.empty")}</p>
+                <p className="px-6 py-4 text-sm text-grid-muted">{t("apps.deploy.empty")}</p>
               ) : (
-                <ol className="flex max-h-[32rem] flex-col divide-y overflow-y-auto">
+                <ol className="flex max-h-[32rem] flex-col divide-y divide-line overflow-y-auto">
                   {deps.map((d) => (
                     <li key={d.id}>
                       <button
@@ -265,8 +263,8 @@ export default function AppPage() {
                           setPinned(d.id !== deps[0]?.id)
                         }}
                         className={cn(
-                          "flex w-full flex-col gap-1 px-4 py-3 text-start hover:bg-muted/50",
-                          d.id === selected && "bg-muted",
+                          "flex w-full flex-col gap-1 px-6 py-3 text-start hover:bg-grid-soft",
+                          d.id === selected && "bg-grid-soft",
                         )}
                       >
                         <span className="flex flex-wrap items-center gap-2 text-sm">
@@ -303,25 +301,25 @@ export default function AppPage() {
                 }
               />
             ) : (
-              <p className="p-4 text-sm text-muted-foreground">{t("apps.deploy.select")}</p>
+              <p className="px-6 py-4 text-sm text-grid-muted">{t("apps.deploy.select")}</p>
             )}
           </div>
-          {anyActive ? <p className="pt-2 text-xs text-muted-foreground">{t("apps.deploy.following")}</p> : null}
+          {anyActive ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("apps.deploy.following")}</p> : null}
         </TabsContent>
 
-        <TabsContent value="logs">
+        <TabsContent value="logs" className="px-6 py-6">
           <RuntimeLogsPanel path={path} team={team.slug} app={app} processes={detail.processes} operate={operate} live={!!live} />
         </TabsContent>
-        <TabsContent value="env">
+        <TabsContent value="env" className="px-6 py-6">
           <EnvPanel path={path} manage={manage} />
         </TabsContent>
-        <TabsContent value="domains">
+        <TabsContent value="domains" className="px-6 py-6">
           <DomainsPanel team={team.slug} path={path} manage={manage} />
         </TabsContent>
-        <TabsContent value="releases">
+        <TabsContent value="releases" className="px-6 py-6">
           <ReleasesPanel path={path} operate={operate} liveId={app.current_release_id} onRollback={pushDeployment} />
         </TabsContent>
-        <TabsContent value="settings">
+        <TabsContent value="settings" className="px-6 py-6">
           <SettingsPanel team={team.slug} path={path} detail={detail} manage={manage} onSaved={(a) => setDetail((d) => (d ? { ...d, app: a } : d))} />
         </TabsContent>
       </Tabs>
@@ -331,7 +329,7 @@ export default function AppPage() {
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 p-4">
+    <div className="flex min-w-0 flex-col gap-2 bg-grid-bg px-6 py-4">
       <dt className="grid-micro">{label}</dt>
       <dd className="min-w-0 text-start">{children}</dd>
     </div>

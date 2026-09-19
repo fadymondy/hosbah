@@ -8,6 +8,7 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -40,12 +41,15 @@ export function McpTokens({
   withScopes,
   canCreate,
   serverName,
+  bleed = false,
 }: {
   basePath: string
   endpoint: string
   withScopes: boolean
   canCreate: boolean
   serverName: string
+  /** Full-bleed bands (a PageBody with `bleed`) instead of cards in a padded column. */
+  bleed?: boolean
 }) {
   const { t } = useI18n()
   const fmt = useFormatDate()
@@ -88,6 +92,126 @@ export function McpTokens({
     if (tok.revoked_at) return <Badge variant="outline">{t("tokens.revoked")}</Badge>
     if (tok.expires_at && new Date(tok.expires_at) < new Date()) return <Badge variant="outline">{t("tokens.expired")}</Badge>
     return <Badge variant="secondary">{t("tokens.active")}</Badge>
+  }
+
+  const table =
+    tokens && tokens.length ? (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("tokens.name")}</TableHead>
+            {withScopes ? <TableHead>{t("tokens.scopes")}</TableHead> : null}
+            <TableHead>{t("tokens.status")}</TableHead>
+            <TableHead>{t("tokens.lastUsed")}</TableHead>
+            <TableHead>{t("tokens.expires")}</TableHead>
+            <TableHead className="text-end">{canCreate ? t("common.actions") : null}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tokens.map((tok) => (
+            <TableRow key={tok.id}>
+              <TableCell className="font-medium">{tok.name}</TableCell>
+              {withScopes ? (
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {(tok.scopes ?? []).map((s) => (
+                      <Badge key={s} variant={s === "destructive" ? "destructive" : "outline"} className="font-mono">
+                        <span dir="ltr">{s}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+              ) : null}
+              <TableCell>{status(tok)}</TableCell>
+              <TableCell dir="ltr" className="text-start">
+                {tok.last_used_at ? fmt(tok.last_used_at) : t("tokens.never")}
+              </TableCell>
+              <TableCell dir="ltr" className="text-start">
+                {tok.expires_at ? fmt(tok.expires_at) : t("tokens.never")}
+              </TableCell>
+              <TableCell className="text-end">
+                {canCreate && !tok.revoked_at ? (
+                  <ConfirmButton
+                    label={t("tokens.revoke")}
+                    title={t("tokens.revokeTitle")}
+                    description={t("tokens.revokeHint", { name: tok.name })}
+                    confirmLabel={t("tokens.revoke")}
+                    onConfirm={async () => {
+                      await apiFetch(`${basePath}/${tok.id}`, { method: "DELETE" })
+                      await load()
+                    }}
+                  />
+                ) : null}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    ) : null
+
+  const empty = (className: string) => (
+    <Empty className={className}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <KeyRoundIcon />
+        </EmptyMedia>
+        <EmptyTitle>{t("tokens.emptyTitle")}</EmptyTitle>
+        <EmptyDescription>{t("tokens.emptyHint")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+
+  const create = canCreate ? (
+    <CreateToken
+      basePath={basePath}
+      withScopes={withScopes}
+      onCreated={(token) => {
+        setPlain(token)
+        void load()
+      }}
+    />
+  ) : null
+
+  if (bleed) {
+    return (
+      <>
+        <SettingsRow label={t("tokens.endpoint")} hint={t("tokens.endpointHint")}>
+          <CopyField value={endpoint} />
+          <p className="text-sm text-grid-muted">{t("tokens.snippetHint")}</p>
+          <CopyField value={snippet} block />
+        </SettingsRow>
+
+        {plain ? (
+          <div role="status" className="border-b border-line border-s-2 border-s-grid-gold bg-grid-soft px-6 py-5">
+            <p className="text-sm font-medium text-grid-fg">{t("tokens.createdTitle")}</p>
+            <p className="mt-1 text-xs text-grid-muted">{t("tokens.createdOnce")}</p>
+            <div className="mt-3 flex max-w-xl flex-col gap-3">
+              <CopyField value={plain} />
+              <div>
+                <Button variant="outline" size="sm" onClick={() => setPlain(null)}>
+                  {t("tokens.dismiss")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <SectionTitle
+          title={t("tokens.listTitle")}
+          hint={!canCreate ? t("common.readOnly") : undefined}
+          action={create}
+        />
+        <ErrorBand message={error} />
+
+        {tokens === null ? (
+          <LoadingRows />
+        ) : tokens.length === 0 && !error ? (
+          empty("border-b")
+        ) : table ? (
+          <TableBand>{table}</TableBand>
+        ) : null}
+      </>
+    )
   }
 
   return (
@@ -143,69 +267,9 @@ export function McpTokens({
           <Skeleton className="h-8 w-full" />
         </div>
       ) : tokens.length === 0 && !error ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <KeyRoundIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("tokens.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("tokens.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : tokens.length ? (
-        <div className="border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("tokens.name")}</TableHead>
-                {withScopes ? <TableHead>{t("tokens.scopes")}</TableHead> : null}
-                <TableHead>{t("tokens.status")}</TableHead>
-                <TableHead>{t("tokens.lastUsed")}</TableHead>
-                <TableHead>{t("tokens.expires")}</TableHead>
-                <TableHead className="text-end">{canCreate ? t("common.actions") : null}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tokens.map((tok) => (
-                <TableRow key={tok.id}>
-                  <TableCell className="font-medium">{tok.name}</TableCell>
-                  {withScopes ? (
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {(tok.scopes ?? []).map((s) => (
-                          <Badge key={s} variant={s === "destructive" ? "destructive" : "outline"} className="font-mono">
-                            <span dir="ltr">{s}</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  ) : null}
-                  <TableCell>{status(tok)}</TableCell>
-                  <TableCell dir="ltr" className="text-start">
-                    {tok.last_used_at ? fmt(tok.last_used_at) : t("tokens.never")}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start">
-                    {tok.expires_at ? fmt(tok.expires_at) : t("tokens.never")}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {canCreate && !tok.revoked_at ? (
-                      <ConfirmButton
-                        label={t("tokens.revoke")}
-                        title={t("tokens.revokeTitle")}
-                        description={t("tokens.revokeHint", { name: tok.name })}
-                        confirmLabel={t("tokens.revoke")}
-                        onConfirm={async () => {
-                          await apiFetch(`${basePath}/${tok.id}`, { method: "DELETE" })
-                          await load()
-                        }}
-                      />
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        empty("border")
+      ) : table ? (
+        <div className="border">{table}</div>
       ) : null}
     </div>
   )

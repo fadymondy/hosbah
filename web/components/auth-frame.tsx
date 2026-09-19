@@ -4,8 +4,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 
 import { ThemedCubeMark } from "@/components/cube-mark"
-import { LanguageSwitch, ThemeToggle } from "@/components/preferences"
-import { Separator } from "@/components/ui/separator"
+import { LanguageMenu, ThemeToggle } from "@/components/preferences"
 import { useI18n } from "@/lib/i18n"
 
 /**
@@ -33,22 +32,13 @@ export function AuthFrame({
     <div className="relative isolate flex min-h-dvh flex-col">
       <header className="sticky top-0 z-50 max-w-screen overflow-x-clip bg-background px-2">
         <div className="grid-screen-line-top grid-screen-line-bottom mx-auto flex h-14 max-w-[860px] items-center gap-2 border-x ps-4 pe-2 sm:gap-4">
-          <Link href={`/${locale}`} className="flex items-center gap-2 font-medium" aria-label={t("common.brand")}>
+          <Link href={`/${locale}`} className="flex items-center gap-2.5" aria-label={t("common.brand")}>
             <ThemedCubeMark size={22} />
-            <span className="text-base tracking-tight">{t("common.brand")}</span>
+            <span className="text-[15px] font-medium">{t("common.brand")}</span>
           </Link>
           <div className="flex-1" />
-          <nav className="hidden items-center gap-4 text-sm sm:flex" aria-label={t("auth.nav")}>
-            <Link href={`/${locale}/login`} className="text-muted-foreground hover:text-foreground">
-              {t("auth.login.title")}
-            </Link>
-            <Link href={`/${locale}/register`} className="text-muted-foreground hover:text-foreground">
-              {t("auth.register.title")}
-            </Link>
-          </nav>
-          <Separator orientation="vertical" className="hidden data-vertical:h-5 data-vertical:self-center sm:block" />
-          <div className="flex items-center">
-            <LanguageSwitch />
+          <div className="flex items-center gap-1">
+            <LanguageMenu />
             <ThemeToggle />
           </div>
         </div>
@@ -92,9 +82,7 @@ export function AuthFrame({
             <div className="grid-hatch h-12" aria-hidden />
           </div>
           <div className="grid-screen-line-bottom flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3 font-mono text-sm">
-            <span className="font-medium" dir="ltr">
-              cloudy-app
-            </span>
+            <span className="font-medium">{t("common.brand")}</span>
             <span className="font-sans text-muted-foreground">{t("auth.footerTagline")}</span>
           </div>
           <dl className="grid grid-cols-1 font-mono text-xs sm:grid-cols-3">
