@@ -42,6 +42,8 @@ export type Domain = {
   verify_name: string
   verify_value: string
   created_at: string
+  /** Imported workloads: where the hostname is routed (127.0.0.1:8081, or http://10.0.0.5:80). */
+  upstream?: string | null
 }
 
 /**

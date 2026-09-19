@@ -108,7 +108,14 @@ export default function AppPage() {
   }
 
   // An imported workload is shown read-only: Hosbah never deploys or changes it.
-  if (isImported(app)) return <ImportedAppView app={app} apiPath={path} />
+  if (isImported(app))
+    return (
+      <ImportedAppView
+        app={app}
+        apiPath={path}
+        onChanged={() => void apiFetch<AppDetail>(path).then(setDetail).catch(() => {})}
+      />
+    )
 
   const live = detail.live_release
   const prev = detail.previous_release

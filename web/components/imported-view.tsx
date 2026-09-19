@@ -2,30 +2,58 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { LayoutGridIcon, ServerIcon, Trash2Icon } from "lucide-react"
+import { LayoutGridIcon, ServerIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
-import { ConfirmButton } from "@/components/confirm-button"
+import { DomainsPanel } from "@/components/apps/domains"
 import { useErrorText } from "@/components/form-error"
 import { ImportedBadge, ImportedNotice, originSummary, OriginFacts } from "@/components/imported"
-import { SectionTitle } from "@/components/states"
+import {
+  DangerZone,
+  DatabaseCredentials,
+  GuestBackup,
+  GuestSnapshots,
+  PowerControls,
+  RecreateContainer,
+  ResizeGuest,
+  useWorkloadActions,
+  WorkloadLogs,
+  WorkloadStats,
+} from "@/components/imported-controls"
+import { ErrorBand, SectionTitle } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
+import { canOperate } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 
+/** The first published host port of a container ("0.0.0.0:8081->80/tcp" → 8081). */
+function firstPort(ports?: string[]): number | undefined {
+  for (const p of ports ?? []) {
+    const m = /:(\d+)->/.exec(p)
+    if (m) return Number(m[1])
+  }
+  return undefined
+}
+
 /**
- * An imported site: what Hosbah found running on the server, shown read-only. The only action is
- * removing the record — the workload itself is never touched (the API refuses everything else).
+ * An imported site: a Proxmox guest or a container Hosbah found on the server, managed like any
+ * service — power, stats, logs, domains with HTTPS, and for guests resize / snapshots / backups,
+ * for containers pull-and-recreate. Only deploying from git does not apply (there is no build).
  */
-export function ImportedAppView({ app, apiPath }: { app: App; apiPath: string }) {
+export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath: string; onChanged?: () => void }) {
   const { t, locale } = useI18n()
   const { team, manage } = useTeam()
   const router = useRouter()
   const errorText = useErrorText()
+  const operate = canOperate(team.role)
   const base = `/${locale}/t/${team.slug}`
+  const guest = app.origin_kind === "guest"
+  const container = app.origin_kind === "container"
+  const { run, busy, error, log } = useWorkloadActions(apiPath, app.server_id)
+  const missing = app.imported_state === "missing"
 
   return (
     <PageBody
@@ -44,6 +72,17 @@ export function ImportedAppView({ app, apiPath }: { app: App; apiPath: string })
       bleed
     >
       <ImportedNotice kind="app" />
+      <ErrorBand message={error} />
+
+      {operate && !missing ? (
+        <section aria-labelledby="power-h">
+          <SectionTitle id="power-h" title={t("controls.power")} hint={t("controls.powerHint")} />
+          <div className="border-b border-line px-6 py-4">
+            <PowerControls item={app} run={(k, s, i) => run(k, s, i).then(() => onChanged?.())} busy={busy} guest={guest} />
+          </div>
+        </section>
+      ) : null}
+
       <OriginFacts
         item={app}
         extra={[
@@ -56,25 +95,68 @@ export function ImportedAppView({ app, apiPath }: { app: App; apiPath: string })
           ],
         ]}
       />
-      {manage ? <RemoveRecord name={app.name} onRemove={async () => {
-        try {
-          await apiFetch(apiPath, { method: "DELETE", body: { confirm: app.name } })
-        } catch (err) {
-          throw new Error(errorText(err))
-        }
-        router.replace(`${base}/apps`)
-      }} /> : null}
+
+      {operate && !missing ? <WorkloadStats path={apiPath} /> : null}
+      {operate && container && !missing ? <WorkloadLogs run={run} busy={busy} /> : null}
+      {log}
+
+      <section aria-labelledby="domains-h">
+        <SectionTitle id="domains-h" title={t("apps.tabs.domains")} hint={t("controls.domainsHint")} className="border-t" />
+        <DomainsPanel
+          team={team.slug}
+          path={apiPath}
+          manage={manage}
+          port={guest ? { required: true } : { required: false, suggested: firstPort(app.origin?.ports) }}
+        />
+      </section>
+
+      {operate && guest && !missing ? (
+        <>
+          <ResizeGuest run={run} busy={busy} item={app} />
+          <GuestSnapshots path={apiPath} name={app.name} run={run} busy={busy} admin={manage} />
+          <GuestBackup run={run} busy={busy} />
+        </>
+      ) : null}
+      {operate && container && !missing ? <RecreateContainer run={run} /> : null}
+
+      {manage ? (
+        <DangerZone
+          name={app.name}
+          admin={manage && !missing}
+          guest={guest}
+          onForget={async () => {
+            try {
+              await apiFetch(apiPath, { method: "DELETE", body: { confirm: app.name } })
+            } catch (err) {
+              throw new Error(errorText(err))
+            }
+            router.replace(`${base}/apps`)
+          }}
+          onDestroy={async (purge) => {
+            try {
+              await run("destroy", "?destroy=true", { method: "DELETE", body: { confirm: app.name, purge } })
+            } catch (err) {
+              throw new Error(errorText(err))
+            }
+          }}
+        />
+      ) : null}
     </PageBody>
   )
 }
 
-/** An imported database: the engine found on the server, read-only; removable as a record only. */
-export function ImportedDatabaseView({ service }: { service: DataService }) {
+/**
+ * An imported database: power, stats, logs and recreate like an imported site; with its admin
+ * login added, its databases, users and backups are managed like any Hosbah database (the page
+ * then shows the full database tools, see databases/[service]).
+ */
+export function ImportedDatabaseView({ service, onChanged }: { service: DataService & { has_credentials?: boolean }; onChanged: () => void }) {
   const { t, locale } = useI18n()
   const { team, manage } = useTeam()
   const router = useRouter()
   const errorText = useErrorText()
   const base = `/${locale}/t/${team.slug}`
+  const apiPath = `/api/teams/${team.slug}/data-services/${service.id}`
 
   return (
     <PageBody
@@ -85,6 +167,7 @@ export function ImportedDatabaseView({ service }: { service: DataService }) {
       bleed
     >
       <ImportedNotice kind="database" />
+      <ImportedDatabaseControls service={service} onChanged={onChanged} />
       <OriginFacts
         item={service}
         extra={[
@@ -103,12 +186,23 @@ export function ImportedDatabaseView({ service }: { service: DataService }) {
           ],
         ]}
       />
+      {manage && !service.has_credentials ? <DatabaseCredentials path={apiPath} onSaved={onChanged} /> : null}
       {manage ? (
-        <RemoveRecord
+        <DangerZone
           name={service.name}
-          onRemove={async () => {
+          admin={manage && service.imported_state !== "missing"}
+          guest={service.origin_kind === "guest"}
+          onForget={async () => {
             try {
-              await apiFetch(`/api/teams/${team.slug}/data-services/${service.id}`, { method: "DELETE" })
+              await apiFetch(apiPath, { method: "DELETE" })
+            } catch (err) {
+              throw new Error(errorText(err))
+            }
+            router.replace(`${base}/databases`)
+          }}
+          onDestroy={async (purge) => {
+            try {
+              await apiFetch(`${apiPath}?destroy=true`, { method: "DELETE", body: { confirm: service.name, purge } })
             } catch (err) {
               throw new Error(errorText(err))
             }
@@ -120,22 +214,29 @@ export function ImportedDatabaseView({ service }: { service: DataService }) {
   )
 }
 
-function RemoveRecord({ name, onRemove }: { name: string; onRemove: () => Promise<void> }) {
+/** Power, stats, logs and recreate for an imported database — also shown atop its full tools. */
+export function ImportedDatabaseControls({ service, onChanged }: { service: DataService; onChanged: () => void }) {
   const { t } = useI18n()
+  const { team } = useTeam()
+  const operate = canOperate(team.role)
+  const apiPath = `/api/teams/${team.slug}/data-services/${service.id}`
+  const { run, busy, error, log } = useWorkloadActions(apiPath, service.server_id)
+  const guest = service.origin_kind === "guest"
+  const container = service.origin_kind === "container"
+  if (!operate || service.imported_state === "missing") return null
   return (
-    <section>
-      <SectionTitle title={t("imported.removeTitle")} hint={t("imported.removeHint")} className="border-t" />
-      <div className="flex border-b border-line px-6 py-4">
-        <ConfirmButton
-          size="default"
-          icon={<Trash2Icon />}
-          label={t("imported.remove")}
-          title={t("imported.removeConfirmTitle", { name })}
-          description={t("imported.removeConfirmBody", { name })}
-          confirmLabel={t("imported.remove")}
-          onConfirm={onRemove}
-        />
-      </div>
-    </section>
+    <>
+      <ErrorBand message={error} />
+      <section aria-labelledby="dbpower-h">
+        <SectionTitle id="dbpower-h" title={t("controls.power")} hint={t("controls.powerHint")} />
+        <div className="border-b border-line px-6 py-4">
+          <PowerControls item={service} run={(k, s, i) => run(k, s, i).then(() => onChanged())} busy={busy} guest={guest} />
+        </div>
+      </section>
+      <WorkloadStats path={apiPath} />
+      {container ? <WorkloadLogs run={run} busy={busy} /> : null}
+      {container ? <RecreateContainer run={run} /> : null}
+      {log}
+    </>
   )
 }

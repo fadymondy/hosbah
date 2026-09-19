@@ -18,7 +18,21 @@ import { useFormatDate, useI18n } from "@/lib/i18n"
 
 const TLS: TLSMode[] = ["auto", "internal", "off"]
 
-export function DomainsPanel({ team, path, manage }: { team: string; path: string; manage: boolean }) {
+/**
+ * `port`: an imported workload's hostname is routed to one of its ports — required for a guest
+ * (Hosbah cannot know which port it serves), optional for a container (default: its first published).
+ */
+export function DomainsPanel({
+  team,
+  path,
+  manage,
+  port,
+}: {
+  team: string
+  path: string
+  manage: boolean
+  port?: { required: boolean; suggested?: number }
+}) {
   const { t } = useI18n()
   const fmt = useFormatDate()
   const errorText = useErrorText()
@@ -27,6 +41,7 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
   const [error, setError] = useState<string | null>(null)
   const [hostname, setHostname] = useState("")
   const [tls, setTls] = useState<TLSMode>("auto")
+  const [portValue, setPortValue] = useState(port?.suggested ? String(port.suggested) : "")
   const [busy, setBusy] = useState(false)
   const [messages, setMessages] = useState<Record<string, string>>({})
 
@@ -57,7 +72,7 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
     try {
       await apiFetch(`${path}/domains`, {
         method: "POST",
-        body: { hostname: hostname.trim().toLowerCase(), tls },
+        body: { hostname: hostname.trim().toLowerCase(), tls, ...(port && portValue ? { port: Number(portValue) } : {}) },
       })
       setHostname("")
       await load()
@@ -109,6 +124,11 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
                   {d.hostname}
                 </a>
                 <Badge variant="outline">{t(`apps.domains.tls.${d.tls}`)}</Badge>
+                {d.upstream ? (
+                  <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                    → {d.upstream}
+                  </span>
+                ) : null}
                 {d.verified ? (
                   <Badge>
                     <CheckCircle2Icon />
@@ -183,6 +203,21 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
               autoComplete="off"
             />
           </SettingsRow>
+          {port ? (
+            <SettingsRow label={t("controls.domainPort")} htmlFor="dom-port" hint={t(port.required ? "controls.domainPortGuest" : "controls.domainPortContainer")}>
+              <Input
+                id="dom-port"
+                type="number"
+                min={1}
+                max={65535}
+                dir="ltr"
+                className="w-32 font-mono"
+                required={port.required}
+                value={portValue}
+                onChange={(e) => setPortValue(e.target.value)}
+              />
+            </SettingsRow>
+          ) : null}
           <SettingsRow
             label={t("apps.domains.tlsLabel")}
             htmlFor="dom-tls"
@@ -210,7 +245,7 @@ export function DomainsPanel({ team, path, manage }: { team: string; path: strin
             </Select>
           </SettingsRow>
           <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy || !hostOK}>
+            <Button type="submit" disabled={busy || !hostOK || (!!port?.required && !portValue)}>
               {busy ? t("common.working") : t("apps.domains.add")}
             </Button>
           </div>

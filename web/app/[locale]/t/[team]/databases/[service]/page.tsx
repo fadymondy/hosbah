@@ -30,7 +30,7 @@ import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import { humanBytes, type DataServiceDetail } from "@/lib/databases"
 import { isImported } from "@/lib/apps"
-import { ImportedDatabaseView } from "@/components/imported-view"
+import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imported-view"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -80,7 +80,11 @@ export default function DataServicePage() {
 
   const s = detail.service
   // An imported database is shown read-only: Hosbah has no credentials for it and never changes it.
-  if (isImported(s)) return <ImportedDatabaseView service={s} />
+  // An imported database without its admin login: power/stats/logs and the credentials form. With
+  // it, the full database tools below apply, with the workload controls on top.
+  const imported = isImported(s)
+  if (imported && !(s as { has_credentials?: boolean }).has_credentials)
+    return <ImportedDatabaseView service={s} onChanged={() => void load()} />
   const isRedis = s.kind === "redis"
 
   const actions = manage ? (
@@ -101,10 +105,12 @@ export default function DataServicePage() {
   return (
     <PageBody
       title={s.name}
+      eyebrow={imported ? t("imported.eyebrowDatabase") : undefined}
       description={`${s.kind} ${s.version}`}
       actions={actions}
       bleed
     >
+      {imported ? <ImportedDatabaseControls service={s} onChanged={() => void load()} /> : null}
       <div className="flex flex-col">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-3">
           <Badge variant={statusVariant(s.status)}>{t(`databases.statuses.${s.status}`)}</Badge>
