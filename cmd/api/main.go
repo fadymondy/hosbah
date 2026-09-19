@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fadymondy/hosbah/internal/mahaam"
 	"github.com/fadymondy/hosbah/internal/server"
 )
 
@@ -23,6 +24,12 @@ func main() {
 	a := server.Boot()
 	defer a.Kernel.Close()
 	k := a.Kernel
+	// Mahaam Feedback: every panic togo recovers and every k.ReportError is filed as an issue in
+	// Hosbah's Mahaam project (MAHAAM_URL / MAHAAM_FEEDBACK_KEY / MAHAAM_APP_URL; off without them).
+	if fb := mahaam.New(mahaam.FromEnv()); fb.Enabled() {
+		k.Hooks.On("error", 100, fb.OnError)
+		k.Log.Info("mahaam feedback: backend errors are filed as issues")
+	}
 	fmt.Printf("→ cloudy listening on %s  (GraphQL %s · REST %s · docs %s)\n",
 		k.Config.Addr, k.Config.GraphQLPath, k.Config.RESTPath, k.Config.DocsPath)
 	if err := k.Serve(context.Background()); err != nil {
