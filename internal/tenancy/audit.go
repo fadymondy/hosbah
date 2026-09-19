@@ -49,6 +49,9 @@ func Record(ctx context.Context, q *db.Queries, teamID, actorID, action, subject
 type RequestMeta struct {
 	IP        string
 	UserAgent string
+	// Method is the HTTP method, so code that only sees a context (a suspended team lets a
+	// platform admin read, not write) can tell a read from a change.
+	Method string
 }
 
 type metaKey struct{}
@@ -76,7 +79,7 @@ func MetaMiddleware(next http.Handler) http.Handler {
 		if host, _, err := net.SplitHostPort(ip); err == nil {
 			ip = host
 		}
-		ctx := WithMeta(r.Context(), RequestMeta{IP: ip, UserAgent: r.UserAgent()})
+		ctx := WithMeta(r.Context(), RequestMeta{IP: ip, UserAgent: r.UserAgent(), Method: r.Method})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

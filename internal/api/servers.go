@@ -305,6 +305,9 @@ type ConnectIn struct {
 
 // provisioningErr maps a provisioning refusal to 422/409 and anything else to 500.
 func provisioningErr(err error) error {
+	if pe := platformErr(err); pe != nil {
+		return pe
+	}
 	var ue *provisioning.UserError
 	if errors.As(err, &ue) {
 		if ue.Conflict {

@@ -20,7 +20,7 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListTeamsForUser :many
-SELECT t.id, t.name, t.slug, t.created_at, m.role
+SELECT t.id, t.name, t.slug, t.created_at, m.role, t.suspended_at
 FROM teams t
 JOIN team_members m ON m.team_id = t.id
 WHERE m.user_id = $1

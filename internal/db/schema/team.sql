@@ -6,6 +6,9 @@ CREATE TABLE teams (
     owner_id text NOT NULL,
     dek_wrapped text NOT NULL,
     require_destructive_approval boolean NOT NULL DEFAULT false,
+    -- Hosbah (platform admin): a suspended team's /api/teams/{team}/... routes and its MCP
+    -- tokens answer 423 (platform admins may still read). Its agents keep connecting.
+    suspended_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );

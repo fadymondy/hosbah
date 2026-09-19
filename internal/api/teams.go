@@ -15,6 +15,7 @@ import (
 	"github.com/togo-framework/auth"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -89,6 +90,13 @@ func (d *deps) registerTeams(api huma.API) {
 
 		out := &teamOut{}
 		err = d.tx(ctx, tenancy.Scope{UserID: id.ID, TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
+			// The platform's max_teams_per_user (403), counted in the same transaction.
+			if err := platform.CheckTeamLimit(ctx, q, id.ID); err != nil {
+				if pe := platformErr(err); pe != nil {
+					return pe
+				}
+				return err
+			}
 			t, err := q.InsertTeam(ctx, db.InsertTeamParams{ID: teamID, Name: name, Slug: slugFor(name), OwnerID: id.ID, DekWrapped: wrapped})
 			if err != nil {
 				return huma.Error500InternalServerError("could not create the team")

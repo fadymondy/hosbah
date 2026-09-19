@@ -29,6 +29,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -112,6 +113,10 @@ type rpcResponse struct {
 // answers every such case identically.
 var ErrUnauthorized = errors.New("invalid or missing MCP token")
 
+// ErrTeamSuspended: the token is valid but its team is suspended by the platform admins. The
+// transport answers 423 with the reason, so a machine caller can tell it from a bad token.
+var ErrTeamSuspended = errors.New(platform.ErrTeamSuspended.Msg)
+
 // Handler serves the endpoint. Only POST: this server offers no server-initiated SSE stream,
 // which the streamable-HTTP transport signals with 405 on GET.
 func (s *Server) Handler(a *app.App) http.HandlerFunc {
@@ -132,6 +137,11 @@ func (s *Server) Handler(a *app.App) http.HandlerFunc {
 			bearer = strings.TrimSpace(h[7:])
 		}
 		caller, err := s.Authenticate(r.Context(), a, bearer)
+		if errors.Is(err, ErrTeamSuspended) {
+			writeRPC(w, http.StatusLocked, rpcResponse{JSONRPC: "2.0",
+				Error: &rpcError{Code: -32003, Message: ErrTeamSuspended.Error()}})
+			return
+		}
 		if err != nil {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="`+s.Name+`"`)
 			writeRPC(w, http.StatusUnauthorized, rpcResponse{JSONRPC: "2.0",

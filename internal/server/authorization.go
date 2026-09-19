@@ -7,6 +7,8 @@ import (
 
 	"github.com/togo-framework/auth"
 	"github.com/togo-framework/togo"
+
+	"github.com/fadymondy/hosbah/internal/app"
 )
 
 /*
@@ -32,7 +34,7 @@ never mounted for tenant tables (see server.go), and RLS returns nothing without
 Delegating identity to auth.Service.Middleware (not re-reading the cookie here) keeps one code
 path for "who is this", the same one /api/auth/me answers from.
 */
-func requireAuthorization(k *togo.Kernel) {
+func requireAuthorization(k *togo.Kernel, a *app.App) {
 	svc, ok := auth.FromKernel(k)
 	if !ok {
 		k.Log.Error("auth service unavailable — refusing to start with an unguarded API")
@@ -40,8 +42,10 @@ func requireAuthorization(k *togo.Kernel) {
 	}
 
 	k.UseMiddleware(func(next http.Handler) http.Handler {
-		member := svc.Middleware(sessionOnly(csrf(next)))
-		admin := svc.RequireRole(RolePlatformAdmin)(sessionOnly(csrf(next)))
+		// activeAccount: a disabled or deleted account's session stops at its next request.
+		active := activeAccount(a)
+		member := svc.Middleware(sessionOnly(active(csrf(next))))
+		admin := svc.RequireRole(RolePlatformAdmin)(sessionOnly(active(csrf(next))))
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
@@ -101,7 +105,8 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/methods",
 		"/api/auth/register", // public sign-up (Hosbah is headed for public SaaS)
 		"/api/auth/login",    // wrapped by requireSecondFactor (login_2fa.go)
-		"/api/auth/logout":
+		"/api/auth/logout",
+		"/api/settings/public": // sign-up mode, announcement, support email — shown before sign-in
 		return true
 	}
 	return false

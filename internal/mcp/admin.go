@@ -10,6 +10,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
@@ -48,7 +49,7 @@ func authenticateAdmin(ctx context.Context, a *app.App, bearer string) (Caller, 
 			return ErrUnauthorized
 		}
 		u, err := q.UserByID(ctx, t.UserID)
-		if err != nil || !hasRole(u.Roles, "admin") {
+		if err != nil || u.DisabledAt != nil || !hasRole(u.Roles, "admin") {
 			return ErrUnauthorized
 		}
 		_ = q.TouchAdminMcpToken(ctx, t.ID)
@@ -118,7 +119,7 @@ func optStr(s string) *string {
 // AdminTools is the admin server's registry.
 func AdminTools() []Tool {
 	statusEnum := []string{"backlog", "todo", "in_progress", "waiting_approval", "in_review", "done"}
-	return []Tool{
+	return append([]Tool{
 		{
 			Name:        "list_issues",
 			Description: "List Hosbah's issues (reports filed through Report a problem, or created here). Filter by status, state, issue_type or a title search.",
@@ -456,25 +457,12 @@ func AdminTools() []Tool {
 					return "", err
 				}
 				want := args.Bool("admin")
-				var roles []string
-				for _, r := range strings.Split(u.Roles, ",") {
-					if r = strings.TrimSpace(r); r != "" && r != "admin" {
-						roles = append(roles, r)
-					}
+				// The same rules as update_user and PATCH /api/admin/users/{id}: not yourself, not the last admin, audited.
+				if _, err := platform.UpdateUser(ctx, env.Q, env.Caller.UserID, u.ID, platform.UserPatch{PlatformAdmin: &want}); err != nil {
+					return "", err
 				}
-				if want {
-					roles = append(roles, "admin")
-				} else {
-					var admins int
-					if err := env.Tx.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE roles ~ '(^|,)\s*admin\s*(,|$)'`).Scan(&admins); err == nil && admins <= 1 && hasRole(u.Roles, "admin") {
-						return "", errors.New("that is the last platform admin — grant someone else first")
-					}
-				}
-				if err := env.Q.SetUserRoles(ctx, db.SetUserRolesParams{ID: u.ID, Roles: strings.Join(roles, ",")}); err != nil {
-					return "", errors.New("could not update roles")
-				}
-				return fmt.Sprintf("%s platform admin: %v (takes effect at their next sign-in).", u.Email, want), nil
+				return fmt.Sprintf("%s platform admin: %v.", u.Email, want), nil
 			},
 		},
-	}
+	}, PlatformTools()...)
 }

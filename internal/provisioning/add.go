@@ -13,6 +13,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/crypto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/providers/sshboot"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -59,6 +60,10 @@ func refuse(msg string) error { return &UserError{Msg: msg} }
 // AddServer inserts the server in the caller's team transaction and queues what brings it up. For
 // a plain byo server it returns the one-time install command.
 func AddServer(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, actorID string, in AddInput) (db.Server, *ops.Install, error) {
+	// The platform's max_servers_per_team (a *platform.Error, 403) — checked first, for every way in.
+	if err := platform.CheckServerLimit(ctx, q, teamID); err != nil {
+		return db.Server{}, nil, err
+	}
 	if in.Connect != nil && in.Provider != "byo" {
 		return db.Server{}, nil, refuse("connect over SSH is for a server you already have (provider byo)")
 	}

@@ -31,8 +31,11 @@ func TestEveryAPIRouteHasTheIntendedTier(t *testing.T) {
 		path := strings.NewReplacer("{team}", "t1", "{member}", "m1", "{id}", "i1", "{token}", "k1").Replace(op.Path)
 		got := classify(op.Method, path)
 		want := tier("member")
-		if strings.HasPrefix(op.Path, "/api/admin/") {
+		switch {
+		case strings.HasPrefix(op.Path, "/api/admin/"):
 			want = "admin"
+		case op.Path == "/api/settings/public":
+			want = "public" // the one public Huma route: sign-up mode and announcement
 		}
 		if got != want {
 			t.Errorf("%s %s is in tier %s, want %s", op.Method, op.Path, got, want)
@@ -51,10 +54,13 @@ func TestFrameworkAndGeneratedRoutes(t *testing.T) {
 		"/api/auth/mfa/magic-link/send": "blocked",
 		"/graphql":                      "blocked",
 		// The public sign-in surface.
-		"/api/health":        "public",
-		"/api/auth/login":    "public",
-		"/api/auth/register": "public",
-		"/api/auth/csrf":     "public",
+		"/api/health":          "public",
+		"/api/auth/login":      "public",
+		"/api/auth/register":   "public",
+		"/api/auth/csrf":       "public",
+		"/api/settings/public": "public",
+		"/api/settings/other":  "admin",
+		"/api/settings":        "admin",
 		// MCP: exact paths only; the generated-style /api/mcp_tokens is NOT token-authed.
 		"/api/mcp":        "token",
 		"/api/admin/mcp":  "token",

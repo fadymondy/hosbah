@@ -12,7 +12,13 @@ CREATE TABLE users (
     password_hash text NOT NULL,
     roles text NOT NULL DEFAULT '',
     permissions text NOT NULL DEFAULT '',
-    created_at text NOT NULL
+    created_at text NOT NULL,
+    -- Hosbah: set by a platform admin. A disabled account cannot sign in, and its existing
+    -- sessions and MCP tokens stop working on their next request (the plugin never writes it).
+    disabled_at timestamptz,
+    -- Hosbah: sessions are stateless JWTs; one issued at or before this instant is refused.
+    -- Set when the account is disabled, so re-enabling it does not revive old sessions.
+    sessions_revoked_at timestamptz
 );
 
 -- TOTP secrets from POST /api/auth/2fa/enroll. Hosbah's login wrapper reads them to require

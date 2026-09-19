@@ -44,7 +44,7 @@ SELECT count(*) FROM team_members WHERE team_id = $1;
 
 -- name: MembershipForRef :one
 -- Resolves a team by id OR slug, only among the caller's own memberships.
-SELECT m.team_id, m.role
+SELECT m.team_id, m.role, t.suspended_at
 FROM team_members m
 JOIN teams t ON t.id = m.team_id
 WHERE m.user_id = sqlc.arg('user_id')::text

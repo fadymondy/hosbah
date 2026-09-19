@@ -56,8 +56,9 @@ func Boot() *app.App {
 	// Outermost first.
 	k.UseMiddleware(securityHeaders)
 	k.UseMiddleware(tenancy.MetaMiddleware)
+	k.UseMiddleware(accountGate(a)) // sign-up mode; disabled accounts cannot sign in
 	k.UseMiddleware(requireSecondFactor(a))
-	requireAuthorization(k)
+	requireAuthorization(k, a)
 
 	svc, err := ops.New(a, ops.ConfigFromEnv())
 	if err != nil {

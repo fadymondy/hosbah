@@ -53,14 +53,22 @@ func authenticateUser(ctx context.Context, a *app.App, bearer string) (Caller, e
 			return ErrUnauthorized // the owner left or was removed: the token is dead
 		}
 		u, err := q.UserByID(ctx, t.UserID)
-		if err != nil {
+		if err != nil || u.DisabledAt != nil {
+			return ErrUnauthorized // a disabled account's tokens die with it
+		}
+		if at, err := q.TeamSuspendedAt(ctx, t.TeamID); err != nil {
 			return ErrUnauthorized
+		} else if at != nil {
+			return ErrTeamSuspended
 		}
 		_ = q.TouchMcpToken(ctx, t.ID) // best effort
 		c = Caller{TokenID: t.ID, TokenName: t.Name, TokenHash: hash, UserID: t.UserID, Email: u.Email,
 			TeamID: t.TeamID, Role: m.Role, Scopes: scopes.Parse(t.Scopes)}
 		return nil
 	})
+	if errors.Is(err, ErrTeamSuspended) {
+		return Caller{}, ErrTeamSuspended
+	}
 	if err != nil {
 		return Caller{}, ErrUnauthorized
 	}

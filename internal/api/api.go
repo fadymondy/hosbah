@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -26,6 +27,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -53,6 +55,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerApprovals(api)
 	d.registerFeedback(api)
 	d.registerAdmin(api)
+	d.registerPlatformAdmin(api)
 }
 
 var (
@@ -96,6 +99,9 @@ func (d *deps) inTeam(ctx context.Context, teamID, ability string,
 		if err != nil {
 			return huma.Error500InternalServerError("membership lookup failed")
 		}
+		if row.SuspendedAt != nil && !d.suspendedReadAllowed(ctx, id.ID) {
+			return huma.NewError(platform.ErrTeamSuspended.Status, platform.ErrTeamSuspended.Msg)
+		}
 		if err := tenancy.SetTeam(ctx, tx, row.TeamID); err != nil {
 			return err
 		}
@@ -105,6 +111,18 @@ func (d *deps) inTeam(ctx context.Context, teamID, ability string,
 		}
 		return fn(q, tx, id, m)
 	})
+}
+
+// suspendedReadAllowed: in a suspended team only a platform admin's reads (GET/HEAD) go through.
+// The role is re-read from the database, not trusted from the session.
+func (d *deps) suspendedReadAllowed(ctx context.Context, userID string) bool {
+	switch tenancy.MetaFrom(ctx).Method {
+	case http.MethodGet, http.MethodHead:
+	default:
+		return false
+	}
+	u, err := db.New(d.a.SQLDB).UserByID(ctx, userID)
+	return err == nil && u.DisabledAt == nil && platform.IsAdminRoles(u.Roles)
 }
 
 func isNoRows(err error) bool { return errors.Is(err, sql.ErrNoRows) }

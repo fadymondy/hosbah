@@ -26,6 +26,8 @@ type TeamSummary struct {
 	Slug      string    `json:"slug"`
 	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
+	// Suspended: a platform admin suspended the team; its routes answer 423.
+	Suspended bool `json:"suspended"`
 }
 
 type MeOut struct {
@@ -77,7 +79,7 @@ func (d *deps) registerMe(api huma.API) {
 				return huma.Error500InternalServerError("could not list teams")
 			}
 			for _, r := range rows {
-				out.Body.Teams = append(out.Body.Teams, TeamSummary{ID: r.ID, Name: r.Name, Slug: r.Slug, Role: r.Role, CreatedAt: r.CreatedAt})
+				out.Body.Teams = append(out.Body.Teams, TeamSummary{ID: r.ID, Name: r.Name, Slug: r.Slug, Role: r.Role, CreatedAt: r.CreatedAt, Suspended: r.SuspendedAt != nil})
 			}
 			return nil
 		})
