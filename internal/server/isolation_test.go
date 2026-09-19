@@ -312,7 +312,7 @@ func TestIsolationSweep(t *testing.T) {
 		"recreate_container": {"app": impAppID}, "resize_guest": {"app": impAppID, "cores": 2}, "list_snapshots": {"app": impAppID},
 		"create_snapshot": {"app": impAppID, "name": "snap1"}, "rollback_snapshot": {"app": impAppID, "name": "snap1"},
 		"delete_snapshot": {"app": impAppID, "name": "snap1", "confirm": "imp-site"}, "backup_guest": {"app": impAppID},
-		"destroy_app": {"app": impAppID, "confirm": "imp-site"}, "destroy_data_service": {"database": impSvcID, "confirm": "imp-pg"},
+		"permanently_destroy_app": {"app": impAppID, "confirm": "imp-site"}, "permanently_destroy_data_service": {"database": impSvcID, "confirm": "imp-pg"},
 		"set_database_credentials": {"database": "imp-pg", "username": "u", "password": "p"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)

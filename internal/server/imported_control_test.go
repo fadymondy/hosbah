@@ -416,8 +416,8 @@ func TestImportedWorkloadControl(t *testing.T) {
 		defer owner.mustJSON("PATCH", "/api/teams/"+team.ID, map[string]any{"require_destructive_approval": false}, 200, nil)
 		before := operationsOf(t, sqlDB, team.ID)
 		args := map[string]any{"database": pgProd.ID, "confirm": "pg-prod"}
-		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "destroy_data_service", args); !res.IsError || !strings.Contains(res.Text, "needs approval") {
-			t.Fatalf("destroy_data_service must be held: %q", res.Text)
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "permanently_destroy_data_service", args); !res.IsError || !strings.Contains(res.Text, "needs approval") {
+			t.Fatalf("permanently_destroy_data_service must be held: %q", res.Text)
 		}
 		if n := operationsOf(t, sqlDB, team.ID); n != before {
 			t.Fatal("a held destroy queued an operation")
@@ -426,11 +426,11 @@ func TestImportedWorkloadControl(t *testing.T) {
 			Requests []struct{ ID, Tool string } `json:"requests"`
 		}
 		owner.mustJSON("GET", "/api/teams/"+team.ID+"/approvals?status=pending", nil, 200, &reqs)
-		if len(reqs.Requests) != 1 || reqs.Requests[0].Tool != "destroy_data_service" {
+		if len(reqs.Requests) != 1 || reqs.Requests[0].Tool != "permanently_destroy_data_service" {
 			t.Fatalf("pending: %+v", reqs)
 		}
 		owner.mustJSON("POST", "/api/teams/"+team.ID+"/approvals/"+reqs.Requests[0].ID+"/approve", nil, 200, nil)
-		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "destroy_data_service", args); res.IsError {
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "permanently_destroy_data_service", args); res.IsError {
 			t.Fatalf("approved destroy: %q", res.Text)
 		}
 		found := false

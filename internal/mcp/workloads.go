@@ -205,10 +205,11 @@ func WorkloadTools() []Tool {
 			},
 		},
 		{
-			Name: "destroy_app", Scope: scopes.Destructive, Destructive: true, ResourceType: "app",
-			Description: "Destroy an imported site's real workload — a Proxmox guest is stopped and destroyed, a container removed — then its record. " +
+			Name: "permanently_destroy_app", Scope: scopes.Destructive, Destructive: true, ResourceType: "app",
+			Description: "PERMANENTLY DELETES THE REAL WORKLOAD — cannot be undone. An imported site's Proxmox guest is stopped and destroyed, " +
+				"or its container removed, then its record. To only stop showing it in Hosbah, use delete_app instead. " +
 				"Owner or admin; confirm must equal the app's name. purge: pvesh --purge for a guest, a container's anonymous volumes. " +
-				"(delete_app removes only the record.)",
+				"Held for approval when the team requires it.",
 			InputSchema: schema([]string{"app", "confirm"}, map[string]any{"app": str("Imported app name or id"), "confirm": str("The app's name, exactly"),
 				"purge": map[string]any{"type": "boolean", "default": false}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
@@ -222,9 +223,10 @@ func WorkloadTools() []Tool {
 			},
 		},
 		{
-			Name: "destroy_data_service", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
-			Description: "Destroy an imported database's real workload (its container or Proxmox guest), then its record. Owner or admin; " +
-				"confirm must equal the service's name. (delete_data_service removes only the record of an imported one.)",
+			Name: "permanently_destroy_data_service", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
+			Description: "PERMANENTLY DELETES THE REAL DATABASE WORKLOAD — cannot be undone, its data is lost. An imported database's container " +
+				"or Proxmox guest is destroyed, then its record. To only stop showing it in Hosbah, use delete_data_service instead. Owner or admin; " +
+				"confirm must equal the service's name. Held for approval when the team requires it.",
 			InputSchema: schema([]string{"database", "confirm"}, map[string]any{"database": str("Imported data service name or id"),
 				"confirm": str("The service's name, exactly"), "purge": map[string]any{"type": "boolean", "default": false}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {

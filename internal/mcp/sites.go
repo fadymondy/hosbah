@@ -21,7 +21,7 @@ func SiteTools() []Tool {
 		Name: "list_sites", Scope: scopes.Read,
 		Description: "A server's sites: Hosbah apps deployed on it, plus imported workloads it already runs (marked imported) — Proxmox guests " +
 			"(vmid, type, address, vCPU, memory, disk, status), Docker containers and their databases. Control an imported one with the workload tools " +
-			"(workload_power, workload_stats, workload_logs, snapshots, resize_guest, backup_guest, recreate_container, destroy_app). Run run_server_step kind=system.info to refresh.",
+			"(workload_power, workload_stats, workload_logs, snapshots, resize_guest, backup_guest, recreate_container, permanently_destroy_app). Run run_server_step kind=system.info to refresh.",
 		InputSchema: schema([]string{"server"}, map[string]any{"server": str("Server name or id")}),
 		Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 			srv, err := findServer(ctx, env, args)
