@@ -67,11 +67,15 @@ func (d AppsDomain) Hostname(app string) string {
 		return ""
 	}
 	h := d.Prefix + app + "." + d.Domain
-	if !agentproto.ValidHostname(h) {
+	if !agentproto.ValidHostname(h) || reservedLabels[d.Prefix+app] {
 		return ""
 	}
 	return h
 }
+
+// reservedLabels are the platform's own names: with an empty prefix an app must not take them.
+var reservedLabels = map[string]bool{"www": true, "api": true, "app": true, "admin": true, "mail": true,
+	"docs": true, "status": true, "agent": true, "install": true, "mcp": true}
 
 // Owns reports whether hostname is a platform hostname (users cannot add or remove those by hand).
 func (d AppsDomain) Owns(hostname string) bool {
