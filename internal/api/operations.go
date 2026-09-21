@@ -304,6 +304,15 @@ func (d *deps) registerOperations(api huma.API) {
 	})
 }
 
+// appOutputKind reports whether an operation's log is a site's own output.
+func appOutputKind(kind string) bool {
+	switch kind {
+	case agentproto.KindAppLogs, agentproto.KindAppExec, agentproto.KindWorkloadLogs:
+		return true
+	}
+	return false
+}
+
 // opWithLogs loads an operation of the team's server and (limit > 0) its decrypted lines after a seq.
 func (d *deps) opWithLogs(ctx context.Context, q *db.Queries, m *tenancy.Membership, serverID, opID string, after int64, limit int32) (db.Operation, []ops.LogLine, error) {
 	op, err := q.OperationInTeam(ctx, db.OperationInTeamParams{ID: opID, TeamID: m.TeamID})
@@ -313,6 +322,14 @@ func (d *deps) opWithLogs(ctx context.Context, q *db.Queries, m *tenancy.Members
 	lines := []ops.LogLine{}
 	if limit <= 0 {
 		return op, lines, nil
+	}
+	// What a site prints (its logs, a cron job's or a queue command's output) is for people who may
+	// operate it, like the app's own log routes: a viewer sees the operation, not its lines.
+	if appOutputKind(op.Kind) && !tenancy.Can(ctx, m, tenancy.AbilityDeploy) {
+		if after > 0 { // a stream asking for what came after the notice: nothing did
+			return op, lines, nil
+		}
+		return op, []ops.LogLine{{Seq: 1, Kind: "log", Stream: "system", Line: "(output is hidden: it needs the deployer role)", At: op.CreatedAt}}, nil
 	}
 	rows, err := q.OperationLogsAfter(ctx, db.OperationLogsAfterParams{OperationID: op.ID, TeamID: m.TeamID, Seq: after, Limit: limit})
 	if err != nil {

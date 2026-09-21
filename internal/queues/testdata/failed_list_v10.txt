@@ -1,0 +1,5 @@
+
+  2026-09-20 03:00:12 9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21 ................................ redis@default App\Jobs\SendInvoice
+  2026-09-19 22:41:07 0b8e6d1f-2c4a-4f7e-9d3b-6e1a2c3d4e5f ............................... redis@emails App\Jobs\SyncCatalogue
+  2026-09-18 01:15:00 17 ................................................................ database@default App\Jobs\PruneExports
+

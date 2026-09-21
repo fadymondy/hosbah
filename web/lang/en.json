@@ -1736,6 +1736,42 @@
         "schedule": "scheduled",
         "manual": "manual"
       }
+    },
+    "queues": {
+      "needsDeployer": "Queue status and failed jobs can hold the site's data, so they need the deployer role.",
+      "none": "No queue system was found in this site.",
+      "unreadable": "A queue system was found, but its state cannot be read from here.",
+      "noQueues": "No queues reported.",
+      "dash": "A dash means the number could not be read; it is never a guess.",
+      "queue": "Queue",
+      "pending": "Pending",
+      "running": "Running",
+      "failed": "Failed",
+      "failedJobs": "Failed jobs",
+      "failedHint": "Payloads stay on the server; only the job, its queue and the first line of the error are shown.",
+      "noFailed": "No failed jobs.",
+      "search": "Search by job, queue or error…",
+      "retry": "Retry",
+      "forget": "Forget",
+      "forgetTitle": "Forget this failed job?",
+      "retryAll": "Retry all",
+      "retryAllBody": "Every failed job goes back on its queue.",
+      "flush": "Delete all",
+      "flushBody": "Every failed job is deleted. This cannot be undone.",
+      "done": "Done",
+      "truncated": "Only the newest failed jobs are listed.",
+      "drivers": {
+        "laravel": "Laravel queues",
+        "celery": "Celery",
+        "bullmq": "BullMQ",
+        "asynq": "Asynq",
+        "none": "No queue system"
+      },
+      "confidence": {
+        "detected": "Detected",
+        "likely": "Likely",
+        "unknown": "Unknown"
+      }
     }
   }
 }

@@ -1,9 +1,7 @@
 "use client"
 
-import { ListOrderedIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteQueues } from "@/components/site/queues"
 
 export default function Page() {
-  return <Planned section="queues" icon={ListOrderedIcon} />
+  return <SiteQueues />
 }

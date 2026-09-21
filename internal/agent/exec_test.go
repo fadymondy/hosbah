@@ -96,6 +96,22 @@ func TestAppExecHandsTheCommandToDockerExecAsOneElement(t *testing.T) {
 	}
 }
 
+// A caller that needs no shell sends a real argv (internal/queues): every element reaches docker exec
+// as it is, after the container's name, and no sh is put in front of it.
+func TestAppExecHandsARealArgvOverElementByElement(t *testing.T) {
+	argv := []string{"php", "artisan", "queue:retry", "--no-ansi", "--no-interaction", "9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21"}
+	fs := &fakeStream{}
+	h, _ := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	oc, _ := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: argv, TimeoutSeconds: 30})
+	if _, code, err := h.appExec(oc); err != nil || code != 0 {
+		t.Fatalf("appExec: %v (%d)", err, code)
+	}
+	want := append([]string{"exec", "-e", "CLOUDY_EXEC_ID=" + execOp, "cloudy-shop-web-22222222"}, argv...)
+	if len(fs.calls) != 1 || fs.calls[0].name != "docker" || !reflect.DeepEqual(fs.calls[0].args, want) {
+		t.Fatalf("argv:\n got %+v\nwant %q", fs.calls, want)
+	}
+}
+
 func TestAppExecReportsTheExitCode(t *testing.T) {
 	fs := &fakeStream{code: 3}
 	h, _ := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)

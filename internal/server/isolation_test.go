@@ -210,6 +210,7 @@ func TestIsolationSweep(t *testing.T) {
 		"monitor":    func(string) []string { return []string{monA.ID, monA.Name} },
 		"schedule":   func(string) []string { return []string{schedA.ID, schedA.Name} },
 		"run":        func(string) []string { return []string{runA} },
+		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
@@ -324,6 +325,9 @@ func TestIsolationSweep(t *testing.T) {
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
+		"get_app_queues": {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
+		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
+		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

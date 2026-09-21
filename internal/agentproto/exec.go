@@ -10,6 +10,11 @@ import (
 // (docker exec, no TTY, that container's own environment), never on the host. A schedule's command
 // is a shell line by nature; it travels as ONE element — Argv = ["sh", "-lc", <command>] — and the
 // shell that reads it is the container's. Neither side ever puts it into a host shell.
+//
+// Argv is a real argv: a caller that needs no shell sends the program and its arguments as they are
+// (internal/queues: ["php", "artisan", "queue:retry", <id>]) and no shell reads them anywhere — the
+// program is found on the image's PATH and runs in the image's working directory. ShellArgv is for
+// the callers whose command IS a shell line; nothing else should use it.
 type ExecParams struct {
 	AppID          string   `json:"app_id"`
 	DeploymentID   string   `json:"deployment_id"` // the live release's deployment: selects its web container by label

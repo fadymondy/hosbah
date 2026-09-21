@@ -15,7 +15,8 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
-// app.exec: a command inside the live release's web container — a site's schedules (cron jobs).
+// app.exec: a command inside the live release's web container — a site's schedules (cron jobs, one
+// shell line: sh -lc <line>) and its queues (internal/queues: a fixed argv with no shell at all).
 //
 // The argv the control plane signed is handed to `docker exec` element by element: no TTY, no
 // stdin, the container's own environment and user. Nothing of it is ever read by a shell on the
