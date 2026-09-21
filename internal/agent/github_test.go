@@ -359,6 +359,136 @@ func TestGitHubBranches(t *testing.T) {
 	}
 }
 
+const (
+	shaA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	shaB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+)
+
+func commitJSON(sha, msg string) string {
+	return `{"sha":"` + sha + `","html_url":"https://github.com/octocat/api/commit/` + sha + `","commit":{"message":` + msg +
+		`,"author":{"name":"The Octocat","date":"2026-09-01T10:00:00Z"},"committer":{"name":"GitHub","date":"2026-09-02T11:00:00Z"}},` +
+		`"author":{"login":"octocat","avatar_url":"https://avatars.githubusercontent.com/u/1?v=4"}}`
+}
+
+func TestGitHubCommits(t *testing.T) {
+	const call = "gh api --hostname github.com --method GET repos/octocat/api/commits?sha=release/1.x&per_page=2"
+	f := &fakeGH{installed: true, answers: map[string]fakeAnswer{
+		call: {out: "[" + commitJSON(shaB, `"Fix the login\n\nA long body that is never returned"`) + `,{"sha":"` + shaA + `","html_url":"","commit":{"message":"no author"},"author":null},{"sha":"nope"}]`},
+	}}
+	oc, _ := opCtx(t, agentproto.GitHubCommitsParams{Repo: "octocat/api", Branch: "release/1.x", Limit: 2})
+	res, _, err := f.host().commits(oc)
+	if err != nil {
+		t.Fatalf("commits: %v (%q)", err, f.argv())
+	}
+	if got := f.argv(); len(got) != 1 || got[0] != call {
+		t.Fatalf("argv: %q", got)
+	}
+	r := res.(agentproto.GitHubCommitsResult)
+	if len(r.Commits) != 2 {
+		t.Fatalf("%+v", r)
+	}
+	c := r.Commits[0]
+	if c.SHA != shaB || c.ShortSHA != "bbbbbbb" || c.Message != "Fix the login" || c.AuthorName != "The Octocat" || c.AuthorLogin != "octocat" ||
+		c.AuthorAvatarURL != "https://avatars.githubusercontent.com/u/1?v=4" || !c.CommittedAt.Equal(time.Date(2026, 9, 2, 11, 0, 0, 0, time.UTC)) ||
+		c.URL != "https://github.com/octocat/api/commit/"+shaB {
+		t.Errorf("commit: %+v", c)
+	}
+	if r.Commits[1].SHA != shaA || r.Commits[1].AuthorLogin != "" {
+		t.Errorf("a commit without a GitHub author: %+v", r.Commits[1])
+	}
+
+	for _, bad := range []agentproto.GitHubCommitsParams{
+		{Repo: "octocat", Branch: "main"}, {Repo: "octocat/api/x", Branch: "main"}, {Repo: "octocat/api", Branch: ""},
+		{Repo: "octocat/api", Branch: "-X"}, {Repo: "octocat/api", Branch: "main&per_page=1000"}, {Repo: "octocat/api", Branch: "a..b"},
+		{Repo: "octocat/api", Branch: "main?x"}, {Repo: "octocat/api", Branch: "ma in"}, {Repo: "octocat/api", Branch: "{branch}"},
+		{Repo: "octocat/api", Branch: "main", Limit: 101}, {Repo: "octocat/api", Branch: "main", Limit: -1}, {Repo: "o/..", Branch: "main"},
+	} {
+		f.calls = nil
+		oc, _ = opCtx(t, bad)
+		if _, code, err := f.host().commits(oc); err == nil || code != 2 || len(f.argv()) != 0 {
+			t.Errorf("%+v accepted (ran %q)", bad, f.argv())
+		}
+	}
+
+	// gh's own reason comes back; without gh nothing runs.
+	f = &fakeGH{installed: true, answers: map[string]fakeAnswer{
+		"gh api --hostname github.com --method GET repos/octocat/api/commits?sha=main&per_page=30": {errOut: "gh: Not Found (HTTP 404)", code: 1}}}
+	oc, _ = opCtx(t, agentproto.GitHubCommitsParams{Repo: "octocat/api", Branch: "main"})
+	if _, code, err := f.host().commits(oc); err == nil || code != 1 || !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("a failing gh: %v %d", err, code)
+	}
+	f = &fakeGH{}
+	if _, code, err := f.host().commits(oc); err == nil || code != 1 || !strings.Contains(err.Error(), "not installed") || len(f.argv()) != 0 {
+		t.Errorf("without gh: %v %d %q", err, code, f.argv())
+	}
+}
+
+func TestGitHubCompare(t *testing.T) {
+	var files []string
+	for i := 0; i < 305; i++ {
+		files = append(files, `{"filename":"src/f`+strings.Repeat("x", i%3)+`.go","status":"modified","additions":3,"deletions":1,"patch":"@@ SECRET-PATCH-BODY @@"}`)
+	}
+	call := "gh api --hostname github.com --method GET repos/octocat/api/compare/" + shaA + "...main?per_page=100"
+	f := &fakeGH{installed: true, answers: map[string]fakeAnswer{
+		call: {out: `{"ahead_by":2,"behind_by":1,"total_commits":2,"commits":[` + commitJSON(shaA, `"older"`) + "," + commitJSON(shaB, `"newer"`) +
+			`],"files":[` + strings.Join(files, ",") + `]}`},
+	}}
+	oc, _ := opCtx(t, agentproto.GitHubCompareParams{Repo: "octocat/api", Base: shaA, Head: "main"})
+	res, _, err := f.host().compare(oc)
+	if err != nil {
+		t.Fatalf("compare: %v (%q)", err, f.argv())
+	}
+	r := res.(agentproto.GitHubCompareResult)
+	if r.AheadBy != 2 || r.BehindBy != 1 || r.TotalCommits != 2 || len(r.Commits) != 2 || r.Commits[0].SHA != shaB || r.Commits[0].Message != "newer" {
+		t.Errorf("newest first: %+v", r.Commits)
+	}
+	if len(r.Files) != agentproto.MaxGitHubCompareFiles || !r.Truncated || r.Files[0].Status != "modified" || r.Files[0].Additions != 3 || r.Files[0].Deletions != 1 {
+		t.Errorf("files: %d truncated=%v", len(r.Files), r.Truncated)
+	}
+	if raw, _ := json.Marshal(r); strings.Contains(string(raw), "SECRET-PATCH-BODY") || strings.Contains(string(raw), "patch") {
+		t.Error("a patch body is in the result")
+	}
+	for _, bad := range []agentproto.GitHubCompareParams{
+		{Repo: "octocat/api", Base: "", Head: "main"}, {Repo: "octocat/api", Base: "main", Head: ""}, {Repo: "octocat/api", Base: "a...b", Head: "main"},
+		{Repo: "octocat/api", Base: "main", Head: "--jq"}, {Repo: "octocat/api", Base: "main", Head: "x?y=1"}, {Repo: "../api", Base: "a", Head: "b"},
+		{Repo: "octocat/api", Base: "main", Head: "x/"}, {Repo: "octocat/api", Base: "main#", Head: "x"},
+	} {
+		f.calls = nil
+		oc, _ = opCtx(t, bad)
+		if _, code, err := f.host().compare(oc); err == nil || code != 2 || len(f.argv()) != 0 {
+			t.Errorf("%+v accepted (ran %q)", bad, f.argv())
+		}
+	}
+}
+
+func TestGitHubPulls(t *testing.T) {
+	const call = "gh api --hostname github.com --method GET repos/octocat/api/pulls?state=open&sort=updated&direction=desc&per_page=50"
+	f := &fakeGH{installed: true, answers: map[string]fakeAnswer{
+		call: {out: `[{"number":12,"title":"Add billing","draft":true,"html_url":"https://github.com/octocat/api/pull/12","updated_at":"2026-09-10T00:00:00Z",` +
+			`"user":{"login":"hubot"},"head":{"ref":"feat/billing"},"base":{"ref":"main"}},{"number":0,"title":"bogus"}]`},
+	}}
+	oc, _ := opCtx(t, agentproto.GitHubPullsParams{Repo: "octocat/api"})
+	res, _, err := f.host().pulls(oc)
+	if err != nil {
+		t.Fatalf("pulls: %v (%q)", err, f.argv())
+	}
+	r := res.(agentproto.GitHubPullsResult)
+	if len(r.Pulls) != 1 {
+		t.Fatalf("%+v", r)
+	}
+	if p := r.Pulls[0]; p.Number != 12 || p.Title != "Add billing" || p.AuthorLogin != "hubot" || p.HeadRef != "feat/billing" || p.BaseRef != "main" ||
+		!p.Draft || p.URL != "https://github.com/octocat/api/pull/12" || !p.UpdatedAt.Equal(time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("%+v", p)
+	}
+	for _, bad := range []agentproto.GitHubPullsParams{{Repo: "octocat"}, {Repo: "octocat/api", Limit: 101}, {Repo: "-o/api"}, {Repo: "o/a b"}} {
+		f.calls = nil
+		oc, _ = opCtx(t, bad)
+		if _, code, err := f.host().pulls(oc); err == nil || code != 2 || len(f.argv()) != 0 {
+			t.Errorf("%+v accepted", bad)
+		}
+	}
+}
+
 func TestGitHubLogout(t *testing.T) {
 	f := &fakeGH{installed: true, answers: map[string]fakeAnswer{
 		"gh api --hostname github.com --include user": {code: 4},
@@ -388,6 +518,8 @@ func TestGitHubCloneHelperArgs(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://github.com/Octo-Cat/api.git": "Octo-Cat/api", "https://github.com/o/r/": "o/r",
 		"https://gitlab.com/o/r": "", "https://github.com/o": "", "git://github.com/o/r": "",
+		"git@github.com:octocat/api.git": "octocat/api", "ssh://git@github.com/octocat/api": "octocat/api", "git@gitlab.com:o/r.git": "",
+		"git@github.com:o/r/x.git": "", "https://github.com.evil.test/o/r": "",
 	} {
 		if got := agentproto.GitHubRepoOf(in); got != want {
 			t.Errorf("GitHubRepoOf(%q) = %q, want %q", in, got, want)

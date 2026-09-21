@@ -1594,6 +1594,25 @@
         "p3": "Certificate issuer, expiry and renewals from Caddy",
         "p4": "Force HTTPS, HSTS and redirects between hostnames"
       }
+    },
+    "repo": {
+      "pending": "Not live yet",
+      "upToDate": "Up to date",
+      "ahead": "{n} commits ahead of live",
+      "behind": "live is {n} behind the branch history",
+      "commits": "Commits",
+      "commitsHint": "On the deployed branch, newest first. Deploy any of them.",
+      "noCommits": "No commits found on this branch.",
+      "search": "Search by message, author or sha…",
+      "live": "Live",
+      "deploy": "Deploy",
+      "deployTitle": "Deploy commit {sha}?",
+      "deploying": "Deploying {sha}",
+      "changes": "Changes since the live release",
+      "changesHint": "{commits} commits, {files} files",
+      "truncated": "The list is cut short; open the compare on GitHub for the rest.",
+      "pulls": "Open pull requests",
+      "draft": "Draft"
     }
   }
 }

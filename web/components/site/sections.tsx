@@ -33,7 +33,7 @@ export type SiteSection = {
 
 export const SITE_SECTIONS: SiteSection[] = [
   { key: "", icon: LayoutDashboardIcon, group: "site", for: "both", ready: true },
-  { key: "repository", icon: GitBranchIcon, group: "code", for: "git", ready: false },
+  { key: "repository", icon: GitBranchIcon, group: "code", for: "git", ready: true },
   { key: "deployments", icon: RocketIcon, group: "code", for: "git", ready: true },
   { key: "environment", icon: KeyRoundIcon, group: "code", for: "git", ready: true },
   { key: "databases", icon: DatabaseIcon, group: "services", for: "git", ready: true },

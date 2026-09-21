@@ -69,7 +69,8 @@ func Timeout(kind string) time.Duration {
 		return 17 * time.Minute // GitHub's device code lives 15 minutes
 	case agentproto.KindGitHubInstall:
 		return 10 * time.Minute
-	case agentproto.KindGitHubStatus, agentproto.KindGitHubLogout, agentproto.KindGitHubBranches:
+	case agentproto.KindGitHubStatus, agentproto.KindGitHubLogout, agentproto.KindGitHubBranches,
+		agentproto.KindGitHubCommits, agentproto.KindGitHubCompare, agentproto.KindGitHubPulls:
 		return 2 * time.Minute
 	case agentproto.KindGitHubRepos:
 		return 3 * time.Minute

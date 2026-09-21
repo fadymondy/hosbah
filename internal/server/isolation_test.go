@@ -297,6 +297,8 @@ func TestIsolationSweep(t *testing.T) {
 		"github_status": {"server": srvA, "refresh": true}, "github_connect": {"server": srvA, "token": "ghp_sweep"},
 		"github_disconnect": {"server": srvA}, "github_repos": {"server": srvA}, "github_branches": {"server": srvA, "repo": "octocat/api"},
 		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
+		"get_app_repository": {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
+		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

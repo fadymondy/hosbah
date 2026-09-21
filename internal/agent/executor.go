@@ -108,6 +108,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	for kind, h := range map[string]Handler{
 		agentproto.KindGitHubInstall: gh.install, agentproto.KindGitHubLogin: gh.login, agentproto.KindGitHubStatus: gh.statusOp,
 		agentproto.KindGitHubLogout: gh.logout, agentproto.KindGitHubRepos: gh.repos, agentproto.KindGitHubBranches: gh.branches,
+		agentproto.KindGitHubCommits: gh.commits, agentproto.KindGitHubCompare: gh.compare, agentproto.KindGitHubPulls: gh.pulls,
 	} {
 		e.handlers[kind] = h
 	}
@@ -221,7 +222,8 @@ func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe:
 		return "" // read-only: never queued behind a long action
-	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches:
+	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches,
+		agentproto.KindGitHubCommits, agentproto.KindGitHubCompare, agentproto.KindGitHubPulls:
 		return "" // read-only gh calls: a pending device login must not hold up the repository picker
 	case agentproto.KindGitHubInstall, agentproto.KindGitHubLogin, agentproto.KindGitHubLogout:
 		// Their own lane: a device login waits up to 15 minutes for a human and must not block

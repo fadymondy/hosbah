@@ -135,6 +135,66 @@ func (s *Service) GitHubBranches(ctx context.Context, q *db.Queries, teamID stri
 	return s.githubEnqueue(ctx, q, teamID, actor, srv, agentproto.KindGitHubBranches, p)
 }
 
+// AppRepo is a git app's GitHub repository, derived from its repo_url.
+type AppRepo struct {
+	Owner, Name, URL, Branch string
+}
+
+// Slug is owner/name.
+func (r AppRepo) Slug() string { return r.Owner + "/" + r.Name }
+
+// AppRepository says which GitHub repository an app deploys from. 422 for an imported app, an app
+// without a repository, and a repository that is not on github.com.
+func AppRepository(a db.App) (AppRepo, error) {
+	if IsImported(a) {
+		return AppRepo{}, invalid(a.Name + " was imported from its server, not deployed from git — it has no repository")
+	}
+	if RepoOf(a) == "" {
+		return AppRepo{}, invalid(a.Name + " has no repository")
+	}
+	owner, name, ok := strings.Cut(agentproto.GitHubRepoOf(RepoOf(a)), "/")
+	if !ok {
+		return AppRepo{}, invalid("the repository of " + a.Name + " is not on github.com — commits, comparisons and pull requests are read through GitHub only")
+	}
+	return AppRepo{Owner: owner, Name: name, URL: "https://github.com/" + owner + "/" + name, Branch: BranchOf(a)}, nil
+}
+
+// GitHubCommits lists a repository's newest commits on a branch (tag or sha), through the server's gh.
+func (s *Service) GitHubCommits(ctx context.Context, q *db.Queries, teamID string, actor Actor, srv db.Server, repo, branch string, limit int) (db.Operation, error) {
+	if err := s.githubServer(srv); err != nil {
+		return db.Operation{}, err
+	}
+	p := agentproto.GitHubCommitsParams{Repo: strings.TrimSpace(repo), Branch: strings.TrimSpace(branch), Limit: limit}
+	if err := p.Validate(); err != nil {
+		return db.Operation{}, invalid(err.Error())
+	}
+	return s.githubEnqueue(ctx, q, teamID, actor, srv, agentproto.KindGitHubCommits, p)
+}
+
+// GitHubCompare compares base...head: ahead/behind, commits and changed files (never patches).
+func (s *Service) GitHubCompare(ctx context.Context, q *db.Queries, teamID string, actor Actor, srv db.Server, repo, base, head string) (db.Operation, error) {
+	if err := s.githubServer(srv); err != nil {
+		return db.Operation{}, err
+	}
+	p := agentproto.GitHubCompareParams{Repo: strings.TrimSpace(repo), Base: strings.TrimSpace(base), Head: strings.TrimSpace(head)}
+	if err := p.Validate(); err != nil {
+		return db.Operation{}, invalid(err.Error())
+	}
+	return s.githubEnqueue(ctx, q, teamID, actor, srv, agentproto.KindGitHubCompare, p)
+}
+
+// GitHubPulls lists a repository's open pull requests.
+func (s *Service) GitHubPulls(ctx context.Context, q *db.Queries, teamID string, actor Actor, srv db.Server, repo string, limit int) (db.Operation, error) {
+	if err := s.githubServer(srv); err != nil {
+		return db.Operation{}, err
+	}
+	p := agentproto.GitHubPullsParams{Repo: strings.TrimSpace(repo), Limit: limit}
+	if err := p.Validate(); err != nil {
+		return db.Operation{}, invalid(err.Error())
+	}
+	return s.githubEnqueue(ctx, q, teamID, actor, srv, agentproto.KindGitHubPulls, p)
+}
+
 // GitHubStateOf reads servers.github; a device code past its expiry is dropped.
 func GitHubStateOf(srv db.Server, now time.Time) ops.GitHubState {
 	var st ops.GitHubState

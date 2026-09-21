@@ -1,9 +1,7 @@
 "use client"
 
-import { GitBranchIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteRepository } from "@/components/site/repository"
 
 export default function Page() {
-  return <Planned section="repository" icon={GitBranchIcon} />
+  return <SiteRepository />
 }

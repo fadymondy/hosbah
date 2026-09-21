@@ -645,6 +645,190 @@ func (g *ghHost) branches(oc *OpContext) (any, int, error) {
 	return res, 0, nil
 }
 
+// ---- github.commits, github.compare, github.pulls ------------------------------------------------
+
+// ghCommitJSON is one commit of GitHub's REST API (repos/{o}/{n}/commits and …/compare).
+type ghCommitJSON struct {
+	SHA     string `json:"sha"`
+	HTMLURL string `json:"html_url"`
+	Commit  struct {
+		Message string `json:"message"`
+		Author  *struct {
+			Name string    `json:"name"`
+			Date time.Time `json:"date"`
+		} `json:"author"`
+		Committer *struct {
+			Date time.Time `json:"date"`
+		} `json:"committer"`
+	} `json:"commit"`
+	Author *struct {
+		Login     string `json:"login"`
+		AvatarURL string `json:"avatar_url"`
+	} `json:"author"`
+}
+
+func (c ghCommitJSON) out() (agentproto.GitHubCommit, bool) {
+	if len(c.SHA) != 40 || !agentproto.ValidGitHubSHA(c.SHA) {
+		return agentproto.GitHubCommit{}, false
+	}
+	first, _, _ := strings.Cut(strings.TrimSpace(c.Commit.Message), "\n")
+	o := agentproto.GitHubCommit{SHA: c.SHA, ShortSHA: c.SHA[:7], Message: clip(strings.TrimSpace(first), 300), URL: clip(c.HTMLURL, 500)}
+	if a := c.Commit.Author; a != nil {
+		o.AuthorName, o.CommittedAt = clip(a.Name, 100), a.Date
+	}
+	if cm := c.Commit.Committer; cm != nil && !cm.Date.IsZero() {
+		o.CommittedAt = cm.Date
+	}
+	if a := c.Author; a != nil {
+		o.AuthorLogin, o.AuthorAvatarURL = clip(a.Login, 100), clip(a.AvatarURL, 500)
+	}
+	return o, true
+}
+
+func commitsOut(in []ghCommitJSON) []agentproto.GitHubCommit {
+	out := make([]agentproto.GitHubCommit, 0, len(in))
+	for _, c := range in {
+		if o, ok := c.out(); ok {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// ghAPI is one read of GitHub's REST API through gh: a GET of a path built from validated parts.
+func (g *ghHost) ghAPI(oc *OpContext, path string, into any) error {
+	r, err := g.gh(oc, ghCall{Quiet: true}, "api", "--hostname", agentproto.GitHubHost, "--method", "GET", path)
+	if err != nil {
+		return lastErr(r, err)
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(r.Stdout)), into); err != nil {
+		return fmt.Errorf("GitHub answered something unreadable: %w", err)
+	}
+	return nil
+}
+
+func (g *ghHost) commits(oc *OpContext) (any, int, error) {
+	var p agentproto.GitHubCommitsParams
+	if err := json.Unmarshal(oc.Params, &p); err != nil {
+		return nil, 2, fmt.Errorf("bad params: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	if p.Limit == 0 {
+		p.Limit = 30
+	}
+	if err := g.requireGH(oc); err != nil {
+		return nil, 1, err
+	}
+	var in []ghCommitJSON
+	if err := g.ghAPI(oc, fmt.Sprintf("repos/%s/commits?sha=%s&per_page=%d", p.Repo, p.Branch, p.Limit), &in); err != nil {
+		return nil, 1, fmt.Errorf("could not list the commits of %s on %s: %v", p.Repo, p.Branch, err)
+	}
+	res := agentproto.GitHubCommitsResult{Commits: commitsOut(in)}
+	if len(res.Commits) > p.Limit {
+		res.Commits = res.Commits[:p.Limit]
+	}
+	oc.Info("%s@%s: %d commits", p.Repo, p.Branch, len(res.Commits))
+	return res, 0, nil
+}
+
+func (g *ghHost) compare(oc *OpContext) (any, int, error) {
+	var p agentproto.GitHubCompareParams
+	if err := json.Unmarshal(oc.Params, &p); err != nil {
+		return nil, 2, fmt.Errorf("bad params: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	if err := g.requireGH(oc); err != nil {
+		return nil, 1, err
+	}
+	var in struct {
+		AheadBy      int            `json:"ahead_by"`
+		BehindBy     int            `json:"behind_by"`
+		TotalCommits int            `json:"total_commits"`
+		Commits      []ghCommitJSON `json:"commits"` // oldest first
+		Files        []struct {
+			Filename  string `json:"filename"`
+			Status    string `json:"status"`
+			Additions int    `json:"additions"`
+			Deletions int    `json:"deletions"`
+		} `json:"files"` // patch bodies are never read
+	}
+	path := fmt.Sprintf("repos/%s/compare/%s...%s?per_page=%d", p.Repo, p.Base, p.Head, agentproto.MaxGitHubCommits)
+	if err := g.ghAPI(oc, path, &in); err != nil {
+		return nil, 1, fmt.Errorf("could not compare %s...%s in %s: %v", p.Base, p.Head, p.Repo, err)
+	}
+	res := agentproto.GitHubCompareResult{AheadBy: in.AheadBy, BehindBy: in.BehindBy, TotalCommits: in.TotalCommits,
+		Commits: commitsOut(in.Commits), Files: []agentproto.GitHubFile{}}
+	for i, j := 0, len(res.Commits)-1; i < j; i, j = i+1, j-1 { // newest first, like github.commits
+		res.Commits[i], res.Commits[j] = res.Commits[j], res.Commits[i]
+	}
+	for _, f := range in.Files {
+		if len(res.Files) >= agentproto.MaxGitHubCompareFiles {
+			res.Truncated = true
+			break
+		}
+		res.Files = append(res.Files, agentproto.GitHubFile{Filename: clip(f.Filename, 500), Status: clip(f.Status, 20), Additions: f.Additions, Deletions: f.Deletions})
+	}
+	// GitHub lists at most 300 files, and one page of commits was asked for.
+	if in.TotalCommits > len(res.Commits) || len(in.Files) >= agentproto.MaxGitHubCompareFiles {
+		res.Truncated = true
+	}
+	oc.Info("%s %s...%s: %d ahead, %d behind, %d files", p.Repo, p.Base, p.Head, res.AheadBy, res.BehindBy, len(res.Files))
+	return res, 0, nil
+}
+
+func (g *ghHost) pulls(oc *OpContext) (any, int, error) {
+	var p agentproto.GitHubPullsParams
+	if err := json.Unmarshal(oc.Params, &p); err != nil {
+		return nil, 2, fmt.Errorf("bad params: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	if p.Limit == 0 {
+		p.Limit = 50
+	}
+	if err := g.requireGH(oc); err != nil {
+		return nil, 1, err
+	}
+	var in []struct {
+		Number    int       `json:"number"`
+		Title     string    `json:"title"`
+		Draft     bool      `json:"draft"`
+		HTMLURL   string    `json:"html_url"`
+		UpdatedAt time.Time `json:"updated_at"`
+		User      *struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Head struct {
+			Ref string `json:"ref"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+	}
+	if err := g.ghAPI(oc, fmt.Sprintf("repos/%s/pulls?state=open&sort=updated&direction=desc&per_page=%d", p.Repo, p.Limit), &in); err != nil {
+		return nil, 1, fmt.Errorf("could not list the pull requests of %s: %v", p.Repo, err)
+	}
+	res := agentproto.GitHubPullsResult{Pulls: []agentproto.GitHubPull{}}
+	for _, pr := range in {
+		if pr.Number <= 0 || len(res.Pulls) >= p.Limit {
+			continue
+		}
+		o := agentproto.GitHubPull{Number: pr.Number, Title: clip(pr.Title, 300), HeadRef: clip(pr.Head.Ref, 250), BaseRef: clip(pr.Base.Ref, 250),
+			Draft: pr.Draft, URL: clip(pr.HTMLURL, 500), UpdatedAt: pr.UpdatedAt}
+		if pr.User != nil {
+			o.AuthorLogin = clip(pr.User.Login, 100)
+		}
+		res.Pulls = append(res.Pulls, o)
+	}
+	oc.Info("%s: %d open pull requests", p.Repo, len(res.Pulls))
+	return res, 0, nil
+}
+
 // ---- deploy clones -------------------------------------------------------------------------------
 
 // ghCredentialHelper is the git credential helper for github.com when gh is installed and holds a

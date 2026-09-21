@@ -595,11 +595,11 @@ func (d *deps) registerApps(api huma.API) {
 	}
 	huma.Register(api, huma.Operation{OperationID: "create-deployment", Method: http.MethodPost, Path: "/api/teams/{team}/apps/{app}/deployments",
 		DefaultStatus: http.StatusCreated, Tags: tags,
-		Summary: "Deploy a ref (default: the app's branch). Owner, admin or deployer. A deploy still waiting is superseded.",
+		Summary: "Deploy a ref — a branch, a tag or a chosen commit (its full sha) — default: the app's branch. Owner, admin or deployer. A deploy still waiting is superseded.",
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
-			Ref string `json:"ref,omitempty" maxLength:"200" doc:"Branch, tag or commit."`
+			Ref string `json:"ref,omitempty" maxLength:"200" doc:"Branch, tag or a full 40-character commit sha (e.g. one from …/repository/commits) — the build checks out exactly this ref instead of the branch head. Default: the app's branch. A short sha cannot be fetched."`
 		}
 	}) (*deploymentOut, error) {
 		out := &deploymentOut{Status: http.StatusCreated}

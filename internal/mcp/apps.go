@@ -248,7 +248,7 @@ func AppTools() []Tool {
 		{
 			Name: "deploy_app", Scope: scopes.Deploy,
 			Description: "Deploy a ref (default: the app's branch): build, release, health-gate, switch, drain. With wait=true, returns when it has finished (up to wait_seconds).",
-			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "ref": str("Branch, tag or commit (optional)"),
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "ref": str("Branch, tag or full 40-character commit sha, e.g. one from list_app_commits (optional)"),
 				"wait": map[string]any{"type": "boolean", "default": false}, "wait_seconds": map[string]any{"type": "integer", "default": 600, "maximum": 1800}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				return queueAndMaybeWait(ctx, env, args, func(s *deploy.Service, a db.App) (db.Deployment, error) {

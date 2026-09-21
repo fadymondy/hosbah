@@ -28,10 +28,14 @@ const (
 	KindGitHubLogout   = "github.logout"
 	KindGitHubRepos    = "github.repos"
 	KindGitHubBranches = "github.branches"
+	KindGitHubCommits  = "github.commits" // one repository's recent commits on a branch
+	KindGitHubCompare  = "github.compare" // base...head: ahead/behind, commits, changed files (no patches)
+	KindGitHubPulls    = "github.pulls"   // one repository's open pull requests
 )
 
 // GitHubKinds are the github.* operations, for the control plane's bookkeeping.
-var GitHubKinds = []string{KindGitHubInstall, KindGitHubLogin, KindGitHubStatus, KindGitHubLogout, KindGitHubRepos, KindGitHubBranches}
+var GitHubKinds = []string{KindGitHubInstall, KindGitHubLogin, KindGitHubStatus, KindGitHubLogout, KindGitHubRepos, KindGitHubBranches,
+	KindGitHubCommits, KindGitHubCompare, KindGitHubPulls}
 
 // GHConfigDir is where gh keeps its hosts file on a server (GH_CONFIG_DIR for every gh the agent runs).
 const GHConfigDir = "/etc/cloudy/gh"
@@ -117,6 +121,140 @@ func (p GitHubBranchesParams) Validate() error {
 	return nil
 }
 
+// Bounds of the repository reads.
+const (
+	MaxGitHubCommits      = 100 // one page of GitHub's API
+	MaxGitHubPulls        = 100
+	MaxGitHubCompareFiles = 300 // what GitHub's compare returns at most
+)
+
+var ghSHARe = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+
+// ValidGitHubSHA: a full or short commit sha.
+func ValidGitHubSHA(s string) bool { return ghSHARe.MatchString(s) }
+
+// ValidGitHubRepo: owner/name.
+func ValidGitHubRepo(s string) bool {
+	owner, name, ok := strings.Cut(s, "/")
+	return ok && ValidGitHubOwner(owner) && ValidGitHubRepoName(name)
+}
+
+// ValidGitHubRev: a branch, tag or sha as it may appear in a `gh api` path or query — ValidRef's
+// charset (letters, digits, . _ / -; no leading dash, no ".."), so no ?, &, #, %, braces or spaces.
+func ValidGitHubRev(s string) bool {
+	return ValidRef(s) && !strings.Contains(s, "//") && !strings.HasSuffix(s, "/")
+}
+
+// GitHubCommitsParams: github.commits.
+type GitHubCommitsParams struct {
+	Repo   string `json:"repo"`   // owner/name
+	Branch string `json:"branch"` // a branch, tag or sha to list from
+	Limit  int    `json:"limit,omitempty"`
+}
+
+// Validate checks github.commits on both sides.
+func (p GitHubCommitsParams) Validate() error {
+	switch {
+	case !ValidGitHubRepo(p.Repo):
+		return errors.New("repo must be owner/name")
+	case !ValidGitHubRev(p.Branch):
+		return errors.New("branch must be a branch, tag or commit")
+	case p.Limit < 0 || p.Limit > MaxGitHubCommits:
+		return errors.New("limit is 1–100")
+	}
+	return nil
+}
+
+// GitHubCompareParams: github.compare (base...head).
+type GitHubCompareParams struct {
+	Repo string `json:"repo"`
+	Base string `json:"base"`
+	Head string `json:"head"`
+}
+
+// Validate checks github.compare on both sides.
+func (p GitHubCompareParams) Validate() error {
+	switch {
+	case !ValidGitHubRepo(p.Repo):
+		return errors.New("repo must be owner/name")
+	case !ValidGitHubRev(p.Base):
+		return errors.New("base must be a branch, tag or commit")
+	case !ValidGitHubRev(p.Head):
+		return errors.New("head must be a branch, tag or commit")
+	}
+	return nil
+}
+
+// GitHubPullsParams: github.pulls.
+type GitHubPullsParams struct {
+	Repo  string `json:"repo"`
+	Limit int    `json:"limit,omitempty"`
+}
+
+// Validate checks github.pulls on both sides.
+func (p GitHubPullsParams) Validate() error {
+	switch {
+	case !ValidGitHubRepo(p.Repo):
+		return errors.New("repo must be owner/name")
+	case p.Limit < 0 || p.Limit > MaxGitHubPulls:
+		return errors.New("limit is 1–100")
+	}
+	return nil
+}
+
+// GitHubCommit is one commit of github.commits and github.compare.
+type GitHubCommit struct {
+	SHA             string    `json:"sha"`
+	ShortSHA        string    `json:"short_sha"`
+	Message         string    `json:"message"` // first line
+	AuthorName      string    `json:"author_name,omitempty"`
+	AuthorLogin     string    `json:"author_login,omitempty"`
+	AuthorAvatarURL string    `json:"author_avatar_url,omitempty"`
+	CommittedAt     time.Time `json:"committed_at"`
+	URL             string    `json:"url"`
+}
+
+// GitHubCommitsResult: github.commits, newest first.
+type GitHubCommitsResult struct {
+	Commits []GitHubCommit `json:"commits"`
+}
+
+// GitHubFile is one changed file of a comparison — never its patch.
+type GitHubFile struct {
+	Filename  string `json:"filename"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+}
+
+// GitHubCompareResult: github.compare. Commits are newest first. Truncated: more commits or files
+// exist than are listed.
+type GitHubCompareResult struct {
+	AheadBy      int            `json:"ahead_by"`
+	BehindBy     int            `json:"behind_by"`
+	TotalCommits int            `json:"total_commits"`
+	Commits      []GitHubCommit `json:"commits"`
+	Files        []GitHubFile   `json:"files"`
+	Truncated    bool           `json:"truncated"`
+}
+
+// GitHubPull is one open pull request.
+type GitHubPull struct {
+	Number      int       `json:"number"`
+	Title       string    `json:"title"`
+	AuthorLogin string    `json:"author_login,omitempty"`
+	HeadRef     string    `json:"head_ref"`
+	BaseRef     string    `json:"base_ref"`
+	Draft       bool      `json:"draft"`
+	URL         string    `json:"url"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// GitHubPullsResult: github.pulls.
+type GitHubPullsResult struct {
+	Pulls []GitHubPull `json:"pulls"`
+}
+
 // GitHubStatus is the result of github.status, github.login, github.logout and github.install.
 type GitHubStatus struct {
 	Installed bool     `json:"installed"`
@@ -162,11 +300,12 @@ type GitHubDeviceCode struct {
 	ExpiresAt       time.Time `json:"expires_at"`
 }
 
-// GitHubRepoOf returns owner/name when repoURL is an https github.com repository, else "".
+// GitHubRepoOf returns owner/name when repoURL is a github.com repository — https://github.com/o/n(.git)
+// or the ssh forms git@github.com:o/n.git and ssh://git@github.com/o/n.git — else "".
 func GitHubRepoOf(repoURL string) string {
 	u := strings.TrimSpace(repoURL)
 	lower := strings.ToLower(u)
-	for _, p := range []string{"https://github.com/", "http://github.com/", "https://www.github.com/"} {
+	for _, p := range []string{"https://github.com/", "http://github.com/", "https://www.github.com/", "git@github.com:", "ssh://git@github.com/"} {
 		if strings.HasPrefix(lower, p) {
 			rest := strings.TrimSuffix(strings.Trim(u[len(p):], "/"), ".git")
 			owner, name, ok := strings.Cut(rest, "/")

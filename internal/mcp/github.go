@@ -158,6 +158,196 @@ func GitHubTools() []Tool {
 	}
 }
 
+// RepositoryTools: the "Repository" section of an app — its GitHub repository read through the
+// GitHub CLI connected on the app's server, set against what is live and what was deployed.
+func RepositoryTools() []Tool {
+	appArg := str("App name or id")
+	return []Tool{
+		{
+			Name: "get_app_repository", Scope: scopes.Read,
+			Description: "An app's GitHub repository: owner/name, branch, the live release's commit, the branch's newest commit and how many " +
+				"commits the branch is ahead of what is live. Read through the GitHub CLI on the app's server (it must be connected to GitHub).",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				return repoRead(ctx, env, args, func(s *deploy.Service, rc deploy.RepoContext) (func(context.Context) (string, error), error) {
+					actor := mcpActor(env)
+					headOp, err := s.GitHubCommits(ctx, env.Q, env.Caller.TeamID, actor, rc.Server, rc.Repo.Slug(), rc.Repo.Branch, 1)
+					if err != nil {
+						return nil, err
+					}
+					var cmpOp *db.Operation
+					if rc.LiveSHA != "" {
+						op, err := s.GitHubCompare(ctx, env.Q, env.Caller.TeamID, actor, rc.Server, rc.Repo.Slug(), rc.LiveSHA, rc.Repo.Branch)
+						if err != nil {
+							return nil, err
+						}
+						cmpOp = &op
+					}
+					return func(ctx context.Context) (string, error) {
+						var b strings.Builder
+						fmt.Fprintf(&b, "repository: %s  (%s)\nbranch: %s\n", rc.Repo.Slug(), rc.Repo.URL, rc.Repo.Branch)
+						switch {
+						case !rc.HasLive:
+							b.WriteString("live: nothing yet\n")
+						case rc.LiveSHA == "":
+							fmt.Fprintf(&b, "live: v%d  commit unknown\n", rc.LiveVersion)
+						default:
+							fmt.Fprintf(&b, "live: v%d  commit %s\n", rc.LiveVersion, rc.LiveSHA)
+						}
+						var head agentproto.GitHubCommitsResult
+						if _, err := s.AwaitResult(ctx, headOp, 20*time.Second, &head); err != nil {
+							if errors.Is(err, deploy.ErrStillRunning) {
+								fmt.Fprintf(&b, "head: the server has not answered yet (operation %s)\n", headOp.ID)
+								return b.String(), nil
+							}
+							return "", err
+						}
+						if cs := deploy.CleanCommits(rc.Repo, head.Commits); len(cs) > 0 {
+							fmt.Fprintf(&b, "head: %s  %s\n", cs[0].SHA, cs[0].Message)
+						}
+						if cmpOp != nil {
+							var cmp agentproto.GitHubCompareResult
+							if _, err := s.AwaitResult(ctx, *cmpOp, 20*time.Second, &cmp); err == nil {
+								fmt.Fprintf(&b, "the branch is %d commits ahead of what is live, %d behind\n", cmp.AheadBy, cmp.BehindBy)
+							}
+						}
+						return b.String(), nil
+					}, nil
+				})
+			},
+		},
+		{
+			Name: "list_app_commits", Scope: scopes.Read,
+			Description: "The newest commits of an app's branch (or another branch, tag or commit), newest first, marking the live one and the " +
+				"newest deployment of each. Deploy one with deploy_app ref=<its full sha>.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "branch": str("Branch, tag or commit (default: the app's branch)"),
+				"limit": map[string]any{"type": "integer", "default": 30, "maximum": 100}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				return repoRead(ctx, env, args, func(s *deploy.Service, rc deploy.RepoContext) (func(context.Context) (string, error), error) {
+					branch := strings.TrimSpace(args.Str("branch"))
+					if branch == "" {
+						branch = rc.Repo.Branch
+					}
+					byCommit, err := deploy.DeploymentsByCommit(ctx, env.Q, env.Caller.TeamID, rc.App)
+					if err != nil {
+						return nil, err
+					}
+					op, err := s.GitHubCommits(ctx, env.Q, env.Caller.TeamID, mcpActor(env), rc.Server, rc.Repo.Slug(), branch, args.Int("limit", 30, 1, 100))
+					if err != nil {
+						return nil, err
+					}
+					return func(ctx context.Context) (string, error) {
+						var r agentproto.GitHubCommitsResult
+						if _, err := s.AwaitResult(ctx, op, 30*time.Second, &r); err != nil {
+							return "", err
+						}
+						return fmt.Sprintf("%s @ %s\n", rc.Repo.Slug(), branch) + commitLines(rc, byCommit, r.Commits), nil
+					}, nil
+				})
+			},
+		},
+		{
+			Name: "compare_app_commits", Scope: scopes.Read,
+			Description: "Compare base...head in an app's repository: ahead/behind, the commits and the changed files (no patches) — what " +
+				"deploying head would change. Defaults: base = the live release's commit, head = the app's branch.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "base": str("Branch, tag or commit (default: the live commit)"),
+				"head": str("Branch, tag or commit (default: the app's branch)")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				return repoRead(ctx, env, args, func(s *deploy.Service, rc deploy.RepoContext) (func(context.Context) (string, error), error) {
+					base, head := strings.TrimSpace(args.Str("base")), strings.TrimSpace(args.Str("head"))
+					if base == "" {
+						base = rc.LiveSHA
+					}
+					if base == "" {
+						return nil, errors.New("nothing is live yet, so there is no default base — give base (a branch, tag or commit)")
+					}
+					if head == "" {
+						head = rc.Repo.Branch
+					}
+					byCommit, err := deploy.DeploymentsByCommit(ctx, env.Q, env.Caller.TeamID, rc.App)
+					if err != nil {
+						return nil, err
+					}
+					op, err := s.GitHubCompare(ctx, env.Q, env.Caller.TeamID, mcpActor(env), rc.Server, rc.Repo.Slug(), base, head)
+					if err != nil {
+						return nil, err
+					}
+					return func(ctx context.Context) (string, error) {
+						var r agentproto.GitHubCompareResult
+						if _, err := s.AwaitResult(ctx, op, 30*time.Second, &r); err != nil {
+							return "", err
+						}
+						var b strings.Builder
+						fmt.Fprintf(&b, "%s  %s...%s: %d ahead, %d behind, %d commits\n", rc.Repo.Slug(), base, head, r.AheadBy, r.BehindBy, r.TotalCommits)
+						b.WriteString(commitLines(rc, byCommit, r.Commits))
+						files, cut := deploy.CleanFiles(r.Files)
+						fmt.Fprintf(&b, "files (%d):\n", len(files))
+						for _, f := range files {
+							fmt.Fprintf(&b, "  %-9s +%d -%d  %s\n", f.Status, f.Additions, f.Deletions, f.Filename)
+						}
+						if r.Truncated || cut {
+							b.WriteString("  (more commits or files exist than are listed)\n")
+						}
+						return b.String(), nil
+					}, nil
+				})
+			},
+		},
+	}
+}
+
+func commitLines(rc deploy.RepoContext, byCommit map[string]db.Deployment, in []agentproto.GitHubCommit) string {
+	commits := deploy.CleanCommits(rc.Repo, in)
+	if len(commits) == 0 {
+		return "  no commits\n"
+	}
+	var b strings.Builder
+	for _, c := range commits {
+		mark := ""
+		if rc.LiveSHA != "" && deploy.SameCommit(c.SHA, rc.LiveSHA) {
+			mark = "  [live]"
+		}
+		if d, ok := byCommit[c.SHA]; ok {
+			mark += fmt.Sprintf("  [deployment #%d %s]", d.Number, d.Status)
+		}
+		who := c.AuthorLogin
+		if who == "" {
+			who = c.AuthorName
+		}
+		fmt.Fprintf(&b, "  %s  %s  %s  %s%s\n", c.SHA, c.CommittedAt.UTC().Format("2006-01-02 15:04"), who, c.Message, mark)
+	}
+	return b.String()
+}
+
+// repoRead resolves the app and its repository, queues the read(s), and answers after commit.
+func repoRead(ctx context.Context, env *Env, args Args,
+	queue func(*deploy.Service, deploy.RepoContext) (func(context.Context) (string, error), error)) (string, error) {
+	a, err := findApp(ctx, env, args)
+	if err != nil {
+		return "", err
+	}
+	s, err := deploys(env)
+	if err != nil {
+		return "", err
+	}
+	rc, err := s.RepositoryOf(ctx, env.Q, env.Caller.TeamID, a)
+	if err != nil {
+		return "", err
+	}
+	answer, err := queue(s, rc)
+	if err != nil {
+		return "", err
+	}
+	env.Then = func(ctx context.Context) (string, error) {
+		out, err := answer(ctx)
+		if errors.Is(err, deploy.ErrStillRunning) {
+			return "The server has not answered yet — is its agent connected?", nil
+		}
+		return out, err
+	}
+	return "", nil
+}
+
 // githubRead queues a read-only github.* operation and answers once the server has (after commit).
 func githubRead(ctx context.Context, env *Env, args Args, queue func(*deploy.Service, db.Server) (db.Operation, error),
 	answer func(*deploy.Service, db.Operation) (string, error)) (string, error) {
