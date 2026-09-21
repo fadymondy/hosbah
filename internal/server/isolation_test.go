@@ -33,6 +33,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/migrate"
 	"github.com/fadymondy/hosbah/internal/monitors"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/schedules"
 )
 
 /*
@@ -125,6 +126,11 @@ func TestIsolationSweep(t *testing.T) {
 	var monA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/monitors", map[string]any{"name": "up-a", "kind": "http",
 		"target": "https://a-" + suffix + ".example.test/health", "enabled": false}, 201, &monA)
+	// A schedule of app A (cron jobs), switched off, and one run of it with sealed output.
+	var schedA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/schedules", map[string]any{"name": "nightly-a", "cron": "0 3 * * *",
+		"command": "echo a-env-cron", "enabled": false}, 201, &schedA)
+	runA := seedScheduleRun(t, teamA.ID, schedA.ID, appA.App.ID, "succeeded", "a-env-output")
 
 	// Imported workloads of A's: a site and a database found running on that server (records only).
 	if _, err := importer.Sync(context.Background(), testDB(t), teamA.ID, srvA, []agentproto.Service{
@@ -202,6 +208,8 @@ func TestIsolationSweep(t *testing.T) {
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"hostname":   func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
 		"monitor":    func(string) []string { return []string{monA.ID, monA.Name} },
+		"schedule":   func(string) []string { return []string{schedA.ID, schedA.Name} },
+		"run":        func(string) []string { return []string{runA} },
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
@@ -312,6 +320,10 @@ func TestIsolationSweep(t *testing.T) {
 		"list_app_monitors": {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
+		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
+		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
+		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
+		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -540,6 +552,7 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 	lastService = a.Ops.(*ops.Service)
 	lastDeploy, _ = a.Deploy.(*deploy.Service)
 	lastMonitors, _ = a.Monitors.(*monitors.Service)
+	lastSchedules, _ = a.Schedules.(*schedules.Service)
 	return ts, func() { a.Stop(); ts.Close(); a.Kernel.Close() }
 }
 
@@ -550,6 +563,10 @@ var lastService *ops.Service
 // lastMonitors is the alerts evaluator of the most recent bootTestServer (a test drives its clock,
 // its HTTP transport and its ticks).
 var lastMonitors *monitors.Service
+
+// lastSchedules is the cron scheduler of the most recent bootTestServer (a test drives its clock and
+// its ticks).
+var lastSchedules *schedules.Service
 
 // lastDeploy is the deploy service of the most recent bootTestServer (a test points its Cloudflare
 // clients at a fake).

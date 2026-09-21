@@ -50,6 +50,8 @@ type App struct {
 	DBSvc any
 	// Monitors is the *monitors.Service (typed any for the same reason): a site's alerts and monitors.
 	Monitors any
+	// Schedules is the *schedules.Service (typed any for the same reason): a site's cron jobs.
+	Schedules any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

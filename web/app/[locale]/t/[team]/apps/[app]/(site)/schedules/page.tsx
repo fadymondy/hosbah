@@ -1,9 +1,7 @@
 "use client"
 
-import { CalendarClockIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteSchedules } from "@/components/site/schedules"
 
 export default function Page() {
-  return <Planned section="schedules" icon={CalendarClockIcon} />
+  return <SiteSchedules />
 }

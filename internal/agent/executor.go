@@ -96,6 +96,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindDBRestore:       dbRestore,
 		agentproto.KindDBRemove:        dbRemove,
 		agentproto.KindCaddyCerts:      caddyCerts,
+		agentproto.KindAppExec:         newExecHost().appExec,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -223,6 +224,10 @@ func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts:
 		return "" // read-only: never queued behind a long action
+	case agentproto.KindAppExec:
+		// A cron job never waits behind a 45-minute build, nor holds one up. The control plane lets one
+		// run of a schedule go at a time; different schedules may overlap.
+		return ""
 	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches,
 		agentproto.KindGitHubCommits, agentproto.KindGitHubCompare, agentproto.KindGitHubPulls:
 		return "" // read-only gh calls: a pending device login must not hold up the repository picker

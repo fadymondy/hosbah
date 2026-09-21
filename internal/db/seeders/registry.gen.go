@@ -90,6 +90,12 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedReportComment(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedSchedule(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedScheduleRun(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedServer(ctx, a); err != nil {
 		return err
 	}

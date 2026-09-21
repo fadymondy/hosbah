@@ -21,6 +21,7 @@ const (
 	KindAppLogs     = "app.logs"     // docker logs --follow of the app's containers, bounded in lines and time
 	KindAppRemove   = "app.remove"   // remove the app's route, containers and images (the app was deleted)
 	KindOpCancel    = "op.cancel"    // cancel a running operation (handled at once, not queued behind it)
+	KindAppExec     = "app.exec"     // run an argv inside the live release's web container (docker exec, no TTY), bounded in time and output
 )
 
 // Provision steps added in P2 (params.step of provision.step). Idempotent like P1's.

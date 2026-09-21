@@ -26,6 +26,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
 	"github.com/fadymondy/hosbah/internal/monitors"
+	"github.com/fadymondy/hosbah/internal/schedules"
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
@@ -107,7 +108,11 @@ func Boot() *app.App {
 	watch := monitors.New(a, mailSender)
 	watch.Start()
 	a.Monitors = watch
-	a.Stop = func() { watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
+	// Schedules: the cron loop (internal/schedules). Its runs are app.exec operations of the app's server.
+	crons := schedules.New(a, svc)
+	crons.Start()
+	a.Schedules = crons
+	a.Stop = func() { crons.Close(); watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)

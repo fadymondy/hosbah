@@ -53,3 +53,9 @@ ALTER TABLE app_logos ADD CONSTRAINT app_logos_app_fk FOREIGN KEY (app_id, team_
 ALTER TABLE monitors ADD CONSTRAINT monitors_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
 ALTER TABLE monitor_incidents ADD CONSTRAINT monitor_incidents_monitor_fk FOREIGN KEY (monitor_id, team_id) REFERENCES monitors (id, team_id) ON DELETE CASCADE;
 ALTER TABLE monitor_incidents ADD CONSTRAINT monitor_incidents_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+-- A site's schedules go with their app; runs with their schedule (and their app). A run outlives
+-- its operation's row (SET NULL): the run keeps its own copy of the outcome.
+ALTER TABLE schedules ADD CONSTRAINT schedules_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_schedule_fk FOREIGN KEY (schedule_id, team_id) REFERENCES schedules (id, team_id) ON DELETE CASCADE;
+ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_operation_fk FOREIGN KEY (operation_id) REFERENCES operations (id) ON DELETE SET NULL;

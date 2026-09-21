@@ -1697,6 +1697,45 @@
         "ok": "Passing",
         "failing": "Failing"
       }
+    },
+    "schedules": {
+      "add": "Add schedule",
+      "search": "Search by name, command or cron…",
+      "when": "When",
+      "last": "Last run",
+      "next": "Next run",
+      "never": "Never run",
+      "runs": "Runs",
+      "runNow": "Run now",
+      "started": "Run started",
+      "pause": "Pause",
+      "resume": "Resume",
+      "emptyTitle": "No schedules yet",
+      "emptyHint": "Run a command on a cron expression inside this site's live release, with its environment.",
+      "deleteBody": "Its run history goes with it.",
+      "runsOf": "Runs of {name}",
+      "close": "Close",
+      "pickRun": "Pick a run to read its output.",
+      "outputHidden": "Output is for people who can read this site's logs.",
+      "noOutput": "(no output)",
+      "dialogHint": "The command runs inside the live release's web container. A run still going when the next time comes is skipped.",
+      "commandHint": "A shell line, run as `sh -lc` in the container.",
+      "cron": "Cron expression",
+      "nextRuns": "Next:",
+      "timezone": "Timezone",
+      "timeout": "Timeout (seconds)",
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "succeeded": "Succeeded",
+        "failed": "Failed",
+        "timeout": "Timed out",
+        "skipped": "Skipped"
+      },
+      "trigger": {
+        "schedule": "scheduled",
+        "manual": "manual"
+      }
     }
   }
 }

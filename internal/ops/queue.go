@@ -47,6 +47,8 @@ func Timeout(kind string) time.Duration {
 		return 2 * time.Minute
 	case agentproto.KindTunnelFrp, agentproto.KindTunnelTailscale:
 		return 5 * time.Minute
+	case agentproto.KindAppExec:
+		return 61 * time.Minute // the longest schedule timeout and a minute; each run sets its own (EnqueueSpec.Timeout)
 	case agentproto.KindAppLogs:
 		return 6 * time.Minute
 	case agentproto.KindDBProvision, agentproto.KindDBRestore:
@@ -106,6 +108,11 @@ type EnqueueSpec struct {
 	// DeploymentID ties an agent operation to a deployment: its events are also appended to the
 	// deployment's own log.
 	DeploymentID string
+	// Timeout, when set, replaces Timeout(Kind) — app.exec runs for as long as its schedule allows.
+	Timeout time.Duration
+	// QueueTTL, when set, replaces QueueTTL: how long the operation may wait for an offline server
+	// before it times out. A cron job that would start an hour late is better not started.
+	QueueTTL time.Duration
 }
 
 // Enqueue inserts an operation in the caller's team transaction. It is idempotent by op_id: the
@@ -126,13 +133,20 @@ func (s *Service) Enqueue(ctx context.Context, q *db.Queries, sp EnqueueSpec) (o
 		return db.Operation{}, false, errors.New("params must be a JSON object")
 	}
 	hash, _ := agentproto.ParamsHash(canon)
+	timeout, ttl := Timeout(sp.Kind), QueueTTL
+	if sp.Timeout > 0 {
+		timeout = sp.Timeout
+	}
+	if sp.QueueTTL > 0 {
+		ttl = sp.QueueTTL
+	}
 	if sp.OpID == "" {
 		sp.OpID = newUUID()
 	}
 	op, err = q.InsertOperation(ctx, db.InsertOperationParams{
 		ID: sp.OpID, TeamID: sp.TeamID, ServerID: sp.ServerID, Kind: sp.Kind, Executor: sp.Executor,
 		Params: string(canon), ParamsHash: hash, CreatedBy: sp.CreatedBy,
-		TimeoutSeconds: int64(Timeout(sp.Kind) / time.Second), ExpiresAt: s.now().Add(QueueTTL).UTC(),
+		TimeoutSeconds: int64(timeout / time.Second), ExpiresAt: s.now().Add(ttl).UTC(),
 		DeploymentID: optional(sp.DeploymentID),
 	})
 	if errors.Is(err, sql.ErrNoRows) { // ON CONFLICT DO NOTHING: the op_id exists
@@ -297,7 +311,11 @@ func (s *Service) sweepOnce(ctx context.Context) error {
 		for _, r := range rows {
 			_, dek, err := s.systemDEK(ctx, q, r.ServerID)
 			if err != nil {
-				return err
+				// One team whose data key does not unwrap must not keep every other team's
+				// operations from timing out: the timeout stands, only its log line is lost.
+				// (Unwrapping is not a statement, so the transaction is still good.)
+				s.log.Warn("a timed-out operation's log line could not be sealed", "op", r.ID, "err", err)
+				continue
 			}
 			msg := "timed out"
 			if r.Error != nil {
