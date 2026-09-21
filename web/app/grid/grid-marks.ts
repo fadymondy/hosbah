@@ -235,9 +235,10 @@ export const PRODUCT_MARKS: Record<string, MarkSpec> = {
     body: "#3B5BDB",
     accent: "#C9A227",
   },
-  // Claude Digital Twin — two opposed arcs meeting at the base: a twin.
+  // Moharrik (was Claude Digital Twin, 2026-09-19; it kept this mark) — two opposed arcs meeting
+  // at the base. The key stays claude-digital-twin so every table that names the mark still does.
   "claude-digital-twin": {
-    name: "Claude Digital Twin",
+    name: "Moharrik",
     cells: [
       [1, 0],
       [3, 0],
