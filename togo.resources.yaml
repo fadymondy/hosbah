@@ -177,6 +177,75 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppBrowser
+      table: app_browsers
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: image
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: memory_mb
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: cpus
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: max_sessions
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: idle_timeout_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: env_prefix
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: host_port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: AppBucket
       table: app_buckets
       fields:

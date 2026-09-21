@@ -69,6 +69,11 @@ func (a *Agent) enqueue(ev agentproto.Event) {
 // running while disconnected; their events are replayed on reconnect.
 func (a *Agent) Run(ctx context.Context) error {
 	go a.Exec.Work(ctx)
+	go func() { // the token gateways of this server's browsers come back with the agent
+		for _, err := range a.Exec.browsers.Restore(ctx) {
+			a.Log.Warn("a browser's gateway did not come back", "error", err)
+		}
+	}()
 	backoff := time.Second
 	for {
 		started := time.Now()

@@ -55,9 +55,12 @@ func Timeout(kind string) time.Duration {
 		return 20 * time.Minute // pull an image, start the engine, wait for readiness, restore
 	case agentproto.KindDBBackup:
 		return 30 * time.Minute
-	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop, agentproto.KindBucketCreate, agentproto.KindBucketRemove, agentproto.KindVolumeRemove:
+	case agentproto.KindBrowserCreate:
+		return 20 * time.Minute // a first pull of the Chromium image can take minutes
+	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop, agentproto.KindBucketCreate, agentproto.KindBucketRemove, agentproto.KindVolumeRemove,
+		agentproto.KindBrowserRemove:
 		return 5 * time.Minute
-	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage:
+	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage, agentproto.KindBrowserStatus:
 		return 2 * time.Minute
 	case agentproto.KindWorkloadLogs:
 		return 6 * time.Minute

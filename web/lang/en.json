@@ -1838,6 +1838,26 @@
         "go": "Go websocket server",
         "custom": "Custom"
       }
+    },
+    "browsers": {
+      "add": "Add browser",
+      "search": "Search browsers…",
+      "emptyTitle": "No browsers yet",
+      "emptyHint": "A headless Chromium on this site's server, for crawling, screenshots, PDFs and tests.",
+      "limits": "Limits",
+      "running": "Running",
+      "stopped": "Stopped",
+      "restarts": "Restarted {n} times",
+      "sessions": "{n} sessions · idle {idle}s",
+      "memory": "Memory (MB)",
+      "cpus": "CPUs",
+      "maxSessions": "Sessions at once",
+      "idle": "Close an idle session after (seconds)",
+      "dialogHint": "The first one on a server downloads the browser image, which can take a few minutes.",
+      "removeHint": "The browser is stopped and its variables are removed from the site.",
+      "noteConnect": "Connect with any CDP client (Puppeteer, Playwright, chromedp) using the WS_ENDPOINT variable; it already carries the token.",
+      "notePrivate": "The browser listens only on the server's private address, behind its token. It is never reachable from the internet.",
+      "noteViewer": "There is no live view of a session yet."
     }
   }
 }

@@ -432,6 +432,12 @@ func publishedPort(oc *OpContext, name string, containerPort int) (int, error) {
 	if err != nil {
 		return 0, errors.New("the container did not publish its port")
 	}
+	return parsePublishedPort(out)
+}
+
+// parsePublishedPort reads the loopback port out of `docker port`'s answer. A port published
+// anywhere but 127.0.0.1 is not one of ours and is not read.
+func parsePublishedPort(out string) (int, error) {
 	hostPort := 0
 	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 		if i := strings.LastIndex(l, ":"); i >= 0 && strings.HasPrefix(l, "127.0.0.1") {

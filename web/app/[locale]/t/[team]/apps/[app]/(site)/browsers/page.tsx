@@ -1,9 +1,7 @@
 "use client"
 
-import { GlobeIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteBrowsers } from "@/components/site/browsers"
 
 export default function Page() {
-  return <Planned section="browsers" icon={GlobeIcon} />
+  return <SiteBrowsers />
 }

@@ -68,3 +68,6 @@ ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_service_fk FOREIGN KEY (servi
 ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_sealed_check CHECK (secret_sealed LIKE 'csv1:%');
 -- A site's realtime configuration goes with its app.
 ALTER TABLE app_realtime ADD CONSTRAINT app_realtime_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+-- A site's browsers go with their app (the agent's app.remove takes their containers).
+ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_sealed_check CHECK (token_sealed LIKE 'csv1:%');

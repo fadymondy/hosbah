@@ -56,6 +56,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerMonitors(api)
 	d.registerSchedules(api)
 	d.registerStorage(api)
+	d.registerBrowsers(api)
 	d.registerRealtime(api)
 	d.registerQueues(api)
 	d.registerCredentials(api)

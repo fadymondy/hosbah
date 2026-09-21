@@ -36,6 +36,7 @@ type Executor struct {
 	now          func() time.Time
 	emit         func(agentproto.Event)
 	handlers     map[string]Handler
+	browsers     *browserHost // owns the token gateways of this server's browsers
 	// Restart is called after an operation that asked for it (agent.update) has reported its
 	// final status.
 	Restart func()
@@ -111,6 +112,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	for kind, h := range map[string]Handler{
 		agentproto.KindVolumeUsage: st.volumeUsage, agentproto.KindVolumeRemove: st.volumeRemove,
 		agentproto.KindBucketCreate: st.bucketCreate, agentproto.KindBucketRemove: st.bucketRemove,
+	} {
+		e.handlers[kind] = h
+	}
+	e.browsers = newBrowserHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindBrowserCreate: e.browsers.create, agentproto.KindBrowserRemove: e.browsers.remove, agentproto.KindBrowserStatus: e.browsers.status,
+		agentproto.KindAppRemove: e.browsers.withAppRemove(appRemove), // a deleted app's browsers go with it
 	} {
 		e.handlers[kind] = h
 	}
@@ -231,8 +239,18 @@ func (e *Executor) Work(ctx context.Context) {
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
-		agentproto.KindVolumeUsage:
+		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus:
 		return "" // read-only: never queued behind a long action
+	case agentproto.KindBrowserCreate, agentproto.KindBrowserRemove:
+		// One lane per browser: its create and remove never interleave, and a first image pull of
+		// minutes holds up neither the app's deploys nor the host lane.
+		var p struct {
+			BrowserID string `json:"browser_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.BrowserID != "" {
+			return "browser:" + p.BrowserID
+		}
+		return "browser:?"
 	case agentproto.KindAppExec:
 		// A cron job never waits behind a 45-minute build, nor holds one up. The control plane lets one
 		// run of a schedule go at a time; different schedules may overlap.
