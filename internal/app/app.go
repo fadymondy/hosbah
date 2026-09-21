@@ -48,6 +48,8 @@ type App struct {
 	Deploy any
 	// DBSvc is the *dbsvc.Service (typed any for the same reason): P3 data services and backups.
 	DBSvc any
+	// Monitors is the *monitors.Service (typed any for the same reason): a site's alerts and monitors.
+	Monitors any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

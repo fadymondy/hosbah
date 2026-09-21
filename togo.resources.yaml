@@ -933,6 +933,134 @@ resources:
           pg: timestamptz
           "null": true
       controller: true
+    - name: Monitor
+      table: monitors
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: target
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: expected_status
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: threshold
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: window_minutes
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: interval_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: notify_emails
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: notify_webhook
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: state
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: last_checked_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: last_error
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: consecutive_failures
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+      controller: true
+    - name: MonitorIncident
+      table: monitor_incidents
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: monitor_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: opened_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: resolved_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: reason
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: last_value
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: notified
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+      controller: true
     - name: Notification
       table: notifications
       fields:

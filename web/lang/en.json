@@ -1651,6 +1651,52 @@
         "unmanaged": "Not managed here",
         "private": "Private server"
       }
+    },
+    "monitors": {
+      "add": "Add monitor",
+      "search": "Search monitors…",
+      "name": "Name",
+      "rule": "Rule",
+      "checked": "Last check",
+      "paused": "Paused",
+      "checkNow": "Check now",
+      "emptyTitle": "No monitors yet",
+      "emptyHint": "Add an uptime check on one of this site's hostnames, or a rule on its server's CPU, memory or disk.",
+      "deleteTitle": "Delete {name}?",
+      "deleteBody": "Its incident history goes with it.",
+      "incidents": "Incidents",
+      "incidentsHint": "What fired and when it recovered, newest first.",
+      "noIncidents": "No incidents.",
+      "open": "Open",
+      "resolved": "Resolved",
+      "more": "Load more",
+      "dialogHint": "An incident opens after two failed checks in a row (uptime) or one reading over the limit (resources), and closes on the first pass.",
+      "url": "URL to check",
+      "urlHint": "Must be one of this site's own hostnames.",
+      "urlNoHosts": "This site has no hostnames yet; add one in the proxy manager first.",
+      "expected": "Expected status",
+      "expectedHint": "0 accepts any 2xx or 3xx.",
+      "maxMs": "Slowest response (ms)",
+      "percent": "Alert above (%)",
+      "window": "Averaged over (minutes)",
+      "interval": "Check every (seconds)",
+      "emails": "Email these addresses",
+      "webhook": "Webhook",
+      "webhookHint": "https only. Receives JSON with event, monitor, app, reason, value and at.",
+      "enabled": "Enabled",
+      "ruleHttp": "expects {status}, every {every}s",
+      "ruleResource": "{kind} above {pct}% over {min} min",
+      "kinds": {
+        "http": "Uptime (HTTP)",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "disk": "Disk"
+      },
+      "state": {
+        "unknown": "No data yet",
+        "ok": "Passing",
+        "failing": "Failing"
+      }
     }
   }
 }

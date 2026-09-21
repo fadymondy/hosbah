@@ -27,6 +27,8 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterImportIgnoreRoutes(api, a)
 	RegisterInvitationRoutes(api, a)
 	RegisterMcpTokenRoutes(api, a)
+	RegisterMonitorRoutes(api, a)
+	RegisterMonitorIncidentRoutes(api, a)
 	RegisterNotificationRoutes(api, a)
 	RegisterOperationRoutes(api, a)
 	RegisterOperationLogRoutes(api, a)

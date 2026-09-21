@@ -53,6 +53,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerGitHub(api)
 	d.registerRepository(api)
 	d.registerDNS(api)
+	d.registerMonitors(api)
 	d.registerCredentials(api)
 	d.registerMe(api)
 	d.registerTeams(api)

@@ -31,6 +31,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/migrate"
+	"github.com/fadymondy/hosbah/internal/monitors"
 	"github.com/fadymondy/hosbah/internal/ops"
 )
 
@@ -120,6 +121,10 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
+	// A monitor of app A (alerts & monitors): an http check of its own hostname.
+	var monA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/monitors", map[string]any{"name": "up-a", "kind": "http",
+		"target": "https://a-" + suffix + ".example.test/health", "enabled": false}, 201, &monA)
 
 	// Imported workloads of A's: a site and a database found running on that server (records only).
 	if _, err := importer.Sync(context.Background(), testDB(t), teamA.ID, srvA, []agentproto.Service{
@@ -196,6 +201,7 @@ func TestIsolationSweep(t *testing.T) {
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"hostname":   func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
+		"monitor":    func(string) []string { return []string{monA.ID, monA.Name} },
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
@@ -303,6 +309,9 @@ func TestIsolationSweep(t *testing.T) {
 		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
 		"get_app_dns": {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},
 		"set_app_dns_record": {"app": appA.App.ID, "hostname": domA.Hostname, "takeover": true},
+		"list_app_monitors": {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
+		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
+		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -530,12 +539,17 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 	a.Ops.(*ops.Service).SetPublicURL(ts.URL)
 	lastService = a.Ops.(*ops.Service)
 	lastDeploy, _ = a.Deploy.(*deploy.Service)
+	lastMonitors, _ = a.Monitors.(*monitors.Service)
 	return ts, func() { a.Stop(); ts.Close(); a.Kernel.Close() }
 }
 
 // lastService is the ops service of the most recent bootTestServer (tests in this package run
 // sequentially).
 var lastService *ops.Service
+
+// lastMonitors is the alerts evaluator of the most recent bootTestServer (a test drives its clock,
+// its HTTP transport and its ticks).
+var lastMonitors *monitors.Service
 
 // lastDeploy is the deploy service of the most recent bootTestServer (a test points its Cloudflare
 // clients at a fake).

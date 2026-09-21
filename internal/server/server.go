@@ -25,6 +25,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
+	"github.com/fadymondy/hosbah/internal/monitors"
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
@@ -102,7 +103,11 @@ func Boot() *app.App {
 	if _, err := importer.Backfill(context.Background(), a.SQLDB, a.Log); err != nil {
 		a.Log.Warn("imported workloads backfill failed", "err", err)
 	}
-	a.Stop = func() { databases.StopScheduler(); deploys.Stop(); svc.Stop() }
+	// Alerts and monitors: the evaluator loop (internal/monitors). It mails through the same sender.
+	watch := monitors.New(a, mailSender)
+	watch.Start()
+	a.Monitors = watch
+	a.Stop = func() { watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)

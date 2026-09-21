@@ -1,9 +1,7 @@
 "use client"
 
-import { BellRingIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteMonitors } from "@/components/site/monitors"
 
 export default function Page() {
-  return <Planned section="monitors" icon={BellRingIcon} />
+  return <SiteMonitors />
 }

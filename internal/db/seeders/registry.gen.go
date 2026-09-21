@@ -60,6 +60,12 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedMcpToken(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedMonitor(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedMonitorIncident(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedNotification(ctx, a); err != nil {
 		return err
 	}

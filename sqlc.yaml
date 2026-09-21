@@ -40,3 +40,7 @@ sql:
           - db_type: "pg_catalog.int8"
             nullable: true
             go_type: { type: "int64", pointer: true }
+          # text[] on database/sql makes sqlc reach for lib/pq (pq.Array), which Hosbah does not
+          # depend on. internal/pgtext.Array scans the literal the pgx stdlib driver hands over.
+          - column: "monitors.notify_emails"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
