@@ -71,8 +71,10 @@ SELECT
     (SELECT count(*) FROM admin_mcp_tokens t WHERE t.user_id = sqlc.arg('user_id')::text AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()))::bigint AS admin_mcp_tokens;
 
 -- name: SetUserDisabled :exec
+-- revoked_at is the app's clock, not now(): sessions carry the app's iat, and a database clock that
+-- lags would let a session from before the disable outlive it.
 UPDATE users SET disabled_at = CASE WHEN sqlc.arg('disabled')::boolean THEN coalesce(disabled_at, now()) ELSE NULL END,
-    sessions_revoked_at = CASE WHEN sqlc.arg('disabled')::boolean THEN now() ELSE sessions_revoked_at END
+    sessions_revoked_at = CASE WHEN sqlc.arg('disabled')::boolean THEN GREATEST(coalesce(sessions_revoked_at, sqlc.arg('revoked_at')::timestamptz), sqlc.arg('revoked_at')::timestamptz) ELSE sessions_revoked_at END
 WHERE id = sqlc.arg('id')::text;
 
 -- name: LockPlatformAdmins :many

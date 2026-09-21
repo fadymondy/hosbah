@@ -163,7 +163,7 @@ func UpdateUser(ctx context.Context, q *db.Queries, actorID, ref string, p UserP
 		changes["platform_admin"] = map[string]bool{"from": wasAdmin, "to": *p.PlatformAdmin}
 	}
 	if p.Disabled != nil && *p.Disabled != wasDisabled {
-		if err := q.SetUserDisabled(ctx, db.SetUserDisabledParams{ID: u.ID, Disabled: *p.Disabled}); err != nil {
+		if err := q.SetUserDisabled(ctx, db.SetUserDisabledParams{ID: u.ID, Disabled: *p.Disabled, RevokedAt: time.Now().UTC()}); err != nil {
 			return UserDetail{}, internal("update the account")
 		}
 		if *p.Disabled {
