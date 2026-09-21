@@ -501,6 +501,9 @@ func (s *Service) DeleteService(ctx context.Context, q *db.Queries, teamID strin
 	if svc.Source == SourceImported {
 		return s.forgetImported(ctx, q, teamID, actor, svc)
 	}
+	if err := refuseServiceWithBuckets(ctx, q, teamID, svc); err != nil {
+		return err
+	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "dataservice.delete", "data_service", svc.ID, auditExtra(actor, nil)); err != nil {
 		return err
 	}

@@ -37,7 +37,7 @@ export const SITE_SECTIONS: SiteSection[] = [
   { key: "deployments", icon: RocketIcon, group: "code", for: "git", ready: true },
   { key: "environment", icon: KeyRoundIcon, group: "code", for: "git", ready: true },
   { key: "databases", icon: DatabaseIcon, group: "services", for: "git", ready: true },
-  { key: "storage", icon: HardDriveIcon, group: "services", for: "git", ready: false },
+  { key: "storage", icon: HardDriveIcon, group: "services", for: "git", ready: true },
   { key: "workers", icon: CogIcon, group: "services", for: "git", ready: true },
   { key: "queues", icon: ListOrderedIcon, group: "services", for: "git", ready: true },
   { key: "schedules", icon: CalendarClockIcon, group: "services", for: "git", ready: true },

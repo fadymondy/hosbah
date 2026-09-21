@@ -376,22 +376,11 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 	}
 	name := agentproto.ContainerName(p.App, p.Process, p.DeploymentID)
 	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", name).Run() //#nosec G204 -- idempotent re-run
-	args := []string{"run", "-d", "--name", name, "--restart", "unless-stopped",
-		"--label", "cloudy.app=" + p.AppID, "--label", "cloudy.process=" + p.Process, "--label", "cloudy.deployment=" + p.DeploymentID,
-		"--log-opt", "max-size=10m", "--log-opt", "max-file=3"}
-	pairs := envPairs(env)
-	if p.Process == "web" {
-		port := strconv.Itoa(p.Port)
-		args = append(args, "-p", "127.0.0.1::"+port, "-e", "PORT")
-		pairs = append(pairs, "PORT="+port)
-	}
-	args = append(args, envArgs(env)...)
-	if p.Command != "" {
-		args = append(args, "--entrypoint", "/bin/sh", p.Image, "-c", p.Command)
-	} else {
-		args = append(args, p.Image)
-	}
+	args, pairs := startArgs(p, name, env)
 	oc.Info("starting %s (%s)", p.Process, name)
+	for _, m := range p.Mounts {
+		oc.Info("volume %s at %s", m.Volume, m.MountPath)
+	}
 	if code, err := oc.RunEnv(pairs, "docker", args...); err != nil {
 		return res, code, fmt.Errorf("could not start %s", p.Process)
 	}
@@ -433,6 +422,32 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 		}
 	}
 	return res, 0, nil
+}
+
+// startArgs is THE place a release container's `docker run` argv is built — web and workers alike,
+// for app.start and app.rollback (restart) both. p has passed Validate: the mounts are this app's
+// derived volume names and clean, allowed paths, so neither can smuggle a comma-separated option
+// into --mount. Docker creates a named volume that does not exist yet.
+func startArgs(p agentproto.StartParams, name string, env map[string]string) (args, pairs []string) {
+	args = []string{"run", "-d", "--name", name, "--restart", "unless-stopped",
+		"--label", "cloudy.app=" + p.AppID, "--label", "cloudy.process=" + p.Process, "--label", "cloudy.deployment=" + p.DeploymentID,
+		"--log-opt", "max-size=10m", "--log-opt", "max-file=3"}
+	pairs = envPairs(env)
+	if p.Process == "web" {
+		port := strconv.Itoa(p.Port)
+		args = append(args, "-p", "127.0.0.1::"+port, "-e", "PORT")
+		pairs = append(pairs, "PORT="+port)
+	}
+	for _, m := range p.Mounts {
+		args = append(args, "--mount", "type=volume,source="+m.Volume+",target="+m.MountPath)
+	}
+	args = append(args, envArgs(env)...)
+	if p.Command != "" {
+		args = append(args, "--entrypoint", "/bin/sh", p.Image, "-c", p.Command)
+	} else {
+		args = append(args, p.Image)
+	}
+	return args, pairs
 }
 
 // healthGate: GET the path until it answers 2xx, the container dies, or the time is up.

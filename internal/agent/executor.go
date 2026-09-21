@@ -106,6 +106,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	} {
 		e.handlers[kind] = h
 	}
+	st := newStorageHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindVolumeUsage: st.volumeUsage, agentproto.KindVolumeRemove: st.volumeRemove,
+		agentproto.KindBucketCreate: st.bucketCreate, agentproto.KindBucketRemove: st.bucketRemove,
+	} {
+		e.handlers[kind] = h
+	}
 	gh := newGHHost()
 	for kind, h := range map[string]Handler{
 		agentproto.KindGitHubInstall: gh.install, agentproto.KindGitHubLogin: gh.login, agentproto.KindGitHubStatus: gh.statusOp,
@@ -222,7 +229,8 @@ func (e *Executor) Work(ctx context.Context) {
 // laneOf: "" runs concurrently; anything else runs one at a time within its lane.
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
-	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts:
+	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
+		agentproto.KindVolumeUsage:
 		return "" // read-only: never queued behind a long action
 	case agentproto.KindAppExec:
 		// A cron job never waits behind a 45-minute build, nor holds one up. The control plane lets one
@@ -255,7 +263,7 @@ func laneOf(op agentproto.SignedOp) string {
 		// (same lane, so in order) install on a fresh server.
 		return "host"
 	case agentproto.KindAppBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
-		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove:
+		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove:
 		var p struct {
 			AppID string `json:"app_id"`
 		}
@@ -264,7 +272,7 @@ func laneOf(op agentproto.SignedOp) string {
 		}
 		return "app:?"
 	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBDrop, agentproto.KindDBBackup,
-		agentproto.KindDBRestore, agentproto.KindDBRemove:
+		agentproto.KindDBRestore, agentproto.KindDBRemove, agentproto.KindBucketCreate, agentproto.KindBucketRemove:
 		var p struct {
 			ServiceID string `json:"service_id"`
 		}

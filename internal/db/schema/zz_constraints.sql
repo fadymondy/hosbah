@@ -59,3 +59,10 @@ ALTER TABLE schedules ADD CONSTRAINT schedules_app_fk FOREIGN KEY (app_id, team_
 ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_schedule_fk FOREIGN KEY (schedule_id, team_id) REFERENCES schedules (id, team_id) ON DELETE CASCADE;
 ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
 ALTER TABLE schedule_runs ADD CONSTRAINT schedule_runs_operation_fk FOREIGN KEY (operation_id) REFERENCES operations (id) ON DELETE SET NULL;
+-- A site's storage: volumes and buckets go with their app. A MinIO data service that still has app
+-- buckets cannot be deleted (NO ACTION = restrict, checked at the end of the statement so deleting a
+-- whole team, which removes both sides at once, still works).
+ALTER TABLE app_volumes ADD CONSTRAINT app_volumes_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_service_fk FOREIGN KEY (service_id, team_id) REFERENCES data_services (id, team_id) ON DELETE NO ACTION;
+ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_sealed_check CHECK (secret_sealed LIKE 'csv1:%');

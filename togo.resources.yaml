@@ -177,6 +177,79 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppBucket
+      table: app_buckets
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: bucket
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: access_key
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: secret_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: env_prefix
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: AppVolume
+      table: app_volumes
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: mount_path
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: ApprovalRequest
       table: approval_requests
       fields:

@@ -1772,6 +1772,43 @@
         "likely": "Likely",
         "unknown": "Unknown"
       }
+    },
+    "storage": {
+      "volumes": "Volumes",
+      "volumesHint": "Folders that survive deploys, mounted into every release and worker.",
+      "noVolumes": "No volumes. Files a release writes are lost on the next deploy.",
+      "addVolume": "Add volume",
+      "mountPath": "Mount path",
+      "size": "Size",
+      "mounted": "Mounted",
+      "nextDeploy": "From the next deploy",
+      "appliesNext": "It applies from the next deploy or restart.",
+      "nameHint": "Lowercase letters, digits and dashes.",
+      "pathHint": "An absolute path inside the container, such as /app/storage. System folders are refused.",
+      "volumeMounted": "The live release still mounts this volume. Removing it takes effect on the next deploy; its data can only be deleted once it is no longer mounted.",
+      "volumeDataHint": "Removing the volume unmounts it. Deleting its data cannot be undone.",
+      "buckets": "S3 buckets",
+      "bucketsHint": "On a MinIO service on this server. Each bucket gets its own key, limited to that bucket, injected as sealed variables.",
+      "noMinio": "There is no MinIO service on this server yet. Create one first:",
+      "noBuckets": "No buckets yet.",
+      "addBucket": "Add bucket",
+      "bucket": "Bucket",
+      "service": "Service",
+      "variables": "Variables",
+      "prefix": "Variable prefix",
+      "bucketDialogHint": "The key is limited to this bucket. The variables apply from the next deploy or restart.",
+      "bucketRemoveHint": "The key is revoked and its variables are removed from the site. The bucket itself is kept unless you delete its data.",
+      "remove": "Remove",
+      "deleteData": "Also delete the data",
+      "force": "Delete even if it is not empty",
+      "typeName": "Type {name} to confirm",
+      "noBrowser": "There is no file browser yet: files are read and written by the site itself.",
+      "status": {
+        "creating": "Creating…",
+        "ready": "Ready",
+        "failed": "Failed",
+        "removing": "Removing…"
+      }
     }
   }
 }

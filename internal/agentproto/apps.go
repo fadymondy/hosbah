@@ -120,6 +120,9 @@ type StartParams struct {
 	Port         int         `json:"port,omitempty"`    // web: the port the app listens on inside (PORT is set to it)
 	Env          string      `json:"env,omitempty"`     // EnvBox, context EnvContext(app, deployment, process)
 	Health       *HealthSpec `json:"health,omitempty"`  // web only
+	// Mounts are the app's persistent volumes (derived names, validated paths), mounted into web and
+	// every worker alike. app.exec reaches them too: it execs into the web container.
+	Mounts []Mount `json:"mounts,omitempty"`
 }
 
 type StartResult struct {
@@ -283,5 +286,5 @@ func (p StartParams) Validate() error {
 	case p.Health != nil && (!strings.HasPrefix(p.Health.Path, "/") || p.Health.TimeoutSeconds < 1 || p.Health.TimeoutSeconds > 600):
 		return errors.New("bad health check")
 	}
-	return nil
+	return ValidateMounts(p.AppID, p.Mounts)
 }

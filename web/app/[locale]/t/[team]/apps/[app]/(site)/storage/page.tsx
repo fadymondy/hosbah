@@ -1,9 +1,7 @@
 "use client"
 
-import { HardDriveIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteStorage } from "@/components/site/storage"
 
 export default function Page() {
-  return <Planned section="storage" icon={HardDriveIcon} />
+  return <SiteStorage />
 }

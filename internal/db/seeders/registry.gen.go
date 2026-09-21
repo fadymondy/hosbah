@@ -18,6 +18,12 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedApp(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppBucket(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedAppVolume(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedApprovalRequest(ctx, a); err != nil {
 		return err
 	}

@@ -203,6 +203,9 @@ type runner struct {
 	live     *db.Release
 	hosts    []agentproto.Route
 	started  time.Time
+
+	mounts       []agentproto.Mount // the app's volumes, read once per deployment (mountsOnce)
+	mountsLoaded bool
 }
 
 // tx runs in the system scope AND the deployment's team (operations are inserted under the team
@@ -654,7 +657,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		return nil, fmt.Errorf("switch: %w", err)
 	}
 
-	containers, _ := json.Marshal(map[string]any{"web": web.Container, "workers": workers})
+	containers := releaseContainers(web.Container, workers, r.mounts)
 	config, _ := json.Marshal(eff)
 	var rel db.Release
 	if err := r.tx(ctx, func(q *db.Queries) error {
@@ -664,7 +667,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		var err error
 		rel, err = q.InsertRelease(ctx, db.InsertReleaseParams{ID: newUUID(), TeamID: r.dep.TeamID, AppID: r.app.ID, DeploymentID: r.dep.ID,
 			Image: image, CommitSha: nonEmpty(built.Commit), Port: int64(eff.Port), HostPort: ptr(int64(web.HostPort)),
-			Containers: ptr(string(containers)), Config: string(config)})
+			Containers: ptr(containers), Config: string(config)})
 		if err != nil {
 			return err
 		}
@@ -686,8 +689,12 @@ func (r *runner) startParams(ctx context.Context, image, process string, eff Eff
 	if err != nil {
 		return agentproto.StartParams{}, err
 	}
+	mounts, err := r.mountsOnce(ctx)
+	if err != nil {
+		return agentproto.StartParams{}, fmt.Errorf("volumes: %w", err)
+	}
 	p := agentproto.StartParams{AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, Image: image, Process: process,
-		Command: eff.Processes[process], Env: box}
+		Command: eff.Processes[process], Env: box, Mounts: mounts}
 	if process == "web" {
 		p.Port = eff.Port
 		p.Health = &agentproto.HealthSpec{Path: eff.HealthPath, TimeoutSeconds: eff.HealthTimeout}
@@ -762,15 +769,15 @@ func (r *runner) swap(ctx context.Context) (*db.Release, error) {
 	for _, w := range res.Workers {
 		workers = append(workers, w.Container)
 	}
-	containers, _ := json.Marshal(map[string]any{"web": res.Web.Container, "workers": workers})
+	containers := releaseContainers(res.Web.Container, workers, r.mounts)
 	if err := r.tx(ctx, func(q *db.Queries) error {
 		if r.dep.Kind == "restart" {
-			return q.SetReleaseContainers(ctx, db.SetReleaseContainersParams{HostPort: ptr(int64(res.Web.HostPort)), Containers: ptr(string(containers)), ID: target.ID})
+			return q.SetReleaseContainers(ctx, db.SetReleaseContainersParams{HostPort: ptr(int64(res.Web.HostPort)), Containers: ptr(containers), ID: target.ID})
 		}
 		if err := q.RetireLiveRelease(ctx, r.app.ID); err != nil {
 			return err
 		}
-		if err := q.ActivateRelease(ctx, db.ActivateReleaseParams{HostPort: ptr(int64(res.Web.HostPort)), Containers: ptr(string(containers)), ID: target.ID}); err != nil {
+		if err := q.ActivateRelease(ctx, db.ActivateReleaseParams{HostPort: ptr(int64(res.Web.HostPort)), Containers: ptr(containers), ID: target.ID}); err != nil {
 			return err
 		}
 		return q.SetAppState(ctx, db.SetAppStateParams{Status: "running", CurrentReleaseID: &target.ID, ID: r.app.ID})

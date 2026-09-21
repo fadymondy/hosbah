@@ -131,6 +131,9 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/schedules", map[string]any{"name": "nightly-a", "cron": "0 3 * * *",
 		"command": "echo a-env-cron", "enabled": false}, 201, &schedA)
 	runA := seedScheduleRun(t, teamA.ID, schedA.ID, appA.App.ID, "succeeded", "a-env-output")
+	// Storage of app A: a volume.
+	var volA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/storage/volumes", map[string]any{"name": "a-env-data", "mount_path": "/data"}, 201, &volA)
 
 	// Imported workloads of A's: a site and a database found running on that server (records only).
 	if _, err := importer.Sync(context.Background(), testDB(t), teamA.ID, srvA, []agentproto.Service{
@@ -210,6 +213,8 @@ func TestIsolationSweep(t *testing.T) {
 		"monitor":    func(string) []string { return []string{monA.ID, monA.Name} },
 		"schedule":   func(string) []string { return []string{schedA.ID, schedA.Name} },
 		"run":        func(string) []string { return []string{runA} },
+		"volume":     func(string) []string { return []string{volA.ID, volA.Name} },
+		"bucket":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
 		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
@@ -328,6 +333,10 @@ func TestIsolationSweep(t *testing.T) {
 		"get_app_queues": {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
 		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
+		"get_app_storage": {"app": appA.App.ID}, "create_app_volume": {"app": appA.App.ID, "name": "stolen", "mount_path": "/stolen"},
+		"remove_app_volume": {"app": appA.App.Name, "volume": volA.Name, "confirm": volA.Name, "delete_data": true},
+		"create_app_bucket": {"app": appA.App.ID, "service": "svc-x", "bucket": "stolen-bucket"},
+		"remove_app_bucket": {"app": appA.App.ID, "bucket": "a-env-bucket", "confirm": "a-env-bucket"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
