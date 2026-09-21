@@ -398,21 +398,22 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 			return fail(1, fmt.Errorf("%s exited right after starting", p.Process))
 		}
 		oc.Info("%s is running", p.Process)
+		if p.Realtime == nil {
+			return res, 0, nil
+		}
+		// The realtime worker: its port was published the way web's is; the deploy routes to it.
+		hostPort, err := publishedPort(oc, name, p.Realtime.Port)
+		if err != nil {
+			return fail(1, err)
+		}
+		res.HostPort = hostPort
+		oc.Info("%s (realtime, path %s) listens on 127.0.0.1:%d", name, p.Realtime.Path, hostPort)
 		return res, 0, nil
 	}
 
-	out, err := execOutput(oc, "docker", "port", name, strconv.Itoa(p.Port)+"/tcp")
+	hostPort, err := publishedPort(oc, name, p.Port)
 	if err != nil {
-		return fail(1, errors.New("the container did not publish its port"))
-	}
-	hostPort := 0
-	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
-		if i := strings.LastIndex(l, ":"); i >= 0 && strings.HasPrefix(l, "127.0.0.1") {
-			hostPort, _ = strconv.Atoi(strings.TrimSpace(l[i+1:]))
-		}
-	}
-	if hostPort == 0 {
-		return fail(1, fmt.Errorf("could not read the published port from %q", strings.TrimSpace(out)))
+		return fail(1, err)
 	}
 	res.HostPort = hostPort
 	oc.Info("%s listens on 127.0.0.1:%d", name, hostPort)
@@ -422,6 +423,31 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 		}
 	}
 	return res, 0, nil
+}
+
+// publishedPort reads which 127.0.0.1 port the kernel picked for a container port (publishArg) —
+// web's, and the realtime worker's.
+func publishedPort(oc *OpContext, name string, containerPort int) (int, error) {
+	out, err := execOutput(oc, "docker", "port", name, strconv.Itoa(containerPort)+"/tcp")
+	if err != nil {
+		return 0, errors.New("the container did not publish its port")
+	}
+	hostPort := 0
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+		if i := strings.LastIndex(l, ":"); i >= 0 && strings.HasPrefix(l, "127.0.0.1") {
+			hostPort, _ = strconv.Atoi(strings.TrimSpace(l[i+1:]))
+		}
+	}
+	if hostPort == 0 {
+		return 0, fmt.Errorf("could not read the published port from %q", strings.TrimSpace(out))
+	}
+	return hostPort, nil
+}
+
+// publishArg is the one way a release container publishes a port: on loopback only, at a host port
+// the kernel picks, so an old and a new release run side by side.
+func publishArg(containerPort int) []string {
+	return []string{"-p", "127.0.0.1::" + strconv.Itoa(containerPort)}
 }
 
 // startArgs is THE place a release container's `docker run` argv is built — web and workers alike,
@@ -434,9 +460,12 @@ func startArgs(p agentproto.StartParams, name string, env map[string]string) (ar
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3"}
 	pairs = envPairs(env)
 	if p.Process == "web" {
-		port := strconv.Itoa(p.Port)
-		args = append(args, "-p", "127.0.0.1::"+port, "-e", "PORT")
-		pairs = append(pairs, "PORT="+port)
+		args = append(append(args, publishArg(p.Port)...), "-e", "PORT")
+		pairs = append(pairs, "PORT="+strconv.Itoa(p.Port))
+	} else if p.Realtime != nil {
+		// The realtime worker only (Validate refuses it on web): an int, so nothing to smuggle. PORT is
+		// not set — a websocket server reads its own variable (REVERB_SERVER_PORT, …).
+		args = append(args, publishArg(p.Realtime.Port)...)
 	}
 	for _, m := range p.Mounts {
 		args = append(args, "--mount", "type=volume,source="+m.Volume+",target="+m.MountPath)
@@ -538,12 +567,17 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 	if p.Upstream != "" && !strings.HasPrefix(p.Upstream, "127.0.0.1:") {
 		return 2, errors.New("upstreams are local ports (127.0.0.1:<port>)")
 	}
+	if p.Realtime != nil {
+		if err := p.Realtime.Validate(); err != nil {
+			return 2, err
+		}
+	}
 	err := applyRoutes(oc, func(t *routeTable) {
 		if p.Upstream == "" {
 			delete(t.Apps, p.AppID)
 			return
 		}
-		t.Apps[p.AppID] = routeEntry{Hosts: p.Hosts, Upstream: p.Upstream}
+		t.Apps[p.AppID] = routeEntry{Hosts: p.Hosts, Upstream: p.Upstream, Realtime: p.Realtime}
 	})
 	if err != nil {
 		return 1, err
@@ -561,6 +595,9 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 		return 0, nil
 	}
 	oc.Info("Caddy now routes %s → %s", strings.Join(names, ", "), p.Upstream)
+	if p.Realtime != nil {
+		oc.Info("realtime: %s* of the same hostnames → %s", p.Realtime.Path, p.Realtime.Upstream)
+	}
 	if probePath == "" {
 		probePath = "/"
 	}
@@ -711,7 +748,10 @@ func appRollback(oc *OpContext) (any, int, error) {
 	if p.Web.Health != nil {
 		probePath = p.Web.Health.Path
 	}
-	if code, err := setRoute(oc, agentproto.RouteParams{AppID: p.AppID, Hosts: p.Hosts, Upstream: fmt.Sprintf("127.0.0.1:%d", web.HostPort)}, probePath); err != nil {
+	// Web switches first; the workers start after it. Until the new realtime worker is up, the
+	// realtime route the app has now (the old release's socket server, still running) is kept.
+	if code, err := setRoute(oc, agentproto.RouteParams{AppID: p.AppID, Hosts: p.Hosts, Upstream: fmt.Sprintf("127.0.0.1:%d", web.HostPort),
+		Realtime: currentRealtime(p.AppID)}, probePath); err != nil {
 		_ = exec.Command("docker", "rm", "-f", web.Container).Run() //#nosec G204 -- undo the start
 		return nil, code, err
 	}
@@ -728,6 +768,11 @@ func appRollback(oc *OpContext) (any, int, error) {
 		}
 		res.Workers = append(res.Workers, r)
 		keep[w.Process] = append(keep[w.Process], r.Container)
+	}
+	// The realtime route now points at the new worker — or goes, when this release has none —
+	// before the old workers stop.
+	if code, err := switchRealtime(oc, p.AppID, p.Workers, res.Workers); err != nil {
+		return res, code, fmt.Errorf("web is back on the kept release, but its realtime route could not be set: %w", err)
 	}
 	// Workers the rolled-back release does not have, or older copies of the ones it does, stop.
 	names, _ := appContainers(oc, p.AppID, "", true)

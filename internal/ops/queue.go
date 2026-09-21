@@ -43,7 +43,7 @@ func Timeout(kind string) time.Duration {
 		return 20 * time.Minute
 	case agentproto.KindAppStart, agentproto.KindAppRollback:
 		return 15 * time.Minute // a 600 s health gate plus an image start
-	case agentproto.KindRouteSet, agentproto.KindOpCancel, agentproto.KindProxySet:
+	case agentproto.KindRouteSet, agentproto.KindOpCancel, agentproto.KindProxySet, agentproto.KindRealtimeRoute:
 		return 2 * time.Minute
 	case agentproto.KindTunnelFrp, agentproto.KindTunnelTailscale:
 		return 5 * time.Minute

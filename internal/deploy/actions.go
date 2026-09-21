@@ -586,7 +586,14 @@ func (s *Service) SyncRoutes(ctx context.Context, q *db.Queries, teamID string, 
 	if err != nil {
 		return err
 	}
-	raw, _ := json.Marshal(agentproto.RouteParams{AppID: a.ID, Hosts: HostsOf(domains), Upstream: fmt.Sprintf("127.0.0.1:%d", *live.HostPort)})
+	// route.set is the app's whole route: the realtime path the live release serves rides along, or
+	// adding a domain would silently unroute the site's websockets.
+	cfg, err := realtimeConfig(ctx, q, a.ID, teamID)
+	if err != nil {
+		return err
+	}
+	raw, _ := json.Marshal(agentproto.RouteParams{AppID: a.ID, Hosts: HostsOf(domains), Upstream: fmt.Sprintf("127.0.0.1:%d", *live.HostPort),
+		Realtime: RealtimeRouteOf(cfg, &live)})
 	_, _, err = s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindRouteSet, Params: raw, CreatedBy: "cloudy"})
 	return err
 }

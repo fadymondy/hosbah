@@ -66,3 +66,5 @@ ALTER TABLE app_volumes ADD CONSTRAINT app_volumes_app_fk FOREIGN KEY (app_id, t
 ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
 ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_service_fk FOREIGN KEY (service_id, team_id) REFERENCES data_services (id, team_id) ON DELETE NO ACTION;
 ALTER TABLE app_buckets ADD CONSTRAINT app_buckets_sealed_check CHECK (secret_sealed LIKE 'csv1:%');
+-- A site's realtime configuration goes with its app.
+ALTER TABLE app_realtime ADD CONSTRAINT app_realtime_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;

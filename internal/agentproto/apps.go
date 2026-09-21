@@ -123,11 +123,16 @@ type StartParams struct {
 	// Mounts are the app's persistent volumes (derived names, validated paths), mounted into web and
 	// every worker alike. app.exec reaches them too: it execs into the web container.
 	Mounts []Mount `json:"mounts,omitempty"`
+	// Realtime, on one worker only: publish this container port on an ephemeral 127.0.0.1 port, the
+	// way web's is, so Caddy can send the site's websocket path to it (realtime.go).
+	Realtime *RealtimePublish `json:"realtime,omitempty"`
 }
 
 type StartResult struct {
 	Container string `json:"container"`
-	HostPort  int    `json:"host_port,omitempty"` // web: 127.0.0.1:<host_port> is the upstream Caddy points at
+	// HostPort: 127.0.0.1:<host_port> is the upstream Caddy points at — web's, or the realtime
+	// worker's. Other workers publish nothing and report 0.
+	HostPort int `json:"host_port,omitempty"`
 }
 
 // Route is one hostname of an app and its TLS mode (auto | internal | off).
@@ -136,11 +141,13 @@ type Route struct {
 	TLS      string `json:"tls"`
 }
 
-// RouteParams: route.set. An empty Upstream removes the app's route.
+// RouteParams: route.set. An empty Upstream removes the app's route. The params describe the app's
+// whole route: without Realtime, a realtime route the app had is removed.
 type RouteParams struct {
-	AppID    string  `json:"app_id"`
-	Hosts    []Route `json:"hosts"`
-	Upstream string  `json:"upstream,omitempty"` // 127.0.0.1:<port>
+	AppID    string         `json:"app_id"`
+	Hosts    []Route        `json:"hosts"`
+	Upstream string         `json:"upstream,omitempty"` // 127.0.0.1:<port>
+	Realtime *RealtimeRoute `json:"realtime,omitempty"`
 }
 
 // DrainParams: app.drain — every container labelled with the app (optionally one process) except
@@ -285,6 +292,16 @@ func (p StartParams) Validate() error {
 		return errors.New("web needs a port")
 	case p.Health != nil && (!strings.HasPrefix(p.Health.Path, "/") || p.Health.TimeoutSeconds < 1 || p.Health.TimeoutSeconds > 600):
 		return errors.New("bad health check")
+	case p.Realtime != nil && p.Process == "web":
+		return errors.New("web is already published — realtime is a worker process")
+	}
+	if p.Realtime != nil {
+		if !ValidRealtimeProcess(strings.TrimPrefix(p.Process, "worker:")) {
+			return fmt.Errorf("bad realtime process %q", p.Process)
+		}
+		if err := p.Realtime.Validate(); err != nil {
+			return err
+		}
 	}
 	return ValidateMounts(p.AppID, p.Mounts)
 }

@@ -21,6 +21,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAppBucket(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppRealtime(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedAppVolume(ctx, a); err != nil {
 		return err
 	}

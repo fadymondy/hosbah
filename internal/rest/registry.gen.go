@@ -14,6 +14,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterAgentEnrollmentRoutes(api, a)
 	RegisterAppRoutes(api, a)
 	RegisterAppBucketRoutes(api, a)
+	RegisterAppRealtimeRoutes(api, a)
 	RegisterAppVolumeRoutes(api, a)
 	RegisterApprovalRequestRoutes(api, a)
 	RegisterBackupRoutes(api, a)

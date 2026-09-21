@@ -226,6 +226,45 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppRealtime
+      table: app_realtime
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: process
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: path
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: AppVolume
       table: app_volumes
       fields:

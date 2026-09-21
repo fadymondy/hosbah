@@ -40,6 +40,39 @@ const routesPath = "/var/lib/cloudy/routes.json"
 type routeEntry struct {
 	Hosts    []agentproto.Route `json:"hosts"`
 	Upstream string             `json:"upstream"`
+	// Realtime: the app's websocket server (a worker with a published port). Requests of the app's
+	// hostnames whose path starts with Realtime.Path go there instead of Upstream.
+	Realtime *agentproto.RealtimeRoute `json:"realtime,omitempty"`
+}
+
+// realtimeStreamCloseDelay keeps upgraded (websocket) connections of a realtime route open across
+// a config load. Without it Caddy closes every stream of the old config the moment a new one is
+// loaded — and this agent loads a whole config for every route change of any app on the server.
+// With it a socket lives until its own upstream goes away: when its release's container drains.
+const realtimeStreamCloseDelay = "24h"
+
+// realtimeCaddyRoute is the route that sends Path* of hosts to the realtime worker. It is placed
+// BEFORE the app's catch-all route of the same hosts (both are terminal; the first match wins).
+// Websocket needs: nothing buffered (Caddy buffers neither requests nor responses unless
+// request_buffers/response_buffers are set — they are not), flushed at once (flush_interval -1),
+// the Upgrade/Connection headers left to reverse_proxy's own handling, and streams that survive
+// config loads (stream_close_delay).
+func realtimeCaddyRoute(id, suffix string, hosts []string, rt agentproto.RealtimeRoute) map[string]any {
+	pattern := rt.Path + "*"
+	if rt.Path == "/" {
+		pattern = "/*"
+	}
+	return map[string]any{
+		"@id":      agentproto.RealtimeRouteID(id) + suffix,
+		"match":    []any{map[string]any{"host": hosts, "path": []string{pattern}}},
+		"terminal": true,
+		"handle": []any{map[string]any{
+			"handler":            "reverse_proxy",
+			"upstreams":          []any{map[string]any{"dial": rt.Upstream}},
+			"flush_interval":     -1,
+			"stream_close_delay": realtimeStreamCloseDelay,
+		}},
+	}
 }
 
 type routeTable struct {
@@ -143,10 +176,21 @@ func renderCaddy(t routeTable) map[string]any {
 				autoHosts = append(autoHosts, h.Hostname)
 			}
 		}
+		// A realtime route that does not validate is never rendered (the table is a file on disk).
+		rt := e.Realtime
+		if rt != nil && rt.Validate() != nil {
+			rt = nil
+		}
 		if len(plain) > 0 {
+			if rt != nil {
+				httpRoutes = append(httpRoutes, realtimeCaddyRoute(id, "-http", plain, *rt))
+			}
 			httpRoutes = append(httpRoutes, route(id, "-http", plain, e.Upstream))
 		}
 		if len(secure) > 0 {
+			if rt != nil {
+				httpsRoutes = append(httpsRoutes, realtimeCaddyRoute(id, "-https", secure, *rt))
+			}
 			httpsRoutes = append(httpsRoutes, route(id, "-https", secure, e.Upstream))
 		}
 	}

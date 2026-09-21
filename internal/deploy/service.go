@@ -206,6 +206,9 @@ type runner struct {
 
 	mounts       []agentproto.Mount // the app's volumes, read once per deployment (mountsOnce)
 	mountsLoaded bool
+
+	realtime       *db.AppRealtime // set when this release has a realtime worker (realtimeOnce)
+	realtimeLoaded bool
 }
 
 // tx runs in the system scope AND the deployment's team (operations are inserted under the team
@@ -625,6 +628,8 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 	created = append(created, web.Container)
 	var workers []string
+	var rtRecord *ReleaseRealtime
+	var rtRoute *agentproto.RealtimeRoute
 	for _, w := range eff.Workers() {
 		wp, err := r.startParams(ctx, image, w, eff)
 		if err != nil {
@@ -638,6 +643,9 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		}
 		created = append(created, res.Container)
 		workers = append(workers, res.Container)
+		if wp.Realtime != nil {
+			rtRecord, rtRoute = r.realtimeStarted(res)
+		}
 	}
 	if r.cancelRequested(ctx) {
 		cleanup()
@@ -647,17 +655,18 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	r.step(ctx, "switch")
 	r.refreshHosts(ctx)
 	upstream := fmt.Sprintf("127.0.0.1:%d", web.HostPort)
-	if err := r.op(ctx, "switch", agentproto.KindRouteSet, agentproto.RouteParams{AppID: r.app.ID, Hosts: r.hosts, Upstream: upstream}, nil); err != nil {
+	// One route.set moves web AND the realtime path: until it, the old release's socket server serves.
+	if err := r.op(ctx, "switch", agentproto.KindRouteSet, agentproto.RouteParams{AppID: r.app.ID, Hosts: r.hosts, Upstream: upstream, Realtime: rtRoute}, nil); err != nil {
 		if r.live != nil && r.live.HostPort != nil {
 			r.logf("error", "switch failed — pointing the route back at release v%d", r.live.Version)
 			_ = r.op(context.Background(), "revert", agentproto.KindRouteSet, agentproto.RouteParams{AppID: r.app.ID, Hosts: r.hosts,
-				Upstream: fmt.Sprintf("127.0.0.1:%d", *r.live.HostPort)}, nil)
+				Upstream: fmt.Sprintf("127.0.0.1:%d", *r.live.HostPort), Realtime: r.liveRealtimeRoute(context.Background())}, nil)
 		}
 		cleanup()
 		return nil, fmt.Errorf("switch: %w", err)
 	}
 
-	containers := releaseContainers(web.Container, workers, r.mounts)
+	containers := releaseContainers(web.Container, workers, r.mounts, rtRecord)
 	config, _ := json.Marshal(eff)
 	var rel db.Release
 	if err := r.tx(ctx, func(q *db.Queries) error {
@@ -695,6 +704,13 @@ func (r *runner) startParams(ctx context.Context, image, process string, eff Eff
 	}
 	p := agentproto.StartParams{AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, Image: image, Process: process,
 		Command: eff.Processes[process], Env: box, Mounts: mounts}
+	rt, err := r.realtimeOnce(ctx, eff)
+	if err != nil {
+		return agentproto.StartParams{}, fmt.Errorf("realtime: %w", err)
+	}
+	if rt != nil && process == agentproto.RealtimeWorker(rt.Process) {
+		p.Realtime = RealtimePublishOf(*rt) // this worker only: every other one publishes nothing
+	}
 	if process == "web" {
 		p.Port = eff.Port
 		p.Health = &agentproto.HealthSpec{Path: eff.HealthPath, TimeoutSeconds: eff.HealthTimeout}
@@ -766,10 +782,14 @@ func (r *runner) swap(ctx context.Context) (*db.Release, error) {
 		return nil, fmt.Errorf("%s: %w", r.dep.Kind, err)
 	}
 	var workers []string
-	for _, w := range res.Workers {
+	var rtRecord *ReleaseRealtime
+	for i, w := range res.Workers {
 		workers = append(workers, w.Container)
+		if i < len(params.Workers) && params.Workers[i].Realtime != nil {
+			rtRecord, _ = r.realtimeStarted(w) // app.rollback routed it itself, after the workers started
+		}
 	}
-	containers := releaseContainers(res.Web.Container, workers, r.mounts)
+	containers := releaseContainers(res.Web.Container, workers, r.mounts, rtRecord)
 	if err := r.tx(ctx, func(q *db.Queries) error {
 		if r.dep.Kind == "restart" {
 			return q.SetReleaseContainers(ctx, db.SetReleaseContainersParams{HostPort: ptr(int64(res.Web.HostPort)), Containers: ptr(containers), ID: target.ID})

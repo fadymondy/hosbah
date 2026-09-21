@@ -134,6 +134,8 @@ func TestIsolationSweep(t *testing.T) {
 	// Storage of app A: a volume.
 	var volA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/storage/volumes", map[string]any{"name": "a-env-data", "mount_path": "/data"}, 201, &volA)
+	// Realtime of app A: a configuration (nothing is live, so any worker name is accepted).
+	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/realtime", map[string]any{"kind": "ws", "process": "a-env-sockets", "port": 6001, "path": "/a-env-ws"}, 200, nil)
 
 	// Imported workloads of A's: a site and a database found running on that server (records only).
 	if _, err := importer.Sync(context.Background(), testDB(t), teamA.ID, srvA, []agentproto.Service{
@@ -337,6 +339,8 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_app_volume": {"app": appA.App.Name, "volume": volA.Name, "confirm": volA.Name, "delete_data": true},
 		"create_app_bucket": {"app": appA.App.ID, "service": "svc-x", "bucket": "stolen-bucket"},
 		"remove_app_bucket": {"app": appA.App.ID, "bucket": "a-env-bucket", "confirm": "a-env-bucket"},
+		"get_app_realtime": {"app": appA.App.ID}, "remove_app_realtime": {"app": appA.App.Name},
+		"set_app_realtime": {"app": appA.App.ID, "kind": "ws", "process": "stolen", "port": 6001, "path": "/stolen"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

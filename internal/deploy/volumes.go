@@ -41,11 +41,16 @@ func (r *runner) mountsOnce(ctx context.Context) ([]agentproto.Mount, error) {
 
 // releaseContainers is releases.containers: the containers of the release as they run now, and the
 // volumes they were started with ("volumes" is how storage knows whether a volume is mounted).
-func releaseContainers(web string, workers []string, mounts []agentproto.Mount) string {
+// "realtime" is the realtime worker and the port it publishes (realtime.go), when there is one.
+func releaseContainers(web string, workers []string, mounts []agentproto.Mount, realtime *ReleaseRealtime) string {
 	if mounts == nil {
 		mounts = []agentproto.Mount{}
 	}
-	raw, _ := json.Marshal(map[string]any{"web": web, "workers": workers, "volumes": mounts})
+	c := map[string]any{"web": web, "workers": workers, "volumes": mounts}
+	if realtime != nil {
+		c["realtime"] = realtime
+	}
+	raw, _ := json.Marshal(c)
 	return string(raw)
 }
 

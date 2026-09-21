@@ -83,6 +83,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppStart:        appStart,
 		agentproto.KindRouteSet:        routeSet,
 		agentproto.KindProxySet:        proxySet,
+		agentproto.KindRealtimeRoute:   realtimeRoute,
 		agentproto.KindAppDrain:        appDrain,
 		agentproto.KindAppRollback:     appRollback,
 		agentproto.KindAppLogs:         appLogs,
@@ -263,7 +264,8 @@ func laneOf(op agentproto.SignedOp) string {
 		// (same lane, so in order) install on a fresh server.
 		return "host"
 	case agentproto.KindAppBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
-		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove:
+		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove,
+		agentproto.KindRealtimeRoute:
 		var p struct {
 			AppID string `json:"app_id"`
 		}

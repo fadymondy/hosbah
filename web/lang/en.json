@@ -1809,6 +1809,35 @@
         "failed": "Failed",
         "removing": "Removing…"
       }
+    },
+    "realtime": {
+      "routed": "Routed",
+      "notRouted": "Not routed yet",
+      "running": "Process running",
+      "notRunning": "Process not running",
+      "suggested": "This looks like {kind}; the form is filled in from:",
+      "endpoints": "Connect to",
+      "processHint": "A worker process from cloudy.toml, without the worker: prefix. It cannot be web.",
+      "portHint": "The port the process listens on inside its container.",
+      "path": "Path",
+      "pathHint": "Requests under this path on the site's hostnames go to the socket server.",
+      "enabledHint": "Route websocket traffic to this process",
+      "appliedNow": "Applied",
+      "appliesNext": "Saved. It takes effect on the next deploy or restart.",
+      "removeTitle": "Remove the realtime route?",
+      "removeBody": "Websocket traffic stops reaching the process at once. The process itself keeps running until the next deploy.",
+      "notes": "Good to know",
+      "noteListen": "The process must listen on 0.0.0.0 (not 127.0.0.1) inside its container, and PORT is not set for it: give it the port in its command or environment.",
+      "noteDeploy": "During a deploy the old socket server keeps serving until the switch; open connections drop when the old release drains, so clients should reconnect.",
+      "noteKeys": "Keys, secrets and allowed origins (REVERB_APP_KEY and the like) are the site's own variables. Set them in",
+      "noteConnections": "Live connection counts are not shown: none of these servers exposes a dependable local count.",
+      "kinds": {
+        "reverb": "Laravel Reverb",
+        "socketio": "Socket.IO (Node)",
+        "ws": "ws (Node)",
+        "go": "Go websocket server",
+        "custom": "Custom"
+      }
     }
   }
 }

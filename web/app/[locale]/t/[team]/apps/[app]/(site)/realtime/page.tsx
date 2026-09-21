@@ -1,9 +1,7 @@
 "use client"
 
-import { RadioIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteRealtime } from "@/components/site/realtime"
 
 export default function Page() {
-  return <Planned section="realtime" icon={RadioIcon} />
+  return <SiteRealtime />
 }
