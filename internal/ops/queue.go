@@ -74,6 +74,8 @@ func Timeout(kind string) time.Duration {
 		return 2 * time.Minute
 	case agentproto.KindGitHubRepos:
 		return 3 * time.Minute
+	case agentproto.KindCaddyCerts:
+		return time.Minute
 	}
 	return 10 * time.Minute
 }

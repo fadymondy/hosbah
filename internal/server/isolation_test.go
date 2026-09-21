@@ -28,6 +28,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/config"
+	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/migrate"
 	"github.com/fadymondy/hosbah/internal/ops"
@@ -194,6 +195,7 @@ func TestIsolationSweep(t *testing.T) {
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
+		"hostname":   func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
@@ -299,6 +301,8 @@ func TestIsolationSweep(t *testing.T) {
 		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
 		"get_app_repository": {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
 		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
+		"get_app_dns": {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},
+		"set_app_dns_record": {"app": appA.App.ID, "hostname": domA.Hostname, "takeover": true},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -525,12 +529,17 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 	ts := httptest.NewServer(a.Kernel.Handler())
 	a.Ops.(*ops.Service).SetPublicURL(ts.URL)
 	lastService = a.Ops.(*ops.Service)
+	lastDeploy, _ = a.Deploy.(*deploy.Service)
 	return ts, func() { a.Stop(); ts.Close(); a.Kernel.Close() }
 }
 
 // lastService is the ops service of the most recent bootTestServer (tests in this package run
 // sequentially).
 var lastService *ops.Service
+
+// lastDeploy is the deploy service of the most recent bootTestServer (a test points its Cloudflare
+// clients at a fake).
+var lastDeploy *deploy.Service
 
 func svcOf(t *testing.T) *ops.Service {
 	t.Helper()

@@ -1,9 +1,7 @@
 "use client"
 
-import { CloudIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteDNS } from "@/components/site/dns"
 
 export default function Page() {
-  return <Planned section="dns" icon={CloudIcon} />
+  return <SiteDNS />
 }

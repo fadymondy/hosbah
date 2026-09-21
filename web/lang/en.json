@@ -1613,6 +1613,44 @@
       "truncated": "The list is cut short; open the compare on GitHub for the rest.",
       "pulls": "Open pull requests",
       "draft": "Draft"
+    },
+    "dns": {
+      "records": "DNS records",
+      "recordsHint": "Each hostname should point at this site's server ({address}).",
+      "recordsHintPrivate": "This server has only a private address, so no public record applies.",
+      "none": "This site has no hostnames yet. Add one in the proxy manager.",
+      "record": "Record",
+      "proxied": "Cloudflare proxy",
+      "proxiedOn": "Proxied",
+      "proxiedOff": "DNS only",
+      "noZone": "No Cloudflare credential of this team holds this zone",
+      "notOurs": "Not created by Hosbah",
+      "create": "Create record",
+      "repair": "Repair",
+      "takeover": "Replace record",
+      "takeoverTitle": "Replace the record for {host}?",
+      "takeoverBody": "Hosbah did not create this record. It is {old} and will become {next}.",
+      "proxy": "Proxy it",
+      "dnsOnly": "DNS only",
+      "deleteTitle": "Delete the record for {host}?",
+      "deleteBody": "The hostname stops resolving until a record exists again.",
+      "saved": "DNS record updated",
+      "certs": "Certificates",
+      "certsHint": "What Caddy serves for each hostname; public certificates renew on their own.",
+      "certsOffline": "The server is offline or did not answer, so certificates could not be read.",
+      "issuer": "Issuer",
+      "expires": "Expires",
+      "daysLeft": "{n} days left",
+      "public": "Public",
+      "internal": "Internal",
+      "noCert": "No certificate yet",
+      "status": {
+        "ok": "Correct",
+        "missing": "Missing",
+        "mismatch": "Points elsewhere",
+        "unmanaged": "Not managed here",
+        "private": "Private server"
+      }
     }
   }
 }

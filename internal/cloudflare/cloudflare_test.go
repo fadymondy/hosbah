@@ -80,6 +80,26 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 			rec.ID = parts[3]
 			f.records[rec.ID] = rec
 			write(w, 200, rec)
+		case r.Method == http.MethodPatch:
+			rec, ok := f.records[parts[3]]
+			if !ok {
+				w.WriteHeader(404)
+				fmt.Fprint(w, `{"success":false,"errors":[{"code":81044,"message":"Record does not exist."}]}`)
+				return
+			}
+			var p RecordPatch
+			_ = json.NewDecoder(r.Body).Decode(&p)
+			if p.Content != nil {
+				rec.Content = *p.Content
+			}
+			if p.Proxied != nil {
+				rec.Proxied = p.Proxied
+			}
+			if p.Comment != nil {
+				rec.Comment = *p.Comment
+			}
+			f.records[rec.ID] = rec
+			write(w, 200, rec)
 		case r.Method == http.MethodDelete:
 			delete(f.records, parts[3])
 			write(w, 200, map[string]string{"id": parts[3]})
@@ -156,5 +176,32 @@ func TestUpsertCollapsesDuplicates(t *testing.T) {
 		if r.Content != "new" {
 			t.Fatalf("content = %q", r.Content)
 		}
+	}
+}
+
+func TestCreatePatchDeleteOneRecord(t *testing.T) {
+	f, c := newFake("example.com")
+	ctx := context.Background()
+	f.records["own"], f.zoneOf["own"] = Record{ID: "own", Type: "A", Name: "app.example.com", Content: "198.51.100.1", Comment: "the user's"}, "z0"
+
+	rec, err := c.CreateRecord(ctx, "z0", Record{Type: "A", Name: "new.example.com", Content: "203.0.113.10", Comment: "ignored"})
+	if err != nil || rec.ID == "" || !Managed(rec) || rec.TTL != 1 {
+		t.Fatalf("created %+v err = %v", rec, err)
+	}
+	if !Managed(Record{Comment: "managed by Cloudy"}) || Managed(f.records["own"]) {
+		t.Fatal("the legacy marker is ours; a user's comment is not")
+	}
+
+	// A partial update leaves what it does not name alone.
+	on := true
+	got, err := c.PatchRecord(ctx, "z0", "own", RecordPatch{Proxied: &on})
+	if err != nil || got.Content != "198.51.100.1" || got.Comment != "the user's" || got.Proxied == nil || !*got.Proxied {
+		t.Fatalf("patched %+v err = %v", got, err)
+	}
+	if _, err := c.PatchRecord(ctx, "z0", "nope", RecordPatch{Proxied: &on}); err == nil {
+		t.Fatal("patching a record that does not exist must fail")
+	}
+	if err := c.DeleteRecord(ctx, "z0", rec.ID); err != nil || len(f.records) != 1 {
+		t.Fatalf("after delete: %v %v", f.records, err)
 	}
 }

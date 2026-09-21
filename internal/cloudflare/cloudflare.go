@@ -265,6 +265,40 @@ const legacyManagedComment = "managed by Cloudy"
 
 func managed(comment string) bool { return comment == ManagedComment || comment == legacyManagedComment }
 
+// Managed reports whether Hosbah created r (its comment carries the marker, old or new).
+func Managed(r Record) bool { return managed(r.Comment) }
+
+// CreateRecord adds one record, marked as Hosbah's.
+func (c *Client) CreateRecord(ctx context.Context, zoneID string, r Record) (Record, error) {
+	if r.TTL == 0 {
+		r.TTL = 1
+	}
+	r.ID, r.Comment = "", ManagedComment
+	var out Record
+	_, err := c.do(ctx, http.MethodPost, "/zones/"+url.PathEscape(zoneID)+"/dns_records", nil, r, &out)
+	return out, err
+}
+
+// RecordPatch is a partial update: nil fields are left as they are.
+type RecordPatch struct {
+	Content *string `json:"content,omitempty"`
+	Proxied *bool   `json:"proxied,omitempty"`
+	Comment *string `json:"comment,omitempty"`
+}
+
+// PatchRecord updates only the given fields of one record.
+func (c *Client) PatchRecord(ctx context.Context, zoneID, recordID string, p RecordPatch) (Record, error) {
+	var out Record
+	_, err := c.do(ctx, http.MethodPatch, "/zones/"+url.PathEscape(zoneID)+"/dns_records/"+url.PathEscape(recordID), nil, p, &out)
+	return out, err
+}
+
+// DeleteRecord removes one record by id. The caller decides whether it may (see Managed).
+func (c *Client) DeleteRecord(ctx context.Context, zoneID, recordID string) error {
+	_, err := c.do(ctx, http.MethodDelete, "/zones/"+url.PathEscape(zoneID)+"/dns_records/"+url.PathEscape(recordID), nil, nil, nil)
+	return err
+}
+
 // DeleteManaged removes the records at name that Hosbah created, leaving the user's own alone.
 func (c *Client) DeleteManaged(ctx context.Context, zoneID, name string) error {
 	rs, err := c.Records(ctx, zoneID, name, "")

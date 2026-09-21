@@ -95,6 +95,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindDBBackup:        dbBackup,
 		agentproto.KindDBRestore:       dbRestore,
 		agentproto.KindDBRemove:        dbRemove,
+		agentproto.KindCaddyCerts:      caddyCerts,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -220,7 +221,7 @@ func (e *Executor) Work(ctx context.Context) {
 // laneOf: "" runs concurrently; anything else runs one at a time within its lane.
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
-	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe:
+	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts:
 		return "" // read-only: never queued behind a long action
 	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches,
 		agentproto.KindGitHubCommits, agentproto.KindGitHubCompare, agentproto.KindGitHubPulls:

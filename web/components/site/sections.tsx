@@ -47,7 +47,7 @@ export const SITE_SECTIONS: SiteSection[] = [
   { key: "logs", icon: ScrollTextIcon, group: "observe", for: "both", ready: true },
   { key: "monitors", icon: BellRingIcon, group: "observe", for: "both", ready: false },
   { key: "proxy", icon: NetworkIcon, group: "network", for: "both", ready: true },
-  { key: "dns", icon: CloudIcon, group: "network", for: "both", ready: false },
+  { key: "dns", icon: CloudIcon, group: "network", for: "both", ready: true },
   { key: "backups", icon: ArchiveIcon, group: "manage", for: "both", ready: true },
   { key: "settings", icon: ActivityIcon, group: "manage", for: "both", ready: true },
 ]
