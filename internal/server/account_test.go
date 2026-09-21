@@ -525,7 +525,8 @@ func TestCodeAttemptsExpiryAndRateLimits(t *testing.T) {
 	}
 	c.expectCode("POST", "/api/auth/code/verify", map[string]any{"email": email, "code": code}, 422, "invalid_code")
 
-	// An expired code is refused. (The resend window is a minute, so force a new code by clearing
+	// An expired code is refused: back-dated by an hour, not a second, because the app checks expiry
+	// with its own clock and the database's can run ahead of it. (The resend window is a minute, so force a new code by clearing
 	// the old row's sent_at.)
 	if _, err := sqlDB.Exec(`DELETE FROM account_codes WHERE email = $1`, email); err != nil {
 		t.Fatal(err)
@@ -533,7 +534,7 @@ func TestCodeAttemptsExpiryAndRateLimits(t *testing.T) {
 	before = mailbox.count(email)
 	c.expect("POST", "/api/auth/code/request", map[string]any{"email": email}, 200)
 	code = mailbox.wait(t, email, before)
-	if _, err := sqlDB.Exec(`UPDATE account_codes SET expires_at = now() - interval '1 second' WHERE email = $1`, email); err != nil {
+	if _, err := sqlDB.Exec(`UPDATE account_codes SET expires_at = now() - interval '1 hour' WHERE email = $1`, email); err != nil {
 		t.Fatal(err)
 	}
 	c.expectCode("POST", "/api/auth/code/verify", map[string]any{"email": email, "code": code}, 422, "invalid_code")
