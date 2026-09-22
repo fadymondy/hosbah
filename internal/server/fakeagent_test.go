@@ -19,7 +19,7 @@ import (
 /*
 fakeAgent speaks the real agent protocol over the real /agent/ws: it answers the challenge with the
 key the server enrolled with, VERIFIES every operation it is sent against the control plane's pinned
-key (agentproto.VerifyOp — the exact gate cloudy-agent applies), records it, and answers with a
+key (agentproto.VerifyOp — the exact gate hosbah-agent applies), records it, and answers with a
 scripted result. Nothing on the host runs: it is the control plane that is under test.
 */
 type fakeAgent struct {

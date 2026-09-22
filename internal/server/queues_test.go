@@ -169,7 +169,7 @@ func TestAppQueues(t *testing.T) {
 			return nil, "this fake agent does not run " + op.Kind
 		}
 		a := answerOf(op)
-		res := agentproto.ExecResult{Container: "cloudy-queue-web-1", ExitCode: a.exit}
+		res := agentproto.ExecResult{Container: "hosbah-queue-web-1", ExitCode: a.exit}
 		if a.exit != 0 {
 			return res, fmt.Sprintf("the command exited with status %d", a.exit)
 		}

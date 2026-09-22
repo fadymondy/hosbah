@@ -115,7 +115,7 @@ func (d *deps) registerInstalls(api huma.API) {
 	type recipeOut struct{ Body RecipeOut }
 	huma.Register(api, huma.Operation{OperationID: "get-recipe", Method: http.MethodGet, Path: "/api/teams/{team}/catalog/{recipe}", Tags: tags,
 		Summary: "One recipe, whole: what it runs (image, port, limits, capabilities, volumes), the variables it takes and sets, and for a " +
-			"stack the repository, branch and cloudy.toml it suggests. 404: no such recipe. Any member.",
+			"stack the repository, branch and hosbah.toml it suggests. 404: no such recipe. Any member.",
 	}, func(ctx context.Context, in *RecipePath) (*recipeOut, error) {
 		out := &recipeOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(*db.Queries, *sql.Tx, *auth.Identity, *tenancy.Membership) error {

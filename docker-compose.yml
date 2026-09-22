@@ -1,11 +1,12 @@
 # Hosbah's own local Postgres. Host port 55491 (5432 and the 55432-55450 range are taken on the
 # dev machine). The app never connects as `postgres`: db/docker/init.sql creates the
-# non-superuser role cloudy_app, which owns the databases — row-level security does not bind a
+# non-superuser role cloudy_app, which owns the databases (the role, the databases and the volume
+# keep their names from before the rename: they are existing data) — row-level security does not bind a
 # superuser, so connecting as one would make the tenancy backstop decorative.
 services:
   postgres:
     image: postgres:16
-    container_name: cloudy-postgres
+    container_name: hosbah-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: cloudy_pg_admin
@@ -14,7 +15,7 @@ services:
       - "55491:5432"
     volumes:
       - cloudy_pgdata:/var/lib/postgresql/data
-      - ./db/docker/init.sql:/docker-entrypoint-initdb.d/10-cloudy.sql:ro
+      - ./db/docker/init.sql:/docker-entrypoint-initdb.d/10-hosbah.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

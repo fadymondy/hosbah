@@ -24,7 +24,7 @@ import (
 
 // execIDEnv marks every process of one app.exec inside the container, so a timeout can find them:
 // killing the `docker exec` client leaves what it started running.
-const execIDEnv = "CLOUDY_EXEC_ID"
+const execIDEnv = "HOSBAH_EXEC_ID"
 
 // execKillScript (a constant; the op id arrives as $1) kills every process carrying the mark.
 const execKillScript = `for p in /proc/[0-9]*; do if tr '\0' '\n' < "$p/environ" 2>/dev/null | grep -qx "` + execIDEnv + `=$1"; then kill -9 "${p#/proc/}" 2>/dev/null; fi; done; exit 0`
@@ -87,15 +87,24 @@ func streamLines(ctx context.Context, onLine func(stream, line string), name str
 
 // liveWebContainer is the running web container of the release a deployment made live.
 func (h *execHost) liveWebContainer(ctx context.Context, appID, deploymentID string) (string, error) {
-	out, err := h.run(ctx, nil, "docker", "ps", "--filter", "label=cloudy.app="+appID, "--filter", "label=cloudy.process=web",
-		"--filter", "label=cloudy.deployment="+deploymentID, "--format", "{{.Names}}")
-	if err != nil {
-		return "", errors.New("could not list the app's containers")
-	}
-	for _, l := range strings.Split(string(out), "\n") {
-		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "-") {
-			return l, nil
+	// hosbah.* labels; cloudy.* when an agent from before the rename started the release. The first
+	// generation that has it answers.
+	listed := false
+	for _, l := range labelSets {
+		out, err := h.run(ctx, nil, "docker", "ps", "--filter", "label="+l(agentproto.LabelApp)+"="+appID, "--filter", "label="+l(agentproto.LabelProcess)+"=web",
+			"--filter", "label="+l(agentproto.LabelDeployment)+"="+deploymentID, "--format", "{{.Names}}")
+		if err != nil {
+			continue
 		}
+		listed = true
+		for _, name := range strings.Split(string(out), "\n") {
+			if name = strings.TrimSpace(name); name != "" && !strings.HasPrefix(name, "-") {
+				return name, nil
+			}
+		}
+	}
+	if !listed {
+		return "", errors.New("could not list the app's containers")
 	}
 	return "", errors.New("the app's live release has no running web container on this server — deploy or restart the app first")
 }

@@ -31,7 +31,8 @@ CREATE TABLE apps (
 );
 
 -- Hosbah: an app runs on one server of its team. name is a DNS-label-like slug because it becomes
--- the image repository (cloudy/<name>) and the container prefix (cloudy-<name>-…) on the server.
+-- the image repository (hosbah/<name>) and the container prefix (hosbah-<name>-…) on the server (cloudy/… and
+-- cloudy-… for images and containers made before the rename).
 -- deploy_hook_hash is the SHA-256 of the per-app deploy-hook token; the token itself is shown once.
 -- runtime is what the last build detected (dockerfile, or railpack:<provider>).
 ALTER TABLE apps ADD CONSTRAINT apps_status_check CHECK (status IN ('new', 'deploying', 'running', 'failed', 'stopped'));

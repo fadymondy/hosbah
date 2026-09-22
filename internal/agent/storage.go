@@ -40,10 +40,13 @@ func (h *storageHost) volumeUsage(oc *OpContext) (any, int, error) {
 	}
 	res := agentproto.VolumeUsageResult{Volumes: []agentproto.VolumeUsage{}}
 	for _, v := range p.Volumes {
+		// Reported under the name asked for; measured under the name it has here (cloudy-vol-… when it
+		// was made before the rename).
 		u := agentproto.VolumeUsage{Volume: v}
-		if out, err := h.run(oc.Ctx, nil, "docker", "volume", "inspect", "--format", "{{.Name}}", v); err == nil && strings.TrimSpace(string(out)) == v {
+		name := resolveName(oc.Ctx, h.run, kindVolume, v)
+		if out, err := h.run(oc.Ctx, nil, "docker", "volume", "inspect", "--format", "{{.Name}}", name); err == nil && strings.TrimSpace(string(out)) == name {
 			u.Exists = true
-			u.Bytes = sizes[v]
+			u.Bytes = sizes[name]
 		}
 		res.Volumes = append(res.Volumes, u)
 	}
@@ -115,6 +118,7 @@ func (h *storageHost) volumeRemove(oc *OpContext) (any, int, error) {
 		return nil, 2, err
 	}
 	res := agentproto.VolumeRemoveResult{Volume: p.Volume}
+	p.Volume = resolveName(oc.Ctx, h.run, kindVolume, p.Volume)
 	if _, err := h.run(oc.Ctx, nil, "docker", "volume", "rm", p.Volume); err != nil {
 		low := strings.ToLower(err.Error())
 		switch {
@@ -213,6 +217,7 @@ func (h *storageHost) bucketRemove(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	p.Container = resolveName(oc.Ctx, h.run, kindContainer, p.Container)
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
@@ -241,8 +246,11 @@ func (h *storageHost) bucketRemove(oc *OpContext) (any, int, error) {
 		return nil, 1, errors.New("could not revoke the access key")
 	}
 	res.KeyRevoked = true
-	if out, err := h.mc(oc, p.Container, env, "mc", "admin", "policy", "rm", "local", p.Policy); err != nil && !gone(out) {
-		oc.Info("the key is revoked; its policy %s could not be removed", p.Policy)
+	// A key made before the rename has a cloudy-bucket-… policy: both names go, whichever it is.
+	for _, policy := range agentproto.NameCandidates(p.Policy) {
+		if out, err := h.mc(oc, p.Container, env, "mc", "admin", "policy", "rm", "local", policy); err != nil && !gone(out) {
+			oc.Info("the key is revoked; its policy %s could not be removed", policy)
+		}
 	}
 	if p.DeleteData {
 		argv := []string{"mc", "rb", "local/" + p.Bucket}

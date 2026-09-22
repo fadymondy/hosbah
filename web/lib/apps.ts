@@ -126,7 +126,10 @@ export type DetectResult = {
   runtime: "dockerfile" | "railpack"
   provider: string
   start_command: string
+  hosbah_toml?: unknown
+  // The same file under its pre-rename key: sent by every agent, old and new.
   cloudy_toml: unknown
+  toml_file?: "hosbah.toml" | "cloudy.toml"
 }
 
 export type Integrations = {

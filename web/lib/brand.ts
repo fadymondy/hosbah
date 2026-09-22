@@ -5,7 +5,7 @@ import type { MarkSpec } from "@/app/grid/grid-marks"
  * (import it from there and delete this constant) once fadymondy.com-v2's
  * web/lib/brand/marks.ts carries a `hosbah` entry and the grid is re-synced.
  */
-export const CLOUDY_MARK: MarkSpec = {
+export const HOSBAH_MARK: MarkSpec = {
   name: "Hosbah",
   cells: [
     [1, 0],
@@ -22,3 +22,6 @@ export const CLOUDY_MARK: MarkSpec = {
   bodyOnDark: "#7FB0D6",
   accent: "#C9A227",
 }
+
+/** The name before the rename; components still import it. */
+export const CLOUDY_MARK = HOSBAH_MARK

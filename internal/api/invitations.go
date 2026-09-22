@@ -6,11 +6,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/togo-framework/auth"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
@@ -47,7 +47,7 @@ func toInvitationOut(i db.Invitation) InvitationOut {
 // acceptURL is the one-time link. There is no mail delivery in local dev, so the
 // inviter is shown it once and passes it on. The web app negotiates the locale.
 func acceptURL(token string) string {
-	origin := strings.TrimRight(os.Getenv("CLOUDY_WEB_ORIGIN"), "/")
+	origin := strings.TrimRight(brand.Getenv("WEB_ORIGIN"), "/")
 	if origin == "" {
 		origin = "http://localhost:3710"
 	}

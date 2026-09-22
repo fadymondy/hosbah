@@ -1,4 +1,4 @@
-// Atlas project config — Cloudy's migration ledger.
+// Atlas project config — Hosbah's migration ledger.
 //
 // Desired state = the per-resource SQL fragments togo writes (internal/db/schema/*.sql).
 // togo 0.2.31 points this at db/atlas/schema/*.hcl, but make:resource never writes HCL there,

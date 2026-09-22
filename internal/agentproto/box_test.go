@@ -94,7 +94,7 @@ func TestRepoURLAndNames(t *testing.T) {
 			t.Errorf("ref %q accepted", r)
 		}
 	}
-	if ContainerName("go-sample", "worker:queue", "0123456789ab") != "cloudy-go-sample-worker-queue-01234567" {
+	if ContainerName("go-sample", "worker:queue", "0123456789ab") != "hosbah-go-sample-worker-queue-01234567" {
 		t.Error("container name")
 	}
 }

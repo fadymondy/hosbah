@@ -24,7 +24,7 @@ import (
 
 const (
 	testNode    = "pve1"
-	testTokenID = "cloudy@pve!ctl"
+	testTokenID = "hosbah@pve!ctl"
 	testSecret  = "5f1c0e2a-secret-token-value"
 	testTmpl    = 9000
 )
@@ -336,7 +336,7 @@ func TestValidateAuthHeader(t *testing.T) {
 	if err := d.Validate(ctxT(t)); err != nil {
 		t.Fatal(err)
 	}
-	want := "PVEAPIToken=cloudy@pve!ctl=" + testSecret
+	want := "PVEAPIToken=hosbah@pve!ctl=" + testSecret
 	for _, h := range f.authSeen {
 		if h != want {
 			t.Fatalf("Authorization = %q, want %q", h, want)
@@ -400,7 +400,7 @@ func TestFingerprintPinning(t *testing.T) {
 		{"tls_fingerprint": "zz"},
 		{"insecure_tls": "true"}, // together with the fingerprint from testCred
 		{"api_url": "http://pve:8006"},
-		{"token_id": "cloudy"},
+		{"token_id": "hosbah"},
 	} {
 		if _, err := New(testCred(f, bad)); err == nil {
 			t.Errorf("config %v accepted", bad)
@@ -410,11 +410,11 @@ func TestFingerprintPinning(t *testing.T) {
 
 func TestCreateVMWireEncodingWithoutSnippets(t *testing.T) {
 	f := newFakePVE(t)
-	d := newTestDriver(t, f, map[string]string{"pool": "cloudy", "bridge": "vmbr1"})
+	d := newTestDriver(t, f, map[string]string{"pool": "hosbah", "bridge": "vmbr1"})
 	if d.DeliversUserData("vm") || d.DeliversUserData("lxc") {
 		t.Fatal("DeliversUserData true without a snippet store")
 	}
-	keys := []string{"ssh-ed25519 AAAAC3Nz+aC/1lZDI1NTE5AAAA= cloudy@ctl", "ssh-rsa AAAAB3+Nza/C1yc2E= fady laptop"}
+	keys := []string{"ssh-ed25519 AAAAC3Nz+aC/1lZDI1NTE5AAAA= hosbah@ctl", "ssh-rsa AAAAB3+Nza/C1yc2E= fady laptop"}
 	id, err := d.Create(ctxT(t), providers.CreateSpec{
 		Name: "Web 01!", Kind: "vm", Size: "medium", SSHPublicKeys: keys,
 		UserData: "#cloud-config\n", Tags: []string{"Team-A", "bad tag!"},
@@ -429,7 +429,7 @@ func TestCreateVMWireEncodingWithoutSnippets(t *testing.T) {
 	if len(clone) != 1 {
 		t.Fatal("no clone call")
 	}
-	for k, v := range map[string]string{"newid": "100", "name": "web-01", "full": "1", "storage": "local-lvm", "pool": "cloudy"} {
+	for k, v := range map[string]string{"newid": "100", "name": "web-01", "full": "1", "storage": "local-lvm", "pool": "hosbah"} {
 		if got := clone[0].Form.Get(k); got != v {
 			t.Errorf("clone %s = %q, want %q", k, got, v)
 		}
@@ -439,7 +439,7 @@ func TestCreateVMWireEncodingWithoutSnippets(t *testing.T) {
 		t.Fatal("no config call")
 	}
 	c := conf[0]
-	for k, v := range map[string]string{"cores": "2", "memory": "2048", "ciuser": "cloudy", "ipconfig0": "ip=dhcp", "net0": "virtio,bridge=vmbr1", "tags": "team-a;badtag"} {
+	for k, v := range map[string]string{"cores": "2", "memory": "2048", "ciuser": "hosbah", "ipconfig0": "ip=dhcp", "net0": "virtio,bridge=vmbr1", "tags": "team-a;badtag"} {
 		if got := c.Form.Get(k); got != v {
 			t.Errorf("config %s = %q, want %q", k, got, v)
 		}
@@ -502,18 +502,24 @@ func TestCreateVMWithSnippetStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := f.callsTo("POST", "/qemu/100/config")[0]
-	if got := c.Form.Get("cicustom"); got != "user=snip:snippets/cloudy-100.yaml" {
+	if got := c.Form.Get("cicustom"); got != "user=snip:snippets/hosbah-100.yaml" {
 		t.Fatalf("cicustom = %q", got)
 	}
-	b, err := os.ReadFile(filepath.Join(dir, "cloudy-100.yaml"))
+	b, err := os.ReadFile(filepath.Join(dir, "hosbah-100.yaml"))
 	if err != nil || string(b) != ud {
 		t.Fatalf("snippet = %q, %v", b, err)
+	}
+	// A guest created before the rename has a cloudy-<vmid>.yaml snippet: Delete removes that too.
+	if err := os.WriteFile(filepath.Join(dir, "cloudy-100.yaml"), []byte(ud), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	if err := d.Delete(ctxT(t), id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "cloudy-100.yaml")); !os.IsNotExist(err) {
-		t.Fatal("snippet not removed on Delete")
+	for _, name := range []string{"hosbah-100.yaml", "cloudy-100.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("snippet %s not removed on Delete", name)
+		}
 	}
 	if _, err := New(testCred(f, map[string]string{"snippets_storage": "snip"})); err == nil {
 		t.Fatal("snippets_storage without snippets_dir accepted")
@@ -522,7 +528,7 @@ func TestCreateVMWithSnippetStore(t *testing.T) {
 
 func TestCreateLXC(t *testing.T) {
 	f := newFakePVE(t)
-	d := newTestDriver(t, f, map[string]string{"pool": "cloudy"})
+	d := newTestDriver(t, f, map[string]string{"pool": "hosbah"})
 	keys := []string{"ssh-ed25519 AAAA+/= one", "ssh-ed25519 BBBB two"}
 	id, err := d.Create(ctxT(t), providers.CreateSpec{
 		Name: "db box", Kind: "lxc", Size: "large", SSHPublicKeys: keys,
@@ -542,7 +548,7 @@ func TestCreateLXC(t *testing.T) {
 		"vmid": "100", "hostname": "db-box", "ostemplate": "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst",
 		"rootfs": "local-lvm:40", "cores": "4", "memory": "3000", "swap": "512", "unprivileged": "1",
 		"features": "nesting=1,keyctl=1", "net0": "name=eth0,bridge=vmbr0,ip=10.10.10.61/24,gw=10.10.10.1",
-		"ssh-public-keys": "ssh-ed25519 AAAA+/= one\nssh-ed25519 BBBB two", "pool": "cloudy", "start": "1",
+		"ssh-public-keys": "ssh-ed25519 AAAA+/= one\nssh-ed25519 BBBB two", "pool": "hosbah", "start": "1",
 	}
 	for k, v := range want {
 		if got := cr[0].Form.Get(k); got != v {
@@ -688,7 +694,7 @@ func TestCreateSpecValidation(t *testing.T) {
 }
 
 func TestHelpers(t *testing.T) {
-	for in, want := range map[string]string{"Web 01!": "web-01", "---": "cloudy-7", "9lives": "cloudy-7", strings.Repeat("a", 70): strings.Repeat("a", 63)} {
+	for in, want := range map[string]string{"Web 01!": "web-01", "---": "hosbah-7", "9lives": "hosbah-7", strings.Repeat("a", 70): strings.Repeat("a", 63)} {
 		if got := hostname(in, 7); got != want {
 			t.Errorf("hostname(%q) = %q, want %q", in, got, want)
 		}

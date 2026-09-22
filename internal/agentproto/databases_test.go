@@ -33,7 +33,7 @@ func TestValidDBName(t *testing.T) {
 func TestProvisionValidate(t *testing.T) {
 	base := DBProvisionParams{
 		ServiceID: testSvcID, Name: "pg1", Kind: "postgres", Version: "16",
-		Image: "postgres:16", Container: "cloudy-db-pg1", Volume: "cloudy-dbdata-pg1",
+		Image: "postgres:16", Container: "hosbah-db-pg1", Volume: "hosbah-dbdata-pg1",
 		Bind: "10.0.0.5", Port: 5432, RootSecret: "cab1:abc",
 	}
 	if err := base.Validate(); err != nil {
@@ -64,11 +64,11 @@ func TestCreateValidateRefusesRedis(t *testing.T) {
 }
 
 func TestRepoValidate(t *testing.T) {
-	if (RepoSpec{Target: "local", Repo: "/var/lib/cloudy/restic/x"}).Validate() != nil {
+	if (RepoSpec{Target: "local", Repo: "/var/lib/hosbah/restic/x"}).Validate() != nil {
 		t.Fatal("valid local repo rejected")
 	}
 	if (RepoSpec{Target: "local", Repo: "/etc/passwd"}).Validate() == nil {
-		t.Fatal("local repo outside /var/lib/cloudy must be refused")
+		t.Fatal("local repo outside /var/lib/hosbah must be refused")
 	}
 	if (RepoSpec{Target: "s3", Repo: "http://x"}).Validate() == nil {
 		t.Fatal("s3 repo must start with s3:")
@@ -84,8 +84,57 @@ func TestRestoreValidateThrowaway(t *testing.T) {
 	if err := p.Validate(); err != nil {
 		t.Fatalf("valid restore rejected: %v", err)
 	}
-	p.Container = "cloudy-db-live"
+	p.Container = "hosbah-db-live"
 	if p.Validate() == nil {
 		t.Fatal("restore must only write its throwaway container")
+	}
+}
+
+// A service, repository or restore made before the rename carries cloudy-… names and
+// /var/lib/cloudy paths: an agent accepts them (it keeps using those objects), and nothing else.
+func TestPreRenameNamesStillValidate(t *testing.T) {
+	old := DBProvisionParams{
+		ServiceID: testSvcID, Name: "pg1", Kind: "postgres", Version: "16",
+		Image: "postgres:16", Container: "cloudy-db-pg1", Volume: "cloudy-dbdata-pg1",
+		Bind: "10.0.0.5", Port: 5432, RootSecret: "cab1:abc",
+	}
+	if err := old.Validate(); err != nil {
+		t.Fatalf("a pre-rename service: %v", err)
+	}
+	other := old
+	other.Container = "cloudy-db-pg2"
+	if other.Validate() == nil {
+		t.Fatal("another service's container must still be refused")
+	}
+	if (RepoSpec{Target: "local", Repo: "/var/lib/cloudy/restic/x"}).Validate() != nil {
+		t.Fatal("a pre-rename local repository")
+	}
+	if (RepoSpec{Target: "local", Repo: "/var/lib/cloudyx/restic/x"}).Validate() == nil {
+		t.Fatal("a look-alike path must be refused")
+	}
+	p := DBRestoreParams{
+		ServiceID: testSvcID, Kind: "postgres", Version: "16", Image: "postgres:16",
+		BackupID: testBkID, SnapshotID: "deadbeef", Container: LegacyName(DBThrowawayName(testBkID)),
+		Volume: "v", Repo: RepoSpec{Target: "local", Repo: "/var/lib/cloudy/restic/x"}, RootSecret: "x",
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("a pre-rename restore throwaway: %v", err)
+	}
+	for _, v := range []string{"cloudy-vol-" + testSvcID + "-data", "hosbah-vol-" + testSvcID + "-data"} {
+		if !ValidVolumeName(testSvcID, v) {
+			t.Errorf("%s is the app's volume", v)
+		}
+	}
+	if ValidVolumeName(testSvcID, "other-vol-"+testSvcID+"-data") {
+		t.Error("a foreign prefix")
+	}
+	if !IsAppImage("shop", "cloudy/shop:1") || !IsAppImage("shop", "hosbah/shop:1") || IsAppImage("shop", "cloudy/shopx:1") {
+		t.Error("IsAppImage")
+	}
+	if got := NameCandidates("hosbah-db-x"); len(got) != 2 || got[0] != "cloudy-db-x" || got[1] != "hosbah-db-x" {
+		t.Errorf("NameCandidates: %v", got)
+	}
+	if LegacyLabel(LabelApp) != "cloudy.app" || LegacyLabel(InstallAppLabel) != "cloudy.install-app" {
+		t.Error("LegacyLabel")
 	}
 }

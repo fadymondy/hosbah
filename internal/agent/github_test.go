@@ -270,8 +270,8 @@ func TestGitHubStatusParsing(t *testing.T) {
 		t.Errorf("api user: %q %q %v", u, s, ok)
 	}
 	for _, out := range []string{
-		"github.com\n  ✓ Logged in to github.com account octocat (/etc/cloudy/gh/hosts.yml)\n  - Active account: true\n  - Git operations protocol: https\n  - Token: gho_************************************\n  - Token scopes: 'gist', 'read:org', 'repo'\n",
-		"github.com\n  ✓ Logged in to github.com as octocat (/etc/cloudy/gh/hosts.yml)\n  ✓ Token scopes: gist, read:org, repo\n",
+		"github.com\n  ✓ Logged in to github.com account octocat (/etc/hosbah/gh/hosts.yml)\n  - Active account: true\n  - Git operations protocol: https\n  - Token: gho_************************************\n  - Token scopes: 'gist', 'read:org', 'repo'\n",
+		"github.com\n  ✓ Logged in to github.com as octocat (/etc/hosbah/gh/hosts.yml)\n  ✓ Token scopes: gist, read:org, repo\n",
 	} {
 		u, s, ok := parseAuthStatus(out)
 		if !ok || u != "octocat" || strings.Join(s, ",") != "gist,read:org,repo" {

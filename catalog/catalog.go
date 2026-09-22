@@ -58,7 +58,7 @@ const (
 	MinGenerate, MaxGenerate          = 16, 64
 	MinMemoryMB, MaxMemoryMB          = 64, 8192
 	MinCPUs, MaxCPUs                  = 0.1, 4.0
-	MaxValue, MaxNotes, MaxCloudyTOML = 1024, 2000, 4096
+	MaxValue, MaxNotes, MaxHosbahTOML = 1024, 2000, 4096
 )
 
 // AllowedCaps is every Linux capability a recipe may ask back after --cap-drop ALL. Nothing here
@@ -156,8 +156,11 @@ type RecipeStack struct {
 	Runtime    string            `yaml:"runtime" json:"runtime"`
 	Env        []string          `yaml:"env,omitempty" json:"env" doc:"Suggested variable names."`
 	Processes  map[string]string `yaml:"processes,omitempty" json:"processes"`
-	CloudyTOML string            `yaml:"cloudy_toml,omitempty" json:"cloudy_toml"`
-	Notes      string            `yaml:"notes,omitempty" json:"notes"`
+	HosbahTOML string            `yaml:"hosbah_toml,omitempty" json:"hosbah_toml" doc:"The hosbah.toml the stack suggests."`
+	// LegacyTOML is the pre-rename key. A recipe may still use it (Parse moves it to HosbahTOML), and
+	// the API still sends it, equal to hosbah_toml, for clients that predate the rename.
+	LegacyTOML string `yaml:"cloudy_toml,omitempty" json:"cloudy_toml,omitempty" doc:"Deprecated: the same as hosbah_toml."`
+	Notes      string `yaml:"notes,omitempty" json:"notes"`
 }
 
 // hasWebUI: the install has an HTTP port a proxy host can point at.
@@ -443,8 +446,11 @@ func (s RecipeStack) validate() error {
 			return fmt.Errorf(`stack.processes %q: use "web" or "worker:<name>" and a one-line command`, name)
 		}
 	}
-	if len(s.CloudyTOML) > MaxCloudyTOML || len(s.Notes) > MaxNotes {
-		return errors.New("stack: cloudy_toml or notes is too long")
+	if s.HosbahTOML != "" && s.LegacyTOML != "" && s.HosbahTOML != s.LegacyTOML {
+		return errors.New("stack: hosbah_toml and cloudy_toml differ; keep hosbah_toml only")
+	}
+	if len(s.HosbahTOML) > MaxHosbahTOML || len(s.LegacyTOML) > MaxHosbahTOML || len(s.Notes) > MaxNotes {
+		return errors.New("stack: hosbah_toml or notes is too long")
 	}
 	return nil
 }
@@ -472,6 +478,12 @@ func Parse(raw []byte) (Recipe, error) {
 	}
 	if err := r.Validate(); err != nil {
 		return Recipe{}, err
+	}
+	if r.Stack != nil {
+		if r.Stack.HosbahTOML == "" {
+			r.Stack.HosbahTOML = r.Stack.LegacyTOML
+		}
+		r.Stack.LegacyTOML = r.Stack.HosbahTOML
 	}
 	r.HasWebUI = r.hasWebUI()
 	return r, nil

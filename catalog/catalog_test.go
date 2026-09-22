@@ -1,6 +1,8 @@
 package catalog_test
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -32,15 +34,15 @@ func TestTheWholeEmbeddedCatalogIsValid(t *testing.T) {
 			}
 		case catalog.KindStack:
 			stacks++
-			// The suggested cloudy.toml must be one Hosbah's own parser accepts, and must say what
+			// The suggested hosbah.toml must be one Hosbah's own parser accepts, and must say what
 			// the suggested processes say.
-			cfg, err := deploy.ParseConfig(r.Stack.CloudyTOML)
+			cfg, err := deploy.ParseConfig(r.Stack.HosbahTOML)
 			if err != nil {
-				t.Errorf("%s: its cloudy.toml does not parse: %v", r.ID, err)
+				t.Errorf("%s: its hosbah.toml does not parse: %v", r.ID, err)
 			}
 			for name, cmd := range r.Stack.Processes {
 				if cfg.Processes[name] != cmd {
-					t.Errorf("%s: process %s differs between processes and cloudy_toml", r.ID, name)
+					t.Errorf("%s: process %s differs between processes and hosbah_toml", r.ID, name)
 				}
 			}
 		}
@@ -202,5 +204,29 @@ func TestLoadRefusesDuplicateIDsAndMisnamedFiles(t *testing.T) {
 	}
 	if _, err := catalog.Render("{host}", map[string]string{}); err == nil {
 		t.Error("Render with a missing value must fail")
+	}
+}
+
+// A stack written before the rename (cloudy_toml) still parses: the value moves to hosbah_toml, and
+// the API keeps sending it under the old key too, for clients that predate the rename.
+func TestAStackWithThePreRenameTomlKeyStillParses(t *testing.T) {
+	raw, err := os.ReadFile("recipes/laravel.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := catalog.Parse(raw)
+	if err != nil || cur.Stack == nil || cur.Stack.HosbahTOML == "" {
+		t.Fatalf("laravel: %v", err)
+	}
+	old, err := catalog.Parse([]byte(strings.Replace(string(raw), "  hosbah_toml: |", "  cloudy_toml: |", 1)))
+	if err != nil {
+		t.Fatalf("cloudy_toml is refused: %v", err)
+	}
+	if old.Stack.HosbahTOML != cur.Stack.HosbahTOML || old.Stack.LegacyTOML != cur.Stack.HosbahTOML {
+		t.Fatalf("cloudy_toml did not become hosbah_toml: %+v", old.Stack)
+	}
+	b, _ := json.Marshal(old.Stack)
+	if !strings.Contains(string(b), `"hosbah_toml":`) || !strings.Contains(string(b), `"cloudy_toml":`) {
+		t.Fatalf("the API sends both keys: %s", b)
 	}
 }

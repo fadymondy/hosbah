@@ -17,7 +17,7 @@ import (
 
 /*
 A server's own GitHub connection (the GitHub CLI on it). Every route and MCP tool enqueues the right
-typed, signed operation with validated params — verified by a fake agent exactly as cloudy-agent
+typed, signed operation with validated params — verified by a fake agent exactly as hosbah-agent
 verifies them; roles gate them; the device flow's one-time code reaches the API while github.login
 is still running; and a token (REST or MCP) is sealed to the agent: it never appears in
 operations.params, an operation log, the audit log or an MCP answer.

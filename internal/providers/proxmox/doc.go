@@ -5,7 +5,7 @@
 //
 // # Credential
 //
-// Config keys: api_url (https://pve:8006), token_id (USER@REALM!TOKENID, e.g. cloudy@pve!ctl),
+// Config keys: api_url (https://pve:8006), token_id (USER@REALM!TOKENID, e.g. hosbah@pve!ctl),
 // node, storage (guest disks), bridge (default vmbr0), pool (optional), template_vmid (the VM
 // cloud-init template), lxc_template (a volid such as
 // local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst), snippets_storage + snippets_dir
@@ -42,11 +42,11 @@
 //
 // # Token and permissions
 //
-// Use a dedicated user and a privilege-separated token, cloudy@pve!ctl — never root@pam. With
+// Use a dedicated user and a privilege-separated token, hosbah@pve!ctl — never root@pam. With
 // privilege separation a token's rights are the intersection of the user's and the token's ACLs,
 // so grant each entry to both:
 //
-//   - PVEVMAdmin on /pool/cloudy (propagated). Guests are created into the pool; the VM template must
+//   - PVEVMAdmin on /pool/hosbah (propagated). Guests are created into the pool; the VM template must
 //     be a member of the pool too so the token can see and clone it.
 //   - Datastore.AllocateSpace on /storage/<storage> (clone targets, rootfs, resize).
 //   - Datastore.Audit on the storage holding the LXC templates and on snippets_storage (referencing
@@ -64,11 +64,11 @@
 // "snippets" storage by some other route, which is what SnippetStore abstracts. DirSnippetStore
 // writes into snippets_dir, a directory the control plane has mounted that backs snippets_storage
 // (an NFS/CIFS/dir storage with the snippets content type). With a store, Create writes
-// cloudy-<vmid>.yaml and sets cicustom=user=<snippets_storage>:snippets/cloudy-<vmid>.yaml. Note that
+// hosbah-<vmid>.yaml and sets cicustom=user=<snippets_storage>:snippets/hosbah-<vmid>.yaml. Note that
 // a custom user= snippet replaces Proxmox's generated user-data, so it must create the user and keys
 // itself (providers.AgentUserData does).
 //
-// Without a store, DeliversUserData("vm") is false: Create still sets ciuser=cloudy and sshkeys and
+// Without a store, DeliversUserData("vm") is false: Create still sets ciuser=hosbah and sshkeys and
 // the control plane bootstraps the agent over SSH (package sshboot). LXC has no cloud-init, so
 // DeliversUserData("lxc") is always false; its keys go to root through ssh-public-keys.
 //

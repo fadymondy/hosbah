@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/fadymondy/hosbah/internal/cloudflare"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -16,47 +16,60 @@ import (
 
 /*
 The apps domain: every app gets a hostname under a domain the platform owns, with no DNS work for
-the user — <prefix><app>.<domain>, e.g. cloudy-app-healthdebug.fadymondy.com. It is configuration,
-not code, so moving to a dedicated domain later is an .env change:
+the user — <prefix><app>.<domain>, e.g. shop.hosbah.com. It is configuration, not code, so moving
+to a dedicated domain later is an .env change (each variable is also read as CLOUDY_…, its name
+before the rename):
 
-  CLOUDY_APPS_DOMAIN        the base domain (unset: the feature is off)
-  CLOUDY_APPS_PREFIX        prepended to the app name (default "cloudy-app-"; "" gives <app>.<domain>)
-  CLOUDY_APPS_TLS           auto (default) | internal | off
-  CLOUDY_CLOUDFLARE_TOKEN   an API token with DNS:Edit on the domain's zone; without it Hosbah only
+  HOSBAH_APPS_DOMAIN        the base domain (unset: the feature is off)
+  HOSBAH_APPS_PREFIX        prepended to the app name (default "hosbah-app-"; "" gives <app>.<domain>)
+  HOSBAH_APPS_TLS           auto (default) | internal | off
+  HOSBAH_CLOUDFLARE_TOKEN   an API token with DNS:Edit on the domain's zone; without it Hosbah only
                             routes the hostname and the DNS (e.g. a wildcard) is the operator's job
-  CLOUDY_APPS_PROXIED       true to put the records behind Cloudflare's proxy (orange cloud)
+  HOSBAH_APPS_PROXIED       true to put the records behind Cloudflare's proxy (orange cloud)
+
+The default prefix was "cloudy-app-" before the rename. Where the prefix is not set, hostnames made
+with that one are still the platform's (Owns); new apps get "hosbah-app-".
 
 Because the platform controls the domain, the hostname is created already verified: no TXT dance.
 */
 
 // AppsDomain is the platform's apps-domain configuration.
 type AppsDomain struct {
-	Domain  string
-	Prefix  string
-	TLS     string
-	Proxied bool
-	DNS     *cloudflare.Client // nil: DNS is managed outside Hosbah
+	Domain string
+	Prefix string
+	// LegacyPrefix is the pre-rename default ("cloudy-app-"), set only when Prefix is the default.
+	LegacyPrefix string
+	TLS          string
+	Proxied      bool
+	DNS          *cloudflare.Client // nil: DNS is managed outside Hosbah
 }
 
 // AppsDomainFromEnv reads the configuration; Domain is "" when the feature is off.
 func AppsDomainFromEnv() AppsDomain {
 	d := AppsDomain{
-		Domain:  strings.Trim(strings.ToLower(strings.TrimSpace(os.Getenv("CLOUDY_APPS_DOMAIN"))), "."),
-		Prefix:  "cloudy-app-",
-		TLS:     strings.TrimSpace(os.Getenv("CLOUDY_APPS_TLS")),
-		Proxied: strings.TrimSpace(os.Getenv("CLOUDY_APPS_PROXIED")) == "true",
+		Domain:       strings.Trim(strings.ToLower(strings.TrimSpace(brand.Getenv("APPS_DOMAIN"))), "."),
+		Prefix:       defaultAppsPrefix,
+		LegacyPrefix: legacyAppsPrefix,
+		TLS:          strings.TrimSpace(brand.Getenv("APPS_TLS")),
+		Proxied:      strings.TrimSpace(brand.Getenv("APPS_PROXIED")) == "true",
 	}
-	if p, ok := os.LookupEnv("CLOUDY_APPS_PREFIX"); ok {
-		d.Prefix = strings.ToLower(strings.TrimSpace(p))
+	if p, ok := brand.LookupEnv("APPS_PREFIX"); ok {
+		d.Prefix, d.LegacyPrefix = strings.ToLower(strings.TrimSpace(p)), ""
 	}
 	if !agentproto.ValidTLS(d.TLS) {
 		d.TLS = "auto"
 	}
-	if tok := strings.TrimSpace(os.Getenv("CLOUDY_CLOUDFLARE_TOKEN")); tok != "" {
+	if tok := strings.TrimSpace(brand.Getenv("CLOUDFLARE_TOKEN")); tok != "" {
 		d.DNS = cloudflare.New(tok)
 	}
 	return d
 }
+
+// The default prefix, and the default before the rename.
+const (
+	defaultAppsPrefix = "hosbah-app-"
+	legacyAppsPrefix  = "cloudy-app-"
+)
 
 // Enabled reports whether apps get a platform hostname.
 func (d AppsDomain) Enabled() bool { return d.Domain != "" }
@@ -79,7 +92,8 @@ var reservedLabels = map[string]bool{"www": true, "api": true, "app": true, "adm
 
 // Owns reports whether hostname is a platform hostname (users cannot add or remove those by hand).
 func (d AppsDomain) Owns(hostname string) bool {
-	return d.Enabled() && strings.HasSuffix(hostname, "."+d.Domain) && strings.HasPrefix(hostname, d.Prefix) &&
+	prefixed := strings.HasPrefix(hostname, d.Prefix) || (d.LegacyPrefix != "" && strings.HasPrefix(hostname, d.LegacyPrefix))
+	return d.Enabled() && strings.HasSuffix(hostname, "."+d.Domain) && prefixed &&
 		!strings.Contains(strings.TrimSuffix(hostname, "."+d.Domain), ".")
 }
 

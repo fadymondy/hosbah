@@ -106,7 +106,7 @@ func (a *Agent) session(parent context.Context) error {
 
 	dctx, dcancel := context.WithTimeout(ctx, 20*time.Second)
 	conn, _, err := websocket.Dial(dctx, a.State.WebSocketURL, &websocket.DialOptions{
-		HTTPHeader: http.Header{"User-Agent": {"cloudy-agent/" + a.Version}},
+		HTTPHeader: http.Header{"User-Agent": {"hosbah-agent/" + a.Version}},
 	})
 	dcancel()
 	if err != nil {

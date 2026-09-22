@@ -62,7 +62,7 @@ func browserParams(t *testing.T) (agentproto.BrowserCreateParams, ed25519.Privat
 		MemoryMB: 1024, CPUs: 1.5, MaxSessions: 5, IdleTimeoutSeconds: 300, Token: box}, priv
 }
 
-const brName = "cloudy-browser-" + brID
+const brName = "hosbah-browser-" + brID
 
 // The exact docker argv: loopback-only ephemeral publish, limits, no-new-privileges, every
 // capability dropped and none added, the pinned image — and no token anywhere near docker.
@@ -80,7 +80,7 @@ func TestBrowserCreateRunsALockedDownContainerAndKeepsTheTokenAwayFromDocker(t *
 		t.Fatalf("result: %+v", r)
 	}
 	want := "docker run -d --restart unless-stopped --name " + brName +
-		" --label cloudy.browser=" + brID + " --label cloudy.browser-app=" + stAppID +
+		" --label hosbah.browser=" + brID + " --label hosbah.browser-app=" + stAppID +
 		" --log-opt max-size=10m --log-opt max-file=3 --memory 1024m --cpus 1.5 --pids-limit 1024 --shm-size 256m" +
 		" --security-opt no-new-privileges --cap-drop ALL -p 127.0.0.1::9222 " + agentproto.BrowserImage
 	var run string
@@ -96,8 +96,8 @@ func TestBrowserCreateRunsALockedDownContainerAndKeepsTheTokenAwayFromDocker(t *
 		if strings.Contains(c.argv, "0.0.0.0") || strings.Contains(c.argv, "--cap-add") || strings.Contains(c.argv, "--privileged") {
 			t.Errorf("forbidden in an argv: %s", c.argv)
 		}
-		if strings.Contains(c.argv, "cloudy.app=") {
-			t.Errorf("a browser must not carry cloudy.app (a deploy's drain would stop it): %s", c.argv)
+		if strings.Contains(c.argv, "hosbah.app=") {
+			t.Errorf("a browser must not carry hosbah.app (a deploy's drain would stop it): %s", c.argv)
 		}
 	}
 	if run != want {
@@ -222,7 +222,7 @@ func TestBrowserStatusReadsInspectAndStats(t *testing.T) {
 		"docker inspect --type container --format {{.State.Running}} {{.RestartCount}} " + brName: "true 3\n",
 		"docker stats --no-stream --format {{.Name}}\t{{.MemUsage}} " + brName:                    brName + "\t212.5MiB / 1GiB\n",
 	})
-	f.fail["docker inspect --type container --format {{.State.Running}} {{.RestartCount}} cloudy-browser-"+other] = "No such container"
+	f.fail["docker inspect --type container --format {{.State.Running}} {{.RestartCount}} hosbah-browser-"+other] = "No such container"
 	oc, _ := opCtx(t, agentproto.BrowserStatusParams{AppID: stAppID, BrowserIDs: []string{brID, other}})
 	res, _, err := h.status(oc)
 	if err != nil {
@@ -245,7 +245,7 @@ func TestAppRemoveTakesTheBrowsersOfTheApp(t *testing.T) {
 	labelled := "00000000-0000-4000-8000-0000000000b3"
 	h, f, _ := newBrowserFake(t, map[string]string{
 		"docker port " + brName + " 9222/tcp":                       "127.0.0.1:49153\n",
-		"docker ps -a --filter label=cloudy.browser-app=" + stAppID: labelled + "\n",
+		"docker ps -a --filter label=hosbah.browser-app=" + stAppID: labelled + "\n",
 	})
 	p, priv := browserParams(t)
 	oc, _ := opCtx(t, p)
@@ -261,7 +261,7 @@ func TestAppRemoveTakesTheBrowsersOfTheApp(t *testing.T) {
 	}
 	argv := strings.Join(f.mutating(), "\n")
 	for _, id := range []string{brID, labelled} {
-		if !strings.Contains(argv, "docker rm -f cloudy-browser-"+id) {
+		if !strings.Contains(argv, "docker rm -f hosbah-browser-"+id) {
 			t.Errorf("%s was not removed:\n%s", id, argv)
 		}
 	}

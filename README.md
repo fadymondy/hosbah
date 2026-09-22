@@ -8,7 +8,7 @@ P0 is the multi-tenant foundation: teams, members, invitations, default-deny aut
 row-level security, envelope encryption, audit, sign-in with TOTP 2FA, the user and admin MCP
 servers, and Hosbah's own issue tracker fed by "Report a problem".
 
-P2 adds one-click app deploys (below). P1 added servers: the `cloudy-agent`, bring-your-own install with a one-liner, signed typed
+P2 adds one-click app deploys (below). P1 added servers: the `hosbah-agent` (`cloudy-agent` before the rename), bring-your-own install with a one-liner, signed typed
 operations with live logs, and the Proxmox driver (tested against a fake PVE API only). No deploys
 yet (P2).
 
@@ -43,15 +43,15 @@ yet (P2).
 
 ```sh
 # build the agent the control plane serves (make agent, or without make:)
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=dev" -o bin/agent/cloudy-agent-linux-amd64 ./cmd/agent
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=dev" -o bin/agent/hosbah-agent-linux-amd64 ./cmd/agent
 echo dev > bin/agent/VERSION
-# in .env: CLOUDY_AGENT_URL=http://host.docker.internal:8710   (then start the API)
+# in .env: HOSBAH_AGENT_URL=http://host.docker.internal:8710   (then start the API)
 
-docker build -t cloudy-dev-target deploy/dev-target      # Ubuntu 24.04 with systemd
-docker run -d --name cloudy-target --privileged --cgroupns=host \
-  -v /sys/fs/cgroup:/sys/fs/cgroup:rw --add-host=host.docker.internal:host-gateway cloudy-dev-target
+docker build -t hosbah-dev-target deploy/dev-target      # Ubuntu 24.04 with systemd
+docker run -d --name hosbah-target --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw --add-host=host.docker.internal:host-gateway hosbah-dev-target
 # Servers → Add server → "A server I already have" → copy the root command, then:
-docker exec cloudy-target sh -c 'curl -fsSL http://host.docker.internal:8710/install/cle_… | sh'
+docker exec hosbah-target sh -c 'curl -fsSL http://host.docker.internal:8710/install/hbe_… | sh'
 ```
 
 ### Connect a server over SSH
@@ -61,7 +61,7 @@ password or private key. The control-plane operation `server.connect` (`internal
 logs in once, probes the OS and whether it is plain Linux, Docker or Proxmox VE, installs Hosbah's
 own per-server key for root, installs the agent and waits for it to enrol. The login is sealed with
 the team key only while the operation runs and is forgotten afterwards, whatever the outcome. On a
-Proxmox node it can also create a `cloudy@pve` API token and save it as a team credential
+Proxmox node it can also create a `hosbah@pve` API token (nodes connected before the rename have `cloudy@pve`, which keeps working) and save it as a team credential
 (`register_proxmox`, on by default). The agent's facts carry the platform and what already runs
 (containers, well-known systemd units, Proxmox guests), and the server page lists them. Ubuntu, Debian
 and the RHEL family (CentOS Stream, RHEL, Rocky and Alma 9–10, via dnf) are supported.
@@ -78,10 +78,10 @@ Tests use an in-process fake of the PVE endpoints listed in `internal/providers/
 The live test only runs when you ask for it:
 
 ```sh
-CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE_TOKEN_SECRET=… \
-  PVE_NODE=pve-3x1 PVE_STORAGE=local PVE_BRIDGE=vmbr1 PVE_POOL=cloudy PVE_TLS_FINGERPRINT=… \
+HOSBAH_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='hosbah@pve!ctl' PVE_TOKEN_SECRET=… \
+  PVE_NODE=pve-3x1 PVE_STORAGE=local PVE_BRIDGE=vmbr1 PVE_POOL=hosbah PVE_TLS_FINGERPRINT=… \
   go test -count=1 -run TestLive -v ./internal/providers/proxmox/   # read-only
-# add CLOUDY_PROXMOX_LIVE_CREATE=1 (+ PVE_LXC_TEMPLATE / PVE_TEMPLATE_VMID) to create and delete a guest
+# add HOSBAH_PROXMOX_LIVE_CREATE=1 (+ PVE_LXC_TEMPLATE / PVE_TEMPLATE_VMID) to create and delete a guest
 ```
 
 ## Apps and deploys (P2)
@@ -89,8 +89,10 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
 - **An app** is a public git URL, a branch and one of the team's servers. It builds with the
   repository's `Dockerfile` when there is one, otherwise with **Railpack** (MIT; version pinned in
   `internal/deploy/toolchain.go`) through its BuildKit frontend image. Images are
-  `cloudy/<app>:<deployment_id>`; the newest 5 are kept, so a rollback needs no rebuild.
-- **`cloudy.toml`** (optional, repository root) sets `port`, `release`, `[healthcheck]` and
+  `hosbah/<app>:<deployment_id>`; the newest 5 are kept, so a rollback needs no rebuild (images built before
+  the rename, `cloudy/<app>`, count among them and roll back like any other).
+- **`hosbah.toml`** (optional, repository root; a repository that still has the pre-rename `cloudy.toml` is read the
+  same way when it has no `hosbah.toml`) sets `port`, `release`, `[healthcheck]` and
   `[processes]`, and wins over the app's settings in Hosbah. Examples: `deploy/samples/*`.
 - **Zero-downtime pipeline**: provision → build → release (a one-off container) → start `web` on an
   ephemeral `127.0.0.1` port → **health gate** (2xx within N seconds) → start workers → switch the
@@ -101,10 +103,10 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
 - **Rollback and restart** skip the build entirely: one `app.rollback` operation starts a kept image,
   gates it, switches the route and drains the rest (about a second on the dev target).
 - **Routing** is Caddy on the server through its admin API on `localhost:2019`. The agent owns the
-  whole configuration (`/var/lib/cloudy/routes.json`, rendered and POSTed to `/load`, which is
+  whole configuration (`/var/lib/hosbah/routes.json`, rendered and POSTed to `/load`, which is
   graceful and atomic): `tls = off` hosts on :80, `internal` (Caddy's own CA) and `auto` on :443.
   `auto` uses on-demand TLS whose `ask` endpoint is the control plane's `/internal/tls/allow`, and
-  that answers yes only for a **verified** domain (TXT `_cloudy-verify.<host>`).
+  that answers yes only for a **verified** domain (TXT `_hosbah-verify.<host>` = `hosbah-verify=…`; a `_cloudy-verify` record made before the rename also counts).
 - **Env values** are sealed with the team DEK, and re-sealed for a deploy to the target agent's own
   key (ed25519 → X25519, bound to app, deployment and process), so `operations.params` never holds a
   plaintext secret. They reach `docker run` as `-e NAME`, with the value in the CLI's environment.
@@ -114,11 +116,12 @@ CLOUDY_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='cloudy@pve!ctl' PVE
 - **Deploy hook**: `POST /hooks/deploy/<token>` — only the token's SHA-256 is stored, and it is shown
   once (rotate it in Settings). A push payload for another branch is acknowledged and skipped; an app
   with auto-deploy paused answers 409.
-- **GitHub App**: written behind an interface but **not configured**. Set `CLOUDY_GITHUB_APP_ID`,
-  `CLOUDY_GITHUB_APP_SLUG`, `CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE` and `CLOUDY_GITHUB_WEBHOOK_SECRET`
+- **GitHub App**: written behind an interface but **not configured**. Set `HOSBAH_GITHUB_APP_ID`,
+  `HOSBAH_GITHUB_APP_SLUG`, `HOSBAH_GITHUB_APP_PRIVATE_KEY_FILE` and `HOSBAH_GITHUB_WEBHOOK_SECRET`
   to enable it; until then `/hooks/github` answers 503 and the UI says "GitHub App not configured".
-- **Apps domain**: set `CLOUDY_APPS_DOMAIN` (e.g. `fadymondy.com`) and every new app gets `<CLOUDY_APPS_PREFIX><app>.<domain>`
-  (default prefix `cloudy-app-`), created already verified. With `CLOUDY_CLOUDFLARE_TOKEN` Hosbah also creates and
+- **Apps domain**: set `HOSBAH_APPS_DOMAIN` (e.g. `hosbah.com`) and every new app gets `<HOSBAH_APPS_PREFIX><app>.<domain>`
+  (default prefix `hosbah-app-`; `cloudy-app-` hostnames given out before the rename stay the platform's), created
+  already verified. With `HOSBAH_CLOUDFLARE_TOKEN` Hosbah also creates and
   deletes its A/AAAA record (only records it made, marked "managed by Hosbah"). Unset = off. Moving to a dedicated
   domain later is only an `.env` change.
 - **Caddy proxy manager** (`internal/deploy/proxyhosts.go`, agent `proxy.set`): a *proxy host* puts any upstream a server
@@ -171,7 +174,7 @@ For servers without a public address: a customer box behind NAT, a laptop, a Doc
 ## SDKs, CLI and mobile
 
 See `sdk/README.md`. The Go (`pkg/hosbah`), Node, Python and PHP/Laravel SDKs and the `hosbah` CLI
-(`cmd/hosbah`, `make cli` builds it for Windows, macOS and Linux) call the team MCP endpoint with a `cld_…` token.
+(`cmd/hosbah`, `make cli` builds it for Windows, macOS and Linux) call the team MCP endpoint with a `hbu_…` token (`cld_…` tokens minted before the rename keep working).
 A mobile app uses the REST API with the Bearer token `POST /api/auth/login` returns.
 
 ## Ports (local)
@@ -180,7 +183,7 @@ A mobile app uses the REST API with the Bearer token `POST /api/auth/login` retu
 |---|---|
 | API (Go) | **8710** — REST `/api`, docs `/docs`, MCP `/api/mcp` + `/api/admin/mcp` |
 | Web (Next.js) | **3710** — proxies `/api/*` to 8710 |
-| Postgres (container `cloudy-postgres`) | **55491** — databases `hosbah`, `cloudy_test`, `cloudy_atlas_dev` |
+| Postgres (container `hosbah-postgres`) | **55491** — databases `cloudy`, `cloudy_test`, `cloudy_atlas_dev` (role `cloudy_app`; data names from before the rename, kept so existing volumes keep working) |
 
 ## Run it
 
@@ -190,7 +193,7 @@ docker volume create cloudy_pgdata
 docker compose up -d
 
 # 2. Config
-cp .env.example .env     # then set AUTH_SECRET (openssl rand -hex 32) and CLOUDY_KEK (openssl rand -base64 32)
+cp .env.example .env     # then set AUTH_SECRET (openssl rand -hex 32) and HOSBAH_KEK (openssl rand -base64 32)
 
 # 3. Schema, then the API
 togo generate            # sqlc -> gqlgen -> OpenAPI export (the integration gate)
@@ -224,7 +227,7 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 - Default-deny route tiers (`internal/server/authorization.go`): blocked, public, token (MCP),
   member, and platform admin as the default for anything unlisted.
 - Team roles `owner`, `admin`, `deployer`, `viewer` via togo `authz` (`internal/tenancy/roles.go`).
-- `internal/crypto`: `CLOUDY_KEK` wraps a per-team DEK (AES-256-GCM, bound to the team id); values
+- `internal/crypto`: `HOSBAH_KEK` wraps a per-team DEK (AES-256-GCM, bound to the team id); values
   are sealed with the team DEK, bound to team + field.
 - Audit: togo audit's `activity_log` + `team_id`, written in the same transaction as the change,
   append-only under RLS.
@@ -233,15 +236,15 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 
 | Endpoint | Tokens | Tools |
 |---|---|---|
-| `POST /api/mcp` | team-bound `cld_…` (mint in *MCP tokens*) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · databases: `create_db`, `attach_database`, `set_backup_schedule`, `drop_database`, `delete_data_service` · servers: `run_server_step` · apps: `update_app`, `list_releases`, `rotate_deploy_hook` · team: `update_member_role`, `delete_credential` · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
-| `POST /api/admin/mcp` | platform-admin `cla_…` | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
+| `POST /api/mcp` | team-bound `hbu_…` (mint in *MCP tokens*; `cld_…` from before the rename still works) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · databases: `create_db`, `attach_database`, `set_backup_schedule`, `drop_database`, `delete_data_service` · servers: `run_server_step` · apps: `update_app`, `list_releases`, `rotate_deploy_hook` · team: `update_member_role`, `delete_credential` · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
+| `POST /api/admin/mcp` | platform-admin `hba_…` (`cla_…` from before the rename still works) | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
 
 Every tool declares a scope (`internal/mcp/scopes_test.go` fails otherwise); a token without it gets
 an in-band `isError`. Only SHA-256 hashes of tokens are stored.
 
 ```json
-{ "mcpServers": { "cloudy": { "type": "http", "url": "http://localhost:8710/api/mcp",
-  "headers": { "Authorization": "Bearer cld_..." } } } }
+{ "mcpServers": { "hosbah": { "type": "http", "url": "http://localhost:8710/api/mcp",
+  "headers": { "Authorization": "Bearer hbu_..." } } } }
 ```
 
 ## Migrations (the ledger)
@@ -264,3 +267,28 @@ The fadymondy.com grid, synced — never edited here: `web/app/grid/` (`npm run 
 `web/app/grid/brand-cloudy.css` until fadymondy.com-v2's `marks.ts` carries `hosbah`.
 The Feedback SDK is the generated copy in `web/lib/feedback/` (`npm run feedback:sync` / `feedback:check`).
 en + ar (RTL), light + dark.
+
+## The rename from Cloudy (2026-09-19)
+
+Everything Hosbah writes now says `hosbah`; everything it reads also accepts what was written as
+`cloudy` before, so nothing already deployed has to change at once.
+
+| What | New (written) | Also read |
+|---|---|---|
+| Environment | `HOSBAH_*` (`internal/brand.Getenv`) | `CLOUDY_*` when the `HOSBAH_` one is unset |
+| Tokens | `hbu_` team MCP, `hba_` admin MCP, `hbe_` enrolment, `hbh_` deploy hook | `cld_`, `cla_`, `cle_`, `cdh_` |
+| Domain ownership | TXT `_hosbah-verify.<host>` = `hosbah-verify=…` | `_cloudy-verify`, `cloudy-verify=` |
+| App config | `hosbah.toml` | `cloudy.toml` when there is no `hosbah.toml` |
+| Agent | `/usr/local/bin/hosbah-agent`, `hosbah-agent.service`, `/etc/hosbah`, `/var/lib/hosbah` | the `cloudy-agent` ones (moved on the first start, links left behind) |
+| Docker | `hosbah-*` containers and volumes, `hosbah/<app>` images, `hosbah.*` labels | `cloudy-*`, `cloudy/<app>`, `cloudy.*`: found, stopped and reused (an existing volume keeps its name) |
+| Agent builds | `bin/agent/hosbah-agent-linux-*` | served as `cloudy-agent-linux-*` too |
+
+Upgrade order: **agents first** (put the new build in the old control plane's agent dist under both names — `make
+agent` writes both — and run `agent.update` on each server), then the control plane. The first start of the new
+agent moves `/etc/cloudy` and `/var/lib/cloudy` and hands itself over from `cloudy-agent.service` to
+`hosbah-agent.service` (`internal/agent/migrate.go`). An agent that missed the update refuses the new names
+(the operation fails before it changes anything) until `agent.update` reaches it.
+
+Kept on purpose: the crypto labels inside sealed and signed data (`cloudy/dek/v1`, `cloudy-op-v1`, …), the MinIO
+root user `cloudy-root`, the op-id and restic-password seeds, Caddy's `cloudy-caddy` unit on servers that have it,
+and the local database, role and volume names (`cloudy`, `cloudy_app`, `cloudy_pgdata`).

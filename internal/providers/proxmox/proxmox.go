@@ -67,7 +67,7 @@ func NewWithSnippetStore(cred providers.Credential, store SnippetStore) (*Driver
 	cfg := func(k string) string { return strings.TrimSpace(cred.Config[k]) }
 	tokenID := cfg("token_id")
 	if at, bang := strings.Index(tokenID, "@"), strings.Index(tokenID, "!"); at < 1 || bang < at+2 || bang == len(tokenID)-1 {
-		return nil, errors.New("proxmox: token_id must look like USER@REALM!TOKENID (e.g. cloudy@pve!ctl)")
+		return nil, errors.New("proxmox: token_id must look like USER@REALM!TOKENID (e.g. hosbah@pve!ctl)")
 	}
 	if cred.Secret == "" {
 		return nil, errors.New("proxmox: the token secret is empty")
@@ -285,7 +285,7 @@ func (d *Driver) createVM(ctx context.Context, node string, vmid int, name, temp
 	conf := url.Values{
 		"cores":     {strconv.Itoa(size.CPUs)},
 		"memory":    {strconv.Itoa(size.MemoryMB)},
-		"ciuser":    {"cloudy"},
+		"ciuser":    {providers.GuestUser},
 		"ipconfig0": {netCfg},
 	}
 	if keys := joinKeys(s.SSHPublicKeys); keys != "" {
@@ -474,8 +474,10 @@ func (d *Driver) Delete(ctx context.Context, id string) error {
 	}
 	if r, ok := d.snippets.(snippetRemover); ok && typ == "qemu" {
 		n, _ := strconv.Atoi(vmid)
-		if err := r.Remove(ctx, snippetFile(n)); err != nil {
-			return fmt.Errorf("proxmox: guest %s deleted, but its snippet was not: %w", id, err)
+		for _, name := range []string{snippetFile(n), legacySnippetFile(n)} {
+			if err := r.Remove(ctx, name); err != nil {
+				return fmt.Errorf("proxmox: guest %s deleted, but its snippet was not: %w", id, err)
+			}
 		}
 	}
 	return nil
@@ -598,7 +600,7 @@ func parseID(id string) (node, typ, vmid string, err error) {
 }
 
 // hostname turns a display name into a DNS label, as Proxmox requires for both VM names and LXC
-// hostnames, falling back to cloudy-<vmid>.
+// hostnames, falling back to hosbah-<vmid>.
 func hostname(name string, vmid int) string {
 	var b strings.Builder
 	dash := false
@@ -617,7 +619,7 @@ func hostname(name string, vmid int) string {
 		h = strings.TrimRight(h[:63], "-")
 	}
 	if h == "" || h[0] >= '0' && h[0] <= '9' {
-		return "cloudy-" + strconv.Itoa(vmid)
+		return "hosbah-" + strconv.Itoa(vmid)
 	}
 	return h
 }
@@ -653,7 +655,10 @@ func joinKeys(keys []string) string {
 // only '+' left in its output are spaces, which become %20.
 func pveURLEncode(s string) string { return strings.ReplaceAll(url.QueryEscape(s), "+", "%20") }
 
-func snippetFile(vmid int) string { return "cloudy-" + strconv.Itoa(vmid) + ".yaml" }
+func snippetFile(vmid int) string { return "hosbah-" + strconv.Itoa(vmid) + ".yaml" }
+
+// legacySnippetFile is a guest's snippet as it was named before the rename (removed on delete too).
+func legacySnippetFile(vmid int) string { return "cloudy-" + strconv.Itoa(vmid) + ".yaml" }
 
 // diskSizeGB reads the size= of a disk spec such as "local-lvm:vm-101-disk-0,size=3584M".
 func diskSizeGB(spec string) (float64, bool) {

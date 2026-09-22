@@ -13,7 +13,7 @@ RETURNING *;
 -- name: DeleteProcessType :exec
 DELETE FROM process_types WHERE id = $1;
 
--- Hosbah queries (the deploy worker writes them from cloudy.toml; the team reads).
+-- Hosbah queries (the deploy worker writes them from hosbah.toml; the team reads).
 -- name: UpsertProcessType :exec
 INSERT INTO process_types (team_id, app_id, name, command) VALUES ($1, $2, $3, $4)
 ON CONFLICT (app_id, name) DO UPDATE SET command = EXCLUDED.command, updated_at = now();

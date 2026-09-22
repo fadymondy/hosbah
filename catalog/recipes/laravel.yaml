@@ -35,7 +35,7 @@ stack:
     - MAIL_MAILER
   processes:
     "worker:queue": php artisan queue:work --tries=3 --max-time=3600
-  cloudy_toml: |
+  hosbah_toml: |
     release = "php artisan migrate --force"
 
     [healthcheck]

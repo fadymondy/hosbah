@@ -177,7 +177,7 @@ export function SiteDatabases() {
   )
 }
 
-/** Workers: the processes the app runs besides web, as its cloudy.toml declares them. */
+/** Workers: the processes the app runs besides web, as its hosbah.toml declares them. */
 export function SiteWorkers() {
   const { t } = useI18n()
   const { detail } = useLoadedSite()

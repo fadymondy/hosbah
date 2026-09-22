@@ -26,7 +26,7 @@ const ScopeAdmin = "admin"
 // longer a platform admin.
 func AdminServer() *Server {
 	return &Server{
-		Name:          "cloudy-admin",
+		Name:          "hosbah-admin",
 		Version:       "0.1.0",
 		Tools:         AdminTools(),
 		AllowedScopes: []string{ScopeAdmin},
@@ -38,7 +38,7 @@ func AdminServer() *Server {
 }
 
 func authenticateAdmin(ctx context.Context, a *app.App, bearer string) (Caller, error) {
-	if !strings.HasPrefix(bearer, tokens.PrefixAdminMCP) || a == nil {
+	if !tokens.HasPrefix(bearer, tokens.AdminMCP) || a == nil {
 		return Caller{}, ErrUnauthorized
 	}
 	hash := tokens.Hash(bearer)

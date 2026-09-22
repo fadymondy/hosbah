@@ -1,7 +1,7 @@
 # Hosbah SDKs
 
 Every SDK and the CLI talk to a team's MCP endpoint (`POST /api/mcp`, JSON-RPC `tools/call`) with a
-team token (`cld_…`, minted under **MCP tokens**). So they get every Hosbah feature, including new ones,
+team token (`hbu_…`, minted under **MCP tokens**; `cld_…` tokens minted before the rename keep working). So they get every Hosbah feature, including new ones,
 through a generic `call(tool, args)`. The token's scopes, the audit log and the team's
 destructive-action approvals apply exactly as they do for AI agents.
 

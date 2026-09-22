@@ -16,8 +16,8 @@ const (
 	KindDBCreate    = "db.create"    // create a database + user + grants inside a running service
 	KindDBBackup    = "db.backup"    // pg_dump -Fc / mysqldump / Redis RDB, pushed into a restic repository
 	KindDBRestore   = "db.restore"   // restore a snapshot into a throwaway container and verify it (restore-test)
-	KindDBRemove    = "db.remove"     // stop and remove a service's container and its volume (the service was deleted)
-	KindDBDrop      = "db.drop"       // drop one database (bucket) and its users inside a running service
+	KindDBRemove    = "db.remove"    // stop and remove a service's container and its volume (the service was deleted)
+	KindDBDrop      = "db.drop"      // drop one database (bucket) and its users inside a running service
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -35,12 +35,17 @@ var (
 )
 
 // ValidDBKind: the managed engines. minio is S3-compatible object storage (buckets).
-func ValidDBKind(s string) bool { return s == "postgres" || s == "mysql" || s == "redis" || s == "minio" }
+func ValidDBKind(s string) bool {
+	return s == "postgres" || s == "mysql" || s == "redis" || s == "minio"
+}
 
 // BucketName maps a database name (lower snake) to an S3 bucket name (no underscores allowed).
 func BucketName(db string) string { return strings.ReplaceAll(db, "_", "-") }
 
 // MinIORootUser is the fixed root access key of a Hosbah MinIO service (the secret is generated).
+// It keeps its pre-rename value on purpose: it is a credential. Every MinIO service created before
+// the rename was started with it, and every mc call the agent makes logs in with it, so a new value
+// would lock the agent out of those services. It never names anything a person sees.
 const MinIORootUser = "cloudy-root"
 
 // ValidDBName: a database or role identifier — lower snake, so it is safe verbatim in the fixed argv
@@ -56,8 +61,10 @@ func ValidGrants(s string) bool { return s == "all" || s == "readwrite" || s == 
 
 // DBContainerName / DBVolumeName / DBThrowawayName name a service's docker objects deterministically
 // from its slug (a service name, validated by ValidAppName), so a re-run finds the same container.
-func DBContainerName(name string) string { return "cloudy-db-" + name }
-func DBVolumeName(name string) string     { return "cloudy-dbdata-" + name }
+// A service created before the rename has cloudy-db-<name> / cloudy-dbdata-<name>; the agent keeps
+// using those (ResolveName), and the validation below accepts either form.
+func DBContainerName(name string) string { return NamePrefix + "db-" + name }
+func DBVolumeName(name string) string    { return NamePrefix + "dbdata-" + name }
 
 // DBThrowawayName is the restore-test's disposable container/volume, named from the backup id.
 func DBThrowawayName(backupID string) string {
@@ -65,7 +72,7 @@ func DBThrowawayName(backupID string) string {
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	return "cloudy-dbrestore-" + short
+	return NamePrefix + "dbrestore-" + short
 }
 
 // DBInternalPort is the port the engine listens on inside its container.
@@ -112,8 +119,8 @@ type RepoSpec struct {
 func (r RepoSpec) Validate() error {
 	switch r.Target {
 	case "local":
-		if !strings.HasPrefix(r.Repo, "/var/lib/cloudy/") {
-			return errors.New("a local restic repository must be under /var/lib/cloudy")
+		if !InWorkDir(r.Repo) {
+			return errors.New("a local restic repository must be under " + WorkDir)
 		}
 	case "minio", "s3":
 		if !strings.HasPrefix(r.Repo, "s3:") {
@@ -151,7 +158,7 @@ func (p DBProvisionParams) Validate() error {
 		return errors.New("bad kind or version")
 	case p.Image != DBImage(p.Kind, p.Version):
 		return fmt.Errorf("image %q is not the pinned image for %s:%s", p.Image, p.Kind, p.Version)
-	case p.Container != DBContainerName(p.Name) || p.Volume != DBVolumeName(p.Name):
+	case !sameDerived(p.Container, DBContainerName(p.Name)) || !sameDerived(p.Volume, DBVolumeName(p.Name)):
 		return errors.New("container or volume name does not match the service")
 	case p.Bind == "" || p.Bind == "0.0.0.0" || p.Port < 1 || p.Port > 65535:
 		return errors.New("a data service binds to a private address and a port")
@@ -268,7 +275,7 @@ func (p DBRestoreParams) Validate() error {
 		return errors.New("image does not match the service kind and version")
 	case !snapshotRE.MatchString(p.SnapshotID):
 		return errors.New("bad snapshot id")
-	case p.Container != DBThrowawayName(p.BackupID):
+	case !sameDerived(p.Container, DBThrowawayName(p.BackupID)):
 		return errors.New("the restore container must be the throwaway for this backup")
 	case p.Kind != "redis" && p.RootSecret == "":
 		return errors.New("postgres and mysql need a root secret for the throwaway")

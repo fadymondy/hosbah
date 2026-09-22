@@ -59,12 +59,12 @@ func newExecFake(answers map[string]string, fs *fakeStream) (*execHost, *fakeRun
 	return &execHost{run: f.run, stream: fs.stream, killGrace: time.Second}, f
 }
 
-var execPS = "docker ps --filter label=cloudy.app=" + execApp + " --filter label=cloudy.process=web --filter label=cloudy.deployment=" + execDep
+var execPS = "docker ps --filter label=hosbah.app=" + execApp + " --filter label=hosbah.process=web --filter label=hosbah.deployment=" + execDep
 
 func TestAppExecHandsTheCommandToDockerExecAsOneElement(t *testing.T) {
 	command := `php artisan schedule:run >> /dev/null; echo "$HOME" 'a b' $(id) && rm -rf /tmp/x | tee`
 	fs := &fakeStream{lines: []string{"hello", "world"}}
-	h, f := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	h, f := newExecFake(map[string]string{execPS: "hosbah-shop-web-22222222\n"}, fs)
 	oc, lines := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: agentproto.ShellArgv(command), TimeoutSeconds: 30})
 
 	res, code, err := h.appExec(oc)
@@ -74,7 +74,7 @@ func TestAppExecHandsTheCommandToDockerExecAsOneElement(t *testing.T) {
 	if len(fs.calls) != 1 {
 		t.Fatalf("want one exec, got %+v", fs.calls)
 	}
-	want := []string{"exec", "-e", "CLOUDY_EXEC_ID=" + execOp, "cloudy-shop-web-22222222", "sh", "-lc", command}
+	want := []string{"exec", "-e", "HOSBAH_EXEC_ID=" + execOp, "hosbah-shop-web-22222222", "sh", "-lc", command}
 	if fs.calls[0].name != "docker" || !reflect.DeepEqual(fs.calls[0].args, want) {
 		t.Fatalf("argv:\n got %q\nwant %q", fs.calls[0].args, want)
 	}
@@ -88,7 +88,7 @@ func TestAppExecHandsTheCommandToDockerExecAsOneElement(t *testing.T) {
 		t.Fatalf("host commands: %+v", f.calls)
 	}
 	r := res.(agentproto.ExecResult)
-	if r.Container != "cloudy-shop-web-22222222" || r.ExitCode != 0 || r.TimedOut || r.Bytes != len("hello\nworld\n") {
+	if r.Container != "hosbah-shop-web-22222222" || r.ExitCode != 0 || r.TimedOut || r.Bytes != len("hello\nworld\n") {
 		t.Fatalf("result: %+v", r)
 	}
 	if got := strings.Join(*lines, "\n"); !strings.Contains(got, "hello\nworld") {
@@ -101,12 +101,12 @@ func TestAppExecHandsTheCommandToDockerExecAsOneElement(t *testing.T) {
 func TestAppExecHandsARealArgvOverElementByElement(t *testing.T) {
 	argv := []string{"php", "artisan", "queue:retry", "--no-ansi", "--no-interaction", "9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21"}
 	fs := &fakeStream{}
-	h, _ := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	h, _ := newExecFake(map[string]string{execPS: "hosbah-shop-web-22222222\n"}, fs)
 	oc, _ := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: argv, TimeoutSeconds: 30})
 	if _, code, err := h.appExec(oc); err != nil || code != 0 {
 		t.Fatalf("appExec: %v (%d)", err, code)
 	}
-	want := append([]string{"exec", "-e", "CLOUDY_EXEC_ID=" + execOp, "cloudy-shop-web-22222222"}, argv...)
+	want := append([]string{"exec", "-e", "HOSBAH_EXEC_ID=" + execOp, "hosbah-shop-web-22222222"}, argv...)
 	if len(fs.calls) != 1 || fs.calls[0].name != "docker" || !reflect.DeepEqual(fs.calls[0].args, want) {
 		t.Fatalf("argv:\n got %+v\nwant %q", fs.calls, want)
 	}
@@ -114,7 +114,7 @@ func TestAppExecHandsARealArgvOverElementByElement(t *testing.T) {
 
 func TestAppExecReportsTheExitCode(t *testing.T) {
 	fs := &fakeStream{code: 3}
-	h, _ := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	h, _ := newExecFake(map[string]string{execPS: "hosbah-shop-web-22222222\n"}, fs)
 	oc, _ := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: agentproto.ShellArgv("exit 3"), TimeoutSeconds: 30})
 	res, code, err := h.appExec(oc)
 	if err == nil || code != 3 || res.(agentproto.ExecResult).ExitCode != 3 {
@@ -124,7 +124,7 @@ func TestAppExecReportsTheExitCode(t *testing.T) {
 
 func TestAppExecTimeoutKillsTheCommand(t *testing.T) {
 	fs := &fakeStream{block: true}
-	h, f := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	h, f := newExecFake(map[string]string{execPS: "hosbah-shop-web-22222222\n"}, fs)
 	oc, _ := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: agentproto.ShellArgv("sleep 600"), TimeoutSeconds: 1})
 
 	started := time.Now()
@@ -140,7 +140,7 @@ func TestAppExecTimeoutKillsTheCommand(t *testing.T) {
 	}
 	// What the exec started inside the container is killed there, found by the op's mark.
 	last := f.calls[len(f.calls)-1].argv
-	if !strings.HasPrefix(last, "docker exec cloudy-shop-web-22222222 sh -c ") || !strings.HasSuffix(last, " sh "+execOp) ||
+	if !strings.HasPrefix(last, "docker exec hosbah-shop-web-22222222 sh -c ") || !strings.HasSuffix(last, " sh "+execOp) ||
 		!strings.Contains(last, "kill -9") || strings.Contains(last, "sleep 600") {
 		t.Fatalf("kill command: %q", last)
 	}
@@ -164,7 +164,7 @@ func TestAppExecCapsItsOutput(t *testing.T) {
 	for i := 0; i < 200; i++ { // 800 KB
 		fs.lines = append(fs.lines, line)
 	}
-	h, _ := newExecFake(map[string]string{execPS: "cloudy-shop-web-22222222\n"}, fs)
+	h, _ := newExecFake(map[string]string{execPS: "hosbah-shop-web-22222222\n"}, fs)
 	oc, lines := execCtx(t, agentproto.ExecParams{AppID: execApp, DeploymentID: execDep, Argv: agentproto.ShellArgv("yes"), TimeoutSeconds: 30})
 	res, _, err := h.appExec(oc)
 	if err != nil {

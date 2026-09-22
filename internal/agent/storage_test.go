@@ -16,7 +16,7 @@ const (
 )
 
 func stStart(process string, mounts ...agentproto.Mount) agentproto.StartParams {
-	p := agentproto.StartParams{AppID: stAppID, App: "shop", DeploymentID: stDepID, Image: "cloudy/shop:" + stDepID, Process: process, Mounts: mounts}
+	p := agentproto.StartParams{AppID: stAppID, App: "shop", DeploymentID: stDepID, Image: "hosbah/shop:" + stDepID, Process: process, Mounts: mounts}
 	if process == "web" {
 		p.Port = 8080
 	}
@@ -28,7 +28,7 @@ func stStart(process string, mounts ...agentproto.Mount) agentproto.StartParams 
 func TestStartArgsMountTheVolumesIntoWebAndWorkers(t *testing.T) {
 	data := agentproto.Mount{Volume: agentproto.VolumeName(stAppID, "data"), MountPath: "/data"}
 	up := agentproto.Mount{Volume: agentproto.VolumeName(stAppID, "uploads"), MountPath: "/srv/app/uploads"}
-	if data.Volume != "cloudy-vol-"+stAppID+"-data" {
+	if data.Volume != "hosbah-vol-"+stAppID+"-data" {
 		t.Fatalf("derived volume name: %s", data.Volume)
 	}
 	for _, process := range []string{"web", "worker:jobs"} {
@@ -69,7 +69,7 @@ func TestStartParamsRefuseBadMounts(t *testing.T) {
 	for name, mounts := range map[string][]agentproto.Mount{
 		"another app's volume":   {{Volume: agentproto.VolumeName("00000000-0000-4000-8000-0000000000a2", "data"), MountPath: "/data"}},
 		"a host path":            {{Volume: "/var/lib/docker", MountPath: "/data"}},
-		"a free volume name":     {{Volume: "cloudy-dbdata-main", MountPath: "/data"}},
+		"a free volume name":     {{Volume: "hosbah-dbdata-main", MountPath: "/data"}},
 		"an option in the name":  {{Volume: own + ",readonly", MountPath: "/data"}},
 		"an option in the path":  {{Volume: own, MountPath: "/data,volume-opt=o=bind"}},
 		"a relative path":        {{Volume: own, MountPath: "data"}},
@@ -139,7 +139,7 @@ func TestVolumeUsageReadsDockerAndNeverRunsAContainer(t *testing.T) {
 			t.Errorf("usage must not start anything: %s", c.argv)
 		}
 	}
-	oc, _ = opCtx(t, agentproto.VolumeUsageParams{AppID: stAppID, Volumes: []string{"cloudy-dbdata-main"}})
+	oc, _ = opCtx(t, agentproto.VolumeUsageParams{AppID: stAppID, Volumes: []string{"hosbah-dbdata-main"}})
 	if _, code, err := h.volumeUsage(oc); err == nil || code != 2 {
 		t.Errorf("a volume that is not the app's must be refused: %d %v", code, err)
 	}
@@ -162,7 +162,7 @@ func TestVolumeRemoveFailsCleanlyWhileInUse(t *testing.T) {
 	h, f = newStorageFake(nil)
 	oc, _ = opCtx(t, agentproto.VolumeRemoveParams{AppID: stAppID, Volume: data})
 	res, _, err := h.volumeRemove(oc)
-	if err != nil || !res.(agentproto.VolumeRemoveResult).Removed || len(f.calls) != 1 || f.calls[0].argv != "docker volume rm "+data {
+	if err != nil || !res.(agentproto.VolumeRemoveResult).Removed || len(f.calls) != 2 || f.calls[1].argv != "docker volume rm "+data { // calls[0]: is there a pre-rename cloudy-vol-…?
 		t.Fatalf("remove: %+v %v %+v", res, err, f.calls)
 	}
 
@@ -173,7 +173,7 @@ func TestVolumeRemoveFailsCleanlyWhileInUse(t *testing.T) {
 		t.Fatalf("already gone is fine: %+v %v", res, err)
 	}
 
-	oc, _ = opCtx(t, agentproto.VolumeRemoveParams{AppID: stAppID, Volume: "cloudy-dbdata-main"})
+	oc, _ = opCtx(t, agentproto.VolumeRemoveParams{AppID: stAppID, Volume: "hosbah-dbdata-main"})
 	if _, code, _ := h.volumeRemove(oc); code != 2 {
 		t.Error("a volume that is not the app's must be refused")
 	}
@@ -193,12 +193,12 @@ func bucketBoxes(t *testing.T, bucket string) (ed25519.PrivateKey, string, strin
 	return priv, root, key
 }
 
-const runningMinIO = "docker inspect --type container --format {{.State.Status}} cloudy-db-files"
+const runningMinIO = "docker inspect --type container --format {{.State.Status}} hosbah-db-files"
 
 func TestBucketCreateScopesTheKeyToOneBucketAndKeepsSecretsOffTheArgv(t *testing.T) {
 	priv, root, key := bucketBoxes(t, "shop-media")
 	h, f := newStorageFake(map[string]string{runningMinIO: "running\n"})
-	p := agentproto.BucketCreateParams{ServiceID: stSvcID, Container: "cloudy-db-files", Bucket: "shop-media", AccessKey: "cbAbCdEfGh0123456789",
+	p := agentproto.BucketCreateParams{ServiceID: stSvcID, Container: "hosbah-db-files", Bucket: "shop-media", AccessKey: "cbAbCdEfGh0123456789",
 		Policy: agentproto.BucketPolicyName("cbAbCdEfGh0123456789"), Secret: key, RootSecret: root}
 	oc, lines := opCtx(t, p)
 	oc.priv = priv
@@ -235,7 +235,7 @@ func TestBucketCreateScopesTheKeyToOneBucketAndKeepsSecretsOffTheArgv(t *testing
 		}
 	}
 	all := strings.Join(argv, "\n")
-	for _, want := range []string{"mc mb --ignore-existing local/shop-media", "mc admin policy attach local cloudy-bucket-cbAbCdEfGh0123456789 --user cbAbCdEfGh0123456789",
+	for _, want := range []string{"mc mb --ignore-existing local/shop-media", "mc admin policy attach local hosbah-bucket-cbAbCdEfGh0123456789 --user cbAbCdEfGh0123456789",
 		"-e MC_HOST_local", "-e S -e U"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in\n%s", want, all)
@@ -269,9 +269,9 @@ func TestBucketCreateScopesTheKeyToOneBucketAndKeepsSecretsOffTheArgv(t *testing
 
 func TestBucketRemoveChecksEmptinessBeforeAnythingChanges(t *testing.T) {
 	priv, root, _ := bucketBoxes(t, "shop-media")
-	p := agentproto.BucketRemoveParams{ServiceID: stSvcID, Container: "cloudy-db-files", Bucket: "shop-media", AccessKey: "cbAbCdEfGh0123456789",
+	p := agentproto.BucketRemoveParams{ServiceID: stSvcID, Container: "hosbah-db-files", Bucket: "shop-media", AccessKey: "cbAbCdEfGh0123456789",
 		Policy: agentproto.BucketPolicyName("cbAbCdEfGh0123456789"), DeleteData: true, RootSecret: root}
-	ls := "docker exec -i -e MC_HOST_local cloudy-db-files mc ls local/shop-media"
+	ls := "docker exec -i -e MC_HOST_local hosbah-db-files mc ls local/shop-media"
 
 	h, f := newStorageFake(map[string]string{runningMinIO: "running\n", ls: "[2026-09-01 10:00:00 UTC] 1.2MiB STANDARD logo.png\n"})
 	oc, _ := opCtx(t, p)
@@ -312,7 +312,7 @@ func TestBucketRemoveChecksEmptinessBeforeAnythingChanges(t *testing.T) {
 	p.Force, p.DeleteData = false, false
 	res, argv = run(p, map[string]string{runningMinIO: "running\n", ls: "x\n"})
 	if !res.KeyRevoked || res.BucketRemoved || strings.Contains(argv, " rb ") ||
-		!strings.Contains(argv, "mc admin user rm local cbAbCdEfGh0123456789") || !strings.Contains(argv, "mc admin policy rm local cloudy-bucket-cbAbCdEfGh0123456789") {
+		!strings.Contains(argv, "mc admin user rm local cbAbCdEfGh0123456789") || !strings.Contains(argv, "mc admin policy rm local hosbah-bucket-cbAbCdEfGh0123456789") {
 		t.Errorf("revoke only: %+v\n%s", res, argv)
 	}
 	if strings.Contains(argv, "r00t-pw-marker") {

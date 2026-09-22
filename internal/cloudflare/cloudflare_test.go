@@ -125,11 +125,11 @@ func TestVerifyAndBadToken(t *testing.T) {
 
 func TestZoneForPicksTheDeepestZone(t *testing.T) {
 	_, c := newFake("fadymondy.com", "apps.fadymondy.com")
-	z, err := c.ZoneFor(context.Background(), "cloudy-app-x.apps.fadymondy.com")
+	z, err := c.ZoneFor(context.Background(), "hosbah-app-x.apps.fadymondy.com")
 	if err != nil || z.Name != "apps.fadymondy.com" {
 		t.Fatalf("zone = %+v err = %v", z, err)
 	}
-	z, err = c.ZoneFor(context.Background(), "cloudy-app-healthdebug.fadymondy.com")
+	z, err = c.ZoneFor(context.Background(), "hosbah-app-healthdebug.fadymondy.com")
 	if err != nil || z.Name != "fadymondy.com" {
 		t.Fatalf("zone = %+v err = %v", z, err)
 	}
@@ -141,7 +141,7 @@ func TestZoneForPicksTheDeepestZone(t *testing.T) {
 func TestPointHostIsIdempotentAndUpdates(t *testing.T) {
 	f, c := newFake("fadymondy.com")
 	ctx := context.Background()
-	host := "cloudy-app-healthdebug.fadymondy.com"
+	host := "hosbah-app-healthdebug.fadymondy.com"
 	if _, _, err := c.PointHost(ctx, host, "203.0.113.10", false); err != nil {
 		t.Fatal(err)
 	}

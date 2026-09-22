@@ -10,10 +10,15 @@ import (
 // echo values, and this is what happens when one day a new one does.
 func TestScrubSecretsRedactsSecretShapedOutput(t *testing.T) {
 	for _, tc := range []struct{ name, in, absent string }{
-		{"mcp token", "deleted; token cld_0123456789abcdef0123", "cld_0123456789abcdef0123"},
-		{"admin token", "minted cla_0123456789abcdef0123", "cla_0123456789abcdef0123"},
-		{"enrolment token", "enrolment cle_0123456789abcdef0123456789", "cle_0123456789abcdef0123456789"},
-		{"deploy hook", "hook cdh_0123456789abcdef0123456789", "cdh_0123456789abcdef0123456789"},
+		{"mcp token", "deleted; token hbu_0123456789abcdef0123", "hbu_0123456789abcdef0123"},
+		{"admin token", "minted hba_0123456789abcdef0123", "hba_0123456789abcdef0123"},
+		{"enrolment token", "enrolment hbe_0123456789abcdef0123456789", "hbe_0123456789abcdef0123456789"},
+		{"deploy hook", "hook hbh_0123456789abcdef0123456789", "hbh_0123456789abcdef0123456789"},
+		// Pre-rename prefixes: those tokens still authenticate, so they are still secrets.
+		{"legacy mcp token", "deleted; token cld_0123456789abcdef0123", "cld_0123456789abcdef0123"},
+		{"legacy admin token", "minted cla_0123456789abcdef0123", "cla_0123456789abcdef0123"},
+		{"legacy enrolment token", "enrolment cle_0123456789abcdef0123456789", "cle_0123456789abcdef0123456789"},
+		{"legacy deploy hook", "hook cdh_0123456789abcdef0123456789", "cdh_0123456789abcdef0123456789"},
 		{"sealed envelope", "sealed csv1:AAAABBBBCCCCDDDD", "csv1:AAAABBBBCCCCDDDD"},
 		{"url password", "postgres://app:hunter2@10.0.0.1:5432/app", "hunter2"},
 		{"redis url password", "redis://default:s3cr3tvalue@172.17.0.1:6379", "s3cr3tvalue"},

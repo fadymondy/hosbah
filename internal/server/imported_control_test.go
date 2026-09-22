@@ -18,7 +18,7 @@ import (
 /*
 Imported workloads are controllable like any other service: every control endpoint enqueues exactly
 one typed, signed operation with validated params (checked here by a fake agent that verifies each
-operation against the control plane's key, as cloudy-agent does); roles gate them; destroying needs
+operation against the control plane's key, as hosbah-agent does); roles gate them; destroying needs
 a typed confirm over REST and the approval gate over MCP; domains become proxy routes to the
 workload; credentials make an imported database a normal one; Hosbah's own workloads and guests
 that are Hosbah servers are refused before anything is queued.

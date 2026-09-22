@@ -19,7 +19,7 @@ App browsers: a headless Chromium of a site, on the site's own server, that the 
 CDP/WebSocket (agent ops browser.create / browser.remove / browser.status).
 
 How a site's container reaches it: exactly the way it reaches a data service — the server's private
-address (privateBind: the Docker bridge gateway 172.17.0.1 unless CLOUDY_DB_BIND names a private
+address (privateBind: the Docker bridge gateway 172.17.0.1 unless HOSBAH_DB_BIND names a private
 NIC) and a port the control plane hands out (from agentproto.BrowserPortBase). Release containers
 run on Docker's default bridge, from which the host's 127.0.0.1 is NOT reachable — so Chromium's own
 port is published on 127.0.0.1 only, and what listens on the private address is the agent's gateway,

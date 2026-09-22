@@ -57,7 +57,7 @@ func EnrollWithFacts(ctx context.Context, controlPlane, token, version string, c
 		return nil, nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("User-Agent", "cloudy-agent/"+version)
+	httpReq.Header.Set("User-Agent", "hosbah-agent/"+version)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, req.Checks, fmt.Errorf("could not reach the control plane at %s: %w", base, err)

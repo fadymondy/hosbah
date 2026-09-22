@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/brand"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -54,9 +54,9 @@ func TestAppBrowsers(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	short := suffix[len(suffix)-6:]
 	ctx := context.Background()
-	// Where a data service is published: CLOUDY_DB_BIND, else the Docker bridge gateway.
+	// Where a data service is published: HOSBAH_DB_BIND (or CLOUDY_DB_BIND), else the Docker bridge gateway.
 	bind := "172.17.0.1"
-	if v := strings.TrimSpace(os.Getenv("CLOUDY_DB_BIND")); v != "" {
+	if v := strings.TrimSpace(brand.Getenv("DB_BIND")); v != "" {
 		bind = v
 	}
 

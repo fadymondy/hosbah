@@ -20,11 +20,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/fadymondy/hosbah/internal/app"
@@ -33,22 +33,23 @@ import (
 
 // Config is where agents reach the control plane and where agent builds live.
 type Config struct {
-	// PublicURL is the origin agents use (CLOUDY_AGENT_URL). The install one-liner, the binary
+	// PublicURL is the origin agents use (HOSBAH_AGENT_URL). The install one-liner, the binary
 	// download and the WebSocket URL an agent is given at enrolment all derive from it. In local
 	// development with a container as the target: http://host.docker.internal:8710.
 	PublicURL string
-	// DistDir holds the built agent binaries (CLOUDY_AGENT_DIST, default bin/agent):
-	// cloudy-agent-linux-amd64, cloudy-agent-linux-arm64 and VERSION (`make agent`).
+	// DistDir holds the built agent binaries (HOSBAH_AGENT_DIST, default bin/agent):
+	// hosbah-agent-linux-amd64, hosbah-agent-linux-arm64 and VERSION (`make agent`). A dir built
+	// before the rename (cloudy-agent-linux-*) is served too.
 	DistDir string
 }
 
 // ConfigFromEnv reads Config from the environment.
 func ConfigFromEnv() Config {
-	u := strings.TrimRight(strings.TrimSpace(os.Getenv("CLOUDY_AGENT_URL")), "/")
+	u := strings.TrimRight(strings.TrimSpace(brand.Getenv("AGENT_URL")), "/")
 	if u == "" {
 		u = "http://localhost:8710"
 	}
-	dist := strings.TrimSpace(os.Getenv("CLOUDY_AGENT_DIST"))
+	dist := strings.TrimSpace(brand.Getenv("AGENT_DIST"))
 	if dist == "" {
 		dist = "bin/agent"
 	}

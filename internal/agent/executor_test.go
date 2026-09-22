@@ -126,7 +126,7 @@ func TestAgentUpdateVerifiesChecksum(t *testing.T) {
 	defer srv.Close()
 
 	dir := t.TempDir()
-	self := filepath.Join(dir, "cloudy-agent")
+	self := filepath.Join(dir, "hosbah-agent")
 	if err := os.WriteFile(self, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestAgentUpdateVerifiesChecksum(t *testing.T) {
 	go e.Work(ctx)
 
 	sum := sha256.Sum256(good)
-	params, _ := json.Marshal(map[string]string{"version": "v2", "url": srv.URL + "/agent/download/cloudy-agent-linux-amd64", "sha256": hex.EncodeToString(sum[:])})
+	params, _ := json.Marshal(map[string]string{"version": "v2", "url": srv.URL + "/agent/download/hosbah-agent-linux-amd64", "sha256": hex.EncodeToString(sum[:])})
 	e.Submit(signedOp(t, priv, "op-up", agentproto.KindAgentUpdate, string(params)))
 	final := s.waitFor(t, func(ev agentproto.Event) bool {
 		return ev.OpID == "op-up" && (ev.Status == agentproto.StatusOK || ev.Status == agentproto.StatusFailed)

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -123,7 +124,9 @@ func provisionStep(oc *OpContext) (any, int, error) {
 
 var basePackages = []string{"ca-certificates", "curl", "gnupg"}
 
-func missingPackages(oc *OpContext, pkgs []string) []string { return hostPkgManager().missing(oc, pkgs) }
+func missingPackages(oc *OpContext, pkgs []string) []string {
+	return hostPkgManager().missing(oc, pkgs)
+}
 
 func stepBasePackages(oc *OpContext) (any, int, error) {
 	missing := missingPackages(oc, basePackages)
@@ -249,7 +252,14 @@ type updateParams struct {
 }
 
 // executablePath is overridable in tests (the real one is the running binary).
-var executablePath = func() string { return selfPath }
+// Symlinks are resolved now, not at start: after the move to hosbah-agent the start path
+// (/usr/local/bin/cloudy-agent) may have become a link to the new binary.
+var executablePath = func() string {
+	if p, err := filepath.EvalSymlinks(selfPath); err == nil {
+		return p
+	}
+	return selfPath
+}
 
 // agentUpdate replaces the agent binary. The version, URL and SHA-256 are inside the signed
 // params, so the control plane's signature covers the exact bytes installed: a download that does

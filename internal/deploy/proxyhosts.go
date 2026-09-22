@@ -3,9 +3,7 @@ package deploy
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -19,7 +17,7 @@ import (
 // TLS, like Nginx Proxy Manager's "proxy hosts", on the Caddy the agent already runs. They share the
 // hostname space with app domains (one hostname routes to one thing in Hosbah), the same TLS modes,
 // and the same verification rule: a public certificate only once the hostname is proven — by the
-// _cloudy-verify TXT record, or at once when the team's Cloudflare holds the zone.
+// _hosbah-verify TXT record (or a pre-rename _cloudy-verify one), or at once when the team's Cloudflare holds the zone.
 
 // ProxyHostInput creates or changes a proxy host.
 type ProxyHostInput struct {
@@ -62,7 +60,7 @@ func (s *Service) CreateProxyHost(ctx context.Context, q *db.Queries, teamID str
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
 	p, err := q.CreateProxyHost(ctx, db.CreateProxyHostParams{TeamID: teamID, ServerID: srv.ID, Hostname: host, Upstream: up, Tls: tls,
-		Enabled: boolOr(in.Enabled, true), Websockets: boolOr(in.Websockets, true), VerifyToken: "cloudy-verify=" + hex.EncodeToString(tok),
+		Enabled: boolOr(in.Enabled, true), Websockets: boolOr(in.Websockets, true), VerifyToken: newVerifyToken(tok),
 		CreatedBy: actor.UserID})
 	if err != nil {
 		if strings.Contains(err.Error(), "proxy_hosts_hostname_key") {
@@ -126,29 +124,21 @@ func (s *Service) DeleteProxyHost(ctx context.Context, q *db.Queries, teamID str
 	return nil
 }
 
-// VerifyProxyHost checks the _cloudy-verify TXT record, like an app domain.
+// VerifyProxyHost checks the verification TXT record (_hosbah-verify, or _cloudy-verify), like an app domain.
 func (s *Service) VerifyProxyHost(ctx context.Context, q *db.Queries, teamID string, actor Actor, p db.ProxyHost) (bool, string, error) {
 	if p.VerifiedAt != nil {
 		return true, p.Hostname + " is already verified.", nil
 	}
-	name := "_cloudy-verify." + p.Hostname
-	lctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	records, err := LookupTXT(lctx, name)
-	for _, r := range records {
-		if strings.TrimSpace(r) == p.VerifyToken {
-			if err := q.MarkProxyHostVerified(ctx, db.MarkProxyHostVerifiedParams{ID: p.ID, TeamID: teamID}); err != nil {
-				return false, "", err
-			}
-			return true, p.Hostname + " is verified.", tenancy.Record(ctx, q, teamID, actor.UserID, "proxy_host.verified", "proxy_host", p.ID,
-				actor.audit(map[string]any{"hostname": p.Hostname}))
+	if ok, found := checkVerifyTXT(ctx, p.Hostname, p.VerifyToken); ok {
+		if err := q.MarkProxyHostVerified(ctx, db.MarkProxyHostVerifiedParams{ID: p.ID, TeamID: teamID}); err != nil {
+			return false, "", err
 		}
+		return true, p.Hostname + " is verified.", tenancy.Record(ctx, q, teamID, actor.UserID, "proxy_host.verified", "proxy_host", p.ID,
+			actor.audit(map[string]any{"hostname": p.Hostname}))
+	} else if found {
+		return false, notVerifiedYet("the TXT record does not match", p.Hostname, p.VerifyToken), nil
 	}
-	why := "no TXT record found"
-	if err == nil && len(records) > 0 {
-		why = "the TXT record does not match"
-	}
-	return false, fmt.Sprintf("Not verified yet (%s). Add a TXT record %s with the value %s, then verify again.", why, name, p.VerifyToken), nil
+	return false, notVerifiedYet("no TXT record found", p.Hostname, p.VerifyToken), nil
 }
 
 // ProxyHostByRef resolves one of the team's proxy hosts by id or hostname.

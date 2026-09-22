@@ -88,7 +88,7 @@ func StorageTools() []Tool {
 		{
 			Name: "create_app_volume", Scope: scopes.Write,
 			Description: "Add a persistent volume to an app: mounted at mount_path in its web and every worker container from the next " +
-				"deploy or restart. The Docker volume's name is derived (cloudy-vol-<app id>-<name>). System paths (/proc, /sys, /dev, /run, " +
+				"deploy or restart. The Docker volume's name is derived (hosbah-vol-<app id>-<name>; cloudy-vol-… for a volume made before the rename). System paths (/proc, /sys, /dev, /run, " +
 				"/etc, /bin, /sbin, /usr, /lib, /lib64, /boot, /var/run) and paths inside another volume are refused. Owner or admin.",
 			InputSchema: schema([]string{"app", "name", "mount_path"}, map[string]any{"app": appArg,
 				"name":       str("Lowercase letter, then up to 30 lowercase letters, digits and dashes; unique in the app"),

@@ -30,10 +30,11 @@ const (
 	// BrowserPidsLimit bounds a browser's processes and threads (Chromium is thread-hungry).
 	BrowserPidsLimit = 1024
 
-	BrowserContainerPrefix = "cloudy-browser-"
-	// Labels. NOT cloudy.app: a deploy's drain and a rollback stop every container with that label.
-	BrowserLabel    = "cloudy.browser"
-	BrowserAppLabel = "cloudy.browser-app"
+	// Names (cloudy-browser- and cloudy.* before the rename; the agent still finds those).
+	BrowserContainerPrefix = NamePrefix + "browser-"
+	// Labels. NOT hosbah.app: a deploy's drain and a rollback stop every container with that label.
+	BrowserLabel    = LabelPrefix + "browser"
+	BrowserAppLabel = LabelPrefix + "browser-app"
 
 	MaxAppBrowsers  = 3
 	BrowserPortBase = 19222 // the first gateway port the control plane hands out on a server

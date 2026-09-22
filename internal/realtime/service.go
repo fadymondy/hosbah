@@ -53,7 +53,7 @@ func RefuseImported(a db.App) error {
 type RealtimeConfig struct {
 	Enabled   bool      `json:"enabled"`
 	Kind      string    `json:"kind" enum:"reverb,socketio,ws,go,custom"`
-	Process   string    `json:"process" doc:"The worker that is the realtime server, by its bare name: reverb is cloudy.toml's \"worker:reverb\"."`
+	Process   string    `json:"process" doc:"The worker that is the realtime server, by its bare name: reverb is hosbah.toml's \"worker:reverb\"."`
 	Port      int       `json:"port" doc:"The port the process listens on INSIDE its container. The agent publishes it on a loopback port it picks."`
 	Path      string    `json:"path" doc:"Requests of the site's hostnames whose path starts with this go to the process. / is the whole site (kind custom only)."`
 	WholeSite bool      `json:"whole_site" doc:"true when path is / — everything, not only websockets, goes to the realtime process."`
@@ -211,10 +211,10 @@ func Clean(in Input) (db.UpsertAppRealtimeParams, error) {
 	}
 	p.Process = strings.TrimSpace(in.Process)
 	if p.Process == "web" {
-		return p, invalid("web is the site itself — the realtime process is a worker of cloudy.toml (\"worker:<name>\"), named here without the worker: prefix")
+		return p, invalid("web is the site itself — the realtime process is a worker of hosbah.toml or cloudy.toml (\"worker:<name>\"), named here without the worker: prefix")
 	}
 	if !agentproto.ValidRealtimeProcess(p.Process) {
-		return p, invalid("process is a worker's name: a lowercase letter, then up to 30 lowercase letters, digits, - or _ (reverb for cloudy.toml's \"worker:reverb\")")
+		return p, invalid("process is a worker's name: a lowercase letter, then up to 30 lowercase letters, digits, - or _ (reverb for hosbah.toml's \"worker:reverb\")")
 	}
 	if in.Port < 1 || in.Port > 65535 {
 		return p, invalid("port is the port the process listens on inside its container: 1–65535")
@@ -261,11 +261,11 @@ func Set(ctx context.Context, q *db.Queries, o *ops.Service, teamID string, acto
 			found = found || n == p.Process
 		}
 		if !found {
-			list := "none — add one under [processes] in cloudy.toml, for example \"worker:" + p.Process + "\""
+			list := "none — add one under [processes] in hosbah.toml (or cloudy.toml), for example \"worker:" + p.Process + "\""
 			if len(names) > 0 {
 				list = strings.Join(names, ", ")
 			}
-			return RealtimeSaved{}, invalid(fmt.Sprintf("the live release declares no process \"worker:%s\" in cloudy.toml. Declared workers: %s", p.Process, list))
+			return RealtimeSaved{}, invalid(fmt.Sprintf("the live release declares no process \"worker:%s\" in hosbah.toml (or cloudy.toml). Declared workers: %s", p.Process, list))
 		}
 	}
 	prev, err := current(ctx, q, teamID, a)

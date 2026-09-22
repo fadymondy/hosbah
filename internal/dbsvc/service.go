@@ -22,12 +22,12 @@ import (
 	"log/slog"
 	"math/big"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/fadymondy/hosbah/internal/crypto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
@@ -52,10 +52,10 @@ func conflict(msg string) error  { return &Error{Status: 409, Message: msg} }
 
 // Service runs P3 data-service and backup actions.
 type Service struct {
-	a          *app.App
-	ops        *ops.Service
-	deploy     *deploy.Service
-	log        *slog.Logger
+	a           *app.App
+	ops         *ops.Service
+	deploy      *deploy.Service
+	log         *slog.Logger
 	schedCancel context.CancelFunc
 }
 
@@ -549,7 +549,7 @@ func (s *Service) withServer(ctx context.Context, teamID, serverID string, build
 			return nil // resume: it already exists
 		}
 		raw, _ := json.Marshal(params)
-		_, _, e := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{OpID: id, TeamID: teamID, ServerID: serverID, Kind: kind, Params: raw, CreatedBy: "cloudy"})
+		_, _, e := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{OpID: id, TeamID: teamID, ServerID: serverID, Kind: kind, Params: raw, CreatedBy: "hosbah"})
 		return e
 	}); err != nil {
 		return err
@@ -609,7 +609,7 @@ func (s *Service) repoSpec(agentKey string, dek []byte, teamID string, svc db.Da
 	repo := agentproto.RepoSpec{Target: target}
 	switch target {
 	case "local":
-		repo.Repo = "/var/lib/cloudy/restic/" + svc.ID
+		repo.Repo = agentproto.WorkDir + "/restic/" + svc.ID // /var/lib/cloudy/restic before the rename: the agent moved it, and left a link
 	case "minio", "s3":
 		cfg, ok := s.remoteConfig(target)
 		if !ok {
@@ -641,11 +641,12 @@ func contOf(svc db.DataService) string {
 	return agentproto.DBContainerName(svc.Name)
 }
 
-func rootContext(serviceID string) string        { return "dbroot:" + serviceID }
-func userContext(serviceID, user string) string  { return "dbuser:" + serviceID + ":" + user }
+func rootContext(serviceID string) string       { return "dbroot:" + serviceID }
+func userContext(serviceID, user string) string { return "dbuser:" + serviceID + ":" + user }
 
 // opID derives a stable operation id from an entity and a step, so a resumed action re-attaches.
 func opID(entityID, step string) string {
+	// "cloudy-db" is frozen: a new seed would give an action resumed across the upgrade new op ids.
 	sum := sha256.Sum256([]byte("cloudy-db\n" + entityID + "\n" + step))
 	b := sum[:16]
 	b[6] = (b[6] & 0x0f) | 0x40
@@ -693,9 +694,9 @@ func auditExtra(a Actor, extra map[string]any) map[string]any {
 
 // privateBind is the address a data service publishes on: never the internet. On the demo target
 // (docker-in-docker) the default docker bridge gateway is reachable by the app containers on the same
-// host, so it is the default; a server with a real private NIC overrides it with CLOUDY_DB_BIND.
+// host, so it is the default; a server with a real private NIC overrides it with HOSBAH_DB_BIND (or CLOUDY_DB_BIND).
 func privateBind(serverID string) string {
-	if v := strings.TrimSpace(os.Getenv("CLOUDY_DB_BIND")); v != "" {
+	if v := strings.TrimSpace(brand.Getenv("DB_BIND")); v != "" {
 		return v
 	}
 	return "172.17.0.1"
@@ -704,6 +705,7 @@ func privateBind(serverID string) string {
 // deriveRepoPassword is a stable restic repository password per service, derived from the team DEK so
 // it never has to be stored and is the same on every backup and restore of that service.
 func deriveRepoPassword(dek []byte, serviceID string) string {
+	// "cloudy-restic" is frozen: it is part of every existing repository's password.
 	sum := sha256.Sum256(append(append([]byte("cloudy-restic\n"), dek...), []byte("\n"+serviceID)...))
 	return hex.EncodeToString(sum[:])
 }
@@ -718,15 +720,15 @@ type remoteRepo struct {
 }
 
 func (s *Service) remoteConfig(target string) (remoteRepo, bool) {
-	pfx := "CLOUDY_S3_"
+	pfx := "S3_" // HOSBAH_S3_* (or CLOUDY_S3_*)
 	if target == "minio" {
-		pfx = "CLOUDY_MINIO_"
+		pfx = "MINIO_"
 	}
 	cfg := remoteRepo{
-		Repo:      os.Getenv(pfx + "REPO"),
-		AccessKey: os.Getenv(pfx + "ACCESS_KEY"),
-		SecretKey: os.Getenv(pfx + "SECRET_KEY"),
-		Region:    os.Getenv(pfx + "REGION"),
+		Repo:      brand.Getenv(pfx + "REPO"),
+		AccessKey: brand.Getenv(pfx + "ACCESS_KEY"),
+		SecretKey: brand.Getenv(pfx + "SECRET_KEY"),
+		Region:    brand.Getenv(pfx + "REGION"),
 	}
 	return cfg, cfg.Repo != "" && cfg.AccessKey != "" && cfg.SecretKey != ""
 }
@@ -746,7 +748,7 @@ func strptr(s string) *string {
 	}
 	return &s
 }
-func int64ptr(v int64) *int64    { return &v }
+func int64ptr(v int64) *int64        { return &v }
 func timeptr(t time.Time) *time.Time { return &t }
 func derefStr(p *string) string {
 	if p == nil {

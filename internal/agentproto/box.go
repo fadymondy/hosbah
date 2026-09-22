@@ -131,6 +131,8 @@ func OpenBox(priv ed25519.PrivateKey, context, box string) ([]byte, error) {
 
 func boxCipher(shared, ephPub, recipientPub []byte) (cipher.AEAD, error) {
 	salt := append(append([]byte{}, ephPub...), recipientPub...)
+	// "cloudy/agent-box/v1" is frozen (pre-rename): agents on both sides of an upgrade must derive the
+	// same key, and changing it would break every box sealed to an agent that has not updated.
 	key, err := hkdf.Key(sha256.New, shared, salt, "cloudy/agent-box/v1", 32)
 	if err != nil {
 		return nil, err

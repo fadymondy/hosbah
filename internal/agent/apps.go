@@ -23,9 +23,17 @@ import (
 
 // App operations (P2). Everything here is a fixed argv for git / docker / railpack, or Caddy JSON —
 // no host shell. The two strings a user controls that do run are the release command and a process
-// command from cloudy.toml, and both run INSIDE the app's own container (sh -c), never on the host.
+// command from hosbah.toml (or cloudy.toml), and both run INSIDE the app's own container (sh -c), never on the host.
 
-const workRoot = "/var/lib/cloudy"
+// workRoot was /var/lib/cloudy before the rename; migrateStateDirs moves it on the first start.
+const workRoot = agentproto.WorkDir
+
+// appDocker runs the docker commands that only read (listing an app's containers); dockerStep
+// the ones that change something, logged to the operation. Tests replace both.
+var (
+	appDocker  runFunc = execRun
+	dockerStep         = func(oc *OpContext, args ...string) (int, error) { return oc.Run("docker", args...) }
+)
 
 func decode[T any](oc *OpContext) (T, error) {
 	var p T
@@ -106,16 +114,22 @@ func gitOut(oc *OpContext, dir string, args ...string) (string, error) {
 // ---- detection -----------------------------------------------------------------------------------
 
 // detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
-// the build plan and says what it found). cloudy.toml is returned raw for the control plane to
-// parse.
+// the build plan and says what it found). hosbah.toml — or, when a repository has none, the
+// pre-rename cloudy.toml — is returned raw for the control plane to parse.
 func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
-	if b, err := os.ReadFile(filepath.Join(src, "cloudy.toml")); err == nil { //#nosec G304 -- inside our checkout
-		if len(b) > agentproto.MaxHosbahToml {
-			return r, 1, errors.New("cloudy.toml is larger than 64 KiB")
+	for _, name := range []string{"hosbah.toml", "cloudy.toml"} {
+		b, err := os.ReadFile(filepath.Join(src, name)) //#nosec G304 -- inside our checkout
+		if err != nil {
+			continue
 		}
-		r.HosbahToml = string(b)
-		oc.Info("found cloudy.toml")
+		if len(b) > agentproto.MaxHosbahToml {
+			return r, 1, errors.New(name + " is larger than 64 KiB")
+		}
+		// Both keys: a control plane from before the rename reads only cloudy_toml.
+		r.HosbahToml, r.LegacyToml, r.TomlFile = string(b), string(b), name
+		oc.Info("found %s", name)
+		break
 	}
 	if st, err := os.Stat(filepath.Join(src, "Dockerfile")); err == nil && st.Mode().IsRegular() {
 		r.Runtime = "dockerfile"
@@ -161,8 +175,8 @@ func readRailpackInfo(infoPath, planPath string) (provider, start string) {
 	if b, err := os.ReadFile(planPath); err == nil { //#nosec G304 -- our own work dir
 		var plan struct {
 			Deploy struct {
-				StartCmd     string `json:"startCommand"`
-				StartCmdAlt  string `json:"startCmd"`
+				StartCmd    string `json:"startCommand"`
+				StartCmdAlt string `json:"startCmd"`
 			} `json:"deploy"`
 		}
 		if json.Unmarshal(b, &plan) == nil {
@@ -205,7 +219,7 @@ func appBuild(oc *OpContext) (any, int, error) {
 		return nil, 2, err
 	}
 	if !agentproto.ValidID(p.AppID) || !agentproto.ValidAppName(p.App) || !agentproto.ValidID(p.DeploymentID) ||
-		p.Image != agentproto.ImageRepo(p.App)+":"+p.DeploymentID {
+		(p.Image != agentproto.ImageRepo(p.App)+":"+p.DeploymentID && p.Image != agentproto.LegacyImageRepo(p.App)+":"+p.DeploymentID) {
 		return nil, 2, errors.New("bad app, deployment or image")
 	}
 	if code, err := dockerReady(oc); err != nil {
@@ -228,7 +242,7 @@ func appBuild(oc *OpContext) (any, int, error) {
 	d.Commit, d.Message = commit, msg
 
 	oc.Progress(3, 4)
-	labels := []string{"--label", "cloudy.app=" + p.AppID, "--label", "cloudy.deployment=" + p.DeploymentID}
+	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
 	args := []string{"buildx", "build", "--progress=plain", "--load", "-t", p.Image}
 	args = append(args, labels...)
 	if d.Runtime == "dockerfile" {
@@ -264,12 +278,18 @@ func dockerReady(oc *OpContext) (int, error) {
 	return 0, nil
 }
 
-// pruneImages keeps the newest `keep` images of cloudy/<app> plus the protected ones.
+// pruneImages keeps the newest `keep` images of hosbah/<app> — counting the app's images from before
+// the rename, cloudy/<app>, with them — plus the protected ones.
 func pruneImages(oc *OpContext, app string, keep int, protect []string) []string {
-	out, err := execOutput(oc, "docker", "image", "ls", agentproto.ImageRepo(app), "--format", "{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}")
-	if err != nil {
-		return nil
+	var out string
+	for _, repo := range []string{agentproto.ImageRepo(app), agentproto.LegacyImageRepo(app)} {
+		b, err := execOutput(oc, "docker", "image", "ls", repo, "--format", "{{.Repository}}:{{.Tag}}\t{{.CreatedAt}}")
+		if err != nil {
+			return nil
+		}
+		out += b + "\n"
 	}
+	out = strings.TrimSpace(out)
 	type img struct{ ref, created string }
 	var imgs []img
 	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
@@ -306,7 +326,7 @@ func appRelease(oc *OpContext) (any, int, error) {
 		return nil, 2, err
 	}
 	if !agentproto.ValidID(p.AppID) || !agentproto.ValidAppName(p.App) || !agentproto.ValidID(p.DeploymentID) ||
-		!strings.HasPrefix(p.Image, agentproto.ImageRepo(p.App)+":") || strings.TrimSpace(p.Command) == "" {
+		!agentproto.IsAppImage(p.App, p.Image) || strings.TrimSpace(p.Command) == "" {
 		return nil, 2, errors.New("bad release params")
 	}
 	env, err := oc.OpenEnv(agentproto.EnvContext(p.AppID, p.DeploymentID, "release"), p.Env)
@@ -315,7 +335,7 @@ func appRelease(oc *OpContext) (any, int, error) {
 	}
 	name := agentproto.ContainerName(p.App, "release", p.DeploymentID)
 	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", name).Run() //#nosec G204 -- a retry after a crash
-	args := []string{"run", "--rm", "--name", name, "--label", "cloudy.app=" + p.AppID, "--label", "cloudy.process=release"}
+	args := []string{"run", "--rm", "--name", name, "--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelProcess + "=release"}
 	args = append(args, envArgs(env)...)
 	args = append(args, "--entrypoint", "/bin/sh", p.Image, "-c", p.Command)
 	oc.Info("release command: %s", p.Command)
@@ -376,6 +396,8 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 	}
 	name := agentproto.ContainerName(p.App, p.Process, p.DeploymentID)
 	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", name).Run() //#nosec G204 -- idempotent re-run
+	// A volume made before the rename keeps its name (and its data): cloudy-vol-… when that exists.
+	p.Mounts = resolveMounts(oc.Ctx, appDocker, p.Mounts)
 	args, pairs := startArgs(p, name, env)
 	oc.Info("starting %s (%s)", p.Process, name)
 	for _, m := range p.Mounts {
@@ -462,7 +484,7 @@ func publishArg(containerPort int) []string {
 // into --mount. Docker creates a named volume that does not exist yet.
 func startArgs(p agentproto.StartParams, name string, env map[string]string) (args, pairs []string) {
 	args = []string{"run", "-d", "--name", name, "--restart", "unless-stopped",
-		"--label", "cloudy.app=" + p.AppID, "--label", "cloudy.process=" + p.Process, "--label", "cloudy.deployment=" + p.DeploymentID,
+		"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelProcess + "=" + p.Process, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3"}
 	pairs = envPairs(env)
 	if p.Process == "web" {
@@ -696,8 +718,8 @@ func drain(oc *OpContext, p agentproto.DrainParams) ([]string, int, error) {
 			continue
 		}
 		oc.Info("draining %s (SIGTERM, %ds grace)", n, grace)
-		_, _ = oc.Run("docker", "stop", "-t", strconv.Itoa(grace), n)
-		if _, err := oc.Run("docker", "rm", "-f", n); err == nil {
+		_, _ = dockerStep(oc, "stop", "-t", strconv.Itoa(grace), n)
+		if _, err := dockerStep(oc, "rm", "-f", n); err == nil {
 			stopped = append(stopped, n)
 		}
 	}
@@ -707,26 +729,36 @@ func drain(oc *OpContext, p agentproto.DrainParams) ([]string, int, error) {
 	return stopped, 0, nil
 }
 
-// appContainers lists the app's containers (all = include stopped ones), newest first.
+// appContainers lists the app's containers (all = include stopped ones), newest first: those
+// labelled hosbah.app, then those an agent from before the rename labelled cloudy.app.
 func appContainers(oc *OpContext, appID, process string, all bool) ([]string, error) {
-	args := []string{"ps", "--filter", "label=cloudy.app=" + appID, "--format", "{{.Names}}"}
-	if all {
-		args = append(args, "-a")
-	}
-	if process != "" {
-		args = append(args, "--filter", "label=cloudy.process="+process)
-	}
-	out, err := execOutput(oc, "docker", args...)
+	names, err := psNames(oc.Ctx, appDocker, func(l labelSet) []string {
+		args := []string{"--filter", "label=" + l(agentproto.LabelApp) + "=" + appID, "--format", "{{.Names}}"}
+		if all {
+			args = append(args, "-a")
+		}
+		if process != "" {
+			args = append(args, "--filter", "label="+l(agentproto.LabelProcess)+"="+process)
+		}
+		return args
+	})
 	if err != nil {
 		return nil, errors.New("could not list the app's containers")
 	}
-	var names []string
-	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
-		if l = strings.TrimSpace(l); l != "" {
-			names = append(names, l)
-		}
-	}
 	return names, nil
+}
+
+// resolveMounts points each mount at the volume as it exists on this host (resolveName).
+func resolveMounts(ctx context.Context, run runFunc, mounts []agentproto.Mount) []agentproto.Mount {
+	if len(mounts) == 0 {
+		return mounts
+	}
+	out := make([]agentproto.Mount, len(mounts))
+	for i, m := range mounts {
+		m.Volume = resolveName(ctx, run, kindVolume, m.Volume)
+		out[i] = m
+	}
+	return out
 }
 
 // ---- app.rollback --------------------------------------------------------------------------------
@@ -793,8 +825,8 @@ func appRollback(oc *OpContext) (any, int, error) {
 			}
 		}
 		if !kept {
-			_, _ = oc.Run("docker", "stop", "-t", strconv.Itoa(max(p.GraceSeconds, 1)), n)
-			_, _ = oc.Run("docker", "rm", "-f", n)
+			_, _ = dockerStep(oc, "stop", "-t", strconv.Itoa(max(p.GraceSeconds, 1)), n)
+			_, _ = dockerStep(oc, "rm", "-f", n)
 		}
 	}
 	return res, 0, nil
@@ -887,12 +919,20 @@ func appRemove(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, code, err
 	}
-	out, _ := execOutput(oc, "docker", "image", "ls", agentproto.ImageRepo(p.App), "--format", "{{.Repository}}:{{.Tag}}")
 	var removed []string
-	for _, ref := range strings.Fields(out) {
+	for _, repo := range []string{agentproto.ImageRepo(p.App), agentproto.LegacyImageRepo(p.App)} {
+		out, _ := execOutput(oc, "docker", "image", "ls", repo, "--format", "{{.Repository}}:{{.Tag}}")
+		removed = append(removed, removeImages(oc, strings.Fields(out))...)
+	}
+	return map[string]any{"containers": stopped, "images": removed}, 0, nil
+}
+
+func removeImages(oc *OpContext, refs []string) []string {
+	var removed []string
+	for _, ref := range refs {
 		if _, err := oc.Run("docker", "image", "rm", "-f", ref); err == nil {
 			removed = append(removed, ref)
 		}
 	}
-	return map[string]any{"containers": stopped, "images": removed}, 0, nil
+	return removed
 }

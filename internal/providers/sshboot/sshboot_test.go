@@ -149,7 +149,7 @@ func TestRunStreamsOutputAndReportsHostKey(t *testing.T) {
 	srv := startServer(t, "127.0.0.1:0", pub)
 	var out bytes.Buffer
 	var seen string
-	cfg := Config{Addr: srv.addr, User: "cloudy", PrivateKeyPEM: priv, HostKey: HostKeyPolicy{Observed: func(fp string) { seen = fp }}}
+	cfg := Config{Addr: srv.addr, User: "hosbah", PrivateKeyPEM: priv, HostKey: HostKeyPolicy{Observed: func(fp string) { seen = fp }}}
 	if err := Run(ctxFor(t, 10*time.Second), cfg, "install agent", &out); err != nil {
 		t.Fatal(err)
 	}

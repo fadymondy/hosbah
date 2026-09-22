@@ -1,9 +1,9 @@
-// Package cloudy is the Go SDK for Hosbah. It talks to a team's MCP endpoint (POST /api/mcp) with a
-// team-bound token (cld_…, minted under MCP tokens), so everything the dashboard can do is reachable
+// Package hosbah is the Go SDK for Hosbah. It talks to a team's MCP endpoint (POST /api/mcp) with a
+// team-bound token (hbu_…, or cld_… minted before the rename; under MCP tokens), so everything the dashboard can do is reachable
 // with the same scopes, audit trail and destructive-action approvals — and new Hosbah features are
 // available through Call before a typed helper exists for them.
 //
-//	c := hosbah.New("https://cloudy-app.fadymondy.com", os.Getenv("CLOUDY_TOKEN"))
+//	c := hosbah.New("https://app.hosbah.com", os.Getenv("HOSBAH_TOKEN"))
 //	out, err := c.Deploy(ctx, "shop", hosbah.Wait())
 //
 // It depends on the standard library only.
@@ -30,7 +30,7 @@ type Client struct {
 	id      atomic.Int64
 }
 
-// New returns a client for baseURL (the Hosbah origin, e.g. https://cloudy-app.fadymondy.com).
+// New returns a client for baseURL (the Hosbah origin, e.g. https://app.hosbah.com).
 func New(baseURL, token string, opts ...Option) *Client {
 	c := &Client{baseURL: strings.TrimRight(baseURL, "/"), token: strings.TrimSpace(token), http: &http.Client{Timeout: 10 * time.Minute}}
 	for _, o := range opts {

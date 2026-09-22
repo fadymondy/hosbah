@@ -26,7 +26,7 @@ CREATE TABLE data_services (
 
 -- Hosbah: a managed data service is one Postgres/MySQL/Redis container on one server of its team,
 -- bound to the server's private interface only. name is a DNS-label-like slug — it becomes the
--- container name (cloudy-db-<name>) and the named volume (cloudy-dbdata-<name>). root_sealed is the
+-- container name (hosbah-db-<name>) and the named volume (hosbah-dbdata-<name>; cloudy-… before the rename). root_sealed is the
 -- root/superuser credential, sealed with the team DEK bound to "dbroot:<id>"; it never leaves the
 -- database except sealed to the target agent inside a signed operation, or through the audited
 -- reveal path. host/port are the private endpoint the agent reports after provisioning.

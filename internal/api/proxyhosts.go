@@ -35,7 +35,7 @@ type ProxyHostOut struct {
 func toProxyHostOut(p db.ProxyHost, serverName string) ProxyHostOut {
 	return ProxyHostOut{ID: p.ID, ServerID: p.ServerID, ServerName: serverName, Hostname: p.Hostname, Upstream: p.Upstream, TLS: p.Tls,
 		Enabled: p.Enabled, Websockets: p.Websockets, Verified: p.VerifiedAt != nil, VerifiedAt: p.VerifiedAt,
-		VerifyName: "_cloudy-verify." + p.Hostname, VerifyValue: p.VerifyToken, CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt}
+		VerifyName: deploy.VerifyName(p.Hostname), VerifyValue: deploy.VerifyValue(p.VerifyToken), CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt}
 }
 
 // ProxyHostPath addresses one proxy host (id or hostname).
@@ -182,7 +182,7 @@ func (d *deps) registerProxyHosts(api huma.API) {
 		}
 	}
 	huma.Register(api, huma.Operation{OperationID: "verify-proxy-host", Method: http.MethodPost, Path: "/api/teams/{team}/proxy-hosts/{proxy}/verify",
-		Tags: tags, Summary: "Check the _cloudy-verify TXT record (owner or admin). Verification gates public certificates.",
+		Tags: tags, Summary: "Check the _hosbah-verify TXT record (a pre-rename _cloudy-verify record also counts) (owner or admin). Verification gates public certificates.",
 	}, func(ctx context.Context, in *ProxyHostPath) (*proxyVerifyOut, error) {
 		out := &proxyVerifyOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {

@@ -48,6 +48,7 @@ func TestVerifySignature(t *testing.T) {
 }
 
 func TestUnconfiguredGitHub(t *testing.T) {
+	t.Setenv("HOSBAH_GITHUB_APP_ID", "")
 	t.Setenv("CLOUDY_GITHUB_APP_ID", "")
 	g := GitHubFromEnv()
 	if g.Configured() {

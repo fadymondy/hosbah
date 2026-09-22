@@ -1,7 +1,8 @@
 // Package crypto is Hosbah's envelope encryption.
 //
-// One key-encryption key (KEK) per deployment, loaded from CLOUDY_KEK (base64, 32
-// bytes) or CLOUDY_KEK_FILE (a service-only file holding the same). It never
+// One key-encryption key (KEK) per deployment, loaded from HOSBAH_KEK (base64, 32
+// bytes) or HOSBAH_KEK_FILE (a service-only file holding the same); CLOUDY_KEK and CLOUDY_KEK_FILE,
+// their names before the rename, are read when those are not set. It never
 // encrypts data directly: it wraps one data-encryption key (DEK) per team, and
 // the wrapped DEK is stored on the team row (teams.dek_wrapped). Every secret a
 // team owns — provider credentials, env values, database passwords, SSH private
@@ -32,6 +33,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/fadymondy/hosbah/internal/brand"
 )
 
 const (
@@ -44,7 +47,7 @@ const (
 var (
 	// ErrNoKEK means no key-encryption key is configured. The server refuses to
 	// start without one rather than storing secrets in the clear.
-	ErrNoKEK = errors.New("crypto: CLOUDY_KEK (or CLOUDY_KEK_FILE) is not set")
+	ErrNoKEK = errors.New("crypto: HOSBAH_KEK (or HOSBAH_KEK_FILE) is not set")
 	// ErrKEKSize means the configured KEK is not exactly 32 bytes.
 	ErrKEKSize = errors.New("crypto: the KEK must decode to exactly 32 bytes")
 	// ErrOpen is returned for any failure to decrypt: wrong key, wrong team or
@@ -68,18 +71,18 @@ func NewKeyring(kek []byte) (*Keyring, error) {
 	return &Keyring{kek: k}, nil
 }
 
-// LoadKeyring reads the KEK from CLOUDY_KEK_FILE (preferred: a file only the
-// service user can read) or CLOUDY_KEK, both base64-encoded.
+// LoadKeyring reads the KEK from HOSBAH_KEK_FILE (preferred: a file only the
+// service user can read) or HOSBAH_KEK, both base64-encoded (brand.Getenv: CLOUDY_… as a fallback).
 func LoadKeyring() (*Keyring, error) {
 	raw := ""
-	if path := strings.TrimSpace(os.Getenv("CLOUDY_KEK_FILE")); path != "" {
+	if path := strings.TrimSpace(brand.Getenv("KEK_FILE")); path != "" {
 		b, err := os.ReadFile(path) //#nosec G304 -- operator-configured key file
 		if err != nil {
-			return nil, fmt.Errorf("crypto: read CLOUDY_KEK_FILE: %w", err)
+			return nil, fmt.Errorf("crypto: read HOSBAH_KEK_FILE: %w", err)
 		}
 		raw = string(b)
 	} else {
-		raw = os.Getenv("CLOUDY_KEK")
+		raw = brand.Getenv("KEK")
 	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -87,7 +90,7 @@ func LoadKeyring() (*Keyring, error) {
 	}
 	kek, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		return nil, fmt.Errorf("crypto: CLOUDY_KEK is not valid base64: %w", err)
+		return nil, fmt.Errorf("crypto: HOSBAH_KEK is not valid base64: %w", err)
 	}
 	return NewKeyring(kek)
 }
@@ -171,6 +174,8 @@ func Open(dek []byte, teamID, context, sealed string) ([]byte, error) {
 // endpoints can refuse to echo it and migrations can find plaintext left over).
 func IsSealed(s string) bool { return strings.HasPrefix(s, sealedPrefix) }
 
+// The "cloudy/…" labels below are part of the sealed data (AEAD additional data) of every DEK and
+// value sealed so far. They are frozen: a new label would make all of them unreadable.
 func dekAAD(teamID string) []byte { return []byte("cloudy/dek/v1\x00" + teamID) }
 
 func valueAAD(teamID, context string) []byte {

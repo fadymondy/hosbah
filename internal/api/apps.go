@@ -195,7 +195,7 @@ func toReleaseOut(r db.Release) ReleaseOut {
 
 func toDomainOut(d db.Domain) DomainOut {
 	return DomainOut{ID: d.ID, Hostname: d.Hostname, TLS: d.Tls, Verified: d.VerifiedAt != nil, VerifiedAt: d.VerifiedAt,
-		VerifyName: "_cloudy-verify." + d.Hostname, VerifyValue: d.VerifyToken, Upstream: d.Upstream, CreatedAt: d.CreatedAt}
+		VerifyName: deploy.VerifyName(d.Hostname), VerifyValue: deploy.VerifyValue(d.VerifyToken), Upstream: d.Upstream, CreatedAt: d.CreatedAt}
 }
 
 // AppPath addresses one app of a team (id or name).
@@ -421,7 +421,7 @@ func (d *deps) registerApps(api huma.API) {
 			Server             string `json:"server" minLength:"1" maxLength:"64" doc:"Server id or name."`
 			RepoURL            string `json:"repo_url" minLength:"1" maxLength:"500" doc:"A public https/http/git URL."`
 			Branch             string `json:"branch,omitempty" maxLength:"200"`
-			Port               int    `json:"port,omitempty" minimum:"0" maximum:"65535" doc:"Default 8080; cloudy.toml wins."`
+			Port               int    `json:"port,omitempty" minimum:"0" maximum:"65535" doc:"Default 8080; hosbah.toml wins."`
 			HealthcheckPath    string `json:"healthcheck_path,omitempty" maxLength:"200"`
 			HealthcheckTimeout int    `json:"healthcheck_timeout,omitempty" minimum:"0" maximum:"600"`
 			Deploy             bool   `json:"deploy,omitempty" doc:"Queue the first deploy right away."`
@@ -998,7 +998,7 @@ func (d *deps) registerApps(api huma.API) {
 		}
 	}
 	huma.Register(api, huma.Operation{OperationID: "verify-domain", Method: http.MethodPost, Path: "/api/teams/{team}/apps/{app}/domains/{domain}/verify",
-		Tags: tags, Summary: "Check the _cloudy-verify TXT record (owner or admin). Verification gates public certificates.",
+		Tags: tags, Summary: "Check the _hosbah-verify TXT record (a pre-rename _cloudy-verify record also counts) (owner or admin). Verification gates public certificates.",
 	}, func(ctx context.Context, in *DomainPath) (*verifyOut, error) {
 		out := &verifyOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {

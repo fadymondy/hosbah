@@ -11,7 +11,7 @@ import (
 const rtApp, rtDep = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
 
 func rtStart(process string, rt *agentproto.RealtimePublish) agentproto.StartParams {
-	p := agentproto.StartParams{AppID: rtApp, App: "shop", DeploymentID: rtDep, Image: "cloudy/shop:" + rtDep, Process: process, Realtime: rt}
+	p := agentproto.StartParams{AppID: rtApp, App: "shop", DeploymentID: rtDep, Image: "hosbah/shop:" + rtDep, Process: process, Realtime: rt}
 	if process == "web" {
 		p.Port = 8080
 	}
@@ -118,8 +118,8 @@ func rtTable() routeTable {
 // catch-all, with what a long-lived websocket needs.
 func TestRenderCaddyRoutesTheRealtimePathBeforeTheCatchAll(t *testing.T) {
 	cfg := renderCaddy(rtTable())
-	for server, hosts := range map[string][]string{"cloudy_http": {"shop.localhost"}, "cloudy_https": {"shop.internal.test", "shop.example.com"}} {
-		suffix := "-" + strings.TrimPrefix(server, "cloudy_")
+	for server, hosts := range map[string][]string{"hosbah_http": {"shop.localhost"}, "hosbah_https": {"shop.internal.test", "shop.example.com"}} {
+		suffix := "-" + strings.TrimPrefix(server, "hosbah_")
 		routes := routesOf(t, cfg, server)
 		rtAt, appAt := -1, -1
 		for i, r := range routes {
@@ -159,7 +159,7 @@ func TestRenderCaddyRoutesTheRealtimePathBeforeTheCatchAll(t *testing.T) {
 		}
 	}
 	b, _ := json.Marshal(cfg)
-	if strings.Count(string(b), "cloudy-realtime-") != 2 {
+	if strings.Count(string(b), "hosbah-realtime-") != 2 {
 		t.Errorf("exactly the two realtime routes (http, https) of one app: %s", b)
 	}
 }
@@ -181,7 +181,7 @@ func TestRenderCaddyWholeSiteAndInvalidRealtime(t *testing.T) {
 		rt := rt
 		e.Realtime = &rt
 		tb.Apps[rtApp] = e
-		if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "cloudy-realtime-") {
+		if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "hosbah-realtime-") {
 			t.Errorf("%s was rendered: %s", name, b)
 		}
 	}
@@ -196,7 +196,7 @@ func TestChangeRealtimeRemovesAndSetsOnlyTheRealtimeHalf(t *testing.T) {
 	}
 	b, _ := json.Marshal(renderCaddy(tb))
 	s := string(b)
-	if strings.Contains(s, "cloudy-realtime-") || strings.Contains(s, "40002") || strings.Contains(s, `"path"`) {
+	if strings.Contains(s, "hosbah-realtime-") || strings.Contains(s, "40002") || strings.Contains(s, `"path"`) {
 		t.Errorf("the realtime route lingers: %s", s)
 	}
 	if !strings.Contains(s, agentproto.RouteID(rtApp)+"-http") || !strings.Contains(s, agentproto.RouteID(rtApp)+"-https") || !strings.Contains(s, "other.localhost") {
@@ -216,7 +216,7 @@ func TestChangeRealtimeRemovesAndSetsOnlyTheRealtimeHalf(t *testing.T) {
 	}
 	// route.set describes the whole route: without Realtime it is gone (setRoute replaces the entry).
 	tb.Apps[rtApp] = routeEntry{Hosts: tb.Apps[rtApp].Hosts, Upstream: "127.0.0.1:40003"}
-	if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "cloudy-realtime-") {
+	if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "hosbah-realtime-") {
 		t.Errorf("a route.set without realtime keeps it: %s", b)
 	}
 }

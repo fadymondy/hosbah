@@ -16,7 +16,7 @@ import (
 
 const (
 	inID     = "00000000-0000-4000-8000-0000000000e1"
-	inName   = "cloudy-install-" + inID
+	inName   = "hosbah-install-" + inID
 	inSecret = "SecretMarker0123456789SecretMark" // 32 alphanumerics
 	inDBURL  = "postgres://app:DbPassMarker99@172.17.0.1:5432/app"
 )
@@ -128,11 +128,11 @@ func TestRecipeInstallRunsTheAgentsOwnRecipeLockedDownWithSecretsInAnEnvFile(t *
 		t.Fatalf("result: %+v", r)
 	}
 	want := "docker run -d --restart unless-stopped --name " + inName +
-		" --label cloudy.install=" + inID + " --label cloudy.install-app=" + stAppID + " --label cloudy.install-recipe=demo@1.2.0" +
+		" --label hosbah.install=" + inID + " --label hosbah.install-app=" + stAppID + " --label hosbah.install-recipe=demo@1.2.0" +
 		" --log-opt max-size=10m --log-opt max-file=3 --memory 384m --cpus 0.75 --pids-limit 512" +
 		" --security-opt no-new-privileges --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE" +
-		" --mount type=volume,source=cloudy-ivol-" + inID + "-data,target=/data" +
-		" --mount type=volume,source=cloudy-ivol-" + inID + "-cache,target=/var/cache/demo" +
+		" --mount type=volume,source=hosbah-ivol-" + inID + "-data,target=/data" +
+		" --mount type=volume,source=hosbah-ivol-" + inID + "-cache,target=/var/cache/demo" +
 		" --env-file " + filepath.Join(rf.h.dir, inID+".env") + " -p 127.0.0.1::8080 example/demo:4.5.6"
 	var run string
 	pulled := false
@@ -146,7 +146,7 @@ func TestRecipeInstallRunsTheAgentsOwnRecipeLockedDownWithSecretsInAnEnvFile(t *
 				t.Errorf("a secret reached an argv or a process env: %s %v", c.argv, c.env)
 			}
 		}
-		for _, bad := range []string{"0.0.0.0", "--privileged", "--network", "--pid ", "--pid=", "--device", " -v ", "type=bind", "cloudy.app=", " -e "} {
+		for _, bad := range []string{"0.0.0.0", "--privileged", "--network", "--pid ", "--pid=", "--device", " -v ", "type=bind", "hosbah.app=", " -e "} {
 			if strings.Contains(c.argv, bad) {
 				t.Errorf("forbidden in an argv (%q): %s", bad, c.argv)
 			}
@@ -272,8 +272,8 @@ func TestRecipeInstallFailureRemovesTheContainerAndScrubsTheLog(t *testing.T) {
 // recipe.remove: the container always; the volumes only with delete_data, found by the install's
 // derived prefix (docker's name filter is a substring match, so every hit is checked again).
 func TestRecipeRemoveKeepsTheVolumesUnlessAsked(t *testing.T) {
-	other := "cloudy-ivol-00000000-0000-4000-8000-0000000000e9-data"
-	answers := map[string]string{"docker volume ls -q --filter name=cloudy-ivol-" + inID + "-": "cloudy-ivol-" + inID + "-data\ncloudy-ivol-" + inID + "-cache\n" + other + "\nx-cloudy-ivol-" + inID + "-data\n"}
+	other := "hosbah-ivol-00000000-0000-4000-8000-0000000000e9-data"
+	answers := map[string]string{"docker volume ls -q --filter name=hosbah-ivol-" + inID + "-": "hosbah-ivol-" + inID + "-data\nhosbah-ivol-" + inID + "-cache\n" + other + "\nx-hosbah-ivol-" + inID + "-data\n"}
 	rf := newRecipeFake(t, answers)
 	oc, _ := opCtx(t, agentproto.RecipeRemoveParams{InstallID: inID, AppID: stAppID})
 	res, _, err := rf.h.remove(oc)
@@ -295,7 +295,7 @@ func TestRecipeRemoveKeepsTheVolumesUnlessAsked(t *testing.T) {
 		t.Fatal(err)
 	}
 	argv = strings.Join(rf.f.mutating(), "\n")
-	for _, v := range []string{"cloudy-ivol-" + inID + "-data", "cloudy-ivol-" + inID + "-cache"} {
+	for _, v := range []string{"hosbah-ivol-" + inID + "-data", "hosbah-ivol-" + inID + "-cache"} {
 		if !strings.Contains(argv, "docker volume rm "+v+"\n") && !strings.HasSuffix(argv, "docker volume rm "+v) {
 			t.Errorf("%s was not removed:\n%s", v, argv)
 		}
@@ -316,11 +316,11 @@ func TestRecipeRemoveKeepsTheVolumesUnlessAsked(t *testing.T) {
 	}
 }
 
-// app.remove takes the app's installs with it — found by label, since they do not carry cloudy.app.
+// app.remove takes the app's installs with it — found by label, since they do not carry hosbah.app.
 func TestAppRemoveTakesTheAppsInstalls(t *testing.T) {
 	second := "00000000-0000-4000-8000-0000000000e2"
 	rf := newRecipeFake(t, map[string]string{
-		"docker ps -a --filter label=cloudy.install-app=" + stAppID: inID + "\n" + second + "\nnot-an-id\n"})
+		"docker ps -a --filter label=hosbah.install-app=" + stAppID: inID + "\n" + second + "\nnot-an-id\n"})
 	oc, _ := opCtx(t, agentproto.RemoveParams{AppID: stAppID, App: "site"})
 	res, _, err := rf.h.withAppRemove(func(*OpContext) (any, int, error) { return map[string]any{}, 0, nil })(oc)
 	if err != nil {
@@ -328,7 +328,7 @@ func TestAppRemoveTakesTheAppsInstalls(t *testing.T) {
 	}
 	argv := strings.Join(rf.f.mutating(), "\n")
 	for _, id := range []string{inID, second} {
-		if !strings.Contains(argv, "docker rm -f cloudy-install-"+id) {
+		if !strings.Contains(argv, "docker rm -f hosbah-install-"+id) {
 			t.Errorf("%s was not removed:\n%s", id, argv)
 		}
 	}
@@ -368,7 +368,7 @@ func TestEveryEmbeddedAppRecipeYieldsALockedDownArgv(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, r := range c.List(catalog.KindApp, "") {
-		argv := strings.Join(installRunArgs(agentproto.RecipeInstallParams{InstallID: inID, AppID: stAppID}, r, "/var/lib/cloudy/installs/x.env"), " ")
+		argv := strings.Join(installRunArgs(agentproto.RecipeInstallParams{InstallID: inID, AppID: stAppID}, r, "/var/lib/hosbah/installs/x.env", nil), " ")
 		for _, must := range []string{"--memory ", "--cpus ", "--pids-limit 512", "--security-opt no-new-privileges", "--cap-drop ALL", "--restart unless-stopped"} {
 			if !strings.Contains(argv, must) {
 				t.Errorf("%s: %q is missing: %s", r.ID, must, argv)

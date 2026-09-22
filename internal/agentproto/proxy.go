@@ -29,7 +29,7 @@ type ProxyParams struct {
 }
 
 // ProxyRouteID is the @id of a proxy host's route in Caddy's config.
-func ProxyRouteID(proxyID string) string { return "cloudy-proxy-" + proxyID }
+func ProxyRouteID(proxyID string) string { return NamePrefix + "proxy-" + proxyID }
 
 // Upstream is a parsed upstream: what to dial, and whether to speak TLS to it.
 type Upstream struct {

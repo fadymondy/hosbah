@@ -12,7 +12,7 @@ import (
 // nothing in them reaches a shell: the agent turns them into fixed argv lists and Caddy JSON.
 const (
 	KindAppDetect   = "app.detect"   // clone a ref and say how it would build (Dockerfile / Railpack provider)
-	KindAppBuild    = "app.build"    // clone, build cloudy/<app>:<deploy_id> with BuildKit, prune to the newest N
+	KindAppBuild    = "app.build"    // clone, build hosbah/<app>:<deploy_id> with BuildKit, prune to the newest N
 	KindAppRelease  = "app.release"  // run the release command in a one-off container from the new image
 	KindAppStart    = "app.start"    // start one process of an image; web gets an ephemeral port and a health gate
 	KindRouteSet    = "route.set"    // point the app's Caddy route (admin API, localhost:2019) at an upstream
@@ -26,8 +26,8 @@ const (
 
 // Provision steps added in P2 (params.step of provision.step). Idempotent like P1's.
 const (
-	StepBuildTools = "build.tools"     // git + the docker-buildx client (BuildKit is Docker's own builder)
-	StepCaddy      = "caddy.install"   // the pinned Caddy release, checksum-verified, under systemd, admin API on localhost
+	StepBuildTools = "build.tools"      // git + the docker-buildx client (BuildKit is Docker's own builder)
+	StepCaddy      = "caddy.install"    // the pinned Caddy release, checksum-verified, under systemd, admin API on localhost
 	StepRailpack   = "railpack.install" // the pinned Railpack release, checksum-verified
 )
 
@@ -70,17 +70,23 @@ type DetectResult struct {
 	Runtime      string `json:"runtime"`            // dockerfile | railpack
 	Provider     string `json:"provider,omitempty"` // railpack's detected provider: golang, node, python, php…
 	StartCommand string `json:"start_command,omitempty"`
-	HosbahToml   string `json:"cloudy_toml,omitempty"` // raw file (≤64 KiB); the control plane parses it
+	// HosbahToml is the raw hosbah.toml (or, failing that, cloudy.toml; ≤64 KiB); the control plane
+	// parses it. The agent sends it under both keys: control planes that predate the rename read
+	// only cloudy_toml. Read it with Toml().
+	HosbahToml string `json:"hosbah_toml,omitempty"`
+	LegacyToml string `json:"cloudy_toml,omitempty"`
+	// TomlFile is the file it came from: "hosbah.toml" or "cloudy.toml".
+	TomlFile string `json:"toml_file,omitempty"`
 }
 
 // BuildParams / BuildResult: app.build.
 type BuildParams struct {
-	AppID            string   `json:"app_id"`
-	App              string   `json:"app"`
-	DeploymentID     string   `json:"deployment_id"`
+	AppID        string `json:"app_id"`
+	App          string `json:"app"`
+	DeploymentID string `json:"deployment_id"`
 	GitSource
-	Image            string   `json:"image"`             // cloudy/<app>:<deployment_id>
-	Keep             int      `json:"keep"`              // newest images of cloudy/<app> to keep (5)
+	Image            string   `json:"image"`             // hosbah/<app>:<deployment_id>
+	Keep             int      `json:"keep"`              // newest images of hosbah/<app> (and cloudy/<app>) to keep (5)
 	Protect          []string `json:"protect,omitempty"` // images never pruned (the live release)
 	RailpackFrontend string   `json:"railpack_frontend"` // BuildKit frontend image, same version as the CLI
 }
@@ -154,9 +160,9 @@ type RouteParams struct {
 // Keep is stopped with SIGTERM, given GraceSeconds, and removed. Label-based rather than a list,
 // so a container orphaned by a crash mid-deploy is cleaned up too.
 type DrainParams struct {
-	AppID        string   `json:"app_id"`
-	Process      string   `json:"process,omitempty"` // "" = all processes
-	Keep         []string `json:"keep,omitempty"`
+	AppID   string   `json:"app_id"`
+	Process string   `json:"process,omitempty"` // "" = all processes
+	Keep    []string `json:"keep,omitempty"`
 	// Only, when set, limits the drain to exactly these containers (cleaning up after a failed
 	// deploy removes the new ones by name — it never relies on a keep-list naming the live ones).
 	Only         []string `json:"only,omitempty"`
@@ -270,14 +276,23 @@ func ContainerName(app, process, deploymentID string) string {
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	return "cloudy-" + app + "-" + strings.ReplaceAll(process, ":", "-") + "-" + short
+	return NamePrefix + app + "-" + strings.ReplaceAll(process, ":", "-") + "-" + short
 }
 
-// ImageRepo is the app's image repository on its server.
-func ImageRepo(app string) string { return "cloudy/" + app }
+// ImageRepo is the app's image repository on its server. Images built before the rename are in
+// LegacyImageRepo, and stay usable (a rollback to one of them).
+func ImageRepo(app string) string { return ImagePrefix + app }
+
+// LegacyImageRepo is the repository an agent before the rename built the app's images into.
+func LegacyImageRepo(app string) string { return LegacyImagePrefix + app }
+
+// IsAppImage reports whether image is a tag of the app's repository, new or old.
+func IsAppImage(app, image string) bool {
+	return strings.HasPrefix(image, ImageRepo(app)+":") || strings.HasPrefix(image, LegacyImageRepo(app)+":")
+}
 
 // RouteID is the Caddy @id of an app's route.
-func RouteID(appID string) string { return "cloudy-app-" + appID }
+func RouteID(appID string) string { return NamePrefix + "app-" + appID }
 
 // Validate checks the fields every app op shares, on both sides of the wire.
 func (p StartParams) Validate() error {
@@ -286,7 +301,7 @@ func (p StartParams) Validate() error {
 		return errors.New("bad app or deployment id")
 	case !ValidProcess(p.Process):
 		return fmt.Errorf("bad process %q", p.Process)
-	case !strings.HasPrefix(p.Image, ImageRepo(p.App)+":"):
+	case !IsAppImage(p.App, p.Image):
 		return fmt.Errorf("image %q is not one of this app's", p.Image)
 	case p.Process == "web" && (p.Port < 1 || p.Port > 65535):
 		return errors.New("web needs a port")
@@ -304,4 +319,12 @@ func (p StartParams) Validate() error {
 		}
 	}
 	return ValidateMounts(p.AppID, p.Mounts)
+}
+
+// Toml is the app's config file as the agent sent it, whichever key carried it.
+func (r DetectResult) Toml() string {
+	if r.HosbahToml != "" {
+		return r.HosbahToml
+	}
+	return r.LegacyToml
 }

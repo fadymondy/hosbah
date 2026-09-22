@@ -83,7 +83,7 @@ func seedLiveRelease(t *testing.T, teamID, appID, serverID, app string) (deploym
 			return err
 		}
 		_, err := tx.Exec(`INSERT INTO releases (team_id, app_id, deployment_id, version, image, port, config, status, activated_at)
-			VALUES ($1, $2, $3, 1, $4, 8080, '{}', 'live', now())`, teamID, appID, deploymentID, "cloudy/"+app+":"+deploymentID)
+			VALUES ($1, $2, $3, 1, $4, 8080, '{}', 'live', now())`, teamID, appID, deploymentID, "hosbah/"+app+":"+deploymentID)
 		return err
 	})
 	if err != nil {
@@ -155,7 +155,7 @@ func TestAppSchedules(t *testing.T) {
 	const secretLine = "cron-output-marker-" + "s3cr3t"
 	var (
 		mu     sync.Mutex
-		result = agentproto.ExecResult{Container: "cloudy-cron-web-1"}
+		result = agentproto.ExecResult{Container: "hosbah-cron-web-1"}
 		errMsg string
 		gate   chan struct{}
 	)
@@ -352,7 +352,7 @@ func TestAppSchedules(t *testing.T) {
 			t.Fatalf("not due yet, but %d operations were queued", n)
 		}
 		held := make(chan struct{})
-		script(agentproto.ExecResult{Container: "cloudy-cron-web-1", ExitCode: 0, Bytes: 40}, "", held)
+		script(agentproto.ExecResult{Container: "hosbah-cron-web-1", ExitCode: 0, Bytes: 40}, "", held)
 		defer func() {
 			select {
 			case <-held:
@@ -454,7 +454,7 @@ func TestAppSchedules(t *testing.T) {
 	})
 
 	t.Run("a manual run, an exit code, a timeout", func(t *testing.T) {
-		script(agentproto.ExecResult{Container: "cloudy-cron-web-1", ExitCode: 3}, "the command exited with status 3", nil)
+		script(agentproto.ExecResult{Container: "hosbah-cron-web-1", ExitCode: 3}, "the command exited with status 3", nil)
 		before := get(owner, every5.ID).NextRunAt
 		var run scheduleRunJSON
 		owner.mustJSON("POST", base+"/schedules/"+every5.ID+"/run", nil, 202, &run)
@@ -469,7 +469,7 @@ func TestAppSchedules(t *testing.T) {
 			t.Fatalf("a manual run does not move next_run_at, and is the last run: %+v", s)
 		}
 		// A disabled schedule can still be run by hand.
-		script(agentproto.ExecResult{Container: "cloudy-cron-web-1", ExitCode: agentproto.ExecExitTimeout, TimedOut: true}, "the command was killed after its timeout of 300 s", nil)
+		script(agentproto.ExecResult{Container: "hosbah-cron-web-1", ExitCode: agentproto.ExecExitTimeout, TimedOut: true}, "the command was killed after its timeout of 300 s", nil)
 		owner.mustJSON("POST", base+"/schedules/"+off.ID+"/run", nil, 202, &run)
 		timedOut := waitRun(off.ID, run.ID, "timeout")
 		if timedOut.ExitCode == nil || *timedOut.ExitCode != 124 || !strings.Contains(timedOut.Error, "killed after its timeout") {
@@ -478,7 +478,7 @@ func TestAppSchedules(t *testing.T) {
 	})
 
 	t.Run("MCP", func(t *testing.T) {
-		script(agentproto.ExecResult{Container: "cloudy-cron-web-1"}, "", nil)
+		script(agentproto.ExecResult{Container: "hosbah-cron-web-1"}, "", nil)
 		res := mcpCall(t, ts.URL, "/api/mcp", readTok.Token, "list_app_schedules", map[string]any{"app": app.App.Name})
 		if res.IsError || !strings.Contains(res.Text, "every-five") || !strings.Contains(res.Text, "switched-off") {
 			t.Fatalf("list_app_schedules: %+v", res)

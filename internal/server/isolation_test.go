@@ -104,7 +104,7 @@ func TestIsolationSweep(t *testing.T) {
 	srvA, opA := enrolledServerWithOp(t, ua, ts.URL, teamA.ID, "alpha-"+suffix)
 	var credA struct{ ID string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/credentials", map[string]any{"provider": "proxmox", "name": "pve-a",
-		"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "cloudy@pve!ctl", "node": "pve", "storage": "local-lvm"},
+		"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "hosbah@pve!ctl", "node": "pve", "storage": "local-lvm"},
 		"secret": "a-secret-" + suffix, "skip_validation": true}, 201, &credA)
 
 	// P2: an app on that server with a deployment, a variable and a domain.

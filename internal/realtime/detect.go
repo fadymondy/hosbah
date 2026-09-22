@@ -7,7 +7,7 @@
 // is read from what that release recorded (releases.containers.realtime), never guessed.
 //
 // detect.go only SUGGESTS a configuration, from what Hosbah already knows about the app: the
-// runtime its build detected, the processes of its live release (cloudy.toml) and the NAMES of its
+// runtime its build detected, the processes of its live release (hosbah.toml) and the NAMES of its
 // environment variables — never their values. Nothing is saved from a suggestion: the caller saves.
 package realtime
 
@@ -67,7 +67,7 @@ const (
 // Inputs is what detection reads. All of it is the control plane's own knowledge of the app.
 type Inputs struct {
 	Runtime   string            // apps.runtime: "dockerfile", "railpack" or "railpack:<provider>"
-	Processes map[string]string // the live release's processes (cloudy.toml): name → command
+	Processes map[string]string // the live release's processes (hosbah.toml): name → command
 	EnvNames  []string          // names of the app's environment variables — never values
 }
 
@@ -75,7 +75,7 @@ type Inputs struct {
 // Process and Port are empty/0 when nothing dependable says them — the caller fills them in.
 type RealtimeSuggestion struct {
 	Kind       string   `json:"kind" doc:"reverb, socketio, ws or go; empty when nothing was found."`
-	Process    string   `json:"process" doc:"The worker of the live release that looks like the realtime server (bare name: reverb is cloudy.toml's worker:reverb); empty when no process could be named."`
+	Process    string   `json:"process" doc:"The worker of the live release that looks like the realtime server (bare name: reverb is hosbah.toml's worker:reverb); empty when no process could be named."`
 	Port       int      `json:"port" doc:"The port that process listens on inside its container: read from its command (--port) or the kind's default; 0 when unknown."`
 	Path       string   `json:"path" doc:"The kind's usual path; empty when nothing was found."`
 	Confidence string   `json:"confidence" enum:"detected,likely,unknown" doc:"detected: a process of the live release runs the framework's realtime server. likely: only indirect signs. unknown: nothing found."`
@@ -220,7 +220,7 @@ func Detect(in Inputs) RealtimeSuggestion {
 		}
 		return RealtimeSuggestion{Kind: KindReverb, Port: 8080, Path: DefaultPath(KindReverb), Confidence: ConfidenceLikely,
 			Evidence: []string{"environment variables named " + strings.Join(reverbEnv, ", "),
-				`no process runs reverb:start — declare one in cloudy.toml, for example "worker:reverb" = "php artisan reverb:start --host=0.0.0.0 --port=8080"`}}
+				`no process runs reverb:start — declare one in hosbah.toml (or cloudy.toml), for example "worker:reverb" = "php artisan reverb:start --host=0.0.0.0 --port=8080"`}}
 	}
 
 	looked := "no process of the live release"

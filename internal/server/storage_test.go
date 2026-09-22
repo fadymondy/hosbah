@@ -90,7 +90,7 @@ func TestAppStorage(t *testing.T) {
 	owner.mustJSON("POST", "/api/teams/"+team.ID+"/apps", map[string]any{"name": "stor-" + short, "server": srv, "repo_url": "https://github.com/octocat/api.git"}, 201, &app)
 	appBase := func(id string) string { return "/api/teams/" + team.ID + "/apps/" + id }
 	base := appBase(app.App.ID)
-	volName := func(slug string) string { return "cloudy-vol-" + app.App.ID + "-" + slug }
+	volName := func(slug string) string { return "hosbah-vol-" + app.App.ID + "-" + slug }
 
 	// The fake agent. bucket.remove answers what the test scripted; volume.usage can be switched off.
 	var (
@@ -113,12 +113,12 @@ func TestAppStorage(t *testing.T) {
 			if err := p.Web.Validate(); err != nil {
 				return nil, err.Error()
 			}
-			res := agentproto.RollbackResult{Web: agentproto.StartResult{Container: "cloudy-stor-web-1", HostPort: 40123}}
+			res := agentproto.RollbackResult{Web: agentproto.StartResult{Container: "hosbah-stor-web-1", HostPort: 40123}}
 			for i, w := range p.Workers {
 				if err := w.Validate(); err != nil {
 					return nil, err.Error()
 				}
-				res.Workers = append(res.Workers, agentproto.StartResult{Container: fmt.Sprintf("cloudy-stor-worker-%d", i)})
+				res.Workers = append(res.Workers, agentproto.StartResult{Container: fmt.Sprintf("hosbah-stor-worker-%d", i)})
 			}
 			return res, ""
 		case agentproto.KindVolumeUsage:
@@ -553,8 +553,8 @@ func TestAppStorage(t *testing.T) {
 		}
 		var p agentproto.BucketCreateParams
 		_ = json.Unmarshal(ops[0].Params, &p)
-		if p.Bucket != bucketName || p.AccessKey != ready.AccessKey || p.Policy != "cloudy-bucket-"+ready.AccessKey || p.ServiceID != minio.ID ||
-			p.Container != "cloudy-db-files-"+short || strings.Contains(string(ops[0].Params), secret) {
+		if p.Bucket != bucketName || p.AccessKey != ready.AccessKey || p.Policy != "hosbah-bucket-"+ready.AccessKey || p.ServiceID != minio.ID ||
+			p.Container != "hosbah-db-files-"+short || strings.Contains(string(ops[0].Params), secret) {
 			t.Fatalf("bucket.create params: %+v", p)
 		}
 		pt, err := agentproto.OpenBox(priv, agentproto.DBSecretContext(minio.ID, "bucket:"+bucketName), p.Secret)
@@ -626,7 +626,7 @@ func TestAppStorage(t *testing.T) {
 		rm := agentOps(agent, agentproto.KindBucketRemove)
 		var p agentproto.BucketRemoveParams
 		_ = json.Unmarshal(rm[len(rm)-1].Params, &p)
-		if p.Bucket != bucketName || !p.DeleteData || !p.Force || p.AccessKey != b.AccessKey || p.Policy != "cloudy-bucket-"+b.AccessKey {
+		if p.Bucket != bucketName || !p.DeleteData || !p.Force || p.AccessKey != b.AccessKey || p.Policy != "hosbah-bucket-"+b.AccessKey {
 			t.Errorf("bucket.remove params: %+v", p)
 		}
 		names := envNames()

@@ -1,4 +1,4 @@
-// Command api is the cloudy HTTP entrypoint. It boots the shared togo stack
+// Command api is the Hosbah HTTP entrypoint. It boots the shared togo stack
 // (Huma REST + OpenAPI and gqlgen GraphQL on the kernel) and serves it.
 package main
 
@@ -30,7 +30,7 @@ func main() {
 		k.Hooks.On("error", 100, fb.OnError)
 		k.Log.Info("mahaam feedback: backend errors are filed as issues")
 	}
-	fmt.Printf("→ cloudy listening on %s  (GraphQL %s · REST %s · docs %s)\n",
+	fmt.Printf("→ hosbah listening on %s  (GraphQL %s · REST %s · docs %s)\n",
 		k.Config.Addr, k.Config.GraphQLPath, k.Config.RESTPath, k.Config.DocsPath)
 	if err := k.Serve(context.Background()); err != nil {
 		panic(err)

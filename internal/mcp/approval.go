@@ -232,8 +232,9 @@ its output is a mistake, and this turns that mistake into a redaction instead of
 It is a backstop, not the design — the tools are written not to echo values in the first place.
 */
 var secretShaped = []*regexp.Regexp{
-	// Hosbah's own token families: MCP (cld_/cla_), enrolment (cle_), deploy hook (cdh_).
-	regexp.MustCompile(`\bc(?:ld|la|le|dh)_[A-Za-z0-9]{16,}`),
+	// Hosbah's own token families: MCP (hbu_/hba_), enrolment (hbe_), deploy hook (hbh_), and
+	// their pre-rename prefixes (cld_/cla_/cle_/cdh_), which still authenticate.
+	regexp.MustCompile(`\b(?:hb[uaeh]|c(?:ld|la|le|dh))_[A-Za-z0-9]{16,}`),
 	// Sealed envelopes, which must never be transported outside a signed operation.
 	regexp.MustCompile(`\bcsv1:[A-Za-z0-9+/=._-]{8,}`),
 	// Any URL carrying credentials, e.g. postgres://user:password@host/db.

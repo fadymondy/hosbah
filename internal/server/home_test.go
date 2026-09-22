@@ -262,7 +262,7 @@ func TestHomePage(t *testing.T) {
 	t.Run("tunnel summary on the server JSON", func(t *testing.T) {
 		var cred struct{ ID string }
 		ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/credentials", map[string]any{"provider": "proxmox", "name": "pve-home",
-			"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "cloudy@pve!ctl", "node": "pve", "storage": "local-lvm"},
+			"config": map[string]string{"api_url": "https://pve.invalid:8006", "token_id": "hosbah@pve!ctl", "node": "pve", "storage": "local-lvm"},
 			"secret": "s", "skip_validation": true}, 201, &cred)
 		err := tenancy.Tx(context.Background(), sqlDB, tenancy.Scope{TeamID: teamA.ID}, func(_ *db.Queries, tx *sql.Tx) error {
 			_, err := tx.Exec(`INSERT INTO tunnels (team_id, server_id, credential_id, kind, remote_port, status, address, created_by)

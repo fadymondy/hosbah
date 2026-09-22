@@ -3,7 +3,7 @@
 // Nothing is stored. What a site's queues hold is read live, from the site's own release, by running
 // the framework's own CLI inside the live web container (the agent's app.exec). Which CLI that is
 // — the driver — is decided here, on the control plane, from what Hosbah already knows about the
-// app: the runtime its build detected, the processes of its live release (cloudy.toml) and the NAMES
+// app: the runtime its build detected, the processes of its live release (hosbah.toml) and the NAMES
 // of its environment variables. Never their values, and never anything a caller typed.
 //
 // Every command that runs is one of a small fixed catalogue (catalogue.go): constants, handed to
@@ -47,7 +47,7 @@ func ValidArg(s string) bool { return argRe.MatchString(s) && !strings.HasPrefix
 // Inputs is what detection reads. All of it is the control plane's own knowledge of the app.
 type Inputs struct {
 	Runtime   string            // apps.runtime: "dockerfile", "railpack" or "railpack:<provider>"
-	Processes map[string]string // the live release's processes (cloudy.toml): name → command
+	Processes map[string]string // the live release's processes (hosbah.toml): name → command
 	Release   string            // the live release's release command
 	EnvNames  []string          // names of the app's environment variables — never values
 }
@@ -214,7 +214,7 @@ func (d Detection) Readable() (bool, string) {
 		return true, ""
 	case DriverCelery:
 		if d.CeleryApp == "" {
-			return false, "celery was detected, but its app module (-A) could not be read from a worker process command in cloudy.toml, so celery inspect cannot be run"
+			return false, "celery was detected, but its app module (-A) could not be read from a worker process command in hosbah.toml (or cloudy.toml), so celery inspect cannot be run"
 		}
 		return true, ""
 	case DriverBullMQ:

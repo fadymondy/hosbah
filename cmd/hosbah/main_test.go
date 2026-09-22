@@ -30,8 +30,8 @@ func TestShortcutCallsTool(t *testing.T) {
 		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"queued"}]}}`))
 	}))
 	defer srv.Close()
-	t.Setenv("CLOUDY_URL", srv.URL)
-	t.Setenv("CLOUDY_TOKEN", "cld_x")
+	t.Setenv("HOSBAH_URL", srv.URL)
+	t.Setenv("HOSBAH_TOKEN", "hbu_x")
 	var out bytes.Buffer
 	if err := run(context.Background(), []string{"deploy", "shop", "--wait"}, &out); err != nil {
 		t.Fatal(err)

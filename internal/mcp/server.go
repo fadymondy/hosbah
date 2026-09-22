@@ -1,7 +1,7 @@
 // Package mcp is Hosbah's Model Context Protocol transport and its two servers:
 //
-//	POST /api/mcp        the USER server — team-bound tokens (mcp_tokens, "cld_…")
-//	POST /api/admin/mcp  the ADMIN server — platform-admin tokens (admin_mcp_tokens, "cla_…")
+//	POST /api/mcp        the USER server — team-bound tokens (mcp_tokens, "hbu_…"; "cld_…" before the rename)
+//	POST /api/admin/mcp  the ADMIN server — platform-admin tokens (admin_mcp_tokens, "hba_…"; "cla_…" before the rename)
 //
 // Ported from fadymondy.com-v2's internal/mcp/server.go (JSON-RPC 2.0 over streamable HTTP,
 // SHA-256-hashed bearer tokens, tool failures reported in-band with isError) and changed where

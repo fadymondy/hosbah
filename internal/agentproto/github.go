@@ -38,7 +38,9 @@ var GitHubKinds = []string{KindGitHubInstall, KindGitHubLogin, KindGitHubStatus,
 	KindGitHubCommits, KindGitHubCompare, KindGitHubPulls}
 
 // GHConfigDir is where gh keeps its hosts file on a server (GH_CONFIG_DIR for every gh the agent runs).
-const GHConfigDir = "/etc/cloudy/gh"
+// It was /etc/cloudy/gh before the rename; the agent moves /etc/cloudy to /etc/hosbah on its first
+// start and leaves a symlink, so both paths reach the same login.
+const GHConfigDir = StateDir + "/gh"
 
 // GitHubHost is the only host Hosbah logs gh into.
 const GitHubHost = "github.com"

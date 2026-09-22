@@ -118,7 +118,7 @@ func (s *Service) totpOf(ctx context.Context, userID string) (*totpState, error)
 
 type keysError struct{}
 
-func (keysError) Error() string { return "two-factor needs CLOUDY_KEK on the server" }
+func (keysError) Error() string { return "two-factor needs HOSBAH_KEK on the server" }
 
 var errNoKeys error = keysError{}
 

@@ -59,7 +59,7 @@ type Item struct {
 }
 
 // Classify maps discovered services to imported apps and data services. Pure: no I/O.
-//   - Hosbah's own workloads (cloudy-* / hosbah-* containers, units and guests) are skipped.
+//   - Hosbah's own workloads (hosbah-* / pre-rename cloudy-* containers, units and guests) are skipped.
 //   - A container whose image is a database engine is a data service; every other container is an app.
 //   - A Proxmox guest whose name has a database token (pg, postgres, mysql, maria, redis, mongo,
 //     minio…) is a data service; every other guest is an app.
@@ -123,9 +123,9 @@ func classifyOne(s agentproto.Service) (Item, bool) {
 	return Item{}, false
 }
 
-// IsHosbahOwned: Hosbah's own containers and units — app processes (cloudy-<app>-<process>-<id>),
-// release and restore-test runs, data services (cloudy-db-*), Caddy (cloudy-caddy), frpc
-// (cloudy-frpc), the agent — all start with "cloudy-"; "hosbah-" is reserved the same way. The same
+// IsHosbahOwned: Hosbah's own containers and units — app processes (hosbah-<app>-<process>-<id>),
+// release and restore-test runs, data services (hosbah-db-*), Caddy (hosbah-caddy), frpc
+// (hosbah-frpc), the agent — all start with "hosbah-", or "cloudy-" when made before the rename. The same
 // check the agent applies to every imported-workload operation (agentproto.IsHosbahOwned).
 func IsHosbahOwned(name string) bool { return agentproto.IsHosbahOwned(name) }
 

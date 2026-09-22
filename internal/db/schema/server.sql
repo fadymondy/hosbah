@@ -48,7 +48,7 @@ CREATE INDEX servers_team_idx ON servers (team_id, created_at);
 -- github: what the server's GitHub CLI (gh) connection last reported — {installed, version,
 -- connected, user, scopes, checked_at} and, while a device login waits for a human, pending
 -- {operation, user_code, verification_uri, expires_at}. Written from github.* operation results
--- (agent scope); never a token (gh keeps its login on the server, in /etc/cloudy/gh).
+-- (agent scope); never a token (gh keeps its login on the server, in /etc/hosbah/gh).
 
 -- color / icon / logo_url: how the team styles the server (home page cards and elsewhere). color is
 -- #RRGGBB; icon is a key from the allowlist in internal/provisioning/appearance.go; logo_url is an

@@ -257,15 +257,15 @@ func connect(ctx context.Context, a *app.App, svc *ops.Service, op db.Operation,
 	}
 }
 
-// registerProxmox creates cloudy@pve with a privilege-separated-off API token and saves it as a
+// registerProxmox creates hosbah@pve with a privilege-separated-off API token and saves it as a
 // team credential. The token secret goes straight from the node's output into a sealed column.
 func registerProxmox(ctx context.Context, a *app.App, client *sshboot.Client, srv db.Server, op db.Operation,
 	host string, p probe, sudo string, dek []byte, info func(string, ...any)) (string, error) {
-	tokenName := "cloudy-" + srv.ID[:8]
-	script := sudo + `sh -c 'pveum user add cloudy@pve --comment Hosbah >/dev/null 2>&1; ` +
-		`pveum acl modify / --users cloudy@pve --roles PVEAdmin >/dev/null && ` +
-		`pveum user token remove cloudy@pve ` + tokenName + ` >/dev/null 2>&1; ` +
-		`pveum user token add cloudy@pve ` + tokenName + ` --privsep 0 --output-format json && echo && ` +
+	tokenName := "hosbah-" + srv.ID[:8]
+	script := sudo + `sh -c 'pveum user add hosbah@pve --comment Hosbah >/dev/null 2>&1; ` +
+		`pveum acl modify / --users hosbah@pve --roles PVEAdmin >/dev/null && ` +
+		`pveum user token remove hosbah@pve ` + tokenName + ` >/dev/null 2>&1; ` +
+		`pveum user token add hosbah@pve ` + tokenName + ` --privsep 0 --output-format json && echo && ` +
 		`openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -fingerprint -sha256 && ` +
 		`pvesm status --content images 2>/dev/null | awk "NR>1 {print \"storage=\" \$1}"'`
 	out, err := client.Output(ctx, script)
@@ -277,7 +277,7 @@ func registerProxmox(ctx context.Context, a *app.App, client *sshboot.Client, sr
 	}
 	cfg := map[string]string{
 		"api_url":  "https://" + net.JoinHostPort(host, "8006"),
-		"token_id": "cloudy@pve!" + tokenName,
+		"token_id": "hosbah@pve!" + tokenName,
 		"node":     p.node,
 		"bridge":   "vmbr0",
 	}

@@ -1,9 +1,13 @@
-// Command cloudy-agent runs on every server Hosbah manages.
+// Command hosbah-agent runs on every server Hosbah manages (it was cloudy-agent before the rename).
 //
-//	cloudy-agent enroll --url https://cloudy.example --token <one-time token> [--state /etc/cloudy/agent.json]
-//	cloudy-agent run [--state /etc/cloudy/agent.json]
-//	cloudy-agent facts      print what enrolment would report, and the checks
-//	cloudy-agent version
+//	hosbah-agent enroll --url https://hosbah.example --token <one-time token> [--state /etc/hosbah/agent.json]
+//	hosbah-agent run [--state /etc/hosbah/agent.json]
+//	hosbah-agent facts      print what enrolment would report, and the checks
+//	hosbah-agent version
+//
+// On its first `run` on a server set up before the rename it moves /etc/cloudy and /var/lib/cloudy
+// to /etc/hosbah and /var/lib/hosbah (links stay at the old paths) and, under systemd, hands itself
+// over from cloudy-agent.service to hosbah-agent.service (internal/agent/migrate.go).
 //
 // Build it static: CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w -X main.version=<v>" ./cmd/agent
 package main
@@ -50,12 +54,12 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: cloudy-agent enroll --url URL --token TOKEN | run | facts | version")
+	fmt.Fprintln(os.Stderr, "usage: hosbah-agent enroll --url URL --token TOKEN | run | facts | version")
 }
 
 func enroll(args []string) int {
 	fs := flag.NewFlagSet("enroll", flag.ExitOnError)
-	url := fs.String("url", "", "control plane origin, e.g. https://cloudy-app.example.com")
+	url := fs.String("url", "", "control plane origin, e.g. https://app.hosbah.example")
 	token := fs.String("token", "", "one-time enrolment token")
 	state := fs.String("state", agent.DefaultStatePath, "where to write the agent's identity")
 	_ = fs.Parse(args)
@@ -98,7 +102,28 @@ func run(args []string) int {
 	_ = fs.Parse(args)
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	st, err := agent.LoadState(*state)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// A server set up before the rename: its directories first (the state file is in one), then —
+	// under systemd — the unit. Both are no-ops once done.
+	for _, note := range agent.MigrateStateDirs() {
+		log.Info("rename: " + note)
+	}
+	logf := func(format string, args ...any) { log.Info("rename: " + fmt.Sprintf(format, args...)) }
+	if agent.MigrateService(logf) {
+		// systemd stops this process (SIGTERM) and starts hosbah-agent.service; nothing connects
+		// meanwhile, so the two never talk to the control plane at once.
+		select {
+		case <-ctx.Done():
+			return 0
+		case <-time.After(90 * time.Second):
+			log.Warn("rename: hosbah-agent.service did not take over within 90s; carrying on as cloudy-agent")
+			agent.RevertService(logf)
+		}
+	}
+
+	st, err := agent.LoadState(agent.StatePath(*state))
 	if err != nil {
 		log.Error("cannot start", "err", err)
 		return 1
@@ -110,13 +135,11 @@ func run(args []string) int {
 	}
 	a.HeartbeatEvery = *heartbeat
 	a.MetricsEvery = *metricsEvery
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	if _, err := catalog.Builtin(); err != nil { // recipe.install would refuse everything: say why at once
 		log.Error("the embedded recipe catalog did not load", "err", err)
 		return 1
 	}
-	log.Info("cloudy-agent starting", "version", version, "server", st.ServerName, "control_plane", st.ControlPlane)
+	log.Info("hosbah-agent starting", "version", version, "server", st.ServerName, "control_plane", st.ControlPlane)
 	if err := a.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		log.Error("stopped", "err", err)
 		return 1

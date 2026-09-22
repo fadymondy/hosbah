@@ -10,7 +10,7 @@ CREATE TABLE app_volumes (
 );
 
 -- Hosbah: a persistent volume of a git-deployed site (app). The Docker volume's name is derived
--- (cloudy-vol-<app id>-<name>), never stored or user-supplied. mount_path is an absolute, cleaned
+-- (hosbah-vol-<app id>-<name>; cloudy-vol-… when made before the rename), never stored or user-supplied. mount_path is an absolute, cleaned
 -- path inside the containers; the deploy pipeline hands the app's volumes to the agent, which mounts
 -- them into the web and every worker container of a release. A volume applies from the next deploy,
 -- restart or rollback. The system roots (/proc, /etc, …) and parent/child overlaps are refused by

@@ -21,10 +21,10 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 	s := string(b)
 
 	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
-	plain := servers["cloudy_http"].(map[string]any)
-	secure := servers["cloudy_https"].(map[string]any)
+	plain := servers["hosbah_http"].(map[string]any)
+	secure := servers["hosbah_https"].(map[string]any)
 	if got := plain["listen"].([]string); got[0] != ":80" {
-		t.Fatalf("cloudy_http listens on %v", got)
+		t.Fatalf("hosbah_http listens on %v", got)
 	}
 	pj, _ := json.Marshal(plain)
 	sj, _ := json.Marshal(secure)
@@ -39,7 +39,7 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 	}
 	// The last plain route is the 404 fallback.
 	routes := plain["routes"].([]any)
-	if last := routes[len(routes)-1].(map[string]any); last["@id"] != "cloudy-fallback" {
+	if last := routes[len(routes)-1].(map[string]any); last["@id"] != "hosbah-fallback" {
 		t.Errorf("no 404 fallback last: %v", last)
 	}
 	for _, want := range []string{
@@ -47,8 +47,8 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 		`"on_demand":true`,
 		`"permission":{"endpoint":"http://cp.test/internal/tls/allow","module":"http"}`,
 		`"flush_interval":-1`,
-		`"@id":"cloudy-app-a-http"`,
-		`"@id":"cloudy-app-a-https"`,
+		`"@id":"hosbah-app-a-http"`,
+		`"@id":"hosbah-app-a-https"`,
 		`"listen":"localhost:2019"`,
 	} {
 		if !strings.Contains(s, want) {
@@ -63,7 +63,7 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 func TestRenderCaddyEmpty(t *testing.T) {
 	cfg := renderCaddy(routeTable{Apps: map[string]routeEntry{}})
 	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
-	if _, ok := servers["cloudy_https"]; ok {
+	if _, ok := servers["hosbah_https"]; ok {
 		t.Error(":443 should not be bound with no TLS routes")
 	}
 	if _, ok := cfg["apps"].(map[string]any)["tls"]; ok {
@@ -82,12 +82,12 @@ func TestRenderCaddyProxyHosts(t *testing.T) {
 		},
 	})
 	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
-	pj, _ := json.Marshal(servers["cloudy_http"])
-	sj, _ := json.Marshal(servers["cloudy_https"])
+	pj, _ := json.Marshal(servers["hosbah_http"])
+	sj, _ := json.Marshal(servers["hosbah_https"])
 	if !strings.Contains(string(pj), "printer.lan.test") || strings.Contains(string(pj), "nas.example.com") {
 		t.Errorf("plain: %s", pj)
 	}
-	if !strings.Contains(string(sj), `"dial":"10.0.0.5:5000"`) || !strings.Contains(string(sj), "cloudy-proxy-p2") {
+	if !strings.Contains(string(sj), `"dial":"10.0.0.5:5000"`) || !strings.Contains(string(sj), "hosbah-proxy-p2") {
 		t.Errorf("secure: %s", sj)
 	}
 	if !strings.Contains(string(sj), `"insecure_skip_verify":true`) {
@@ -98,8 +98,8 @@ func TestRenderCaddyProxyHosts(t *testing.T) {
 		t.Errorf("auto TLS subjects: %s", all)
 	}
 	// The 404 fallback stays last on :80.
-	routes := servers["cloudy_http"].(map[string]any)["routes"].([]any)
-	if routes[len(routes)-1].(map[string]any)["@id"] != "cloudy-fallback" {
+	routes := servers["hosbah_http"].(map[string]any)["routes"].([]any)
+	if routes[len(routes)-1].(map[string]any)["@id"] != "hosbah-fallback" {
 		t.Error("fallback is not last")
 	}
 }

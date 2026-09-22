@@ -122,6 +122,9 @@ func dbProvision(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	// A service created before the rename keeps its cloudy-db-… container and cloudy-dbdata-… volume.
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	p.Volume = resolveName(oc.Ctx, appDocker, kindVolume, p.Volume)
 	if code, err := dbDockerReady(oc); err != nil {
 		return nil, code, err
 	}
@@ -144,7 +147,7 @@ func dbProvision(oc *OpContext) (any, int, error) {
 	oc.Progress(2, 3)
 	publish := fmt.Sprintf("%s:%d:%d", p.Bind, p.Port, agentproto.DBInternalPort(p.Kind))
 	args := []string{"run", "-d", "--name", p.Container, "--restart", "unless-stopped",
-		"--label", "cloudy.dataservice=" + p.ServiceID, "--label", "cloudy.kind=" + p.Kind,
+		"--label", agentproto.LabelDataService + "=" + p.ServiceID, "--label", agentproto.LabelKind + "=" + p.Kind,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
 		"-v", p.Volume + ":" + dataDirOf(p.Kind), "-p", publish}
 	// The image goes after the run options and before any container command, so redis'
@@ -258,6 +261,7 @@ func dbCreate(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
@@ -386,6 +390,7 @@ func dbBackup(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
 	if _, code, err := ensureRestic(oc); err != nil {
 		return nil, code, err
 	}
@@ -589,7 +594,7 @@ func dbStartThrowaway(oc *OpContext, p agentproto.DBRestoreParams, rootpw string
 	if _, err := oc.Run("docker", "volume", "create", p.Volume); err != nil {
 		return 1, errors.New("could not create the throwaway volume")
 	}
-	args := []string{"run", "-d", "--name", p.Container, "--label", "cloudy.restoretest=" + p.ServiceID,
+	args := []string{"run", "-d", "--name", p.Container, "--label", agentproto.LabelRestoreTest + "=" + p.ServiceID,
 		"-v", p.Volume + ":" + dataDirOf(p.Kind)}
 	var pairs []string
 	switch p.Kind {
@@ -733,6 +738,8 @@ func dbRemove(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	p.Volume = resolveName(oc.Ctx, appDocker, kindVolume, p.Volume)
 	_, _ = oc.Run("docker", "rm", "-f", p.Container)
 	removed := false
 	if _, err := oc.Run("docker", "volume", "rm", "-f", p.Volume); err == nil {
@@ -778,6 +785,7 @@ func dbDrop(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err

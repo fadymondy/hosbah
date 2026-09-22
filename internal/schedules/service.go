@@ -43,7 +43,7 @@ const (
 	// opGrace is what the operation is allowed on top of the command's own timeout.
 	opGrace = time.Minute
 	// systemActor is operations.created_by of a scheduled (not manual) run.
-	systemActor = "cloudy"
+	systemActor = "hosbah"
 
 	claimBatch = 50
 	watchPoll  = 5 * time.Second

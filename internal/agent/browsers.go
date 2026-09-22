@@ -93,7 +93,7 @@ func browserRunArgs(p agentproto.BrowserCreateParams) []string {
 }
 
 func (h *browserHost) upstreamPort(ctx context.Context, browserID string) (int, error) {
-	out, err := h.run(ctx, nil, "docker", "port", agentproto.BrowserContainerName(browserID), strconv.Itoa(agentproto.BrowserCDPPort)+"/tcp")
+	out, err := h.run(ctx, nil, "docker", "port", h.containerOf(ctx, browserID), strconv.Itoa(agentproto.BrowserCDPPort)+"/tcp")
 	if err != nil {
 		return 0, errors.New("the container did not publish its port")
 	}
@@ -140,7 +140,10 @@ func (h *browserHost) create(oc *OpContext) (any, int, error) {
 	}
 	oc.Progress(2, 4)
 	h.closeGateway(p.BrowserID)
-	_, _ = h.run(oc.Ctx, nil, "docker", "rm", "-f", name) // idempotent re-run
+	// Idempotent re-run (a browser made before the rename comes back under the new name).
+	for _, n := range agentproto.NameCandidates(name) {
+		_, _ = h.run(oc.Ctx, nil, "docker", "rm", "-f", n)
+	}
 	oc.Info("starting %s (%d MiB, %g CPU, CDP on 127.0.0.1 only)", name, p.MemoryMB, p.CPUs)
 	if _, err := h.run(oc.Ctx, nil, "docker", browserRunArgs(p)...); err != nil {
 		return fail("could not start the browser", err)
@@ -246,15 +249,22 @@ func (h *browserHost) remove(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	name := h.containerOf(oc.Ctx, p.BrowserID)
 	removed, err := h.removeOne(oc, p.BrowserID)
 	if err != nil {
 		return nil, 1, err
 	}
-	return agentproto.BrowserRemoveResult{Container: agentproto.BrowserContainerName(p.BrowserID), Removed: removed}, 0, nil
+	return agentproto.BrowserRemoveResult{Container: name, Removed: removed}, 0, nil
+}
+
+// containerOf is the browser's container on this server: cloudy-browser-<id> for a browser made
+// before the rename, else hosbah-browser-<id>.
+func (h *browserHost) containerOf(ctx context.Context, browserID string) string {
+	return resolveName(ctx, h.run, kindContainer, agentproto.BrowserContainerName(browserID))
 }
 
 func (h *browserHost) removeOne(oc *OpContext, id string) (bool, error) {
-	name := agentproto.BrowserContainerName(id)
+	name := h.containerOf(oc.Ctx, id)
 	h.closeGateway(id)
 	_ = os.Remove(h.statePath(id))
 	_, _ = h.run(oc.Ctx, nil, "docker", "stop", "-t", "5", name)
@@ -287,9 +297,12 @@ func (h *browserHost) withAppRemove(next Handler) Handler {
 				ids[st.BrowserID] = true
 			}
 		}
-		if out, err := h.run(oc.Ctx, nil, "docker", "ps", "-a", "--filter", "label="+agentproto.BrowserAppLabel+"="+p.AppID,
-			"--format", `{{.Label "`+agentproto.BrowserLabel+`"}}`); err == nil {
-			for _, id := range strings.Fields(string(out)) {
+		// hosbah.browser-app, and cloudy.browser-app on browsers made before the rename.
+		if out, err := psNames(oc.Ctx, h.run, func(l labelSet) []string {
+			return []string{"-a", "--filter", "label=" + l(agentproto.BrowserAppLabel) + "=" + p.AppID,
+				"--format", `{{.Label "` + l(agentproto.BrowserLabel) + `"}}`}
+		}); err == nil {
+			for _, id := range out {
 				if agentproto.ValidID(id) {
 					ids[id] = true
 				}
@@ -297,8 +310,9 @@ func (h *browserHost) withAppRemove(next Handler) Handler {
 		}
 		var gone []string
 		for id := range ids {
+			name := h.containerOf(oc.Ctx, id)
 			if _, err := h.removeOne(oc, id); err == nil {
-				gone = append(gone, agentproto.BrowserContainerName(id))
+				gone = append(gone, name)
 			}
 		}
 		if m, ok := res.(map[string]any); ok && len(gone) > 0 {
@@ -318,9 +332,11 @@ func (h *browserHost) status(oc *OpContext) (any, int, error) {
 	}
 	res := agentproto.BrowserStatusResult{Browsers: []agentproto.BrowserState{}}
 	var running []string
+	names := map[string]string{}
 	for _, id := range p.BrowserIDs {
 		st := agentproto.BrowserState{BrowserID: id}
-		name := agentproto.BrowserContainerName(id)
+		name := h.containerOf(oc.Ctx, id)
+		names[id] = name
 		if out, err := h.run(oc.Ctx, nil, "docker", "inspect", "--type", "container", "--format", "{{.State.Running}} {{.RestartCount}}", name); err == nil {
 			if f := strings.Fields(string(out)); len(f) == 2 {
 				st.Running = f[0] == "true"
@@ -342,7 +358,7 @@ func (h *browserHost) status(oc *OpContext) (any, int, error) {
 		if out, err := h.run(oc.Ctx, nil, "docker", args...); err == nil {
 			mem := parseMemUsage(string(out))
 			for i := range res.Browsers {
-				res.Browsers[i].MemoryBytes = mem[agentproto.BrowserContainerName(res.Browsers[i].BrowserID)]
+				res.Browsers[i].MemoryBytes = mem[names[res.Browsers[i].BrowserID]]
 			}
 		}
 	}

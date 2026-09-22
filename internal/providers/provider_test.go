@@ -38,7 +38,7 @@ func TestAgentUserData(t *testing.T) {
 	got := AgentUserData(`curl -fsSL "https://x/install/tok" | sh`, []string{"ssh-ed25519 AAAA one", "  ", "ssh-ed25519 BBBB two\n"})
 	want := `#cloud-config
 users:
-  - name: cloudy
+  - name: hosbah
     groups: [sudo]
     shell: /bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"

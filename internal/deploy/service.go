@@ -51,7 +51,7 @@ type Service struct {
 	active map[string]bool
 
 	github GitHubApp
-	// apps is the platform apps domain (CLOUDY_APPS_DOMAIN …); see appsdomain.go.
+	// apps is the platform apps domain (HOSBAH_APPS_DOMAIN …); see appsdomain.go.
 	apps AppsDomain
 	// cfOpts, when set, configures every Cloudflare client (tests).
 	cfOpts []cloudflare.Option
@@ -400,6 +400,7 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 // stepOpID derives an operation id from (deployment, step): the same step of the same deployment is
 // always the same operation, so a resumed pipeline re-attaches instead of running it twice.
 func stepOpID(deploymentID, step string) string {
+	// "cloudy-step" is frozen: a new seed would give a deploy resumed across the upgrade new op ids.
 	sum := sha256.Sum256([]byte("cloudy-step\n" + deploymentID + "\n" + step))
 	b := sum[:16]
 	b[6] = (b[6] & 0x0f) | 0x40
@@ -570,7 +571,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 	r.publish()
 
-	cfg, err := ParseConfig(built.HosbahToml)
+	cfg, err := ParseConfigFile(built.Toml(), ConfigFileOf(built.DetectResult))
 	if err != nil {
 		return nil, err
 	}

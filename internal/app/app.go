@@ -34,7 +34,7 @@ type App struct {
 	Storage  togo.Storage
 	Realtime togo.Broker
 
-	// Keys is the envelope-encryption keyring (CLOUDY_KEK). Set by server.Boot,
+	// Keys is the envelope-encryption keyring (HOSBAH_KEK). Set by server.Boot,
 	// which refuses to start without it.
 	Keys *crypto.Keyring
 

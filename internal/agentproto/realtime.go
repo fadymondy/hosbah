@@ -36,7 +36,7 @@ var (
 	localUpstreamRE   = regexp.MustCompile(`^127\.0\.0\.1:([1-9][0-9]{0,4})$`)
 )
 
-// ValidRealtimeProcess: the bare name of a worker ("reverb" is cloudy.toml's "worker:reverb"). A
+// ValidRealtimeProcess: the bare name of a worker ("reverb" is hosbah.toml's "worker:reverb"). A
 // letter first, so it can never read as an option; "web" is not a worker.
 func ValidRealtimeProcess(s string) bool { return realtimeProcessRE.MatchString(s) && s != "web" }
 
@@ -154,4 +154,4 @@ type RealtimeRouteResult struct {
 }
 
 // RealtimeRouteID is the Caddy @id of an app's realtime route (suffix: -http or -https).
-func RealtimeRouteID(appID string) string { return "cloudy-realtime-" + appID }
+func RealtimeRouteID(appID string) string { return NamePrefix + "realtime-" + appID }

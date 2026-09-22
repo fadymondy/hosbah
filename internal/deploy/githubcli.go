@@ -18,7 +18,7 @@ A server's own GitHub connection, through the GitHub CLI (gh) on it.
 This sits beside the GitHub App (github.go), not in place of it: with gh logged in on a server, the
 new-app form can list the repositories and branches the account sees, and deploy clones of private
 github.com repositories on that server succeed through gh's git credential helper. The login lives
-on the server (in /etc/cloudy/gh); the control plane keeps only what gh last reported
+on the server (in /etc/hosbah/gh); the control plane keeps only what gh last reported
 (servers.github). A token given for the token mode is sealed to the server's agent key at once —
 operations.params holds ciphertext only that server opens, and no log or audit entry carries it.
 */

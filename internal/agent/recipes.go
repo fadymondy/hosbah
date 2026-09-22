@@ -135,7 +135,12 @@ func installEnv(r catalog.Recipe, sec agentproto.InstallSecrets) (map[string]str
 
 // installRunArgs is THE place an install's `docker run` argv is built — from the agent's own recipe.
 // Env names only reach the argv through the env file's path.
-func installRunArgs(p agentproto.RecipeInstallParams, r catalog.Recipe, envFile string) []string {
+// volName is the Docker volume of one of the recipe's volumes (resolveName: an install made before
+// the rename keeps its cloudy-ivol-… volumes); nil derives the current name.
+func installRunArgs(p agentproto.RecipeInstallParams, r catalog.Recipe, envFile string, volName func(slug string) string) []string {
+	if volName == nil {
+		volName = func(slug string) string { return agentproto.InstallVolumeName(p.InstallID, slug) }
+	}
 	args := []string{"run", "-d", "--restart", "unless-stopped", "--name", agentproto.InstallContainerName(p.InstallID),
 		"--label", agentproto.InstallLabel + "=" + p.InstallID, "--label", agentproto.InstallAppLabel + "=" + p.AppID,
 		"--label", agentproto.InstallRecipeLabel + "=" + r.ID + "@" + r.Version,
@@ -147,7 +152,7 @@ func installRunArgs(p agentproto.RecipeInstallParams, r catalog.Recipe, envFile 
 		args = append(args, "--cap-add", c)
 	}
 	for _, v := range r.Volumes {
-		args = append(args, "--mount", "type=volume,source="+agentproto.InstallVolumeName(p.InstallID, v.Name)+",target="+v.MountPath)
+		args = append(args, "--mount", "type=volume,source="+volName(v.Name)+",target="+v.MountPath)
 	}
 	if envFile != "" {
 		args = append(args, "--env-file", envFile)
@@ -236,7 +241,11 @@ func (h *recipeHost) install(oc *OpContext) (any, int, error) {
 		}
 	}
 	oc.Progress(2, 4)
-	_, _ = h.run(oc.Ctx, nil, "docker", "rm", "-f", name) // idempotent re-run; the volumes stay
+	// Idempotent re-run; the volumes stay. The container of an install made before the rename goes
+	// too (it comes back under the new name, on its old volumes).
+	for _, n := range agentproto.NameCandidates(name) {
+		_, _ = h.run(oc.Ctx, nil, "docker", "rm", "-f", n)
+	}
 	envFile := ""
 	if len(env) > 0 {
 		if envFile, err = h.writeEnvFile(p.InstallID, env); err != nil {
@@ -244,7 +253,9 @@ func (h *recipeHost) install(oc *OpContext) (any, int, error) {
 		}
 	}
 	oc.Info("starting %s: %s %s (%d MiB, %g CPU%s)", name, r.ID, r.Version, r.Limits.MemoryMB, r.Limits.CPUs, capsNote(r.Caps))
-	_, err = h.run(oc.Ctx, nil, "docker", installRunArgs(p, r, envFile)...)
+	_, err = h.run(oc.Ctx, nil, "docker", installRunArgs(p, r, envFile, func(slug string) string {
+		return resolveName(oc.Ctx, h.run, kindVolume, agentproto.InstallVolumeName(p.InstallID, slug))
+	})...)
 	if envFile != "" {
 		_ = os.Remove(envFile) // docker has read it; the values now live in the container's config only
 	}
@@ -280,7 +291,7 @@ func capsNote(caps []string) string {
 }
 
 func (h *recipeHost) publishedPort(ctx context.Context, installID string, containerPort int) (int, error) {
-	out, err := h.run(ctx, nil, "docker", "port", agentproto.InstallContainerName(installID), strconv.Itoa(containerPort)+"/tcp")
+	out, err := h.run(ctx, nil, "docker", "port", h.containerOf(ctx, installID), strconv.Itoa(containerPort)+"/tcp")
 	if err != nil {
 		return 0, errors.New("the container did not publish its port")
 	}
@@ -295,36 +306,53 @@ func (h *recipeHost) remove(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
+	name := h.containerOf(oc.Ctx, p.InstallID)
 	removed, err := h.removeOne(oc, p.InstallID)
 	if err != nil {
 		return nil, 1, err
 	}
-	res := agentproto.RecipeRemoveResult{Container: agentproto.InstallContainerName(p.InstallID), Removed: removed, VolumesRemoved: []string{}}
+	res := agentproto.RecipeRemoveResult{Container: name, Removed: removed, VolumesRemoved: []string{}}
 	if p.DeleteData {
 		// Found by the derived prefix, so this works whatever catalog this agent has. A UUID is a
-		// fixed length, so one install's prefix is never the start of another's.
-		prefix := agentproto.InstallVolumeName(p.InstallID, "")
-		out, err := h.run(oc.Ctx, nil, "docker", "volume", "ls", "-q", "--filter", "name="+prefix)
-		if err != nil {
-			return nil, 1, errors.New("could not list the install's volumes")
-		}
-		for _, v := range strings.Fields(string(out)) {
-			if !strings.HasPrefix(v, prefix) || !agentproto.ValidVolumeSlug(strings.TrimPrefix(v, prefix)) {
-				continue // docker's name filter is a substring match
+		// fixed length, so one install's prefix is never the start of another's. Both prefixes: an
+		// install made before the rename has cloudy-ivol-… volumes.
+		for _, prefix := range agentproto.NameCandidates(agentproto.InstallVolumeName(p.InstallID, "")) {
+			out, err := h.run(oc.Ctx, nil, "docker", "volume", "ls", "-q", "--filter", "name="+prefix)
+			if err != nil {
+				return nil, 1, errors.New("could not list the install's volumes")
 			}
-			if _, err := h.run(oc.Ctx, nil, "docker", "volume", "rm", v); err != nil {
-				oc.Info("%s", clip(err.Error(), 300))
-				return nil, 1, errors.New("could not remove volume " + v)
+			if code, err := h.removeVolumes(oc, prefix, string(out), &res); err != nil {
+				return nil, code, err
 			}
-			oc.Info("removed volume %s", v)
-			res.VolumesRemoved = append(res.VolumesRemoved, v)
 		}
 	}
 	return res, 0, nil
 }
 
+// removeVolumes removes the listed volumes that carry the install's prefix.
+func (h *recipeHost) removeVolumes(oc *OpContext, prefix, listed string, res *agentproto.RecipeRemoveResult) (int, error) {
+	for _, v := range strings.Fields(listed) {
+		if !strings.HasPrefix(v, prefix) || !agentproto.ValidVolumeSlug(strings.TrimPrefix(v, prefix)) {
+			continue // docker's name filter is a substring match
+		}
+		if _, err := h.run(oc.Ctx, nil, "docker", "volume", "rm", v); err != nil {
+			oc.Info("%s", clip(err.Error(), 300))
+			return 1, errors.New("could not remove volume " + v)
+		}
+		oc.Info("removed volume %s", v)
+		res.VolumesRemoved = append(res.VolumesRemoved, v)
+	}
+	return 0, nil
+}
+
+// containerOf is the install's container on this server: cloudy-install-<id> for an install made
+// before the rename, else hosbah-install-<id>.
+func (h *recipeHost) containerOf(ctx context.Context, installID string) string {
+	return resolveName(ctx, h.run, kindContainer, agentproto.InstallContainerName(installID))
+}
+
 func (h *recipeHost) removeOne(oc *OpContext, id string) (bool, error) {
-	name := agentproto.InstallContainerName(id)
+	name := h.containerOf(oc.Ctx, id)
 	_ = os.Remove(filepath.Join(h.dir, id+".env"))
 	_, _ = h.run(oc.Ctx, nil, "docker", "stop", "-t", "10", name)
 	if _, err := h.run(oc.Ctx, nil, "docker", "rm", "-f", name); err != nil {
@@ -351,18 +379,22 @@ func (h *recipeHost) withAppRemove(next Handler) Handler {
 		if json.Unmarshal(oc.Params, &p) != nil || !agentproto.ValidID(p.AppID) {
 			return res, code, err
 		}
-		out, lerr := h.run(oc.Ctx, nil, "docker", "ps", "-a", "--filter", "label="+agentproto.InstallAppLabel+"="+p.AppID,
-			"--format", `{{.Label "`+agentproto.InstallLabel+`"}}`)
+		// hosbah.install-app, and cloudy.install-app on installs made before the rename.
+		ids, lerr := psNames(oc.Ctx, h.run, func(l labelSet) []string {
+			return []string{"-a", "--filter", "label=" + l(agentproto.InstallAppLabel) + "=" + p.AppID,
+				"--format", `{{.Label "` + l(agentproto.InstallLabel) + `"}}`}
+		})
 		if lerr != nil {
 			return res, code, nil
 		}
 		var gone []string
-		for _, id := range strings.Fields(string(out)) {
+		for _, id := range ids {
 			if !agentproto.ValidID(id) {
 				continue
 			}
+			name := h.containerOf(oc.Ctx, id)
 			if _, err := h.removeOne(oc, id); err == nil {
-				gone = append(gone, agentproto.InstallContainerName(id))
+				gone = append(gone, name)
 			}
 		}
 		if m, ok := res.(map[string]any); ok && len(gone) > 0 {
@@ -383,9 +415,11 @@ func (h *recipeHost) status(oc *OpContext) (any, int, error) {
 	c, _ := h.catalog()
 	res := agentproto.RecipeStatusResult{Installs: []agentproto.InstallState{}}
 	var running []string
+	names := map[string]string{}
 	for i, id := range p.InstallIDs {
 		st := agentproto.InstallState{InstallID: id}
-		name := agentproto.InstallContainerName(id)
+		name := h.containerOf(oc.Ctx, id)
+		names[id] = name
 		if out, err := h.run(oc.Ctx, nil, "docker", "inspect", "--type", "container", "--format", "{{.State.Running}} {{.RestartCount}}", name); err == nil {
 			if f := strings.Fields(string(out)); len(f) == 2 {
 				st.Running = f[0] == "true"
@@ -407,7 +441,7 @@ func (h *recipeHost) status(oc *OpContext) (any, int, error) {
 		if out, err := h.run(oc.Ctx, nil, "docker", args...); err == nil {
 			mem := parseMemUsage(string(out))
 			for i := range res.Installs {
-				res.Installs[i].MemoryBytes = mem[agentproto.InstallContainerName(res.Installs[i].InstallID)]
+				res.Installs[i].MemoryBytes = mem[names[res.Installs[i].InstallID]]
 			}
 		}
 	}

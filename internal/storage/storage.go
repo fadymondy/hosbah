@@ -2,7 +2,7 @@
 // (Its S3 buckets live with the data services, internal/dbsvc/buckets.go.)
 //
 // A volume is a name and a mount path. The Docker volume behind it is DERIVED —
-// cloudy-vol-<app id>-<name> — and the deploy pipeline (internal/deploy, startParams) hands the
+// hosbah-vol-<app id>-<name> (cloudy-vol-… when made before the rename; the agent keeps that name) — and the deploy pipeline (internal/deploy, startParams) hands the
 // app's volumes to the agent as typed mounts, which the agent validates again and adds to the web
 // and every worker container of a release. So a volume applies from the next deploy, restart or
 // rollback; whether the live release mounts it is read from what that release recorded
@@ -51,7 +51,7 @@ type Volume struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	MountPath string    `json:"mount_path"`
-	Volume    string    `json:"volume" doc:"The Docker volume on the app's server: cloudy-vol-<app id>-<name>. Derived, never chosen."`
+	Volume    string    `json:"volume" doc:"The Docker volume on the app's server: hosbah-vol-<app id>-<name> (the agent keeps using cloudy-vol-… for a volume made before the rename). Derived, never chosen."`
 	Mounted   bool      `json:"mounted" doc:"true when the live release's containers were started with this volume at this path. false: it applies from the next deploy or restart."`
 	Bytes     *int64    `json:"bytes" doc:"What Docker reports the volume holds (rounded); null when the server could not be asked, Docker reports none, or the volume does not exist yet."`
 	CreatedAt time.Time `json:"created_at"`

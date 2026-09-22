@@ -101,7 +101,7 @@ func ProxyTools() []Tool {
 		},
 		{
 			Name: "verify_proxy_host", Scope: scopes.Write,
-			Description: "Check a proxy host's _cloudy-verify TXT record. Verification gates its public certificate.",
+			Description: "Check a proxy host's _hosbah-verify TXT record (a pre-rename _cloudy-verify record also counts). Verification gates its public certificate.",
 			InputSchema: schema([]string{"proxy"}, map[string]any{"proxy": proxyArg}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
@@ -155,7 +155,7 @@ func findProxy(ctx context.Context, env *Env, args Args) (db.ProxyHost, error) {
 func proxySummary(verb string, p db.ProxyHost) string {
 	out := fmt.Sprintf("%s %s → %s (tls %s, %s, id %s).\n", verb, p.Hostname, p.Upstream, p.Tls, onOff(p.Enabled, "enabled", "disabled"), p.ID)
 	if p.VerifiedAt == nil && p.Tls == "auto" {
-		out += fmt.Sprintf("Not verified yet: add a TXT record _cloudy-verify.%s = %s, then call verify_proxy_host.\n", p.Hostname, p.VerifyToken)
+		out += fmt.Sprintf("Not verified yet: add a TXT record %s = %s, then call verify_proxy_host.\n", deploy.VerifyName(p.Hostname), deploy.VerifyValue(p.VerifyToken))
 	}
 	return out
 }

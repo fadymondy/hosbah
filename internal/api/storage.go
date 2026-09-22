@@ -90,7 +90,7 @@ func (d *deps) registerStorage(api huma.API) {
 	}
 	huma.Register(api, huma.Operation{OperationID: "create-app-volume", Method: http.MethodPost, Path: base + "/volumes",
 		DefaultStatus: http.StatusCreated, Tags: tags,
-		Summary: "Add a persistent volume: a Docker volume named cloudy-vol-<app id>-<name> (derived), mounted at mount_path in the web and " +
+		Summary: "Add a persistent volume: a Docker volume named hosbah-vol-<app id>-<name> (derived; cloudy-vol-… for one made before the rename), mounted at mount_path in the web and " +
 			"every worker container from the next deploy or restart. 422: a bad name; a mount path that is not absolute, is /, or is at or " +
 			"under /proc, /sys, /dev, /run, /etc, /bin, /sbin, /usr, /lib, /lib64, /boot or /var/run (after normalising, so /data/../etc " +
 			"is /etc); an imported app. 409: the name or path is taken, the path is inside or around another volume's, or the app has 10. " +

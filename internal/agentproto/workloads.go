@@ -70,12 +70,12 @@ var (
 )
 
 // IsHosbahOwned reports whether a container, unit or guest name is one of Hosbah's own: app processes
-// (cloudy-<app>-<process>-<id>), release and restore-test runs, data services (cloudy-db-*), Caddy,
-// frpc, the agent — all "cloudy-…"; "hosbah-…" is reserved the same way. The importer never imports
+// (hosbah-<app>-<process>-<id>), release and restore-test runs, data services (hosbah-db-*), Caddy,
+// frpc, the agent — all "hosbah-…", or "cloudy-…" when they were made before the rename. The importer never imports
 // them, and every imported-workload operation refuses them on both sides of the wire.
 func IsHosbahOwned(name string) bool {
 	n := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(name), "/"))
-	return strings.HasPrefix(n, "cloudy-") || strings.HasPrefix(n, "hosbah-") || n == "cloudy" || n == "hosbah"
+	return strings.HasPrefix(n, NamePrefix) || strings.HasPrefix(n, LegacyNamePrefix) || n == "hosbah" || n == "cloudy"
 }
 
 // ValidVMID: a Proxmox guest id (100 – 999999999).

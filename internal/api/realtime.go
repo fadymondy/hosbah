@@ -25,7 +25,7 @@ Hosbah's: 422 on every route. A team the caller is not in: 404.
 type RealtimeIn struct {
 	Enabled   *bool  `json:"enabled,omitempty" doc:"Default true. false keeps the configuration and removes the route at once."`
 	Kind      string `json:"kind" enum:"reverb,socketio,ws,go,custom" doc:"What the process is. It only chooses the default path."`
-	Process   string `json:"process" minLength:"1" maxLength:"31" doc:"^[a-z][a-z0-9_-]{0,30}$ — the bare name of a worker of cloudy.toml (reverb for \"worker:reverb\"). Not web."`
+	Process   string `json:"process" minLength:"1" maxLength:"31" doc:"^[a-z][a-z0-9_-]{0,30}$ — the bare name of a worker of hosbah.toml (reverb for \"worker:reverb\"). Not web."`
 	Port      int    `json:"port" minimum:"1" maximum:"65535" doc:"The port the process listens on inside its container."`
 	Path      string `json:"path,omitempty" maxLength:"100" doc:"Starts with /; letters, digits, . _ - and / only; no . or .. segments. Default: /app (reverb), /socket.io (socketio), /ws (others)."`
 	WholeSite bool   `json:"whole_site,omitempty" doc:"Required, with kind custom, for the path / — the whole site goes to the process."`
@@ -55,7 +55,7 @@ func (d *deps) registerRealtime(api huma.API) {
 
 	type savedOut struct{ Body realtime.RealtimeSaved }
 	huma.Register(api, huma.Operation{OperationID: "set-app-realtime", Method: http.MethodPut, Path: path, Tags: tags,
-		Summary: "Save the site's realtime configuration (upsert): which worker of cloudy.toml is the websocket server, the port it listens on " +
+		Summary: "Save the site's realtime configuration (upsert): which worker of hosbah.toml is the websocket server, the port it listens on " +
 			"inside its container, and the path of the site's hostnames that goes to it. From the next deploy or restart the agent publishes " +
 			"that port on loopback and Caddy routes path* to it, ahead of the site's own route (applies: next_deploy). When the live release " +
 			"already publishes that process's port — a changed path, or enabling again — the route changes at once (applies: now, operation). " +

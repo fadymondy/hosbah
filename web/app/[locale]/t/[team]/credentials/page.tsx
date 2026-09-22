@@ -227,11 +227,11 @@ const CLOUDFLARE_FIELDS = [
 
 const FIELDS = [
   { key: "api_url", label: "credentials.apiUrl", required: true, placeholder: "https://pve.example:8006" },
-  { key: "token_id", label: "credentials.tokenId", required: true, placeholder: "cloudy@pve!ctl" },
+  { key: "token_id", label: "credentials.tokenId", required: true, placeholder: "hosbah@pve!ctl" },
   { key: "node", label: "credentials.node", required: true, placeholder: "pve-3x1" },
   { key: "storage", label: "credentials.storage", required: true, placeholder: "local" },
   { key: "bridge", label: "credentials.bridge", required: false, placeholder: "vmbr1" },
-  { key: "pool", label: "credentials.pool", required: false, placeholder: "cloudy" },
+  { key: "pool", label: "credentials.pool", required: false, placeholder: "hosbah" },
   { key: "lxc_template", label: "credentials.lxcTemplate", required: false, placeholder: "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst" },
   { key: "template_vmid", label: "credentials.templateVmid", required: false, placeholder: "9000" },
   { key: "tls_fingerprint", label: "credentials.fingerprint", required: false, placeholder: "AB:CD:…" },

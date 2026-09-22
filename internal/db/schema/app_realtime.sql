@@ -13,7 +13,7 @@ CREATE TABLE app_realtime (
 );
 
 -- Hosbah: the "Realtime" section of a git-deployed site (app) — at most one row per app. process is
--- the bare name of a worker declared in the site's cloudy.toml ("reverb" = [processes] "worker:reverb");
+-- the bare name of a worker declared in the site's hosbah.toml ("reverb" = [processes] "worker:reverb");
 -- port is what that process listens on INSIDE its container; path is the URL prefix of the site's
 -- hostnames Caddy sends to it ("/" = the whole site, kind custom only — internal/realtime enforces
 -- that, and the agent validates process, port and path again). Applies from the next deploy, restart

@@ -1,3 +1,3 @@
-module example.com/cloudy-go-sample
+module example.com/hosbah-go-sample
 
 go 1.23

@@ -1,20 +1,25 @@
 # Hosbah control plane on Proxmox LXC 117 (10.10.10.117). Images built on the
 # workstation and loaded via `docker load`. NPM host 61 forwards
-# cloudy-app.fadymondy.com -> 10.10.10.117:3710 (web). web proxies /api -> api.
-# The managed server "target-1" (cloudy-target agent) stays on the workstation and
-# connects out to wss://cloudy-app.fadymondy.com/agent/ws (same pinned key via CLOUDY_KEK).
-name: cloudy-prod
+# app.hosbah.com -> 10.10.10.117:3710 (web). web proxies /api -> api.
+# The managed server "target-1" (its agent in the hosbah-target container) stays on the workstation
+# and connects out to wss://app.hosbah.com/agent/ws (same pinned key via HOSBAH_KEK).
+#
+# Before the rename this stack was the project cloudy-prod (containers cloudy-api, cloudy-web, images
+# cloudy-api, cloudy-web). To switch a running box to these names, tag the images as hosbah-api and
+# hosbah-web, then `docker compose -p cloudy-prod down && docker compose up -d` (a few seconds of
+# downtime; there are no volumes: all state is in Postgres). Keep the same .env.prod.
+name: hosbah-prod
 services:
   api:
-    image: cloudy-api
-    container_name: cloudy-api
+    image: hosbah-api
+    container_name: hosbah-api
     env_file: .env.prod
     ports:
       - "0.0.0.0:8710:8710"
     restart: unless-stopped
   web:
-    image: cloudy-web
-    container_name: cloudy-web
+    image: hosbah-web
+    container_name: hosbah-web
     environment:
       NODE_ENV: production
       API_ORIGIN: http://api:8710

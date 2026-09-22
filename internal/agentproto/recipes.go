@@ -17,12 +17,13 @@ const (
 	KindRecipeRemove  = "recipe.remove"  // stop and remove the container; its volumes only when asked; idempotent
 	KindRecipeStatus  = "recipe.status"  // read-only: running?, restart count, memory, the current loopback port
 
-	InstallContainerPrefix = "cloudy-install-"
-	InstallVolumePrefix    = "cloudy-ivol-"
-	// Labels. NOT cloudy.app: a deploy's drain and a rollback stop every container with that label.
-	InstallLabel       = "cloudy.install"
-	InstallAppLabel    = "cloudy.install-app"
-	InstallRecipeLabel = "cloudy.install-recipe"
+	// Names (cloudy-install-, cloudy-ivol- and cloudy.* before the rename; the agent still finds those).
+	InstallContainerPrefix = NamePrefix + "install-"
+	InstallVolumePrefix    = NamePrefix + "ivol-"
+	// Labels. NOT hosbah.app: a deploy's drain and a rollback stop every container with that label.
+	InstallLabel       = LabelPrefix + "install"
+	InstallAppLabel    = LabelPrefix + "install-app"
+	InstallRecipeLabel = LabelPrefix + "install-recipe"
 
 	// InstallPidsLimit bounds an install's processes and threads.
 	InstallPidsLimit = 512

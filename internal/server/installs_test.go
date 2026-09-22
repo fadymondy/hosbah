@@ -269,11 +269,12 @@ func TestAppInstalls(t *testing.T) {
 			Verified bool
 			Stack    *struct {
 				Repo, Branch, Runtime string
-				CloudyTOML            string `json:"cloudy_toml"`
+				HosbahTOML            string `json:"hosbah_toml"`
+				CloudyTOML            string `json:"cloudy_toml"` // the pre-rename key, still sent
 			}
 		}
 		viewer.mustJSON("GET", "/api/teams/"+team.ID+"/catalog/laravel", nil, 200, &stack)
-		if stack.Stack == nil || !strings.HasPrefix(stack.Stack.Repo, "https://github.com/") || stack.Stack.CloudyTOML == "" {
+		if stack.Stack == nil || !strings.HasPrefix(stack.Stack.Repo, "https://github.com/") || stack.Stack.HosbahTOML == "" || stack.Stack.CloudyTOML != stack.Stack.HosbahTOML {
 			t.Errorf("stack: %+v", stack)
 		}
 		viewer.mustJSON("GET", "/api/teams/"+team.ID+"/catalog/no-such-recipe", nil, 404, nil)

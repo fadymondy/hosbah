@@ -1,11 +1,11 @@
 """Hosbah SDK for Python (3.9+, standard library only).
 
-It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Hosbah tool is
+It calls a team's MCP endpoint (POST /api/mcp) with a team token (hbu_…, or cld_… minted before the rename), so every Hosbah tool is
 available through ``call``, with the token's scopes, the audit log and destructive-action approvals.
 
     from hosbah import Hosbah
-    cloudy = Hosbah(os.environ["CLOUDY_URL"], os.environ["CLOUDY_TOKEN"])
-    cloudy.deploy("shop", wait=True)
+    hosbah = Hosbah(os.environ["HOSBAH_URL"], os.environ["HOSBAH_TOKEN"])
+    hosbah.deploy("shop", wait=True)
 """
 
 from __future__ import annotations

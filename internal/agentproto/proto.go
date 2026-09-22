@@ -1,4 +1,4 @@
-// Package agentproto is the wire contract between the Hosbah control plane and cloudy-agent.
+// Package agentproto is the wire contract between the Hosbah control plane and hosbah-agent.
 // Both sides import it, so a message shape or a signature layout cannot drift between them.
 //
 // Transport: one WebSocket per agent, dialled OUT by the agent to /agent/ws. Every message is a
@@ -202,6 +202,7 @@ func ParamsHash(params []byte) (string, error) {
 // decides what runs and where. Newline-separated; none of the fields can contain a newline
 // (ids are uuids, kinds are from the allowlist, the hash is hex, the rest are integers).
 func OpSigningBytes(op *SignedOp) []byte {
+	// "cloudy-op-v1" is frozen (pre-rename): agents that have not updated verify with it.
 	return []byte("cloudy-op-v1\n" + op.OpID + "\n" + op.ServerID + "\n" + op.Kind + "\n" +
 		op.ParamsHash + "\n" + strconv.FormatInt(op.Exp, 10) + "\n" + strconv.FormatInt(op.TimeoutSeconds, 10))
 }
@@ -256,6 +257,7 @@ func VerifyOp(pub ed25519.PublicKey, op *SignedOp, serverID string, now time.Tim
 
 // AuthSigningBytes is what an agent signs to answer a challenge.
 func AuthSigningBytes(nonce, serverID string) []byte {
+	// "cloudy-agent-auth-v1" is frozen (pre-rename): control planes on both sides of an upgrade check it.
 	return []byte("cloudy-agent-auth-v1\n" + nonce + "\n" + serverID)
 }
 

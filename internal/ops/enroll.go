@@ -31,9 +31,6 @@ import (
 // EnrolTTL is how long an enrolment token (and the install command carrying it) works.
 const EnrolTTL = 15 * time.Minute
 
-// enrolPrefix makes a leaked enrolment token recognisable (cle_ = cloudy enrolment).
-const enrolPrefix = "cle_"
-
 // Install is the one-liner a person runs on a server.
 type Install struct {
 	URL         string    `json:"url"`
@@ -48,7 +45,7 @@ func (s *Service) NewEnrollment(ctx context.Context, q *db.Queries, teamID, serv
 	if err := q.DeleteOpenEnrollments(ctx, db.DeleteOpenEnrollmentsParams{ServerID: serverID, TeamID: teamID}); err != nil {
 		return Install{}, err
 	}
-	plain, hash := tokens.New(enrolPrefix)
+	plain, hash := tokens.New(tokens.PrefixEnrol)
 	exp := s.now().Add(EnrolTTL).UTC()
 	if _, err := q.InsertEnrollment(ctx, db.InsertEnrollmentParams{TeamID: teamID, ServerID: serverID, TokenHash: hash,
 		ExpiresAt: exp, CreatedBy: createdBy}); err != nil {
@@ -80,7 +77,7 @@ func (s *Service) handleInstall(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "This Hosbah install link is not valid: it expired, was already used, or never existed.\n"+
 			"Create a new one on the server's page in Hosbah.\n")
 	}
-	if !strings.HasPrefix(token, enrolPrefix) || len(token) > 128 {
+	if !tokens.HasPrefix(token, tokens.Enrol) || len(token) > 128 {
 		notValid()
 		return
 	}
@@ -123,17 +120,22 @@ func (s *Service) handleDownload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		for _, arch := range []string{"amd64", "arm64"} {
 			if d.sha[arch] != "" {
-				fmt.Fprintf(w, "%s  cloudy-agent-linux-%s\n", d.sha[arch], arch)
+				fmt.Fprintf(w, "%s  %s%s\n", d.sha[arch], agentproto.AgentDistPrefix, arch)
 			}
 		}
 		return
 	}
-	arch, ok := strings.CutPrefix(name, "cloudy-agent-linux-")
+	// Either name: hosbah-agent-linux-<arch>, or cloudy-agent-linux-<arch> — what an install script
+	// or an agent.update issued by a control plane from before the rename asks for. Same bytes.
+	arch, ok := strings.CutPrefix(name, agentproto.AgentDistPrefix)
+	if !ok {
+		arch, ok = strings.CutPrefix(name, agentproto.LegacyAgentDistPrefix)
+	}
 	if !ok || (arch != "amd64" && arch != "arm64") || d.sha[arch] == "" {
 		http.NotFound(w, r)
 		return
 	}
-	f, err := os.Open(filepath.Join(s.cfg.DistDir, name)) //#nosec G304 -- name is one of two fixed values
+	f, err := os.Open(filepath.Join(s.cfg.DistDir, d.file[arch])) //#nosec G304 -- one of four fixed names
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -157,7 +159,7 @@ func (s *Service) UpdateParams(arch string) (json.RawMessage, string, error) {
 	}
 	b, _ := json.Marshal(map[string]string{
 		"version": d.version,
-		"url":     s.cfg.PublicURL + "/agent/download/cloudy-agent-linux-" + arch,
+		"url":     s.cfg.PublicURL + "/agent/download/" + agentproto.AgentDistPrefix + arch,
 		"sha256":  d.sha[arch],
 	})
 	return b, d.version, nil
@@ -185,7 +187,7 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := strings.TrimSpace(req.Token)
-	if !strings.HasPrefix(token, enrolPrefix) {
+	if !tokens.HasPrefix(token, tokens.Enrol) {
 		writeJSON(http.StatusUnauthorized, map[string]string{"error": errBadToken.Error()})
 		return
 	}
@@ -304,6 +306,7 @@ type distEntry struct {
 type distInfo struct {
 	version string
 	sha     map[string]string
+	file    map[string]string // arch → the file in the dist dir
 }
 
 func (c *distCache) load(dir string) distInfo {
@@ -312,19 +315,25 @@ func (c *distCache) load(dir string) distInfo {
 	if c.entries == nil {
 		c.entries = map[string]distEntry{}
 	}
-	out := distInfo{version: "dev", sha: map[string]string{}}
+	out := distInfo{version: "dev", sha: map[string]string{}, file: map[string]string{}}
 	if b, err := os.ReadFile(filepath.Join(dir, "VERSION")); err == nil { //#nosec G304 -- operator-configured dir
 		if v := strings.TrimSpace(string(b)); v != "" {
 			out.version = v
 		}
 	}
 	for _, arch := range []string{"amd64", "arm64"} {
-		path := filepath.Join(dir, "cloudy-agent-linux-"+arch)
-		fi, err := os.Stat(path)
+		// hosbah-agent-linux-<arch>; a dist dir built before the rename has cloudy-agent-linux-<arch>.
+		name := agentproto.AgentDistPrefix + arch
+		fi, err := os.Stat(filepath.Join(dir, name))
 		if err != nil {
-			continue
+			name = agentproto.LegacyAgentDistPrefix + arch
+			if fi, err = os.Stat(filepath.Join(dir, name)); err != nil {
+				continue
+			}
 		}
-		if e, ok := c.entries[arch]; ok && e.size == fi.Size() && e.mod.Equal(fi.ModTime()) {
+		path := filepath.Join(dir, name)
+		out.file[arch] = name
+		if e, ok := c.entries[path]; ok && e.size == fi.Size() && e.mod.Equal(fi.ModTime()) {
 			out.sha[arch] = e.sha
 			continue
 		}
@@ -339,7 +348,7 @@ func (c *distCache) load(dir string) distInfo {
 			continue
 		}
 		sum := hex.EncodeToString(h.Sum(nil))
-		c.entries[arch] = distEntry{size: fi.Size(), mod: fi.ModTime(), sha: sum}
+		c.entries[path] = distEntry{size: fi.Size(), mod: fi.ModTime(), sha: sum}
 		out.sha[arch] = sum
 	}
 	return out

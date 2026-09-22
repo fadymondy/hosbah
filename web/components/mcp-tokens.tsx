@@ -80,7 +80,7 @@ export function McpTokens({
         [serverName]: {
           type: "http",
           url: endpoint,
-          headers: { Authorization: `Bearer ${plain ?? (withScopes ? "cld_…" : "cla_…")}` },
+          headers: { Authorization: `Bearer ${plain ?? (withScopes ? "hbu_…" : "hba_…")}` },
         },
       },
     },

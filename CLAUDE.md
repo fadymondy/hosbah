@@ -12,7 +12,7 @@ togo generate                        # sqlc -> gqlgen -> atlas diff -> OpenAPI e
 togo migrate                         # = go run ./cmd/migrate; applies db/atlas/migrations through the ledger
 go run ./cmd/api                     # API on :8710 (REST /api, docs /docs, MCP /api/mcp, /api/admin/mcp)
 cd web && npm run dev                # web on :3710, proxies /api/* to :8710
-make agent                           # static cloudy-agent binaries into bin/agent (served to enrolling servers)
+make agent                           # static hosbah-agent binaries (also served under the legacy cloudy-agent name) into bin/agent (served to enrolling servers)
 
 go test -count=1 ./...                               # integration tests use TEST_DATABASE_URL and migrate it themselves
 go test -count=1 -run TestName ./internal/agent/     # single test
@@ -21,7 +21,7 @@ cd web && npm run typecheck && npm run grid:check && npm run feedback:check && n
 go run ./cmd/admin promote you@example.com           # platform admin (sign up in the web app first)
 ```
 
-Proxmox live tests only run with `CLOUDY_PROXMOX_LIVE=1` plus `PVE_*` env vars (see README). By default they run against an in-process fake PVE API.
+Proxmox live tests only run with `HOSBAH_PROXMOX_LIVE=1` plus `PVE_*` env vars (see README). By default they run against an in-process fake PVE API.
 
 ## togo conventions (from .claude/rules/conventions.md)
 
@@ -34,14 +34,14 @@ Proxmox live tests only run with `CLOUDY_PROXMOX_LIVE=1` plus `PVE_*` env vars (
 - **Tenancy is the core invariant.** Tenant data is reachable only through the hand-written handlers in `internal/api` under `/api/teams/{team}/...`. Generated CRUD (`internal/rest`, `/graphql`) is **not mounted** because it has no notion of a team. A team you are not in returns 404.
 - Every tenant query runs in `tenancy.Tx`, which sets `app.user_id`/`app.team_id` with `SET LOCAL`. Postgres FORCE row-level security backs up every `WHERE team_id`. Policies live in `db/atlas/migrations/*_row_level_security.sql`. Extra RLS contexts: `app.server_id` (authenticated agent) and `app.system` (dispatcher, sweeper and provisioning worker only). Pure `Scope{System: true}` only gets the explicit `*_system_*` policies. Some tables allow system INSERT but not SELECT or DELETE (`agent_enrollments`, `notifications`), and `operations` has no system INSERT. So a system-scope write that reads back (INSERT…RETURNING) or deletes fails. Use `Scope{System: true, TeamID: …}` or team scope for those.
 - Route authorization is default-deny, in tiers (blocked, public, token/MCP, member, platform admin by default): `internal/server/authorization.go`. Team roles are owner/admin/deployer/viewer (`internal/tenancy/roles.go`).
-- **Crypto** (`internal/crypto`): `CLOUDY_KEK` wraps a per-team DEK. Secrets and logs are sealed with the team DEK, bound to team and field. Deploy env values are re-sealed to the target agent's key, so `operations.params` never holds plaintext.
-- **Agent** (`cmd/agent`, `internal/agent`): enrols with a one-time token, then dials out to `/agent/ws`. Operations are typed (`internal/agentproto`, `internal/ops`), ed25519-signed by the control plane and verified against the key pinned at enrolment. The queue is the `operations` table (pending → sent → running → ok/failed/timeout, `FOR UPDATE SKIP LOCKED`, idempotent by `op_id`, per-op `seq` replayed on reconnect). New operation kinds must be added to the typed protocol on both sides.
+- **Crypto** (`internal/crypto`): `HOSBAH_KEK` (or legacy `CLOUDY_KEK`) wraps a per-team DEK. Secrets and logs are sealed with the team DEK, bound to team and field. Deploy env values are re-sealed to the target agent's key, so `operations.params` never holds plaintext.
+- **Agent** (`cmd/agent`, `internal/agent`; the binary and unit are hosbah-agent, and on first start after an update it moves /etc/cloudy and /var/lib/cloudy to /etc/hosbah and /var/lib/hosbah and hands over from cloudy-agent.service): enrols with a one-time token, then dials out to `/agent/ws`. Operations are typed (`internal/agentproto`, `internal/ops`), ed25519-signed by the control plane and verified against the key pinned at enrolment. The queue is the `operations` table (pending → sent → running → ok/failed/timeout, `FOR UPDATE SKIP LOCKED`, idempotent by `op_id`, per-op `seq` replayed on reconnect). New operation kinds must be added to the typed protocol on both sides.
 - **Deploys** (`internal/deploy`): Dockerfile or Railpack build → release → web on an ephemeral port → health gate → workers → Caddy upstream switch → drain. The agent owns the Caddy config through its admin API.
 - **Data services and backups**: `internal/dbsvc` (databases, users, restic backups).
-- **MCP** (`internal/mcp`): team server `/api/mcp` (`cld_…` tokens) and admin server `/api/admin/mcp` (`cla_…`). Every tool must declare a scope; `internal/mcp/scopes_test.go` enforces this.
+- **MCP** (`internal/mcp`): team server `/api/mcp` (`hbu_…` tokens; legacy `cld_…` still accepted) and admin server `/api/admin/mcp` (`hba_…`; legacy `cla_…`). Every tool must declare a scope; `internal/mcp/scopes_test.go` enforces this.
 - Logs reach the browser through team-scoped SSE endpoints, never through the global `/events`.
 - **Connecting servers**: `internal/provisioning/add.go` (`AddServer`) is shared by the REST API and MCP. The `server.connect` control-plane op (`connect.go`) logs in over SSH once, installs Hosbah's key and the agent, and can register a Proxmox node as a credential.
-- **Domains**: the apps domain (`CLOUDY_APPS_DOMAIN`, `internal/deploy/appsdomain.go`), team Cloudflare credentials (`internal/cloudflare`, `teamdns.go`), and the Caddy proxy manager (`proxyhosts.go` plus the agent `proxy.set` op). App domains and proxy hosts share one hostname namespace, checked in system scope by `HostnameTaken`.
+- **Domains**: the apps domain (`HOSBAH_APPS_DOMAIN`, `internal/deploy/appsdomain.go`), team Cloudflare credentials (`internal/cloudflare`, `teamdns.go`), and the Caddy proxy manager (`proxyhosts.go` plus the agent `proxy.set` op). App domains and proxy hosts share one hostname namespace, checked in system scope by `HostnameTaken`.
 - **SDKs and CLI** (`pkg/hosbah`, `sdk/{node,python,php}`, `cmd/hosbah`) wrap the team MCP endpoint. A new feature needs an MCP tool to reach them. The isolation sweep (`internal/server/isolation_test.go`) must be taught every new path parameter and team-scoped MCP tool.
 
 ## Migrations
@@ -58,3 +58,7 @@ atlas migrate new <name> --dir file://db/atlas/migrations && atlas migrate hash 
 - `web/app/grid/` and `web/lib/feedback/` are synced copies from fadymondy.com-v2. Never edit them here; use `npm run grid:sync` / `feedback:sync`.
 - Brand CSS: `web/app/grid/brand-cloudy.css`.
 - Every UI change must work in en + ar (RTL) and in light + dark.
+
+## Naming (since 2026-09-23)
+
+Everything is named hosbah; readers still accept the old cloudy names so deployed servers keep working: `HOSBAH_*` env with `CLOUDY_*` fallback (`internal/brand`), `hosbah.toml` then `cloudy.toml`, `_hosbah-verify` or `_cloudy-verify` TXT records, `hbu_/hba_/hbe_/hbh_` tokens plus the old `cld_/cla_/cle_/cdh_`, `hosbah.*` and `cloudy.*` Docker labels, old-named volumes reused. Frozen on purpose (do not rename): the crypto context strings (`cloudy/dek/v1` …), op-id seeds `cloudy-step`/`cloudy-db`, the restic password prefix, the MinIO root user, existing servers' `cloudy-caddy` unit, and the database/role names.

@@ -2,7 +2,7 @@
 // password reset, sign-in by emailed code, and authenticator-app two-factor with recovery codes.
 //
 // Ported from fadymondy.com-v2's internal/account (signup.go, twofactor.go; same owner) and fitted
-// to Hosbah: sqlc queries, the TOTP secret sealed under CLOUDY_KEK (crypto.Keyring.SealPlatform),
+// to Hosbah: sqlc queries, the TOTP secret sealed under HOSBAH_KEK (crypto.Keyring.SealPlatform),
 // the existing users.sessions_revoked_at for "sign every session out", and the platform's
 // disabled-account refusal on every path that creates a session.
 //
@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/togo-framework/auth"
 
 	"github.com/fadymondy/hosbah/internal/crypto"
@@ -81,7 +82,7 @@ func New(sqlDB *sql.DB, keys *crypto.Keyring, svc *auth.Service, log *slog.Logge
 		signupIP:  newLimiter(20, 10*time.Minute),
 		emailSend: newLimiter(6, time.Hour),
 		tries:     newLimiter(15, 10*time.Minute),
-		trusted:   parseCIDRs(os.Getenv("CLOUDY_TRUSTED_PROXIES")),
+		trusted:   parseCIDRs(brand.Getenv("TRUSTED_PROXIES")),
 	}
 }
 
@@ -105,7 +106,7 @@ func localeOf(r *http.Request, asked string) string {
 }
 
 /*
-clientIP keys the per-client limits. RemoteAddr, unless it is one of CLOUDY_TRUSTED_PROXIES
+clientIP keys the per-client limits. RemoteAddr, unless it is one of HOSBAH_TRUSTED_PROXIES
 (comma-separated CIDRs or addresses): then X-Forwarded-For is walked from the right, and the
 first address that is not a trusted proxy is the client. Nothing else trusts the header — a
 client that sets its own X-Forwarded-For cannot pick a fresh bucket. Behind a proxy with the

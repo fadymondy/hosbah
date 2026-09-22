@@ -7,11 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/brand"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -35,7 +35,7 @@ func UserServer() *Server {
 }
 
 func authenticateUser(ctx context.Context, a *app.App, bearer string) (Caller, error) {
-	if !strings.HasPrefix(bearer, tokens.PrefixUserMCP) || a == nil {
+	if !tokens.HasPrefix(bearer, tokens.UserMCP) || a == nil {
 		return Caller{}, ErrUnauthorized
 	}
 	hash := tokens.Hash(bearer)
@@ -257,7 +257,7 @@ func UserTools() []Tool {
 					auditChanges(env, map[string]any{"email": email, "role": role})); err != nil {
 					return "", err
 				}
-				origin := strings.TrimRight(os.Getenv("CLOUDY_WEB_ORIGIN"), "/")
+				origin := strings.TrimRight(brand.Getenv("WEB_ORIGIN"), "/")
 				return fmt.Sprintf("Invited %s as %s. Accept link (shown once): %s/invite/%s", email, role, origin, token), nil
 			},
 		},

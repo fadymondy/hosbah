@@ -322,7 +322,7 @@ export default function NewAppPage() {
                   <dd dir="ltr" className="min-w-0 truncate text-start font-mono text-xs leading-5">
                     {shortSha(detected.commit)} {detected.message}
                   </dd>
-                  <dt className="text-muted-foreground">cloudy.toml</dt>
+                  <dt className="text-muted-foreground">hosbah.toml</dt>
                   <dd className="text-xs leading-5">
                     {detected.cloudy_toml ? t("apps.new.tomlFound") : t("apps.new.tomlMissing")}
                   </dd>

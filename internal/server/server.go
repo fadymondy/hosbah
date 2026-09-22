@@ -50,19 +50,19 @@ func Boot() *app.App {
 	k := togo.New()
 	a := app.New(context.Background(), k)
 	if a.SQLDB == nil {
-		panic("cloudy: database unavailable — check DATABASE_URL")
+		panic("hosbah: database unavailable — check DATABASE_URL")
 	}
 
 	keys, err := crypto.LoadKeyring()
 	if err != nil {
 		// Refuse to run rather than store team secrets without envelope encryption.
-		panic("cloudy: " + err.Error())
+		panic("hosbah: " + err.Error())
 	}
 	a.Keys = keys
 
 	authSvc, ok := auth.FromKernel(k)
 	if !ok {
-		panic("cloudy: auth service not registered")
+		panic("hosbah: auth service not registered")
 	}
 	// Email verification, password reset, sign-in by code and two-factor (internal/account).
 	accounts := account.New(a.SQLDB, keys, authSvc, a.Log, mailSender)
@@ -85,7 +85,7 @@ func Boot() *app.App {
 
 	svc, err := ops.New(a, ops.ConfigFromEnv())
 	if err != nil {
-		panic("cloudy: " + err.Error())
+		panic("hosbah: " + err.Error())
 	}
 	svc.RegisterRunner(ops.KindProviderCreate, provisioning.Runner(a, svc))
 	svc.RegisterRunner(ops.KindServerConnect, provisioning.ConnectRunner(a, svc))
@@ -99,7 +99,7 @@ func Boot() *app.App {
 	a.Deploy = deploys
 
 	if _, err := catalog.Builtin(); err != nil { // a bad embedded recipe never starts (and never passes the tests)
-		panic("cloudy: recipe catalog: " + err.Error())
+		panic("hosbah: recipe catalog: " + err.Error())
 	}
 	databases := dbsvc.New(a, svc, deploys)
 	databases.StartScheduler()

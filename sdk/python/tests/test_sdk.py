@@ -21,7 +21,7 @@ class FakeResp(io.BytesIO):
 class FakeOpener:
     def open(self, req, timeout=None):
         body = json.loads(req.data)
-        if req.headers.get("Authorization") != "Bearer cld_ok":
+        if req.headers.get("Authorization") != "Bearer hbu_ok":
             raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", {}, io.BytesIO(b'{"error":{"message":"invalid token"}}'))
         args = body["params"].get("arguments", {})
         if body["params"].get("name") == "deploy_app" and args.get("app") == "shop":
@@ -31,12 +31,12 @@ class FakeOpener:
 
 class SDKTest(unittest.TestCase):
     def test_calls(self):
-        c = Hosbah("https://c.test/", "cld_ok", opener=FakeOpener())
+        c = Hosbah("https://c.test/", "hbu_ok", opener=FakeOpener())
         self.assertEqual(c.deploy("shop", wait=True), "Deployment #3 succeeded.")
         with self.assertRaises(HosbahToolError):
             c.deploy("nope")
         with self.assertRaises(HosbahApiError) as e:
-            Hosbah("https://c.test", "cld_bad", opener=FakeOpener()).apps()
+            Hosbah("https://c.test", "hbu_bad", opener=FakeOpener()).apps()
         self.assertEqual(e.exception.status, 401)
         with self.assertRaises(ValueError):
             Hosbah("https://c.test", "")

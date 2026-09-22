@@ -16,7 +16,7 @@ func TestClassify(t *testing.T) {
 		in   agentproto.Service
 		want *want // nil = skipped
 	}{
-		// Hosbah's own workloads.
+		// Hosbah's own workloads, named before the rename (cloudy-…) and after (hosbah-…).
 		{"managed db", agentproto.Service{Kind: "container", Name: "cloudy-db-pg1", Image: "postgres:16"}, nil},
 		{"app process", agentproto.Service{Kind: "container", Name: "cloudy-shop-web-01234567", Image: "cloudy/shop:v3"}, nil},
 		{"release run", agentproto.Service{Kind: "container", Name: "cloudy-app-x", Image: "cloudy/x:v1"}, nil},
@@ -26,6 +26,10 @@ func TestClassify(t *testing.T) {
 		{"hosbah-", agentproto.Service{Kind: "container", Name: "hosbah-agent", Image: "x"}, nil},
 		{"own control-plane guest", agentproto.Service{Kind: "guest", Name: "cloudy", ID: "117", Type: "lxc", Address: "10.10.10.117"}, nil},
 		{"own demo guest", agentproto.Service{Kind: "guest", Name: "cloudy-demo", ID: "120", Type: "lxc"}, nil},
+		{"managed db (new name)", agentproto.Service{Kind: "container", Name: "hosbah-db-pg1", Image: "postgres:16"}, nil},
+		{"app process (new name)", agentproto.Service{Kind: "container", Name: "hosbah-shop-web-01234567", Image: "hosbah/shop:v3"}, nil},
+		{"caddy unit (new name)", agentproto.Service{Kind: "systemd", Name: "hosbah-caddy", Status: "active", Ports: []string{"80"}}, nil},
+		{"own guest (new name)", agentproto.Service{Kind: "guest", Name: "hosbah", ID: "121", Type: "lxc"}, nil},
 
 		// Database engines by image.
 		{"postgres", agentproto.Service{Kind: "container", Name: "pg-main", Image: "postgres:16-alpine", Ports: []string{"127.0.0.1:5433->5432/tcp"}},

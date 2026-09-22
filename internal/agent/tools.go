@@ -86,12 +86,36 @@ func stepBuildTools(oc *OpContext) (any, int, error) {
 // ---- caddy.install -------------------------------------------------------------------------------
 
 const (
-	caddyBin      = "/usr/local/bin/caddy"
-	caddyUnit     = "cloudy-caddy"
-	caddyUnitPath = "/etc/systemd/system/cloudy-caddy.service"
-	caddyConfig   = "/etc/caddy/cloudy.json"
-	caddyAdmin    = "http://localhost:2019"
+	caddyBin   = "/usr/local/bin/caddy"
+	caddyAdmin = "http://localhost:2019"
 )
+
+// caddySetup is where Hosbah's Caddy lives on a server: its systemd unit and the config file the
+// agent rewrites.
+type caddySetup struct{ unit, unitPath, config string }
+
+var (
+	caddyCurrent = caddySetup{"hosbah-caddy", "/etc/systemd/system/hosbah-caddy.service", "/etc/caddy/hosbah.json"}
+	// caddyLegacy is the install of an agent from before the rename. It stays as it is — renaming the
+	// unit would restart Caddy, and drop every connection of every site — and the agent keeps
+	// writing the file that unit loads.
+	caddyLegacy = caddySetup{"cloudy-caddy", "/etc/systemd/system/cloudy-caddy.service", "/etc/caddy/cloudy.json"}
+)
+
+// installedCaddy is the setup on this server: the pre-rename one when only it is installed.
+func installedCaddy() caddySetup {
+	if _, err := os.Stat(caddyCurrent.unitPath); err != nil {
+		if _, err := os.Stat(caddyLegacy.unitPath); err == nil {
+			return caddyLegacy
+		}
+	}
+	return caddyCurrent
+}
+
+// unitFile is the unit's content for this setup.
+func (c caddySetup) unitFile() string {
+	return strings.Replace(caddyUnitFile, "{{config}}", c.config, 1)
+}
 
 // The unit runs Caddy as its own system user with only the capability to bind 80/443. Its config
 // is the file the agent rewrites on every route change (so a restart comes back with the current
@@ -106,7 +130,7 @@ Type=notify
 User=caddy
 Group=caddy
 Environment=XDG_DATA_HOME=/var/lib XDG_CONFIG_HOME=/var/lib/caddy/config
-ExecStart=/usr/local/bin/caddy run --environ --config /etc/caddy/cloudy.json
+ExecStart=/usr/local/bin/caddy run --environ --config {{config}}
 TimeoutStopSec=5s
 Restart=on-failure
 AmbientCapabilities=CAP_NET_BIND_SERVICE
@@ -130,9 +154,10 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 			return nil, 1, err
 		}
 	}
+	cs := installedCaddy()
 	have := toolVersion(oc.Ctx, caddyBin, "version")
-	unitOK := fileHas(caddyUnitPath, caddyUnitFile)
-	if strings.HasPrefix(have, "v"+p.Tool.Version) && unitOK && serviceActive(oc.Ctx, caddyUnit) && caddyUp(oc.Ctx) {
+	unitOK := fileHas(cs.unitPath, cs.unitFile())
+	if strings.HasPrefix(have, "v"+p.Tool.Version) && unitOK && serviceActive(oc.Ctx, cs.unit) && caddyUp(oc.Ctx) {
 		oc.Info("Caddy %s is installed and its admin API answers on localhost:2019 — nothing to do", p.Tool.Version)
 		// The config file may predate a control-plane change (the ask URL): re-render it.
 		if err := applyRoutes(oc, nil); err != nil {
@@ -143,7 +168,7 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 	oc.Progress(1, 5)
 	if !strings.HasPrefix(have, "v"+p.Tool.Version) {
 		for _, port := range []string{"80", "443", "2019"} {
-			if !portFree(port) && !serviceActive(oc.Ctx, caddyUnit) {
+			if !portFree(port) && !serviceActive(oc.Ctx, cs.unit) {
 				return nil, 1, fmt.Errorf("port %s is in use by something other than Hosbah's Caddy — free it first", port)
 			}
 		}
@@ -173,17 +198,17 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 	if err := writeConfigFile(); err != nil {
 		return nil, 1, err
 	}
-	if err := os.WriteFile(caddyUnitPath, []byte(caddyUnitFile), 0o644); err != nil { //#nosec G306 -- a unit file
+	if err := os.WriteFile(cs.unitPath, []byte(cs.unitFile()), 0o644); err != nil { //#nosec G306 -- a unit file
 		return nil, 1, err
 	}
 	oc.Progress(4, 5)
 	if code, err := oc.Run("systemctl", "daemon-reload"); err != nil {
 		return nil, code, err
 	}
-	if code, err := oc.Run("systemctl", "enable", caddyUnit); err != nil {
+	if code, err := oc.Run("systemctl", "enable", cs.unit); err != nil {
 		return nil, code, err
 	}
-	if code, err := oc.Run("systemctl", "restart", caddyUnit); err != nil {
+	if code, err := oc.Run("systemctl", "restart", cs.unit); err != nil {
 		return nil, code, err
 	}
 	oc.Progress(5, 5)
@@ -195,7 +220,7 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 		}
 	}
 	if !caddyUp(oc.Ctx) {
-		_, _ = oc.Run("systemctl", "status", "--no-pager", "--lines", "20", caddyUnit)
+		_, _ = oc.Run("systemctl", "status", "--no-pager", "--lines", "20", cs.unit)
 		return nil, 1, errors.New("Caddy did not start: its admin API is not answering on localhost:2019")
 	}
 	oc.Info("Caddy %s is running; admin API on localhost:2019", toolVersion(oc.Ctx, caddyBin, "version"))
@@ -244,7 +269,7 @@ func installFromTarball(oc *OpContext, t agentproto.ToolInstall, member, dest st
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download: HTTP %d", resp.StatusCode)
 	}
-	tmp, err := os.CreateTemp("", "cloudy-tool-*.tar.gz")
+	tmp, err := os.CreateTemp("", "hosbah-tool-*.tar.gz")
 	if err != nil {
 		return err
 	}

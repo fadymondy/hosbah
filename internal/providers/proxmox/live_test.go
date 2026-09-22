@@ -7,19 +7,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/fadymondy/hosbah/internal/providers"
 	"github.com/fadymondy/hosbah/internal/providers/sshboot"
 )
 
-// TestLive runs against a real Proxmox VE. It is skipped unless CLOUDY_PROXMOX_LIVE=1.
+// TestLive runs against a real Proxmox VE. It is skipped unless HOSBAH_PROXMOX_LIVE=1 (or CLOUDY_PROXMOX_LIVE=1).
 //
-// Tier 1 (CLOUDY_PROXMOX_LIVE=1): read-only — Validate, Regions, Images.
-// Tier 2 (also CLOUDY_PROXMOX_LIVE_CREATE=1): creates an LXC (if PROXMOX_LXC_TEMPLATE is set) and a
+// Tier 1 (HOSBAH_PROXMOX_LIVE=1): read-only — Validate, Regions, Images.
+// Tier 2 (also HOSBAH_PROXMOX_LIVE_CREATE=1): creates an LXC (if PROXMOX_LXC_TEMPLATE is set) and a
 // VM (if PROXMOX_TEMPLATE_VMID is set), waits for each to run with an IP, then deletes it. Deletion
 // is registered with t.Cleanup, so it happens even when the test fails.
 func TestLive(t *testing.T) {
-	if os.Getenv("CLOUDY_PROXMOX_LIVE") != "1" {
-		t.Skip("set CLOUDY_PROXMOX_LIVE=1 (and the PROXMOX_* variables) to run against a real Proxmox")
+	if brand.Getenv("PROXMOX_LIVE") != "1" {
+		t.Skip("set HOSBAH_PROXMOX_LIVE=1 (and the PROXMOX_* variables) to run against a real Proxmox")
 	}
 	// PROXMOX_* or the shorter PVE_* names (PVE_URL, PVE_TOKEN_ID, PVE_TOKEN_SECRET, PVE_NODE, PVE_STORAGE, PVE_BRIDGE, PVE_POOL…).
 	env := func(k string) string {
@@ -65,7 +66,7 @@ func TestLive(t *testing.T) {
 	}
 	t.Logf("images: %+v", images)
 
-	if os.Getenv("CLOUDY_PROXMOX_LIVE_CREATE") != "1" {
+	if brand.Getenv("PROXMOX_LIVE_CREATE") != "1" {
 		return
 	}
 	if cred.Config["lxc_template"] != "" {
@@ -83,7 +84,7 @@ func liveCreate(t *testing.T, d *Driver, kind string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	id, err := d.Create(ctx, providers.CreateSpec{Name: "cloudy-live-" + kind, Kind: kind, SSHPublicKeys: []string{pub}, Tags: []string{"cloudy-live-test"}})
+	id, err := d.Create(ctx, providers.CreateSpec{Name: "hosbah-live-" + kind, Kind: kind, SSHPublicKeys: []string{pub}, Tags: []string{"hosbah-live-test"}})
 	if id != "" {
 		t.Cleanup(func() {
 			dctx, dcancel := context.WithTimeout(context.Background(), 5*time.Minute)

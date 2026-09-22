@@ -100,7 +100,7 @@ func TailnetHostname(name string) string {
 		s = s[:63]
 	}
 	if s == "" {
-		s = "cloudy-server"
+		s = "hosbah-server"
 	}
 	return s
 }

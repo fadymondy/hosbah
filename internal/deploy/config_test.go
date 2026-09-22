@@ -47,7 +47,7 @@ func TestParseConfigRefusesMistakes(t *testing.T) {
 		"[healthcheck]\ntimeout = 1":        "timeout",
 		"[processes]\nqueue = \"x\"":        `"web" or "worker:<name>"`,
 		"[processes]\n\"worker:q\" = \" \"": "empty command",
-		`port = `:                           "cloudy.toml",
+		`port = `:                           "hosbah.toml",
 	} {
 		if _, err := ParseConfig(raw); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: want an error mentioning %q, got %v", raw, want, err)

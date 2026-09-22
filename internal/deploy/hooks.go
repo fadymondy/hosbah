@@ -42,7 +42,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // {"ref": "<branch|tag|sha>"} deploys that ref; no body deploys the app's branch.
 func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
-	if !strings.HasPrefix(token, HookTokenPrefix) || len(token) > 100 {
+	if !tokens.HasPrefix(token, tokens.Hook) || len(token) > 100 {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 		return
 	}

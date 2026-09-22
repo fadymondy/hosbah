@@ -12,7 +12,7 @@ import (
 )
 
 /*
-Realtime in the pipeline. An app's app_realtime row names one worker of its cloudy.toml, the port
+Realtime in the pipeline. An app's app_realtime row names one worker of its hosbah.toml, the port
 that worker listens on inside its container, and a path. A deploy, restart or rollback:
 
  1. starts that worker with StartParams.Realtime, so the agent publishes the port on an ephemeral
@@ -103,7 +103,7 @@ func (r *runner) realtimeOnce(ctx context.Context, eff Effective) (*db.AppRealti
 		return nil, nil
 	}
 	if _, ok := eff.Processes[agentproto.RealtimeWorker(cfg.Process)]; !ok {
-		r.logf("error", `realtime: this release declares no process "worker:%s" in cloudy.toml — nothing is routed to %s`, cfg.Process, cfg.Path)
+		r.logf("error", `realtime: this release declares no process "worker:%s" in hosbah.toml (or cloudy.toml) — nothing is routed to %s`, cfg.Process, cfg.Path)
 		return nil, nil
 	}
 	if err := RealtimePublishOf(*cfg).Validate(); err != nil || !agentproto.ValidRealtimeProcess(cfg.Process) {

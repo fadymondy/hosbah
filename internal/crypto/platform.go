@@ -20,10 +20,11 @@ const platformPrefix = "cpv1:"
 
 func (k *Keyring) platformKey() []byte {
 	m := hmac.New(sha256.New, k.kek)
-	m.Write([]byte("cloudy/platform-key/v1"))
+	m.Write([]byte("cloudy/platform-key/v1")) // frozen (pre-rename): it derives the key of everything sealed so far
 	return m.Sum(nil)
 }
 
+// platformAAD's label is frozen for the same reason: it is the additional data of every sealed value.
 func platformAAD(context string) []byte { return []byte("cloudy/platform/v1\x00" + context) }
 
 // SealPlatform encrypts an account-level secret. OpenPlatform must be given the same context.

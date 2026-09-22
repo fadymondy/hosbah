@@ -1,4 +1,4 @@
-// Package agent is cloudy-agent: the small program on every managed server. It enrols once with
+// Package agent is hosbah-agent (cloudy-agent before the rename): the small program on every managed server. It enrols once with
 // a one-time token, then dials OUT to the control plane over a WebSocket, answers a signed
 // challenge with its own ed25519 key, heartbeats with metrics, and executes the typed operations
 // the control plane signs — nothing else. cmd/agent is the thin binary around it.
@@ -13,10 +13,13 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 // DefaultStatePath is where enrolment leaves the agent's identity.
-const DefaultStatePath = "/etc/cloudy/agent.json"
+// It was /etc/cloudy/agent.json before the rename (MigrateStateDirs moves it; StatePath finds it).
+const DefaultStatePath = agentproto.StateDir + "/agent.json"
 
 // State is what enrolment writes to disk (mode 0600): who this agent is and whom it trusts.
 type State struct {

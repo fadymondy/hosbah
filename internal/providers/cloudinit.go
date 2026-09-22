@@ -5,8 +5,12 @@ import (
 	"strings"
 )
 
-// AgentUserData returns a minimal #cloud-config document that creates a passwordless-sudo "cloudy"
-// user holding sshPublicKeys, skips the package-index refresh (the install command does what it
+// GuestUser is the sudo user Hosbah creates on a guest it provisions (and bootstraps over SSH). Guests
+// provisioned before the rename have "cloudy"; nothing logs in as it after their agent enrolled.
+const GuestUser = "hosbah"
+
+// AgentUserData returns a minimal #cloud-config document that creates a passwordless-sudo GuestUser
+// holding sshPublicKeys, skips the package-index refresh (the install command does what it
 // needs), and runs installCommand once, on first boot, through sh -c.
 //
 // Every scalar is emitted as a YAML double-quoted string. strconv.Quote's escapes (\" \\ \n \t \xNN
@@ -16,7 +20,7 @@ func AgentUserData(installCommand string, sshPublicKeys []string) string {
 	var b strings.Builder
 	b.WriteString("#cloud-config\n")
 	b.WriteString("users:\n")
-	b.WriteString("  - name: cloudy\n")
+	b.WriteString("  - name: " + GuestUser + "\n")
 	b.WriteString("    groups: [sudo]\n")
 	b.WriteString("    shell: /bin/bash\n")
 	b.WriteString("    sudo: \"ALL=(ALL) NOPASSWD:ALL\"\n")

@@ -19,16 +19,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fadymondy/hosbah/internal/brand"
 )
 
 /*
 The GitHub App integration, behind an interface so Hosbah runs without it.
 
 What the owner must supply (nothing is configured yet):
-  CLOUDY_GITHUB_APP_ID                the App's numeric id
-  CLOUDY_GITHUB_APP_SLUG              its URL name (for the "Install" link)
-  CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE  the App's private key (.pem), readable only by the service
-  CLOUDY_GITHUB_WEBHOOK_SECRET        the webhook secret set on the App
+  HOSBAH_GITHUB_APP_ID                the App's numeric id
+  HOSBAH_GITHUB_APP_SLUG              its URL name (for the "Install" link)
+  HOSBAH_GITHUB_APP_PRIVATE_KEY_FILE  the App's private key (.pem), readable only by the service
+  HOSBAH_GITHUB_WEBHOOK_SECRET        the webhook secret set on the App
+  (each also read as CLOUDY_…, its name before the rename)
 
 With them, Hosbah mints a short-lived app JWT (RS256, 9 minutes), exchanges it for a 1-hour
 installation token per clone, and verifies every webhook delivery's X-Hub-Signature-256 HMAC.
@@ -51,9 +54,9 @@ type GitHubApp interface {
 
 // GitHubFromEnv builds the integration from the environment: unconfigured when anything is missing.
 func GitHubFromEnv() GitHubApp {
-	id, _ := strconv.ParseInt(strings.TrimSpace(os.Getenv("CLOUDY_GITHUB_APP_ID")), 10, 64)
-	keyFile := strings.TrimSpace(os.Getenv("CLOUDY_GITHUB_APP_PRIVATE_KEY_FILE"))
-	secret := os.Getenv("CLOUDY_GITHUB_WEBHOOK_SECRET")
+	id, _ := strconv.ParseInt(strings.TrimSpace(brand.Getenv("GITHUB_APP_ID")), 10, 64)
+	keyFile := strings.TrimSpace(brand.Getenv("GITHUB_APP_PRIVATE_KEY_FILE"))
+	secret := brand.Getenv("GITHUB_WEBHOOK_SECRET")
 	if id == 0 || keyFile == "" || secret == "" {
 		return unconfiguredGitHub{}
 	}
@@ -65,7 +68,7 @@ func GitHubFromEnv() GitHubApp {
 	if err != nil {
 		return unconfiguredGitHub{}
 	}
-	return &githubApp{appID: id, slug: os.Getenv("CLOUDY_GITHUB_APP_SLUG"), key: key, secret: []byte(secret),
+	return &githubApp{appID: id, slug: brand.Getenv("GITHUB_APP_SLUG"), key: key, secret: []byte(secret),
 		api: "https://api.github.com", http: &http.Client{Timeout: 15 * time.Second}, now: time.Now}
 }
 

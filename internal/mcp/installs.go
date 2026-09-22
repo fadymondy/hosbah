@@ -24,7 +24,7 @@ func InstallTools() []Tool {
 		{
 			Name: "list_catalog", Scope: scopes.Read,
 			Description: "The built-in catalog of recipes: apps (one pinned image installed next to a site with install_recipe) and stacks " +
-				"(a template for a new app: repository, branch, variables, cloudy.toml). \"not yet verified\" means Hosbah has not run that " +
+				"(a template for a new app: repository, branch, variables, hosbah.toml). \"not yet verified\" means Hosbah has not run that " +
 				"recipe end to end.",
 			InputSchema: schema(nil, map[string]any{"kind": str("app or stack (default: both)"), "q": str("Matches id, name and summary")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
@@ -60,7 +60,7 @@ func InstallTools() []Tool {
 		{
 			Name: "get_recipe", Scope: scopes.Read,
 			Description: "One recipe of the catalog, whole: image, port, limits, capabilities, volumes, the variables it takes and the ones it " +
-				"sets on the site; for a stack the repository, branch, variables and cloudy.toml it suggests. There are no secrets in a recipe.",
+				"sets on the site; for a stack the repository, branch, variables and hosbah.toml it suggests. There are no secrets in a recipe.",
 			InputSchema: schema([]string{"recipe"}, map[string]any{"recipe": str("Recipe id")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				c, err := catalog.Builtin()
@@ -275,8 +275,8 @@ func recipeText(r catalog.Recipe) string {
 		for name, cmd := range st.Processes {
 			fmt.Fprintf(&b, "process %s: %s\n", name, cmd)
 		}
-		if st.CloudyTOML != "" {
-			fmt.Fprintf(&b, "cloudy.toml:\n%s\n", st.CloudyTOML)
+		if st.HosbahTOML != "" {
+			fmt.Fprintf(&b, "hosbah.toml:\n%s\n", st.HosbahTOML)
 		}
 		if st.Notes != "" {
 			fmt.Fprintf(&b, "notes: %s\n", st.Notes)

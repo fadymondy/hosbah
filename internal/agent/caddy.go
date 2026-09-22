@@ -19,23 +19,33 @@ import (
 
 /*
 Routing. The agent owns Caddy's whole configuration: a route table (app → hostnames + upstream)
-persisted in /var/lib/cloudy/routes.json, rendered into one JSON document and handed to Caddy's
+persisted in /var/lib/hosbah/routes.json, rendered into one JSON document and handed to Caddy's
 admin API with POST /load. Caddy swaps configs gracefully — requests in flight finish on the old
 upstream, new ones go to the new — and atomically: a config it rejects leaves the running one in
 place. Rendering the whole table every time (rather than PATCHing routes by @id) means there is
 no drift to reconcile after a crash, and the file on disk is what Caddy loads on a restart.
 
 Two HTTP servers:
-  cloudy_http   :80   hosts with tls=off (plain HTTP), then a 404 for any other host
-  cloudy_https  :443  hosts with tls=internal (Caddy's local CA) or tls=auto (a public certificate,
+  hosbah_http   :80   hosts with tls=off (plain HTTP), then a 404 for any other host
+  hosbah_https  :443  hosts with tls=internal (Caddy's local CA) or tls=auto (a public certificate,
                       issued on demand — only after the control plane's /internal/tls/allow says
                       the domain is verified). Caddy's automatic HTTPS adds the :80 → :443
                       redirects for these hosts itself.
 Reverse proxies flush immediately (flush_interval -1) and nothing is compressed, so SSE and
 WebSocket traffic of the apps is never buffered.
+
+Server names and route ids were cloudy_… / cloudy-… before the rename. Nothing needs to remove
+those: every change loads the WHOLE config (POST /load replaces it), so the first load by this
+agent leaves none of the old ids behind. Caddy keeps its listeners across the swap.
 */
 
-const routesPath = "/var/lib/cloudy/routes.json"
+const routesPath = agentproto.WorkDir + "/routes.json"
+
+// The two HTTP servers of the config.
+const (
+	caddyHTTP  = "hosbah_http"
+	caddyHTTPS = "hosbah_https"
+)
 
 type routeEntry struct {
 	Hosts    []agentproto.Route `json:"hosts"`
@@ -223,7 +233,7 @@ func renderCaddy(t routeTable) map[string]any {
 		}
 	}
 	httpRoutes = append(httpRoutes, map[string]any{
-		"@id": "cloudy-fallback",
+		"@id": agentproto.NamePrefix + "fallback",
 		"handle": []any{map[string]any{
 			"handler": "static_response", "status_code": 404,
 			"body": "No app is routed at this hostname.\n",
@@ -231,10 +241,10 @@ func renderCaddy(t routeTable) map[string]any {
 	})
 
 	servers := map[string]any{
-		"cloudy_http": map[string]any{"listen": []string{":80"}, "routes": httpRoutes},
+		caddyHTTP: map[string]any{"listen": []string{":80"}, "routes": httpRoutes},
 	}
 	if len(httpsRoutes) > 0 {
-		servers["cloudy_https"] = map[string]any{"listen": []string{":443"}, "routes": httpsRoutes}
+		servers[caddyHTTPS] = map[string]any{"listen": []string{":443"}, "routes": httpsRoutes}
 	}
 	apps := map[string]any{"http": map[string]any{"servers": servers}}
 
@@ -307,6 +317,7 @@ func writeConfigFile() error {
 }
 
 func writeCaddyFile(cfg map[string]any) error {
+	caddyConfig := installedCaddy().config
 	if err := os.MkdirAll(filepath.Dir(caddyConfig), 0o755); err != nil {
 		return err
 	}

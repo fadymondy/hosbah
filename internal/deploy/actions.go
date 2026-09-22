@@ -3,7 +3,6 @@ package deploy
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,8 +68,8 @@ func (a Actor) trigger() string {
 	return "manual"
 }
 
-// HookTokenPrefix marks an app deploy-hook token.
-const HookTokenPrefix = "cdh_"
+// HookTokenPrefix marks an app deploy-hook token (cdh_ before the rename; still accepted).
+const HookTokenPrefix = tokens.PrefixHook
 
 // ---- apps --------------------------------------------------------------------------------------------
 
@@ -441,7 +440,9 @@ func validEnvName(s string) bool {
 // ---- domains ---------------------------------------------------------------------------------------
 
 // NormalizeHostname lowercases and drops a trailing dot.
-func NormalizeHostname(h string) string { return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".") }
+func NormalizeHostname(h string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(h)), ".")
+}
 
 // AddDomain routes a hostname to the app (at once, if a release is live). An imported app is routed
 // through a proxy route on its server to where the workload listens: port is the container's
@@ -472,14 +473,14 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 		return db.Domain{}, invalid("tls must be auto, internal or off")
 	}
 	if s.apps.Owns(hostname) {
-		return db.Domain{}, invalid("hostnames under "+s.apps.Domain+" are given to apps automatically")
+		return db.Domain{}, invalid("hostnames under " + s.apps.Domain + " are given to apps automatically")
 	}
 	if upstream != "" && s.hostnameTaken(ctx, hostname) {
 		return db.Domain{}, conflict("that hostname is already routed in Hosbah")
 	}
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
-	d, err := q.InsertDomain(ctx, db.InsertDomainParams{TeamID: teamID, AppID: a.ID, Hostname: hostname, Tls: tls, VerifyToken: "cloudy-verify=" + hex.EncodeToString(tok)})
+	d, err := q.InsertDomain(ctx, db.InsertDomainParams{TeamID: teamID, AppID: a.ID, Hostname: hostname, Tls: tls, VerifyToken: newVerifyToken(tok)})
 	if err != nil {
 		if strings.Contains(err.Error(), "domains_hostname_key") {
 			return db.Domain{}, conflict("that hostname is already routed to an app in Hosbah")
@@ -546,30 +547,22 @@ var LookupTXT = func(ctx context.Context, name string) ([]string, error) {
 	return net.DefaultResolver.LookupTXT(ctx, name)
 }
 
-// VerifyDomain checks the _cloudy-verify TXT record. Verification gates public certificates (the
+// VerifyDomain checks the domain's verification TXT record (_hosbah-verify, or _cloudy-verify). Verification gates public certificates (the
 // on-demand TLS ask), not routing.
 func (s *Service) VerifyDomain(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, d db.Domain) (bool, string, error) {
 	if d.VerifiedAt != nil {
 		return true, d.Hostname + " is already verified.", nil
 	}
-	name := "_cloudy-verify." + d.Hostname
-	lctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	records, err := LookupTXT(lctx, name)
-	for _, r := range records {
-		if strings.TrimSpace(r) == d.VerifyToken {
-			if err := q.MarkDomainVerified(ctx, db.MarkDomainVerifiedParams{ID: d.ID, TeamID: teamID}); err != nil {
-				return false, "", err
-			}
-			return true, d.Hostname + " is verified.", tenancy.Record(ctx, q, teamID, actor.UserID, "domain.verified", "app", a.ID,
-				actor.audit(map[string]any{"hostname": d.Hostname}))
+	if ok, found := checkVerifyTXT(ctx, d.Hostname, d.VerifyToken); ok {
+		if err := q.MarkDomainVerified(ctx, db.MarkDomainVerifiedParams{ID: d.ID, TeamID: teamID}); err != nil {
+			return false, "", err
 		}
+		return true, d.Hostname + " is verified.", tenancy.Record(ctx, q, teamID, actor.UserID, "domain.verified", "app", a.ID,
+			actor.audit(map[string]any{"hostname": d.Hostname}))
+	} else if found {
+		return false, notVerifiedYet("the TXT record does not match", d.Hostname, d.VerifyToken), nil
 	}
-	why := "no TXT record found"
-	if err == nil && len(records) > 0 {
-		why = "the TXT record does not match"
-	}
-	return false, fmt.Sprintf("Not verified yet (%s). Add a TXT record %s with the value %s, then verify again.", why, name, d.VerifyToken), nil
+	return false, notVerifiedYet("no TXT record found", d.Hostname, d.VerifyToken), nil
 }
 
 // SyncRoutes points the app's hostnames at its live release now (domains added or removed between
@@ -594,7 +587,7 @@ func (s *Service) SyncRoutes(ctx context.Context, q *db.Queries, teamID string, 
 	}
 	raw, _ := json.Marshal(agentproto.RouteParams{AppID: a.ID, Hosts: HostsOf(domains), Upstream: fmt.Sprintf("127.0.0.1:%d", *live.HostPort),
 		Realtime: RealtimeRouteOf(cfg, &live)})
-	_, _, err = s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindRouteSet, Params: raw, CreatedBy: "cloudy"})
+	_, _, err = s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindRouteSet, Params: raw, CreatedBy: "hosbah"})
 	return err
 }
 

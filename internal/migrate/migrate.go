@@ -30,7 +30,7 @@ import (
 // Dir is the versioned migration directory, relative to the repo root.
 const Dir = "db/atlas/migrations"
 
-const lockKey = 7_326_104_118 // arbitrary, stable: "cloudy migrate"
+const lockKey = 7_326_104_118 // arbitrary and stable: never change it (old and new binaries must share the lock)
 
 // Migration is one versioned file.
 type Migration struct {

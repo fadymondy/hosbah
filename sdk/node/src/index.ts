@@ -1,11 +1,11 @@
 /**
  * Hosbah SDK for Node.js / TypeScript (Node 18+, Bun, Deno, edge runtimes — anything with fetch).
  *
- * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Hosbah tool is
+ * It calls a team's MCP endpoint (POST /api/mcp) with a team token (hbu_…, or cld_… minted before the rename), so every Hosbah tool is
  * available through `call`, with the token's scopes, the audit log and destructive-action approvals.
  *
  *   import { Hosbah } from "@hosbah/sdk"
- *   const hosbah = new Hosbah({ url: process.env.CLOUDY_URL!, token: process.env.CLOUDY_TOKEN! })
+ *   const hosbah = new Hosbah({ url: process.env.HOSBAH_URL!, token: process.env.HOSBAH_TOKEN! })
  *   await hosbah.deploy("shop", { wait: true })
  */
 

@@ -2,7 +2,7 @@
 
 Everything below runs against the **live** demo. Sign in and click through it.
 
-- **URL:** https://cloudy-app.fadymondy.com
+- **URL:** https://app.hosbah.com
 - **You:** `info@3x1.io` (platform admin + owner of the demo team).
 - **Team:** **Demo**. You own it; it is the only team you land in.
 
@@ -17,9 +17,13 @@ by stopping every local piece (`cloudy-target`, `cloudy-git`, the git HTTP serve
 |---|---|---|
 | Control plane (`cloudy-api`, `cloudy-web`) | LXC 117, 10.10.10.117 | `/opt/cloudy/docker-compose.yml`, `restart: unless-stopped` |
 | Database | pg-shared, LXC 102 | database `hosbah` |
-| Managed server **demo-1** | LXC 120, 10.10.10.120 | Debian 13, Docker CE, the `cloudy-agent` under systemd |
+| Managed server **demo-1** | LXC 120, 10.10.10.120 | Debian 13, Docker CE, the `hosbah-agent` under systemd (`cloudy-agent` until its first update after the rename) |
 | Sample git repos | LXC 117 `:3791` | Gitea, `cloudy/sample-{go,node,python,php}`, public |
 | Edge | NPM host 61 → 10.10.10.117:3710 | Cloudflare in front |
+
+The `cloudy-…` names above (containers, `/opt/cloudy`, the Gitea org, the `*.cloudy.localhost` demo domains
+below) are the live demo's real names from before the rename to Hosbah. They are data, not code: they keep
+working as they are, so this walkthrough uses them unchanged.
 
 ## 1. See the online server with live metrics
 1. Log in → you land in **Demo**.
@@ -29,7 +33,7 @@ by stopping every local piece (`cloudy-target`, `cloudy-git`, the git HTTP serve
    (every 15 s).
 
 > demo-1 was enrolled through the product's own bring-your-own path — `curl -fsSL
-> https://cloudy-app.fadymondy.com/install/<token> | sh` on a bare Debian box — not by
+> https://app.hosbah.com/install/<token> | sh` on a bare Debian box — not by
 > hand. It worked first try, over Cloudflare, and a later `agent.update` rolled it onto
 > a new agent build without dropping the connection.
 
@@ -56,9 +60,9 @@ pct exec 120 -- curl -s -H "Host: go.cloudy.localhost" http://127.0.0.1/
 > **600/600 requests answered 200 — zero failed requests.**
 
 ## 4. Drive it from the user MCP
-1. **MCP tokens → Create token** (tick `read` + `deploy`). The token (`cld_…`) is shown once.
-2. Point an MCP client at `https://cloudy-app.fadymondy.com/api/mcp` with
-   `Authorization: Bearer cld_…` and call `deploy_app` then `rollback_app`
+1. **MCP tokens → Create token** (tick `read` + `deploy`). The token (`hbu_…`; `cld_…` before the rename) is shown once.
+2. Point an MCP client at `https://app.hosbah.com/api/mcp` with
+   `Authorization: Bearer hbu_…` and call `deploy_app` then `rollback_app`
    (both accept `{"app":"sample-node","wait":true}`).
 3. A call needing a scope the token lacks (e.g. `delete_app`, which needs `destructive`)
    is refused in-band with a clear message — it does not act.

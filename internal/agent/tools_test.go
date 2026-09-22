@@ -55,8 +55,8 @@ func TestSatisfiedPackagesKeepsGenuinelyMissing(t *testing.T) {
 	}
 
 	// A probe that cannot possibly succeed must leave its package in the list.
-	const fake = "cloudy-test-absent-tool"
-	buildCapability[fake] = []string{"cloudy-test-absent-tool-binary", "--version"}
+	const fake = "hosbah-test-absent-tool"
+	buildCapability[fake] = []string{"hosbah-test-absent-tool-binary", "--version"}
 	t.Cleanup(func() { delete(buildCapability, fake) })
 	if got := satisfiedPackages(oc, []string{fake}); len(got) != 1 || got[0] != fake {
 		t.Fatalf("a failing probe must keep its package, got %v", got)

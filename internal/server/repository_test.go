@@ -19,7 +19,7 @@ import (
 /*
 The "Repository" section of a site: an app's GitHub repository read through the GitHub CLI on the
 app's server. Every route and MCP tool queues the right typed, signed github.* read with validated
-params (a fake agent verifies them exactly as cloudy-agent does); commits are marked against the
+params (a fake agent verifies them exactly as hosbah-agent does); commits are marked against the
 live release and the app's deployments; what an agent reports is cleaned before it is shown; an
 imported app or a non-GitHub repository is a 422, a server not connected to GitHub a 409, another
 team a 404.
@@ -211,7 +211,7 @@ func TestAppRepository(t *testing.T) {
 		}
 		sha := shaA
 		_, err := q.InsertRelease(context.Background(), db.InsertReleaseParams{ID: "rel-" + suffix, TeamID: team.ID, AppID: app.App.ID,
-			DeploymentID: "dep1-" + suffix, Image: "cloudy/repo:1", CommitSha: &sha, Port: 8080, Config: "{}"})
+			DeploymentID: "dep1-" + suffix, Image: "hosbah/repo:1", CommitSha: &sha, Port: 8080, Config: "{}"})
 		return err
 	})
 	if err != nil {

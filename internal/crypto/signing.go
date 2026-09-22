@@ -8,12 +8,14 @@ import (
 )
 
 // opsSigningInfo is the HKDF context string. Changing it changes the key every agent has pinned.
+// Frozen (pre-rename): it derives the key every enrolled agent pinned. A new label is a new key,
+// and every agent would refuse every operation.
 const opsSigningInfo = "cloudy/ops-signing/v1"
 
 // OpsSigningKey is the control plane's ed25519 key for signing agent operations.
 //
 // It is derived from the KEK with HKDF-SHA256 under its own context string, so it needs no table
-// and no second secret, and it is as protected as the KEK itself (CLOUDY_KEK_FILE in production).
+// and no second secret, and it is as protected as the KEK itself (HOSBAH_KEK_FILE in production).
 // The consequence, stated plainly: rotating the KEK rotates this key, and every enrolled agent
 // must then be given the new public key (a re-enrolment, or a key-rotation op signed with the old
 // key — not built in P1). A KMS-held signing key can replace this behind the same method.

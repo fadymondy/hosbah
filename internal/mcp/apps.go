@@ -237,8 +237,8 @@ func AppTools() []Tool {
 				}
 				var b strings.Builder
 				for _, d := range rows {
-					fmt.Fprintf(&b, "  %s  tls %s  %s  (TXT _cloudy-verify.%s = %s)\n", d.Hostname, d.Tls,
-						map[bool]string{true: "verified", false: "not verified"}[d.VerifiedAt != nil], d.Hostname, d.VerifyToken)
+					fmt.Fprintf(&b, "  %s  tls %s  %s  (TXT %s = %s)\n", d.Hostname, d.Tls,
+						map[bool]string{true: "verified", false: "not verified"}[d.VerifiedAt != nil], deploy.VerifyName(d.Hostname), deploy.VerifyValue(d.VerifyToken))
 				}
 				return b.String(), nil
 			},
@@ -430,13 +430,13 @@ func AppTools() []Tool {
 				if d.VerifiedAt != nil {
 					return fmt.Sprintf("%s now routes to %s (tls %s), verified through the team's Cloudflare (DNS created).", d.Hostname, a.Name, d.Tls), nil
 				}
-				return fmt.Sprintf("%s now routes to %s (tls %s). To verify it, add a TXT record _cloudy-verify.%s = %s and call verify_domain.",
-					d.Hostname, a.Name, d.Tls, d.Hostname, d.VerifyToken), nil
+				return fmt.Sprintf("%s now routes to %s (tls %s). To verify it, add a TXT record %s = %s and call verify_domain.",
+					d.Hostname, a.Name, d.Tls, deploy.VerifyName(d.Hostname), deploy.VerifyValue(d.VerifyToken)), nil
 			},
 		},
 		{
 			Name: "verify_domain", Scope: scopes.Write,
-			Description: "Check a domain's _cloudy-verify TXT record. Verification lets Caddy issue a public certificate for it.",
+			Description: "Check a domain's _hosbah-verify TXT record (a pre-rename _cloudy-verify record also counts). Verification lets Caddy issue a public certificate for it.",
 			InputSchema: schema([]string{"app", "domain"}, map[string]any{"app": appArg, "domain": str("Hostname or domain id")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {

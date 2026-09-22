@@ -137,14 +137,16 @@ func TestKeyringRejectsBadKEK(t *testing.T) {
 func TestLoadKeyringFromEnvAndFile(t *testing.T) {
 	kek, _ := NewDEK()
 	enc := base64.StdEncoding.EncodeToString(kek)
-
 	t.Setenv("CLOUDY_KEK_FILE", "")
 	t.Setenv("CLOUDY_KEK", "")
+
+	t.Setenv("HOSBAH_KEK_FILE", "")
+	t.Setenv("HOSBAH_KEK", "")
 	if _, err := LoadKeyring(); !errors.Is(err, ErrNoKEK) {
 		t.Fatalf("expected ErrNoKEK with nothing configured, got %v", err)
 	}
 
-	t.Setenv("CLOUDY_KEK", enc)
+	t.Setenv("HOSBAH_KEK", enc)
 	k1, err := LoadKeyring()
 	if err != nil {
 		t.Fatal(err)
@@ -156,19 +158,60 @@ func TestLoadKeyringFromEnvAndFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(other)+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CLOUDY_KEK_FILE", path)
+	t.Setenv("HOSBAH_KEK_FILE", path)
 	k2, err := LoadKeyring()
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, wrapped, _ := k1.NewTeamKey("t")
 	if _, err := k2.UnwrapDEK("t", wrapped); !errors.Is(err, ErrOpen) {
-		t.Fatal("CLOUDY_KEK_FILE did not take precedence over CLOUDY_KEK")
+		t.Fatal("HOSBAH_KEK_FILE did not take precedence over CLOUDY_KEK")
 	}
 
-	t.Setenv("CLOUDY_KEK_FILE", "")
-	t.Setenv("CLOUDY_KEK", "not base64!")
+	t.Setenv("HOSBAH_KEK_FILE", "")
+	t.Setenv("HOSBAH_KEK", "not base64!")
 	if _, err := LoadKeyring(); err == nil {
 		t.Fatal("expected an error for a non-base64 KEK")
+	}
+}
+
+// An .env written before the rename (CLOUDY_KEK, CLOUDY_KEK_FILE) still loads the same KEK; the
+// HOSBAH_ names win when both are set.
+func TestLoadKeyringReadsThePreRenameVariables(t *testing.T) {
+	kek, _ := NewDEK()
+	t.Setenv("HOSBAH_KEK_FILE", "")
+	t.Setenv("HOSBAH_KEK", "")
+	t.Setenv("CLOUDY_KEK_FILE", "")
+	t.Setenv("CLOUDY_KEK", base64.StdEncoding.EncodeToString(kek))
+	old, err := LoadKeyring()
+	if err != nil {
+		t.Fatalf("CLOUDY_KEK is not read: %v", err)
+	}
+	_, wrapped, _ := old.NewTeamKey("t")
+
+	path := filepath.Join(t.TempDir(), "kek")
+	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(kek)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLOUDY_KEK", "")
+	t.Setenv("CLOUDY_KEK_FILE", path)
+	fromFile, err := LoadKeyring()
+	if err != nil {
+		t.Fatalf("CLOUDY_KEK_FILE is not read: %v", err)
+	}
+	if _, err := fromFile.UnwrapDEK("t", wrapped); err != nil {
+		t.Fatalf("the same KEK through CLOUDY_KEK_FILE: %v", err)
+	}
+
+	other, _ := NewDEK()
+	t.Setenv("HOSBAH_KEK", base64.StdEncoding.EncodeToString(other))
+	t.Setenv("CLOUDY_KEK_FILE", "")
+	t.Setenv("CLOUDY_KEK", base64.StdEncoding.EncodeToString(kek))
+	k, err := LoadKeyring()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := k.UnwrapDEK("t", wrapped); !errors.Is(err, ErrOpen) {
+		t.Fatal("HOSBAH_KEK must win over CLOUDY_KEK")
 	}
 }

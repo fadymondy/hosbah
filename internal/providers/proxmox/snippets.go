@@ -10,7 +10,7 @@ import (
 )
 
 // SnippetStore puts a cloud-init snippet where a Proxmox "snippets" storage can see it and returns
-// its volid (e.g. "nfs-snippets:snippets/cloudy-123.yaml"). It exists because the PVE API has no way
+// its volid (e.g. "nfs-snippets:snippets/hosbah-123.yaml"). It exists because the PVE API has no way
 // to upload snippets; see the package documentation.
 type SnippetStore interface {
 	Put(ctx context.Context, name string, content []byte) (volid string, err error)
@@ -41,7 +41,7 @@ func (s DirSnippetStore) Put(_ context.Context, name string, content []byte) (st
 	if s.Dir == "" || s.Storage == "" {
 		return "", errors.New("proxmox: DirSnippetStore needs Dir and Storage")
 	}
-	f, err := os.CreateTemp(s.Dir, ".cloudy-snippet-*")
+	f, err := os.CreateTemp(s.Dir, ".hosbah-snippet-*")
 	if err != nil {
 		return "", fmt.Errorf("proxmox: writing snippet: %w", err)
 	}

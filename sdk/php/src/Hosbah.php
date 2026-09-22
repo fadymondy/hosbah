@@ -7,10 +7,10 @@ namespace Hosbah;
 /**
  * Hosbah SDK for PHP 8.1+ (framework-free; Laravel integration in Hosbah\Laravel).
  *
- * It calls a team's MCP endpoint (POST /api/mcp) with a team token (cld_…), so every Hosbah tool is
+ * It calls a team's MCP endpoint (POST /api/mcp) with a team token (hbu_…, or cld_… minted before the rename), so every Hosbah tool is
  * available through call(), with the token's scopes, the audit log and destructive-action approvals.
  *
- *   $hosbah = new \Hosbah\Hosbah(getenv('CLOUDY_URL'), getenv('CLOUDY_TOKEN'));
+ *   $hosbah = new \Hosbah\Hosbah(getenv('HOSBAH_URL'), getenv('HOSBAH_TOKEN'));
  *   $hosbah->deploy('shop', wait: true);
  */
 final class Hosbah

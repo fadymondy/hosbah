@@ -9,7 +9,7 @@ import (
 )
 
 // MountsOf turns an app's volumes into what the agent mounts. The Docker volume's name is derived
-// here (cloudy-vol-<app id>-<name>) — nothing a user typed names a volume on the host.
+// here (hosbah-vol-<app id>-<name>; the agent keeps using cloudy-vol-… for a volume made before the rename) — nothing a user typed names a volume on the host.
 func MountsOf(appID string, vols []db.AppVolume) []agentproto.Mount {
 	out := make([]agentproto.Mount, 0, len(vols))
 	for _, v := range vols {

@@ -51,7 +51,8 @@ func (f *fakeRunner) mutating() []string {
 	var out []string
 	for _, c := range f.calls {
 		if strings.HasPrefix(c.argv, "pvesh get") || strings.HasPrefix(c.argv, "docker inspect") ||
-			strings.HasPrefix(c.argv, "docker image inspect") || strings.HasPrefix(c.argv, "docker stats") {
+			strings.HasPrefix(c.argv, "docker image inspect") || strings.HasPrefix(c.argv, "docker stats") ||
+			strings.HasPrefix(c.argv, "docker container inspect") || strings.HasPrefix(c.argv, "docker volume inspect") || strings.HasPrefix(c.argv, "docker ps") {
 			continue
 		}
 		out = append(out, c.argv)
@@ -130,7 +131,7 @@ func TestHosbahOwnedTargetsAreRefusedBeforeAnyChange(t *testing.T) {
 	for k, v := range pveAnswers {
 		answers[k] = v
 	}
-	answers["pvesh get /nodes/pve/lxc/101/config"] = `{"hostname":"cloudy-control-plane"}`
+	answers["pvesh get /nodes/pve/lxc/101/config"] = `{"hostname":"hosbah-control-plane"}`
 	for _, params := range []any{
 		agentproto.PowerParams{WorkloadRef: agentproto.Guest("101", "lxc", ""), Action: "stop"},
 		agentproto.DestroyParams{WorkloadRef: agentproto.Guest("101", "lxc", ""), Purge: true},
@@ -153,9 +154,9 @@ func TestHosbahOwnedTargetsAreRefusedBeforeAnyChange(t *testing.T) {
 	}
 	// A Hosbah container name never even reaches a command.
 	w, f := newFake(pveAnswers)
-	oc, _ := opCtx(t, agentproto.DestroyParams{WorkloadRef: agentproto.WorkloadRef{Target: "container", Name: "cloudy-db-main"}})
+	oc, _ := opCtx(t, agentproto.DestroyParams{WorkloadRef: agentproto.WorkloadRef{Target: "container", Name: "hosbah-db-main"}})
 	if _, code, err := w.destroy(oc); err == nil || code != 2 || len(f.calls) != 0 {
-		t.Fatalf("destroy of cloudy-db-main: %v %d %v", err, code, f.calls)
+		t.Fatalf("destroy of hosbah-db-main: %v %d %v", err, code, f.calls)
 	}
 }
 
@@ -356,8 +357,8 @@ func TestImportedCredentialsLogInAsTheirUser(t *testing.T) {
 	if got := strings.Join(args, " "); got != "docker exec -i -e PGPASSWORD pg-main pg_dumpall -h 127.0.0.1 -U admin -d shop" || env[0] != "PGPASSWORD=pw" {
 		t.Fatalf("pg_dumpall of an imported service: %s", got)
 	}
-	args, _ = dbDumpCommand("postgres", "orders", map[string]string{"password": "pw"}, "cloudy-db-x")
-	if got := strings.Join(args, " "); got != "docker exec -i -e PGPASSWORD cloudy-db-x pg_dump -U postgres -d orders -Fc" {
+	args, _ = dbDumpCommand("postgres", "orders", map[string]string{"password": "pw"}, "hosbah-db-x")
+	if got := strings.Join(args, " "); got != "docker exec -i -e PGPASSWORD hosbah-db-x pg_dump -U postgres -d orders -Fc" {
 		t.Fatalf("pg_dump of a managed service: %s", got)
 	}
 	args, _ = dbDumpCommand("mysql", "", root, "maria")

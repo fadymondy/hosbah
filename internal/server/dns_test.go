@@ -377,7 +377,7 @@ func TestAppDNSAndCertificates(t *testing.T) {
 		owner.expect("GET", appBase("no-such-app")+"/dns", nil, 404)
 		// Not this app's hostnames: a managed record of the zone, a sibling app's domain, the zone
 		// apex, and things that are not hostnames at all.
-		for _, h := range []string{host("mail"), host("sibling"), zone, "nope", "a b." + zone, "*." + zone, "_cloudy-verify." + host("ok")} {
+		for _, h := range []string{host("mail"), host("sibling"), zone, "nope", "a b." + zone, "*." + zone, "_cloudy-verify." + host("ok"), "_hosbah-verify." + host("ok")} {
 			owner.expect("PUT", base+"/dns/"+esc(h), map[string]any{"takeover": true}, 404)
 			owner.expect("DELETE", base+"/dns/"+esc(h), nil, 404)
 		}

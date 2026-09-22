@@ -38,7 +38,7 @@ func GenerateKey() (authorizedKey string, privatePEM []byte, err error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("sshboot: generating key: %w", err)
 	}
-	block, err := ssh.MarshalPrivateKey(priv, "cloudy-bootstrap")
+	block, err := ssh.MarshalPrivateKey(priv, "hosbah-bootstrap")
 	if err != nil {
 		return "", nil, fmt.Errorf("sshboot: encoding key: %w", err)
 	}

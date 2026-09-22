@@ -219,7 +219,7 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 		return inst, err
 	}
 
-	cs := providers.CreateSpec{Name: srv.Name, Kind: spec.Kind, Size: spec.Size, SSHPublicKeys: []string{*srv.SshPublicKey}, Tags: []string{"cloudy"}}
+	cs := providers.CreateSpec{Name: srv.Name, Kind: spec.Kind, Size: spec.Size, SSHPublicKeys: []string{*srv.SshPublicKey}, Tags: []string{"hosbah"}}
 	cs.Options = map[string]string{}
 	if spec.IPConfig != "" {
 		cs.Options["ipconfig0"] = spec.IPConfig
@@ -279,7 +279,7 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 		if err != nil {
 			return nil, err
 		}
-		user, cmd := "cloudy", inst.Command
+		user, cmd := providers.GuestUser, inst.Command
 		if spec.Kind == providers.KindLXC {
 			user, cmd = "root", inst.CommandRoot // LXC keys go to root
 		}

@@ -17,10 +17,26 @@ import (
 
 const (
 	frpcBin      = "/usr/local/bin/frpc"
-	frpcConfig   = "/etc/cloudy/frpc.toml"
-	frpcUnit     = "cloudy-frpc"
-	frpcUnitPath = "/etc/systemd/system/cloudy-frpc.service"
+	frpcConfig   = agentproto.StateDir + "/frpc.toml"
+	frpcUnit     = "hosbah-frpc"
+	frpcUnitPath = "/etc/systemd/system/hosbah-frpc.service"
+
+	// The unit of an agent from before the rename. Applying or removing a tunnel retires it: the
+	// tunnel restarts then anyway. Its config was /etc/cloudy/frpc.toml, which is frpcConfig once
+	// the state directory moved.
+	legacyFrpcUnit     = "cloudy-frpc"
+	legacyFrpcUnitPath = "/etc/systemd/system/cloudy-frpc.service"
 )
+
+// retireLegacyFrpc stops and removes the pre-rename frpc unit, if this server has it.
+func retireLegacyFrpc(oc *OpContext) {
+	if _, err := os.Stat(legacyFrpcUnitPath); err != nil {
+		return
+	}
+	oc.Info("replacing the tunnel unit %s with %s", legacyFrpcUnit, frpcUnit)
+	_, _ = oc.Run("systemctl", "disable", "--now", legacyFrpcUnit)
+	_ = os.Remove(legacyFrpcUnitPath)
+}
 
 const frpcUnitFile = `[Unit]
 Description=Hosbah tunnel (frpc)
@@ -28,7 +44,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/frpc -c /etc/cloudy/frpc.toml
+ExecStart=/usr/local/bin/frpc -c /etc/hosbah/frpc.toml
 Restart=always
 RestartSec=5
 
@@ -48,6 +64,7 @@ func tunnelFrp(oc *OpContext) (any, int, error) {
 		return nil, 2, errors.New("Hosbah runs frpc under systemd; this server has no systemd")
 	}
 	if p.Remove {
+		retireLegacyFrpc(oc)
 		_, _ = oc.Run("systemctl", "disable", "--now", frpcUnit)
 		_ = os.Remove(frpcUnitPath)
 		_ = os.Remove(frpcConfig)
@@ -76,13 +93,13 @@ auth.token = %s
 loginFailExit = false
 
 [[proxies]]
-name = "cloudy-%s"
+name = "hosbah-%s"
 type = "tcp"
 localIP = "127.0.0.1"
 localPort = %d
 remotePort = %d
 `, p.TunnelID, strconv.Quote(p.ServerAddr), p.ServerPort, strconv.Quote(sec["token"]), p.TunnelID[:8], p.LocalPort, p.RemotePort)
-	if err := os.MkdirAll("/etc/cloudy", 0o700); err != nil {
+	if err := os.MkdirAll(agentproto.StateDir, 0o700); err != nil {
 		return nil, 1, err
 	}
 	if err := os.WriteFile(frpcConfig, []byte(conf), 0o600); err != nil {
@@ -92,6 +109,7 @@ remotePort = %d
 		oc.Info("%s", strings.TrimSpace(out))
 		return nil, 1, errors.New("frpc rejected its configuration")
 	}
+	retireLegacyFrpc(oc)
 	if err := os.WriteFile(frpcUnitPath, []byte(frpcUnitFile), 0o644); err != nil { //#nosec G306 -- a unit file
 		return nil, 1, err
 	}
@@ -150,7 +168,7 @@ func tunnelTailscale(oc *OpContext) (any, int, error) {
 		_, _ = oc.Run("systemctl", "enable", "--now", "tailscaled")
 	}
 	// The auth key goes through a 0600 file (tailscale up --auth-key=file:…), never an argv.
-	f, err := os.CreateTemp("", "cloudy-ts-*")
+	f, err := os.CreateTemp("", "hosbah-ts-*")
 	if err != nil {
 		return nil, 1, err
 	}

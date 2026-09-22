@@ -23,7 +23,7 @@ const (
 const (
 	MaxAppVolumes    = 10
 	MaxMountPath     = 200
-	VolumeNamePrefix = "cloudy-vol-"
+	VolumeNamePrefix = NamePrefix + "vol-" // cloudy-vol- before the rename; still accepted
 )
 
 var (
@@ -45,9 +45,10 @@ func ValidVolumeSlug(s string) bool { return volumeSlugRE.MatchString(s) }
 func VolumeName(appID, slug string) string { return VolumeNamePrefix + appID + "-" + slug }
 
 // ValidVolumeName reports whether name is a volume of that app.
+// A volume made before the rename (cloudy-vol-<app>-<slug>) is one too.
 func ValidVolumeName(appID, name string) bool {
-	pfx := VolumeNamePrefix + appID + "-"
-	return ValidID(appID) && strings.HasPrefix(name, pfx) && ValidVolumeSlug(strings.TrimPrefix(name, pfx))
+	slug, ok := hasFamilyPrefix(name, VolumeNamePrefix+appID+"-")
+	return ValidID(appID) && ok && ValidVolumeSlug(slug)
 }
 
 // CleanMountPath normalises a mount path (path.Clean) and applies the rules: absolute, the charset
@@ -167,7 +168,13 @@ func ValidBucket(s string) bool {
 func ValidAccessKey(s string) bool { return accessKeyRE.MatchString(s) }
 
 // BucketPolicyName is the MinIO policy of one access key. Derived.
-func BucketPolicyName(accessKey string) string { return "cloudy-bucket-" + accessKey }
+// Keys made before the rename have cloudy-bucket-<key>; both are accepted (ValidBucketPolicy).
+func BucketPolicyName(accessKey string) string { return NamePrefix + "bucket-" + accessKey }
+
+// ValidBucketPolicy reports whether policy is the key's policy, new or old.
+func ValidBucketPolicy(accessKey, policy string) bool {
+	return sameDerived(policy, BucketPolicyName(accessKey))
+}
 
 // BucketSecretPurpose is the DBSecretContext purpose of a bucket key's secret box: {"secret": …}.
 func BucketSecretPurpose(bucket string) string { return "bucket:" + bucket }
@@ -193,7 +200,7 @@ func (p BucketCreateParams) Validate() error {
 		return errors.New("bad container name")
 	case !ValidBucket(p.Bucket):
 		return fmt.Errorf("bad bucket name %q", p.Bucket)
-	case !ValidAccessKey(p.AccessKey) || p.Policy != BucketPolicyName(p.AccessKey):
+	case !ValidAccessKey(p.AccessKey) || !ValidBucketPolicy(p.AccessKey, p.Policy):
 		return errors.New("bad access key or policy name")
 	case p.Secret == "" || p.RootSecret == "":
 		return errors.New("bucket.create needs the root and key secrets")
