@@ -384,10 +384,31 @@ func TestSystemctlKilledByTheHandoverIsNotARefusal(t *testing.T) {
 	}
 }
 
+// A server where that misreading re-enabled the old unit heals on the new unit's next start; one
+// already right is left alone.
+func TestTheNewUnitReclaimsBootFromTheOldOne(t *testing.T) {
+	var f fakeService // no failures: "is-enabled cloudy-agent" succeeds, i.e. the old unit is enabled
+	if migrateService(f.host("/usr/local/bin/hosbah-agent", "0::/system.slice/hosbah-agent.service", true), t.Logf) {
+		t.Fatal("reported a handover from the new unit")
+	}
+	want := "systemctl is-enabled --quiet cloudy-agent.service\nsystemctl enable hosbah-agent.service\nsystemctl disable cloudy-agent.service"
+	if got := strings.Join(f.calls, "\n"); got != want {
+		t.Fatalf("calls:\n%s", got)
+	}
+
+	f = fakeService{fail: map[string]error{"systemctl is-enabled --quiet cloudy-agent.service": errors.New("exit status 1")}}
+	migrateService(f.host("/usr/local/bin/hosbah-agent", "0::/system.slice/hosbah-agent.service", true), t.Logf)
+	if len(f.calls) != 1 {
+		t.Fatalf("changed a server that was already right: %v", f.calls)
+	}
+}
+
 // Already moved (or installed after the rename), or not under systemd: no unit work.
 func TestNoHandoverOutsideTheOldUnit(t *testing.T) {
-	var f fakeService
-	if migrateService(f.host("/usr/local/bin/hosbah-agent", "0::/system.slice/hosbah-agent.service", true), t.Logf) || len(f.calls) != 0 {
+	// The new unit only asks whether the old one is still enabled (it is not here).
+	f := fakeService{fail: map[string]error{"systemctl is-enabled --quiet cloudy-agent.service": errors.New("exit status 1")}}
+	if migrateService(f.host("/usr/local/bin/hosbah-agent", "0::/system.slice/hosbah-agent.service", true), t.Logf) ||
+		strings.Join(f.calls, "\n") != "systemctl is-enabled --quiet cloudy-agent.service" {
 		t.Fatalf("new unit: %v", f.calls)
 	}
 	f = fakeService{}

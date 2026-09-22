@@ -153,9 +153,12 @@ func MigrateService(logf func(string, ...any)) bool { return migrateService(real
 func RevertService(logf func(string, ...any)) { revertService(realServiceHost(), logf) }
 
 // inLegacyUnit: this process runs inside cloudy-agent.service.
-func (h serviceHost) inLegacyUnit() bool {
+func (h serviceHost) inLegacyUnit() bool { return h.inUnit(agentproto.LegacyAgentUnit) }
+
+// inUnit: this process runs inside <unit>.service.
+func (h serviceHost) inUnit(unit string) bool {
 	cg, err := h.cgroup()
-	return err == nil && strings.Contains(cg, "/"+agentproto.LegacyAgentUnit+".service")
+	return err == nil && strings.Contains(cg, "/"+unit+".service")
 }
 
 func migrateService(h serviceHost, logf func(string, ...any)) bool {
@@ -174,6 +177,15 @@ func migrateService(h serviceHost, logf func(string, ...any)) bool {
 		return false
 	}
 	if !h.inLegacyUnit() {
+		// Running as the new unit: make sure it is also the one that starts at boot. An agent that
+		// read its own handover as a refusal (before stoppedByHandover) re-enabled the old unit and
+		// disabled the new one while systemd was already swapping them.
+		if h.inUnit(agentproto.AgentUnit) && h.run("systemctl", "is-enabled", "--quiet", agentproto.LegacyAgentUnit+".service") == nil {
+			logf("%s.service was still enabled at boot; enabling %s.service instead", agentproto.LegacyAgentUnit, agentproto.AgentUnit)
+			if err := h.run("systemctl", "enable", agentproto.AgentUnit+".service"); err == nil {
+				_ = h.run("systemctl", "disable", agentproto.LegacyAgentUnit+".service")
+			}
+		}
 		return false
 	}
 	logf("this server still runs the agent as %s.service; moving it to %s.service", agentproto.LegacyAgentUnit, agentproto.AgentUnit)
