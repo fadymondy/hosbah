@@ -272,6 +272,19 @@ func (s *Service) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		failTo(w, r, fallback, oauthstate.PurposeLogin, "", OAuthRateLimited)
 		return
 	}
+	// A GitHub App installation, not a sign-in: with "Request user authorization (OAuth) during
+	// installation" on, GitHub sends the browser here instead of to the Setup URL. Hand it over
+	// untouched; /api/github/setup checks its own state and confirms the installation with GitHub.
+	if chi.URLParam(r, "provider") == "github" && qs.Get("installation_id") != "" && qs.Get("setup_action") != "" {
+		fwd := url.Values{}
+		for _, k := range []string{"installation_id", "setup_action", "state"} {
+			if v := qs.Get(k); v != "" {
+				fwd.Set(k, v)
+			}
+		}
+		http.Redirect(w, r, "/api/github/setup?"+fwd.Encode(), http.StatusSeeOther)
+		return
+	}
 	// The state is consumed before anything else, whatever the provider said.
 	browser := ""
 	if c, err := r.Cookie(oauthCookie); err == nil {

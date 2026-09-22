@@ -214,6 +214,14 @@ func TestGitHubAppInstallReposCloneAndPush(t *testing.T) {
 		return sysCount(t, sqlDB, `SELECT count(*) FROM github_installations WHERE installation_id = $1`, instID)
 	}
 
+	// With "Request user authorization during installation" on, GitHub returns an installation to
+	// the sign-in callback: it is handed to the setup handler as is (the user code is dropped), not
+	// refused as a sign-in with an unknown state.
+	if status, loc := location(t, owner, "/api/auth/oauth/github/callback?code=abc&installation_id=4242&setup_action=install&state=st1"); status != http.StatusSeeOther ||
+		loc.Path != "/api/github/setup" || loc.Query().Get("state") != "st1" || loc.Query().Get("installation_id") != "4242" || loc.Query().Get("code") != "" {
+		t.Fatalf("installation at the sign-in callback -> %d %s", status, loc)
+	}
+
 	// A made-up state is refused, and nothing is stored.
 	begin(owner, team.ID)
 	loc := setup(owner, url.Values{"installation_id": {"4242"}, "setup_action": {"install"}, "state": {"forged"}})
