@@ -370,6 +370,20 @@ func TestAHandoverThatCannotHappenKeepsTheOldUnit(t *testing.T) {
 	}
 }
 
+// The job stops this unit at once and systemd kills systemctl with it (seen on the win-docker test
+// server): that is the handover happening, so nothing is reverted.
+func TestSystemctlKilledByTheHandoverIsNotARefusal(t *testing.T) {
+	f := fakeService{fail: map[string]error{"systemctl --no-block start hosbah-agent.service": errors.New("signal: terminated")}}
+	if !migrateService(f.host("/usr/local/bin/cloudy-agent", "0::/system.slice/cloudy-agent.service", true), t.Logf) {
+		t.Fatal("a handover carried out was reported as refused")
+	}
+	for _, c := range f.calls {
+		if c == "systemctl enable cloudy-agent.service" || c == "systemctl disable hosbah-agent.service" {
+			t.Fatalf("reverted a handover that happened: %q", c)
+		}
+	}
+}
+
 // Already moved (or installed after the rename), or not under systemd: no unit work.
 func TestNoHandoverOutsideTheOldUnit(t *testing.T) {
 	var f fakeService

@@ -206,13 +206,21 @@ func migrateService(h serviceHost, logf func(string, ...any)) bool {
 	}
 	// --no-block: systemd queues the job and answers at once. The job stops this unit (Conflicts=),
 	// then starts the new one.
-	if err := h.run("systemctl", "--no-block", "start", agentproto.AgentUnit+".service"); err != nil {
+	if err := h.run("systemctl", "--no-block", "start", agentproto.AgentUnit+".service"); err != nil && !stoppedByHandover(err) {
 		logf("systemd did not accept the handover (staying on %s.service): %v", agentproto.LegacyAgentUnit, err)
 		revertService(h, logf)
 		return false
 	}
 	logf("handed over to %s.service; systemd stops this process now", agentproto.AgentUnit)
 	return true
+}
+
+// stoppedByHandover: systemctl was killed by SIGTERM. The queued job stops this unit at once
+// (Conflicts=) and systemd kills its whole control group — the systemctl child with it, often
+// before it has printed its answer. That is the handover being carried out, not refused; reading
+// it as a refusal would re-enable the old unit behind the new one's back. (Seen on a real server.)
+func stoppedByHandover(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "signal: terminated")
 }
 
 func revertService(h serviceHost, logf func(string, ...any)) {
