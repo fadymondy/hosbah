@@ -191,17 +191,26 @@ func (s *Service) inTx(ctx context.Context, fn func(q *db.Queries) error) error 
 
 // challenge answers 401 2fa_required with a fresh challenge for u.
 func (s *Service) challenge(w http.ResponseWriter, r *http.Request, u *user) {
-	ctx := r.Context()
-	id, err := newChallengeID()
-	if err == nil {
-		err = s.q().CreateChallenge(ctx, db.CreateChallengeParams{ID: id, UserID: u.ID, ExpiresAt: s.Now().UTC().Add(challengeTTL)})
-	}
+	id, err := s.newChallenge(r.Context(), u)
 	if err != nil {
 		fail(w, http.StatusInternalServerError, CodeInternal, "could not start the second step")
 		return
 	}
-	_ = s.q().DeleteExpiredChallenges(ctx)
 	fail(w, http.StatusUnauthorized, Code2FARequired, "Enter the code from your authenticator app.", "challenge", id)
+}
+
+// newChallenge stores a fresh second-step challenge for u (5 minutes, 5 tries). Password sign-in
+// hands it back as JSON; a Google or GitHub sign-in hands it to the sign-in page (oauth.go).
+func (s *Service) newChallenge(ctx context.Context, u *user) (string, error) {
+	id, err := newChallengeID()
+	if err != nil {
+		return "", err
+	}
+	if err := s.q().CreateChallenge(ctx, db.CreateChallengeParams{ID: id, UserID: u.ID, ExpiresAt: s.Now().UTC().Add(challengeTTL)}); err != nil {
+		return "", err
+	}
+	_ = s.q().DeleteExpiredChallenges(ctx)
+	return id, nil
 }
 
 func challengeExpired(w http.ResponseWriter) {

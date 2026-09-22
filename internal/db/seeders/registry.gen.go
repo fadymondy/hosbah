@@ -66,6 +66,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedEnvVar(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedGithubInstallation(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedImportIgnore(ctx, a); err != nil {
 		return err
 	}

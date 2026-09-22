@@ -215,6 +215,16 @@ CheckSignup decides whether POST /api/auth/register may go ahead.
     accepts the invitation as usual.
 */
 func CheckSignup(ctx context.Context, sqlDB *sql.DB, email, invitationToken string) error {
+	h := ""
+	if strings.TrimSpace(invitationToken) != "" {
+		h = tokens.Hash(strings.TrimSpace(invitationToken))
+	}
+	return CheckSignupHashed(ctx, sqlDB, email, h)
+}
+
+// CheckSignupHashed is CheckSignup with the invitation token's hash (tokens.Hash) instead of the
+// token: a sign-up through Google or GitHub keeps only the hash while the visitor is away.
+func CheckSignupHashed(ctx context.Context, sqlDB *sql.DB, email, invitationHash string) error {
 	s, err := ReadSettings(ctx, sqlDB)
 	if err != nil {
 		return err
@@ -223,10 +233,10 @@ func CheckSignup(ctx context.Context, sqlDB *sql.DB, email, invitationToken stri
 	case SignupClosed:
 		return refuse(http.StatusForbidden, "sign-up is closed on this platform")
 	case SignupInviteOnly:
-		if strings.TrimSpace(invitationToken) == "" {
+		if invitationHash == "" {
 			return refuse(http.StatusForbidden, "sign-up is by invitation only — use the link in your invitation")
 		}
-		if !InvitationValidFor(ctx, sqlDB, email, invitationToken) {
+		if !InvitationValidForHash(ctx, sqlDB, email, invitationHash) {
 			return refuse(http.StatusForbidden, "sign-up is by invitation only, and this invitation is not valid for that email")
 		}
 	}
@@ -238,10 +248,17 @@ func CheckSignup(ctx context.Context, sqlDB *sql.DB, email, invitationToken stri
 // invitation was delivered to that inbox, so it already proves the address).
 func InvitationValidFor(ctx context.Context, sqlDB *sql.DB, email, token string) bool {
 	token = strings.TrimSpace(token)
-	if token == "" || strings.TrimSpace(email) == "" {
+	if token == "" {
 		return false
 	}
-	hash := tokens.Hash(token)
+	return InvitationValidForHash(ctx, sqlDB, email, tokens.Hash(token))
+}
+
+// InvitationValidForHash is InvitationValidFor with the token's hash (tokens.Hash).
+func InvitationValidForHash(ctx context.Context, sqlDB *sql.DB, email, hash string) bool {
+	if hash == "" || strings.TrimSpace(email) == "" {
+		return false
+	}
 	ok := false
 	_ = tenancy.Tx(ctx, sqlDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, _ *sql.Tx) error {
 		inv, err := q.InvitationByTokenHash(ctx, hash)

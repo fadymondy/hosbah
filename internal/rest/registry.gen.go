@@ -29,6 +29,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterDeploymentLogRoutes(api, a)
 	RegisterDomainRoutes(api, a)
 	RegisterEnvVarRoutes(api, a)
+	RegisterGithubInstallationRoutes(api, a)
 	RegisterImportIgnoreRoutes(api, a)
 	RegisterInvitationRoutes(api, a)
 	RegisterMcpTokenRoutes(api, a)

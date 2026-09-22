@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type FormEvent } from "react"
 
 import { CodeInput, RecoveryInput, RESEND_SECONDS } from "@/components/auth/code-input"
+import { OAuthButtons, useOAuthErrorText } from "@/components/auth/oauth"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Button } from "@/components/ui/button"
@@ -24,8 +25,10 @@ type Mode = "password" | "code"
 export default function LoginPage() {
   const { t, locale } = useI18n()
   const router = useRouter()
-  const next = safeNext(useSearchParams().get("next"), locale)
+  const params = useSearchParams()
+  const next = safeNext(params.get("next"), locale)
   const errorText = useErrorText()
+  const oauthErrorText = useOAuthErrorText()
 
   const [mode, setMode] = useState<Mode>("password")
   const [email, setEmail] = useState("")
@@ -37,8 +40,22 @@ export default function LoginPage() {
   const [second, setSecond] = useState("")
   const [useRecovery, setUseRecovery] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // A Google / GitHub round trip that failed comes back with ?oauth_error=<code>.
+  const [error, setError] = useState<string | null>(() => oauthErrorText(params.get("oauth_error")))
   useDocumentTitle(challenge ? t("account.twoFactorTitle") : t("auth.login.title"))
+
+  // A Google / GitHub sign-in of an account with two-factor comes back with #challenge=<id> (a
+  // fragment: it never reaches a server log). Take it into the second step and drop it from the URL.
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    const id = hash.get("challenge")
+    if (!id) return
+    window.history.replaceState(null, "", window.location.pathname + window.location.search)
+    setChallenge(id)
+    setSecond("")
+    setUseRecovery(false)
+    setError(null)
+  }, [])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -184,6 +201,7 @@ export default function LoginPage() {
       <form onSubmit={onSubmit}>
         <FieldGroup>
           <FormError message={error} />
+          <OAuthButtons next={next} />
           <Field>
             <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
             <Input

@@ -358,6 +358,12 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_deployments", nil); res.IsError || strings.Contains(res.Text, appA.App.ID) || strings.Contains(res.Text, appA.Deployment.ID) {
 		t.Errorf("list_deployments (team feed) as B leaked team A's deployments: %+v", res)
 	}
+	// The GitHub App tools read the caller's own team's installations only.
+	for _, tool := range []string{"github_app_status", "github_app_repos"} {
+		if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, tool, nil); strings.Contains(res.Text, teamA.ID) || strings.Contains(res.Text, teamA.Slug) {
+			t.Errorf("MCP %s as B leaked team A: %s", tool, res.Text)
+		}
+	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_proxy_hosts", nil); strings.Contains(res.Text, proxyA.Hostname) {
 		t.Errorf("list_proxy_hosts as B leaked team A's proxy host: %s", res.Text)
 	}

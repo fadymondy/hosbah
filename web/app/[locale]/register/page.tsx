@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useState, type FormEvent } from "react"
 
 import { AuthFrame } from "@/components/auth-frame"
+import { OAuthButtons } from "@/components/auth/oauth"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -92,6 +93,7 @@ export default function RegisterPage() {
         <form onSubmit={onSubmit}>
           <FieldGroup>
             <FormError message={error} />
+            <OAuthButtons next={next} invitation={invitation} />
             <Field>
               <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
               <Input

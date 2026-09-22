@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
+import { GitHubAppSection } from "@/components/github-app"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +70,7 @@ export default function SettingsPage() {
           </div>
         ) : null}
       </form>
+      <GitHubAppSection team={team.slug} />
     </PageBody>
   )
 }

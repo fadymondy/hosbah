@@ -64,8 +64,15 @@ type Service struct {
 	signupIP  *limiter // 20 / 10 min per client: sign-up and every "send me a code"
 	emailSend *limiter // 6 / hour per address: codes mailed
 	tries     *limiter // 15 / 10 min per client and per address: code guesses
+	// 30 / 10 min per client: Google / GitHub round trips (start and callback each count).
+	oauthTries *limiter
 
 	trusted []*net.IPNet
+
+	// Sign-in providers (oauth.go) and the public origin their redirect URI is built on.
+	oauthMu   sync.RWMutex
+	providers map[string]*Provider
+	origin    string
 }
 
 // New builds the flows. keys seals authenticator secrets; without them two-factor enrolment is
@@ -79,10 +86,13 @@ func New(sqlDB *sql.DB, keys *crypto.Keyring, svc *auth.Service, log *slog.Logge
 	}
 	return &Service{
 		DB: sqlDB, Keys: keys, Auth: svc, Log: log, Send: send, Now: time.Now,
-		signupIP:  newLimiter(20, 10*time.Minute),
-		emailSend: newLimiter(6, time.Hour),
-		tries:     newLimiter(15, 10*time.Minute),
-		trusted:   parseCIDRs(brand.Getenv("TRUSTED_PROXIES")),
+		signupIP:   newLimiter(20, 10*time.Minute),
+		emailSend:  newLimiter(6, time.Hour),
+		tries:      newLimiter(15, 10*time.Minute),
+		oauthTries: newLimiter(30, 10*time.Minute),
+		trusted:    parseCIDRs(brand.Getenv("TRUSTED_PROXIES")),
+		providers:  ProvidersFromEnv(),
+		origin:     PublicOrigin(),
 	}
 }
 

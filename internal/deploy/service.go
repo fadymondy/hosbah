@@ -51,6 +51,9 @@ type Service struct {
 	active map[string]bool
 
 	github GitHubApp
+	// ghMu guards github (tests swap it) and repoCache, the GitHub App repositories per team.
+	ghMu      sync.Mutex
+	repoCache map[string]repoCacheEntry
 	// apps is the platform apps domain (HOSBAH_APPS_DOMAIN …); see appsdomain.go.
 	apps AppsDomain
 	// cfOpts, when set, configures every Cloudflare client (tests).
@@ -64,7 +67,7 @@ func New(a *app.App, o *ops.Service) *Service {
 		log = slog.Default()
 	}
 	return &Service{a: a, ops: o, log: log.With("component", "deploy"), wake: make(chan struct{}, 1), active: map[string]bool{},
-		github: GitHubFromEnv(), apps: AppsDomainFromEnv()}
+		github: GitHubFromEnv(), repoCache: map[string]repoCacheEntry{}, apps: AppsDomainFromEnv()}
 }
 
 // Start launches the worker. Deployments this control plane was running when it stopped are
@@ -542,9 +545,17 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		protect = append(protect, r.live.Image)
 	}
 	var built agentproto.BuildResult
+	src := agentproto.GitSource{RepoURL: RepoOf(r.app), Ref: r.dep.Ref}
+	if box, err := r.s.CloneToken(ctx, r.dep.TeamID, src.RepoURL, r.agentKey); err != nil {
+		// A public repository still clones; a private one fails with the reason from git.
+		r.logf("info", "could not get a GitHub App token for this repository (%v) — cloning without it", err)
+	} else if box != "" {
+		src.Token = box
+		r.logf("info", "cloning with a fresh token of the team's GitHub App installation")
+	}
 	if err := r.op(ctx, "build", agentproto.KindAppBuild, agentproto.BuildParams{
 		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
-		GitSource: agentproto.GitSource{RepoURL: RepoOf(r.app), Ref: r.dep.Ref},
+		GitSource: src,
 		Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
 	}, &built); err != nil {
 		return nil, fmt.Errorf("build: %w", err)

@@ -81,7 +81,11 @@ func Boot() *app.App {
 	accounts.Mount(
 		func(p string, h http.HandlerFunc) { k.Router.Post(p, h) },
 		func(p string, h http.HandlerFunc) { k.Router.Get(p, h) },
+		func(p string, h http.HandlerFunc) { k.Router.Delete(p, h) },
 	)
+	if configureAccounts != nil {
+		configureAccounts(accounts)
+	}
 
 	svc, err := ops.New(a, ops.ConfigFromEnv())
 	if err != nil {
@@ -179,3 +183,7 @@ func OpenAPI() ([]byte, error) {
 // mailSender overrides how account emails are delivered; nil means mail.FromEnv (SMTP from
 // MAIL_*, or the log with DEV_MAIL_LOG=1). The integration tests set it to capture codes.
 var mailSender mail.Sender
+
+// configureAccounts, when set, adjusts the account service after it is built (the integration
+// tests point the Google and GitHub sign-in providers at fakes).
+var configureAccounts func(*account.Service)

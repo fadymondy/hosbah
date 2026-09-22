@@ -1046,6 +1046,45 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: GithubInstallation
+      table: github_installations
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: installation_id
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: account_login
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: account_type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: repository_selection
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: installed_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: suspended_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
     - name: ImportIgnore
       table: import_ignores
       fields:

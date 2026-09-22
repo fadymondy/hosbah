@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, ScanSearchIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
+import { AppRepoPicker } from "@/components/apps/app-repo-picker"
 import { RepoPicker } from "@/components/apps/repo-picker"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
@@ -209,6 +210,15 @@ export default function NewAppPage() {
               />
               <FieldDescription>{t("apps.new.nameHint")}</FieldDescription>
             </Field>
+            <AppRepoPicker
+              team={team.slug}
+              value={repo}
+              onPick={(url, def) => {
+                setRepo(url)
+                if (def) setBranch(def)
+                setDetectOp(null)
+              }}
+            />
             {server ? (
               <Field>
                 <FieldLabel>{t("github.pickRepo")}</FieldLabel>

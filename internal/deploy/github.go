@@ -50,7 +50,41 @@ type GitHubApp interface {
 	InstallationToken(ctx context.Context, installationID int64) (token string, expires time.Time, err error)
 	// VerifyWebhook checks a delivery's X-Hub-Signature-256 header against the webhook secret.
 	VerifyWebhook(body []byte, signatureHeader string) bool
+	// Installation reads an installation with the App's own JWT (GET /app/installations/{id}):
+	// the only source of truth for which account it is on. ErrInstallationNotFound when GitHub
+	// does not know it (or it is another App's).
+	Installation(ctx context.Context, installationID int64) (GitHubInstallation, error)
+	// InstallationRepos lists the repositories an installation can reach (GET
+	// /installation/repositories with a fresh installation token, every page, at most max).
+	InstallationRepos(ctx context.Context, installationID int64, max int) ([]GitHubAppRepo, error)
 }
+
+// ErrInstallationNotFound: GitHub does not know that installation (for this App).
+var ErrInstallationNotFound = errors.New("GitHub does not know that installation of the App")
+
+// GitHubInstallation is GitHub's own answer about an installation.
+type GitHubInstallation struct {
+	ID                  int64
+	AccountLogin        string
+	AccountType         string // User | Organization | Enterprise
+	RepositorySelection string // all | selected
+	SuspendedAt         *time.Time
+}
+
+// GitHubAppRepo is a repository an installation can reach.
+type GitHubAppRepo struct {
+	InstallationID int64     `json:"installation_id"`
+	Name           string    `json:"name"`
+	NameWithOwner  string    `json:"name_with_owner"`
+	IsPrivate      bool      `json:"is_private"`
+	DefaultBranch  string    `json:"default_branch"`
+	URL            string    `json:"url"`
+	Description    string    `json:"description,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// MaxAppRepos bounds a team's repository listing.
+const MaxAppRepos = 2000
 
 // GitHubFromEnv builds the integration from the environment: unconfigured when anything is missing.
 func GitHubFromEnv() GitHubApp {
@@ -80,6 +114,21 @@ func (unconfiguredGitHub) InstallationToken(context.Context, int64) (string, tim
 	return "", time.Time{}, ErrGitHubNotConfigured
 }
 func (unconfiguredGitHub) VerifyWebhook([]byte, string) bool { return false }
+func (unconfiguredGitHub) Installation(context.Context, int64) (GitHubInstallation, error) {
+	return GitHubInstallation{}, ErrGitHubNotConfigured
+}
+func (unconfiguredGitHub) InstallationRepos(context.Context, int64, int) ([]GitHubAppRepo, error) {
+	return nil, ErrGitHubNotConfigured
+}
+
+// NewGitHubApp builds the integration from its parts; apiBase is https://api.github.com in
+// production (tests pass a fake's URL).
+func NewGitHubApp(appID int64, slug string, key *rsa.PrivateKey, webhookSecret []byte, apiBase string, client *http.Client) GitHubApp {
+	if client == nil {
+		client = &http.Client{Timeout: 15 * time.Second}
+	}
+	return &githubApp{appID: appID, slug: slug, key: key, secret: webhookSecret, api: strings.TrimRight(apiBase, "/"), http: client, now: time.Now}
+}
 
 type githubApp struct {
 	appID  int64
@@ -176,4 +225,98 @@ func ParseRSAPrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 		return nil, errors.New("not an RSA key")
 	}
 	return rk, nil
+}
+
+// apiGet GETs path with a bearer credential into out. 404 is ErrInstallationNotFound.
+func (g *githubApp) apiGet(ctx context.Context, bearer, path string, out any) (http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.api+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := g.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		return resp.Header, ErrInstallationNotFound
+	case resp.StatusCode != http.StatusOK:
+		return resp.Header, fmt.Errorf("GitHub answered %d for %s", resp.StatusCode, strings.SplitN(path, "?", 2)[0])
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		return resp.Header, errors.New("GitHub's answer is unreadable")
+	}
+	return resp.Header, nil
+}
+
+func (g *githubApp) Installation(ctx context.Context, installationID int64) (GitHubInstallation, error) {
+	if installationID <= 0 {
+		return GitHubInstallation{}, ErrInstallationNotFound
+	}
+	jwt, err := g.appJWT()
+	if err != nil {
+		return GitHubInstallation{}, err
+	}
+	var out struct {
+		ID      int64 `json:"id"`
+		Account struct {
+			Login string `json:"login"`
+			Type  string `json:"type"`
+		} `json:"account"`
+		RepositorySelection string     `json:"repository_selection"`
+		SuspendedAt         *time.Time `json:"suspended_at"`
+	}
+	if _, err := g.apiGet(ctx, jwt, fmt.Sprintf("/app/installations/%d", installationID), &out); err != nil {
+		return GitHubInstallation{}, err
+	}
+	if out.ID != installationID || out.Account.Login == "" {
+		return GitHubInstallation{}, ErrInstallationNotFound
+	}
+	return GitHubInstallation{ID: out.ID, AccountLogin: out.Account.Login, AccountType: out.Account.Type,
+		RepositorySelection: out.RepositorySelection, SuspendedAt: out.SuspendedAt}, nil
+}
+
+func (g *githubApp) InstallationRepos(ctx context.Context, installationID int64, max int) ([]GitHubAppRepo, error) {
+	token, _, err := g.InstallationToken(ctx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	var repos []GitHubAppRepo
+	for page := 1; page <= 50 && len(repos) < max; page++ {
+		var out struct {
+			TotalCount   int `json:"total_count"`
+			Repositories []struct {
+				Name          string    `json:"name"`
+				FullName      string    `json:"full_name"`
+				Private       bool      `json:"private"`
+				DefaultBranch string    `json:"default_branch"`
+				HTMLURL       string    `json:"html_url"`
+				Description   *string   `json:"description"`
+				UpdatedAt     time.Time `json:"updated_at"`
+			} `json:"repositories"`
+		}
+		if _, err := g.apiGet(ctx, token, fmt.Sprintf("/installation/repositories?per_page=100&page=%d", page), &out); err != nil {
+			return nil, err
+		}
+		for _, r := range out.Repositories {
+			d := ""
+			if r.Description != nil {
+				d = *r.Description
+			}
+			repos = append(repos, GitHubAppRepo{InstallationID: installationID, Name: r.Name, NameWithOwner: r.FullName, IsPrivate: r.Private,
+				DefaultBranch: r.DefaultBranch, URL: r.HTMLURL, Description: d, UpdatedAt: r.UpdatedAt})
+		}
+		if len(out.Repositories) < 100 || len(repos) >= out.TotalCount {
+			break
+		}
+	}
+	if len(repos) > max {
+		repos = repos[:max]
+	}
+	return repos, nil
 }

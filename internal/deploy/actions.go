@@ -622,7 +622,17 @@ func (s *Service) Detect(ctx context.Context, q *db.Queries, teamID string, acto
 			return db.Operation{}, err
 		}
 	}
-	raw, _ := json.Marshal(agentproto.DetectParams{GitSource: agentproto.GitSource{RepoURL: agentproto.NormalizeRepoURL(repoURL), Ref: ref}, RailpackFrontend: RailpackFrontend})
+	src := agentproto.GitSource{RepoURL: agentproto.NormalizeRepoURL(repoURL), Ref: ref}
+	if srv.AgentPublicKey != nil {
+		// The team's GitHub App installation, when it covers the repository (a private one then
+		// detects too). Without it the clone goes ahead as before.
+		if box, err := s.CloneToken(ctx, teamID, src.RepoURL, *srv.AgentPublicKey); err == nil {
+			src.Token = box
+		} else {
+			s.log.Warn("could not mint a GitHub App token for app.detect", "err", err)
+		}
+	}
+	raw, _ := json.Marshal(agentproto.DetectParams{GitSource: src, RailpackFrontend: RailpackFrontend})
 	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindAppDetect, Params: raw, CreatedBy: actor.UserID})
 	return op, err
 }

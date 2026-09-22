@@ -118,10 +118,39 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/code/verify",
 		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
 		"/api/auth/logout",
-		"/api/settings/public": // sign-up mode, announcement, support email — shown before sign-in
+		"/api/settings/public", // sign-up mode, announcement, support email — shown before sign-in
+		"/api/auth/providers":  // which "Continue with Google / GitHub" buttons to show
 		return true
 	}
+	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
+	// a single-use state bound to this browser) and the callback (accepts only that state). The
+	// start with ?link=1 attaches the provider to the signed-in account: member tier.
+	if provider, rest, ok := oauthPath(p); ok && provider != "" {
+		return rest == "/callback" || (rest == "" && !r.URL.Query().Has("link"))
+	}
 	return false
+}
+
+// oauthPath splits /api/auth/oauth/{provider}[/callback]. Only the known providers match, so no
+// other path under it is ever public.
+func oauthPath(p string) (provider, rest string, ok bool) {
+	tail, ok := strings.CutPrefix(p, "/api/auth/oauth/")
+	if !ok {
+		return "", "", false
+	}
+	provider, rest, _ = strings.Cut(tail, "/")
+	if rest != "" {
+		rest = "/" + rest
+	}
+	switch provider {
+	case "google", "github":
+	default:
+		return "", "", false
+	}
+	if rest != "" && rest != "/callback" {
+		return "", "", false
+	}
+	return provider, rest, true
 }
 
 // isTokenAuthed: the MCP endpoints authenticate bearer tokens against their own tables.
@@ -139,10 +168,15 @@ var memberPrefixes = []string{
 	"/api/feedback",             // "Report a problem" — files as you
 	"/api/auth/me",              // plugin: who am I
 	"/api/auth/change-password", // plugin: needs the current password
+	"/api/github",               // the GitHub App's setup callback: the state names the team and the user
 }
 
 func isMemberAllowed(r *http.Request) bool {
 	p := r.URL.Path
+	// Linking Google / GitHub to the signed-in account (…/oauth/{provider}?link=1).
+	if provider, rest, ok := oauthPath(p); ok && provider != "" && rest == "" && r.URL.Query().Has("link") {
+		return true
+	}
 	for _, prefix := range memberPrefixes {
 		if p == prefix || strings.HasPrefix(p, prefix+"/") {
 			return true

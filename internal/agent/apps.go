@@ -71,10 +71,22 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 	}
 	env, cred, ghRepo := gitEnv, []string(nil), agentproto.GitHubRepoOf(src.RepoURL)
 	helper := ""
-	if ghRepo != "" {
+	var fetchEnv []string // added to the fetch only: the one command that talks to the remote
+	if src.Token != "" {
+		tok, err := openCloneToken(oc, src)
+		if err != nil {
+			return "", "", 2, err
+		}
+		// The team's GitHub App installation: git asks the helper, which reads the token from the
+		// environment of the fetch. The argv (logged) names only the variable.
+		cred = []string{"-c", "credential.https://github.com.helper=", "-c", "credential.https://github.com.helper=" + appTokenHelper}
+		fetchEnv = []string{appTokenEnv + "=" + tok}
+		helper = "app"
+		oc.Info("using the team's GitHub App installation for %s", ghRepo)
+	} else if ghRepo != "" {
 		helper = ghCredentialHelper()
 	}
-	if helper != "" {
+	if helper != "" && src.Token == "" {
 		// A github.com repository and a gh login on this server: git asks gh for credentials, so a
 		// private repository the connected account can read clones. Nothing is written to disk.
 		cred = ghCredentialArgs(helper)
@@ -87,7 +99,14 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 		{"-C", dir, "fetch", "--depth", "1", "--no-tags", "origin", src.Ref},
 		{"-C", dir, "checkout", "--quiet", "--detach", "FETCH_HEAD"},
 	} {
-		if code, err := oc.RunEnv(env, "git", append(cred, gitArgs(argv...)...)...); err != nil {
+		runEnv := env
+		if argv[2] == "fetch" && len(fetchEnv) > 0 {
+			runEnv = append(append([]string{}, env...), fetchEnv...)
+		}
+		if code, err := oc.RunEnv(runEnv, "git", append(cred, gitArgs(argv...)...)...); err != nil {
+			if argv[2] == "fetch" && src.Token != "" {
+				return "", "", code, fmt.Errorf("git fetch failed: the team's GitHub App installation cannot read this repository, or it has no %q", src.Ref)
+			}
 			if argv[2] == "fetch" && ghRepo != "" {
 				return "", "", code, ghFetchError(helper != "", src.Ref)
 			}
@@ -102,6 +121,41 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 	commit = strings.TrimSpace(out)
 	oc.Info("checked out %s at %s", src.Ref, commit)
 	return commit, strings.TrimSpace(msg), 0, nil
+}
+
+// appTokenEnv carries a GitHub App installation token to the one git fetch that needs it.
+const appTokenEnv = "HOSBAH_GIT_TOKEN"
+
+// appTokenHelper is git's credential helper for that fetch: on "get" it answers the installation
+// token (username x-access-token, as GitHub expects) from the environment; "store" and "erase" do
+// nothing, so nothing is ever written anywhere.
+const appTokenHelper = `!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$` + appTokenEnv + `"; }; f`
+
+// openCloneToken opens a clone token sealed to this server for exactly this repository.
+func openCloneToken(oc *OpContext, src agentproto.GitSource) (string, error) {
+	if agentproto.GitHubRepoOf(src.RepoURL) == "" {
+		return "", errors.New("a GitHub App token is only used for github.com repositories")
+	}
+	pt, err := agentproto.OpenBox(oc.priv, agentproto.GitTokenContext(src.RepoURL), src.Token)
+	if err != nil {
+		return "", errors.New("the GitHub App token could not be opened with this server's key")
+	}
+	tok := strings.TrimSpace(string(pt))
+	if tok == "" || len(tok) > 512 || !tokenChars(tok) {
+		return "", errors.New("the GitHub App token is malformed")
+	}
+	return tok, nil
+}
+
+// tokenChars: GitHub tokens are ASCII letters, digits, "_" and "-". Anything else could not be a
+// token and has no business reaching a shell-run helper.
+func tokenChars(s string) bool {
+	for _, c := range s {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.') {
+			return false
+		}
+	}
+	return true
 }
 
 func gitOut(oc *OpContext, dir string, args ...string) (string, error) {

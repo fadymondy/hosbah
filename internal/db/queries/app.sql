@@ -102,3 +102,9 @@ DELETE FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
 -- An imported app's state as a power action on it just left it (the next discovery confirms it).
 UPDATE apps SET imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
+
+-- name: AppsForRepoInTeam :many
+-- A GitHub App push: the git apps of the installation's team on that repository and branch, except
+-- those whose automatic deploys are paused.
+SELECT * FROM apps WHERE team_id = sqlc.arg('team_id') AND source = 'git' AND lower(repo_url) = lower(sqlc.arg('repo_url')::text)
+    AND branch = sqlc.arg('branch')::text AND NOT autodeploy_paused;

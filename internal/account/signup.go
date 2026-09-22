@@ -287,9 +287,16 @@ func (s *Service) wrapLogin(next http.Handler, w http.ResponseWriter, r *http.Re
 
 /* ------------------------------------------------------------ endpoints */
 
-// Mount adds the account endpoints. The /api/auth/* ones are public; /api/me/2fa* are for any
-// signed-in member (the authorization tiers in internal/server).
-func (s *Service) Mount(post, get func(pattern string, h http.HandlerFunc)) {
+// Mount adds the account endpoints. The /api/auth/* ones are public (except the ?link=1 start of a
+// Google / GitHub round trip); /api/me/* are for any signed-in member (the authorization tiers in
+// internal/server).
+func (s *Service) Mount(post, get, del func(pattern string, h http.HandlerFunc)) {
+	get("/api/auth/providers", s.handleProviders)
+	get("/api/auth/oauth/{provider}", s.handleOAuthStart)
+	get("/api/auth/oauth/{provider}/callback", s.handleOAuthCallback)
+	get("/api/me/identities", s.handleIdentities)
+	del("/api/me/identities/{id}", s.handleUnlink)
+
 	post("/api/auth/verify-email", s.handleVerify)
 	post("/api/auth/verify-email/resend", s.handleResend)
 	post("/api/auth/password/forgot", s.handleForgot)
@@ -522,12 +529,7 @@ func (s *Service) complete(w http.ResponseWriter, r *http.Request, u *user, extr
 }
 
 func (s *Service) issue(w http.ResponseWriter, u *user, extra map[string]any) {
-	if s.Auth == nil {
-		fail(w, http.StatusInternalServerError, CodeInternal, "sign-in is unavailable")
-		return
-	}
-	id := auth.Identity{ID: u.ID, Email: u.Email, Roles: splitCSV(u.Roles), Permissions: splitCSV(u.Permissions), Guard: "api"}
-	token, err := s.Auth.IssueSession(w, id)
+	token, id, err := s.startSession(w, u)
 	if err != nil {
 		fail(w, http.StatusInternalServerError, CodeInternal, "could not sign in")
 		return
@@ -537,4 +539,15 @@ func (s *Service) issue(w http.ResponseWriter, u *user, extra map[string]any) {
 		body[k] = v
 	}
 	writeJSON(w, http.StatusOK, body)
+}
+
+// startSession mints u's session through the auth plugin (the cookie is set on w). Every session
+// this package creates comes from here.
+func (s *Service) startSession(w http.ResponseWriter, u *user) (string, auth.Identity, error) {
+	id := auth.Identity{ID: u.ID, Email: u.Email, Roles: splitCSV(u.Roles), Permissions: splitCSV(u.Permissions), Guard: "api"}
+	if s.Auth == nil {
+		return "", id, errors.New("sign-in is unavailable")
+	}
+	token, err := s.Auth.IssueSession(w, id)
+	return token, id, err
 }

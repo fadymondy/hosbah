@@ -1,12 +1,13 @@
 package deploy
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -28,7 +29,7 @@ func (s *Service) MountPublic(r chi.Router) {
 }
 
 // GitHub is the GitHub App integration (unconfigured until the owner supplies its credentials).
-func (s *Service) GitHub() GitHubApp { return s.github }
+func (s *Service) GitHub() GitHubApp { return s.gh() }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -54,7 +55,7 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 
 	hash := tokens.Hash(token)
 	var (
-		status = http.StatusNotFound
+		status     = http.StatusNotFound
 		out    any = map[string]string{"error": "not found"}
 	)
 	err := tenancy.Tx(r.Context(), s.a.SQLDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
@@ -100,24 +101,122 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, out)
 }
 
-// handleGitHubWebhook: push events of installed repositories deploy every app on that repo and branch.
+// handleGitHubWebhook is the GitHub App's webhook. Every delivery must carry a valid
+// X-Hub-Signature-256; then:
+//
+//	push                        the installation's team deploys its apps on that repository and
+//	                            branch (never another team's, whatever their repository URL says),
+//	                            except those with automatic deploys paused — once per X-GitHub-Delivery
+//	installation                deleted → the row goes; suspend / unsuspend → suspended_at
+//	installation_repositories   the repository selection follows; the team's listing is refreshed
+//
+// Installation events reach every GitHub App whatever it subscribes to. A new installation is never
+// stored from a webhook: only the setup callback knows which team it is for.
 func (s *Service) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
-	if !s.github.Configured() {
+	g := s.gh()
+	if !g.Configured() {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": ErrGitHubNotConfigured.Error()})
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 25<<20))
-	if err != nil || !s.github.VerifyWebhook(body, r.Header.Get("X-Hub-Signature-256")) {
+	if err != nil || !g.VerifyWebhook(body, r.Header.Get("X-Hub-Signature-256")) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "bad signature"})
 		return
 	}
-	if r.Header.Get("X-GitHub-Event") != "push" {
-		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "not a push"})
-		return
+	var ev struct {
+		Action       string `json:"action"`
+		Installation *struct {
+			ID                  int64      `json:"id"`
+			RepositorySelection string     `json:"repository_selection"`
+			SuspendedAt         *time.Time `json:"suspended_at"`
+		} `json:"installation"`
+		RepositorySelection string `json:"repository_selection"`
 	}
+	_ = json.Unmarshal(body, &ev)
+	ctx := r.Context()
+	switch r.Header.Get("X-GitHub-Event") {
+	case "push":
+		s.githubPush(w, r, body)
+	case "installation":
+		if ev.Installation == nil || ev.Installation.ID <= 0 {
+			writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "no installation"})
+			return
+		}
+		id := ev.Installation.ID
+		team := ""
+		err := s.sys(ctx, func(q *db.Queries) error {
+			var err error
+			switch ev.Action {
+			case "deleted":
+				team, err = q.DeleteGitHubInstallationByInstallationID(ctx, id)
+			case "suspend":
+				at := time.Now().UTC()
+				if ev.Installation.SuspendedAt != nil {
+					at = *ev.Installation.SuspendedAt
+				}
+				team, err = q.SetGitHubInstallationSuspended(ctx, db.SetGitHubInstallationSuspendedParams{SuspendedAt: &at, InstallationID: id})
+			case "unsuspend":
+				team, err = q.SetGitHubInstallationSuspended(ctx, db.SetGitHubInstallationSuspendedParams{InstallationID: id})
+			default:
+				return nil
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil // not connected to any team
+			}
+			return err
+		})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not record the change"})
+			return
+		}
+		if team != "" {
+			s.ForgetAppRepos(team)
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"installation": ev.Action, "applied": team != ""})
+	case "installation_repositories":
+		if ev.Installation == nil || ev.Installation.ID <= 0 {
+			writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "no installation"})
+			return
+		}
+		sel := ev.RepositorySelection
+		if sel == "" {
+			sel = ev.Installation.RepositorySelection
+		}
+		if sel != "all" && sel != "selected" {
+			sel = "selected"
+		}
+		team := ""
+		err := s.sys(ctx, func(q *db.Queries) error {
+			var err error
+			team, err = q.SetGitHubInstallationSelection(ctx, db.SetGitHubInstallationSelectionParams{RepositorySelection: sel, InstallationID: ev.Installation.ID})
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			return err
+		})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not record the change"})
+			return
+		}
+		if team != "" {
+			s.ForgetAppRepos(team)
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"repositories": ev.Action, "applied": team != ""})
+	default:
+		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "not handled"})
+	}
+}
+
+// githubPush deploys the installation's team's apps on the pushed repository and branch, once per
+// delivery: the delivery id is recorded in the same transaction as the deploys it queued, so a
+// redelivery of a push that queued finds it and does nothing, and one that failed is retried.
+func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte) {
 	var push struct {
-		Ref        string `json:"ref"`
-		Deleted    bool   `json:"deleted"`
+		Ref          string `json:"ref"`
+		Deleted      bool   `json:"deleted"`
+		Installation *struct {
+			ID int64 `json:"id"`
+		} `json:"installation"`
 		Repository struct {
 			HTMLURL string `json:"html_url"`
 		} `json:"repository"`
@@ -126,28 +225,75 @@ func (s *Service) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "not a branch push"})
 		return
 	}
-	queued := 0
+	if push.Installation == nil || push.Installation.ID <= 0 {
+		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "not from an installation"})
+		return
+	}
+	delivery := strings.TrimSpace(r.Header.Get("X-GitHub-Delivery"))
+	if delivery == "" || len(delivery) > 100 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no X-GitHub-Delivery"})
+		return
+	}
 	ctx := r.Context()
-	_ = tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
-		apps, err := q.AppsForRepo(ctx, db.AppsForRepoParams{RepoURL: agentproto.NormalizeRepoURL(push.Repository.HTMLURL), Branch: strings.TrimPrefix(push.Ref, "refs/heads/")})
+	var inst db.GithubInstallation
+	found := false
+	if err := s.sys(ctx, func(q *db.Queries) error {
+		row, err := q.GitHubInstallationByInstallationID(ctx, push.Installation.ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		inst, found = row, err == nil
+		return err
+	}); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "lookup failed"})
+		return
+	}
+	if !found {
+		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "installation not connected to a team"})
+		return
+	}
+	if inst.SuspendedAt != nil {
+		writeJSON(w, http.StatusAccepted, map[string]string{"skipped": "installation suspended"})
+		return
+	}
+	repoURL := agentproto.NormalizeRepoURL(push.Repository.HTMLURL)
+	branch := strings.TrimPrefix(push.Ref, "refs/heads/")
+	queued, duplicate := 0, false
+	err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: inst.TeamID}, func(q *db.Queries, _ *sql.Tx) error {
+		n, err := q.RecordGitHubDelivery(ctx, db.RecordGitHubDeliveryParams{DeliveryID: delivery, Event: "push"})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			duplicate = true
+			return nil
+		}
+		_ = q.PruneGitHubDeliveries(ctx)
+		apps, err := q.AppsForRepoInTeam(ctx, db.AppsForRepoInTeamParams{TeamID: inst.TeamID, RepoURL: repoURL, Branch: branch})
 		if err != nil {
 			return err
 		}
 		for _, a := range apps {
-			if err := s.queueForTeam(ctx, a); err == nil {
-				queued++
+			if _, err := s.QueueDeployment(ctx, q, inst.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil); err != nil {
+				var ae *ActionError
+				if errors.As(err, &ae) {
+					continue // this app cannot deploy now (its page says why); the others still do
+				}
+				return err
 			}
+			queued++
 		}
 		return nil
 	})
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not queue the deploys"})
+		return
+	}
+	if duplicate {
+		writeJSON(w, http.StatusAccepted, map[string]any{"queued": 0, "duplicate": true})
+		return
+	}
 	writeJSON(w, http.StatusAccepted, map[string]int{"queued": queued})
-}
-
-func (s *Service) queueForTeam(ctx context.Context, a db.App) error {
-	return tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{TeamID: a.TeamID}, func(q *db.Queries, _ *sql.Tx) error {
-		_, err := s.QueueDeployment(ctx, q, a.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil)
-		return err
-	})
 }
 
 // handleTLSAllow is Caddy's `ask`: 200 only for a hostname that is routed to an app, set to auto

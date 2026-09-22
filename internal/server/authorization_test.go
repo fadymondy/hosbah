@@ -92,6 +92,19 @@ func TestFrameworkAndGeneratedRoutes(t *testing.T) {
 		"/api/auth/code/request":        "public",
 		"/api/auth/code/verify":         "public",
 		"/api/auth/2fa/challenge":       "public",
+		// Google / GitHub sign-in: the start and the callback are public; linking needs a session.
+		"/api/auth/providers":                  "public",
+		"/api/auth/oauth/google":               "public",
+		"/api/auth/oauth/github/callback":      "public",
+		"/api/auth/oauth/github?link=1":        "member",
+		"/api/auth/oauth/google?next=/x&link=": "member",
+		"/api/auth/oauth/other":                "admin",
+		"/api/auth/oauth/google/other":         "admin",
+		"/api/auth/oauth/google/callback/x":    "admin",
+		"/api/me/identities":                   "member",
+		"/api/me/identities/abc":               "member",
+		// The GitHub App's setup URL: signed in; the state names the team.
+		"/api/github/setup": "member",
 	} {
 		if got := classify("POST", path); got != want {
 			t.Errorf("%s: tier %s, want %s", path, got, want)

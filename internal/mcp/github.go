@@ -406,3 +406,95 @@ func githubStateText(srv db.Server) string {
 	}
 	return text
 }
+
+// GitHubAppTools: the team's GitHub App installations and the repositories they reach. Read-only:
+// installing the App takes a person at github.com (the web app's team settings).
+func GitHubAppTools() []Tool {
+	return []Tool{
+		{
+			Name: "github_app_status", Scope: scopes.Read,
+			Description: "The GitHub App: whether this platform has it configured, and the GitHub accounts (users or organisations) it is " +
+				"installed on for this team, with their repository access. Deploys of those accounts' repositories clone with a fresh " +
+				"installation token, and their pushes deploy automatically. Installing it is done in the web app (team settings).",
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				g := s.GitHub()
+				rows, err := env.Q.GitHubInstallationsOfTeam(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", err
+				}
+				var b strings.Builder
+				if g.Configured() {
+					fmt.Fprintf(&b, "GitHub App: configured (%s)\n", orDash(ptrStr(g.Slug())))
+				} else {
+					b.WriteString("GitHub App: not configured on this platform\n")
+				}
+				if len(rows) == 0 {
+					b.WriteString("No installations for this team.\n")
+					return b.String(), nil
+				}
+				for _, in := range rows {
+					state := "active"
+					if in.SuspendedAt != nil {
+						state = "suspended"
+					}
+					fmt.Fprintf(&b, "  %-30s %-12s repositories: %-8s %s (installation %d)\n", in.AccountLogin, in.AccountType, in.RepositorySelection, state, in.InstallationID)
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "github_app_repos", Scope: scopes.Read,
+			Description: "Repositories the team's GitHub App installations can reach, newest first, with visibility and default branch. " +
+				"Use the URL as repo_url for create_app. Owner, admin or deployer.",
+			InputSchema: schema(nil, map[string]any{"limit": map[string]any{"type": "integer", "default": 200, "maximum": 2000}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				rows, err := env.Q.GitHubInstallationsOfTeam(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", err
+				}
+				if len(rows) == 0 {
+					return "No GitHub App installations for this team — install the App from the team settings in the web app.", nil
+				}
+				teamID, limit := env.Caller.TeamID, args.Int("limit", 200, 1, 2000)
+				// GitHub is asked after the transaction: no connection is held while it answers.
+				env.Then = func(ctx context.Context) (string, error) {
+					repos, err := s.AppRepos(ctx, teamID, rows)
+					if err != nil {
+						return "", err
+					}
+					if len(repos) == 0 {
+						return "No repositories.", nil
+					}
+					var b strings.Builder
+					for i, r := range repos {
+						if i >= limit {
+							fmt.Fprintf(&b, "  (%d more: raise limit)\n", len(repos)-limit)
+							break
+						}
+						vis := "public"
+						if r.IsPrivate {
+							vis = "private"
+						}
+						fmt.Fprintf(&b, "  %-45s %-8s %-12s %s\n", r.NameWithOwner, vis, orDash(ptrStr(r.DefaultBranch)), r.URL)
+					}
+					return b.String(), nil
+				}
+				return "", nil
+			},
+		},
+	}
+}
+
+func ptrStr(s string) *string { return &s }

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { InboxIcon, MessageSquareShareIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { Badge } from "@/components/ui/badge"
 import { ChangePassword } from "@/components/account/change-password"
+import { ConnectedAccounts } from "@/components/account/connected-accounts"
 import { TwoFactor } from "@/components/account/two-factor"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -24,6 +25,9 @@ export default function AccountPage() {
     <PageBody title={t("account.title")} description={<span dir="ltr">{me.user.email}</span>} bleed>
       <TwoFactor />
       <ChangePassword />
+      <Suspense fallback={null}>
+        <ConnectedAccounts />
+      </Suspense>
       <MyReports />
     </PageBody>
   )

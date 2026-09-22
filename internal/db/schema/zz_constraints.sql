@@ -77,3 +77,6 @@ ALTER TABLE app_installs ADD CONSTRAINT app_installs_app_fk FOREIGN KEY (app_id,
 ALTER TABLE app_installs ADD CONSTRAINT app_installs_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 ALTER TABLE app_installs ADD CONSTRAINT app_installs_proxy_fk FOREIGN KEY (proxy_host_id) REFERENCES proxy_hosts (id) ON DELETE SET NULL;
 ALTER TABLE app_installs ADD CONSTRAINT app_installs_sealed_check CHECK (secrets LIKE 'csv1:%');
+
+-- GitHub App installations belong to a team and go with it.
+ALTER TABLE github_installations ADD CONSTRAINT github_installations_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;

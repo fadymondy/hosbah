@@ -51,12 +51,22 @@ type ProvisionParams struct {
 	AskURL string `json:"ask_url,omitempty"`
 }
 
-// GitSource is where an app's code comes from. P2: a public URL (no credentials). The GitHub App
-// path will add a short-lived installation token here, sealed to the agent like env values.
+// GitSource is where an app's code comes from: a URL without credentials, and a ref.
+//
+// Token, when set, is a GitHub App installation token (valid one hour) for a github.com repository
+// of the team's installation: a box sealed to the target agent's own key with GitTokenContext(RepoURL)
+// (SealBox), so operations.params only ever holds ciphertext that server alone opens, bound to that
+// one repository. The agent hands it to git for the fetch only, through the environment of that one
+// command (a credential helper that reads it from there) — never in an argv, a URL, a file or a log.
+// Agents from before it existed ignore the field and clone without it.
 type GitSource struct {
 	RepoURL string `json:"repo_url"`
 	Ref     string `json:"ref"`
+	Token   string `json:"token,omitempty"`
 }
+
+// GitTokenContext binds a sealed clone token to the repository it is for.
+func GitTokenContext(repoURL string) string { return "git-token:" + NormalizeRepoURL(repoURL) }
 
 // DetectParams / DetectResult: app.detect.
 type DetectParams struct {

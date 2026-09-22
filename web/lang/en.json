@@ -73,6 +73,24 @@
       "closedBody": "New accounts are not being created right now. If you already have one, sign in.",
       "inviteOnlyTitle": "Sign-up is by invitation",
       "inviteOnlyBody": "Open the invitation link a team sent to your email to create your account."
+    },
+    "oauth": {
+      "continueWith": "Continue with {provider}",
+      "or": "or",
+      "generic": "Signing in with that account did not work. Try again.",
+      "errors": {
+        "provider_unavailable": "Signing in with that provider is not set up on this platform.",
+        "state_invalid": "That sign-in link expired or was opened in another browser. Start again.",
+        "denied": "The sign-in was cancelled at the provider.",
+        "provider_error": "The provider could not confirm the sign-in. Try again.",
+        "oauth_email_unverified": "That account has no verified email address at the provider. Verify one there (for GitHub: your primary address), then try again.",
+        "signup_closed": "Sign-up is closed on this platform, and no account uses that email address.",
+        "invite_only": "Sign-up is by invitation. Open the invitation link sent to that email address, then continue with the provider.",
+        "identity_taken": "That account is already connected to another Hosbah user.",
+        "rate_limited": "Too many attempts. Try again in a few minutes.",
+        "account_disabled": "This account has been disabled. Contact the platform administrator.",
+        "internal": "Something went wrong on our side. Try again."
+      }
     }
   },
   "onboarding": {
@@ -845,7 +863,24 @@
     "useRecovery": "Use a recovery code",
     "verify": "Verify",
     "verifyIntro": "We emailed you a 6-digit code. Enter it to confirm the address and sign in.",
-    "verifyTitle": "Verify your email"
+    "verifyTitle": "Verify your email",
+    "identities": {
+      "title": "Connected accounts",
+      "hint": "Sign in with Google or GitHub instead of a password. Only an address the provider has verified is used.",
+      "connect": "Connect {provider}",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {provider}?",
+      "disconnectBody": "You will no longer be able to sign in with this {provider} account.",
+      "since": "Connected {date}",
+      "lastUsed": "last used {date}",
+      "none": "No accounts connected yet.",
+      "noProviders": "Sign-in with Google or GitHub is not set up on this platform.",
+      "noPassword": "This account has no password; it signs in with the accounts below. Use “Forgot password” on the sign-in page to set one.",
+      "lastMethod": "This is the only way into your account. Set a password first (“Forgot password” on the sign-in page) or connect another account.",
+      "linkedToast": "{provider} is connected.",
+      "unlinkedToast": "{provider} is disconnected.",
+      "githubSetupFailed": "The GitHub App installation link expired or was opened in another browser. Start again from the team settings."
+    }
   },
   "admin": {
     "title": "Platform admin",
@@ -1427,7 +1462,41 @@
     "openServer": "Open the server",
     "typeUrl": "Or type a repository URL",
     "private": "Private",
-    "branch": "Branch"
+    "branch": "Branch",
+    "app": {
+      "title": "GitHub App",
+      "hint": "Install Hosbah’s GitHub App on a GitHub account or organisation: its repositories appear in New site, deploys clone them with a short-lived token, and pushes deploy automatically.",
+      "notConfigured": "The GitHub App is not set up on this platform.",
+      "install": "Install GitHub App",
+      "addAccount": "Install on another account",
+      "manage": "Manage on GitHub",
+      "allRepos": "All repositories",
+      "selectedRepos": "Selected repositories",
+      "suspended": "Suspended",
+      "types": {
+        "User": "User",
+        "Organization": "Organization",
+        "Enterprise": "Enterprise"
+      },
+      "none": "Not installed on any GitHub account yet.",
+      "askAdmin": "An owner or admin can install the GitHub App.",
+      "connectedToast": "The GitHub App is connected.",
+      "requested": "GitHub asked an organisation owner to approve the installation. It appears here once they do.",
+      "errors": {
+        "state_invalid": "That installation link expired or was opened in another browser. Start again.",
+        "installation_unknown": "GitHub does not know that installation. Start again.",
+        "installation_taken": "That GitHub account’s installation is already connected to another team.",
+        "github_unavailable": "GitHub could not be reached to confirm the installation. Try again.",
+        "not_configured": "The GitHub App is not set up on this platform.",
+        "forbidden": "Only an owner or admin of the team can install the GitHub App.",
+        "internal": "Something went wrong on our side. Try again."
+      },
+      "fromApp": "From the GitHub App",
+      "fromAppHint": "Repositories the team’s GitHub App installations can reach. Deploys clone them with a short-lived installation token.",
+      "loading": "Loading repositories from GitHub…",
+      "noRepos": "No repositories.",
+      "search": "Search repositories"
+    }
   },
   "lists": {
     "count": "{shown} of {total}",
