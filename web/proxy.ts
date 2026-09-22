@@ -23,6 +23,8 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (
     pathname.startsWith("/api") ||
+    // Webhooks (GitHub App, per-app deploy hooks) are the API's, rewritten there: no locale prefix.
+    pathname.startsWith("/hooks/") ||
     pathname.startsWith("/_next") ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {

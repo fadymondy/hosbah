@@ -9,7 +9,11 @@ const nextConfig = {
   // the togo session cookie (HttpOnly) and CSRF cookie are first-party.
   async rewrites() {
     const origin = process.env.API_ORIGIN ?? "http://localhost:8710"
-    return [{ source: "/api/:path*", destination: `${origin}/api/:path*` }]
+    return [
+      { source: "/api/:path*", destination: `${origin}/api/:path*` },
+      // GitHub App webhooks and per-app deploy hooks are served by the API too.
+      { source: "/hooks/:path*", destination: `${origin}/hooks/:path*` },
+    ]
   },
   async headers() {
     // Dev chunks use stable filenames with a 4h max-age; a stale stylesheet
