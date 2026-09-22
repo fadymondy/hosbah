@@ -1,7 +1,8 @@
 # fadymondy/hosbah-sdk (PHP + Laravel)
 
 ```bash
-composer require fadymondy/hosbah-sdk
+composer config repositories.hosbah vcs https://github.com/fadymondy/hosbah-php
+composer require fadymondy/hosbah-sdk:dev-main
 ```
 
 ```php
@@ -18,3 +19,5 @@ $hosbah = new \Hosbah\Hosbah(getenv('HOSBAH_URL'), getenv('HOSBAH_TOKEN'));
 
 The token is a team MCP token (`hbu_…`, or `cld_…` minted before the rename); its scopes decide what the SDK may do. Publish the config with
 `php artisan vendor:publish --tag=hosbah-config`. Tests: `php tests/sdk_test.php`.
+
+This repository is published from [fadymondy/hosbah](https://github.com/fadymondy/hosbah) (`sdk/php`); open issues and changes there. MIT licensed.

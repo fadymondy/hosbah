@@ -5,13 +5,15 @@ team token (`hbu_…`, minted under **MCP tokens**; `cld_…` tokens minted befo
 through a generic `call(tool, args)`. The token's scopes, the audit log and the team's
 destructive-action approvals apply exactly as they do for AI agents.
 
-| Language | Path | Install | Tests |
+| Language | Repository | Install | Tests |
 |---|---|---|---|
-| Go | `pkg/hosbah` | `go get github.com/fadymondy/hosbah/pkg/hosbah` | `go test ./pkg/hosbah` |
-| Node / TypeScript | `sdk/node` | `npm i @hosbah/sdk` | `cd sdk/node && npm test` |
-| Python | `sdk/python` | `pip install hosbah-sdk` | `python -m unittest discover tests` |
-| PHP / Laravel | `sdk/php` | `composer require fadymondy/hosbah-sdk` | `php tests/sdk_test.php` |
-| CLI (Windows, macOS, Linux) | `cmd/hosbah` | `make cli` → `bin/cli/hosbah-<os>-<arch>` | `go test ./cmd/hosbah` |
+| Go | [fadymondy/hosbah-go](https://github.com/fadymondy/hosbah-go) (source: `pkg/hosbah`) | `go get github.com/fadymondy/hosbah-go` | `go test ./pkg/hosbah` |
+| Node / TypeScript | [fadymondy/hosbah-node](https://github.com/fadymondy/hosbah-node) (source: `sdk/node`) | `npm i github:fadymondy/hosbah-node` | `cd sdk/node && npm test` |
+| Python | [fadymondy/hosbah-python](https://github.com/fadymondy/hosbah-python) (source: `sdk/python`) | `pip install git+https://github.com/fadymondy/hosbah-python` | `python -m unittest discover tests` |
+| PHP / Laravel | [fadymondy/hosbah-php](https://github.com/fadymondy/hosbah-php) (source: `sdk/php`) | `composer config repositories.hosbah vcs https://github.com/fadymondy/hosbah-php && composer require fadymondy/hosbah-sdk:dev-main` | `php tests/sdk_test.php` |
+| CLI (Windows, macOS, Linux) | this repository, `cmd/hosbah` | `make cli` → `bin/cli/hosbah-<os>-<arch>` | `go test ./cmd/hosbah` |
+
+The code lives here; each SDK is published to its own public repository with `scripts/publish-sdks.sh` (run it after changing an SDK). Not yet on npm, PyPI or Packagist: install from the repositories as above.
 
 Typed helpers exist for the common calls (deploy, env, domains, proxy hosts, connecting a server);
 `tools()` / `hosbah tools` lists everything else.

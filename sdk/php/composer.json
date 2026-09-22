@@ -3,13 +3,20 @@
     "description": "Hosbah SDK for PHP and Laravel — manage servers, apps, domains and proxy hosts from your app.",
     "type": "library",
     "license": "MIT",
+    "keywords": ["hosbah", "deploy", "servers", "laravel", "sdk"],
+    "homepage": "https://hosbah.com",
+    "authors": [{ "name": "Fady Mondy" }],
+    "support": {
+        "source": "https://github.com/fadymondy/hosbah-php",
+        "issues": "https://github.com/fadymondy/hosbah-php/issues"
+    },
     "require": { "php": ">=8.1", "ext-json": "*" },
     "suggest": { "illuminate/support": "Laravel integration (service provider + Hosbah facade)" },
     "autoload": { "psr-4": { "Hosbah\\": "src/" }, "files": ["src/Hosbah.php"] },
     "extra": {
         "laravel": {
-            "providers": ["Hosbah\Laravel\HosbahServiceProvider"],
-            "aliases": { "Hosbah": "Hosbah\Laravel\Facades\Hosbah" }
+            "providers": ["Hosbah\\Laravel\\HosbahServiceProvider"],
+            "aliases": { "Hosbah": "Hosbah\\Laravel\\Facades\\Hosbah" }
         }
     }
 }

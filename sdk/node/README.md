@@ -13,3 +13,5 @@ console.log(await hosbah.call("list_databases"))   // any tool — see `await ho
 
 The token is a team MCP token (`hbu_…` — or `cld_…` if it was minted before the rename; **MCP tokens** in the dashboard). Its scopes decide what the
 SDK may do; every call is audited, and destructive tools follow the team's approval setting.
+
+This repository is published from [fadymondy/hosbah](https://github.com/fadymondy/hosbah) (`sdk/node`); open issues and changes there. MIT licensed.

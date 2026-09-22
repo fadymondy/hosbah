@@ -10,5 +10,12 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 
+authors = [{ name = "Fady Mondy" }]
+
+[project.urls]
+Homepage = "https://hosbah.com"
+Source = "https://github.com/fadymondy/hosbah-python"
+Issues = "https://github.com/fadymondy/hosbah-python/issues"
+
 [tool.setuptools]
 packages = ["hosbah"]

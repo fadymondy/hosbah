@@ -12,3 +12,5 @@ print(hosbah.call("list_databases"))   # any tool — see hosbah.tools()
 
 Standard library only. The token is a team MCP token (`hbu_…`, or `cld_…` minted before the rename); its scopes decide what the SDK may do.
 Run the tests with `python -m unittest discover tests`.
+
+This repository is published from [fadymondy/hosbah](https://github.com/fadymondy/hosbah) (`sdk/python`); open issues and changes there. MIT licensed.
