@@ -1,0 +1,51 @@
+# Written from Laravel's own documentation (laravel.com/docs: Installation, Deployment, Queues, Task
+# Scheduling) and the laravel/laravel skeleton (branch 13.x: .env.example, bootstrap/app.php).
+# verified: false — the repository, branch, health route and commands were checked against the
+# skeleton, but this stack has not been deployed end to end through Hosbah's Railpack build yet.
+id: laravel
+name: Laravel
+summary: The Laravel application skeleton, with a queue worker and migrations on every deploy.
+description: >-
+  A starting point for a Laravel site on Hosbah: the official application skeleton, a release command
+  that migrates the database before traffic moves, a queue worker next to the web process, and the
+  health route the skeleton already has (/up). Create your own repository from the skeleton, then
+  point the site at it. Schedules (php artisan schedule:run, every minute) are added from the site's
+  Schedules section.
+homepage: https://laravel.com
+licence: MIT
+kind: stack
+version: "1.0.0"
+verified: false
+stack:
+  repo: https://github.com/laravel/laravel
+  branch: 13.x
+  runtime: php
+  env:
+    - APP_NAME
+    - APP_ENV
+    - APP_KEY
+    - APP_DEBUG
+    - APP_URL
+    - LOG_CHANNEL
+    - DB_CONNECTION
+    - DB_URL
+    - SESSION_DRIVER
+    - CACHE_STORE
+    - QUEUE_CONNECTION
+    - MAIL_MAILER
+  processes:
+    "worker:queue": php artisan queue:work --tries=3 --max-time=3600
+  cloudy_toml: |
+    release = "php artisan migrate --force"
+
+    [healthcheck]
+    path = "/up"
+    timeout = 120
+
+    [processes]
+    "worker:queue" = "php artisan queue:work --tries=3 --max-time=3600"
+  notes: >-
+    Set APP_KEY to the output of `php artisan key:generate --show`, APP_ENV=production and
+    APP_DEBUG=false. Attach a managed Postgres or MySQL service to get DATABASE_URL and copy it to
+    DB_URL (with DB_CONNECTION=pgsql or mysql); the skeleton's default is SQLite, which does not
+    survive a deploy without a volume. LOG_CHANNEL=stderr sends logs to the site's log stream.

@@ -1858,6 +1858,29 @@
       "noteConnect": "Connect with any CDP client (Puppeteer, Playwright, chromedp) using the WS_ENDPOINT variable; it already carries the token.",
       "notePrivate": "The browser listens only on the server's private address, behind its token. It is never reachable from the internet.",
       "noteViewer": "There is no live view of a session yet."
+    },
+    "stacks": {
+      "installed": "Installed next to this site",
+      "installedHint": "Each runs in its own limited container on the site's server, linked through sealed variables.",
+      "none": "Nothing installed yet. Pick something from the catalog below.",
+      "catalog": "Catalog",
+      "catalogHint": "Ready apps to install next to a site, and starter stacks for a new site. Every recipe pins its image and states its licence.",
+      "search": "Search the catalog…",
+      "unverified": "Not yet verified",
+      "homepage": "Homepage",
+      "newSite": "New site from this stack",
+      "install": "Install",
+      "installHint": "Secrets are generated for it and injected into this site as sealed variables from the next deploy.",
+      "hostnameHint": "Optional. Exposes its web UI on this hostname through the proxy manager.",
+      "needsService": "This recipe needs a running data service on the same server; create it under the server's Databases first.",
+      "installing": "Installing {name}",
+      "removeHint": "The container is removed along with the hostname and variables it created. Its data is kept unless you delete it.",
+      "publishLater": "Publishing your own recipes is coming; the format is built for it, and needs review and signing first.",
+      "kinds": {
+        "app": "App",
+        "stack": "Stack"
+      },
+      "fromStack": "Prefilled from the {name} stack."
     }
   }
 }

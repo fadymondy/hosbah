@@ -71,3 +71,9 @@ ALTER TABLE app_realtime ADD CONSTRAINT app_realtime_app_fk FOREIGN KEY (app_id,
 -- A site's browsers go with their app (the agent's app.remove takes their containers).
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_sealed_check CHECK (token_sealed LIKE 'csv1:%');
+-- A site's installed recipes go with their app (the agent's app.remove takes their containers). A
+-- proxy host somebody deleted by hand just stops being the install's.
+ALTER TABLE app_installs ADD CONSTRAINT app_installs_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_installs ADD CONSTRAINT app_installs_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_installs ADD CONSTRAINT app_installs_proxy_fk FOREIGN KEY (proxy_host_id) REFERENCES proxy_hosts (id) ON DELETE SET NULL;
+ALTER TABLE app_installs ADD CONSTRAINT app_installs_sealed_check CHECK (secrets LIKE 'csv1:%');

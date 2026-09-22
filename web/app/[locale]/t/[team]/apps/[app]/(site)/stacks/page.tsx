@@ -1,9 +1,7 @@
 "use client"
 
-import { BlocksIcon } from "lucide-react"
-
-import { Planned } from "@/components/site/planned"
+import { SiteStacks } from "@/components/site/stacks"
 
 export default function Page() {
-  return <Planned section="stacks" icon={BlocksIcon} />
+  return <SiteStacks />
 }

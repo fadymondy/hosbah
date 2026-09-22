@@ -1,0 +1,42 @@
+# Written from SearXNG's own documentation (docs.searxng.org: "Installation container",
+# "settings: server") and the image's entrypoint. Run by Hosbah with exactly these constraints on
+# 2026-09-22: /healthz answered 200 and a search returned results.
+id: searxng
+name: SearXNG
+summary: A private metasearch engine that aggregates results from many search services without tracking.
+description: >-
+  SearXNG queries many search engines at once and shows the combined results; it keeps no profile of
+  its users. Hosbah runs the official image with a generated secret key and keeps its cache (favicons,
+  engine data) on a volume. Settings are created inside the container on first start and live as long
+  as the container does; they cannot be edited from Hosbah yet. SearXNG ships with only the HTML
+  result format enabled — its JSON format is switched on in settings.yml, not by a variable — so
+  SEARXNG_URL is an address for links and redirects, not yet a search API for the site. The instance
+  has no login: give it a hostname only if it may be public.
+homepage: https://docs.searxng.org
+licence: AGPL-3.0-or-later
+kind: app
+version: "1.0.0"
+verified: true
+image: searxng/searxng:2026.9.21-df67eb6c2
+port: 8080
+healthcheck: /healthz
+env:
+  - name: SEARXNG_SECRET
+    generate: { length: 48, charset: alnum }
+    secret: true
+  - name: SEARXNG_LIMITER
+    value: "false"
+  - name: SEARXNG_IMAGE_PROXY
+    value: "true"
+volumes:
+  - name: cache
+    mount_path: /var/cache/searxng
+limits:
+  memory_mb: 512
+  cpus: 1
+# The image starts as root and writes /etc/searxng/settings.yml into a directory owned by its
+# unprivileged user; without DAC_OVERRIDE that first write fails and the container exits.
+caps: [DAC_OVERRIDE]
+exposes:
+  - env: SEARXNG_URL
+    template: "https://{host}"

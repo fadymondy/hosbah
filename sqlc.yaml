@@ -44,3 +44,5 @@ sql:
           # depend on. internal/pgtext.Array scans the literal the pgx stdlib driver hands over.
           - column: "monitors.notify_emails"
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "app_installs.env_injected"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }

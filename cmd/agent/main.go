@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fadymondy/hosbah/catalog"
 	"github.com/fadymondy/hosbah/internal/agent"
 	"github.com/fadymondy/hosbah/internal/agentproto"
 )
@@ -111,6 +112,10 @@ func run(args []string) int {
 	a.MetricsEvery = *metricsEvery
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if _, err := catalog.Builtin(); err != nil { // recipe.install would refuse everything: say why at once
+		log.Error("the embedded recipe catalog did not load", "err", err)
+		return 1
+	}
 	log.Info("cloudy-agent starting", "version", version, "server", st.ServerName, "control_plane", st.ControlPlane)
 	if err := a.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		log.Error("stopped", "err", err)

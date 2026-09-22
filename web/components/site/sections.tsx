@@ -43,7 +43,7 @@ export const SITE_SECTIONS: SiteSection[] = [
   { key: "schedules", icon: CalendarClockIcon, group: "services", for: "git", ready: true },
   { key: "realtime", icon: RadioIcon, group: "services", for: "git", ready: true },
   { key: "browsers", icon: GlobeIcon, group: "services", for: "git", ready: true },
-  { key: "stacks", icon: BlocksIcon, group: "services", for: "both", ready: false },
+  { key: "stacks", icon: BlocksIcon, group: "services", for: "git", ready: true },
   { key: "logs", icon: ScrollTextIcon, group: "observe", for: "both", ready: true },
   { key: "monitors", icon: BellRingIcon, group: "observe", for: "both", ready: true },
   { key: "proxy", icon: NetworkIcon, group: "network", for: "both", ready: true },

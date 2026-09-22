@@ -63,6 +63,22 @@ export default function NewAppPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.slug])
 
+  // ?stack=<recipe> (from the catalog) prefills the repository and branch from that stack.
+  const [stack, setStack] = useState<{ name: string; stack: { repo: string; branch: string; notes?: string } } | null>(null)
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("stack")
+    if (!id) return
+    apiFetch<{ name: string; stack: { repo: string; branch: string; notes?: string } }>(`/api/teams/${team.slug}/catalog/${encodeURIComponent(id)}`)
+      .then((r) => {
+        if (!r.stack) return
+        setStack(r)
+        setRepo((cur) => cur || r.stack.repo)
+        setBranch((cur) => (cur && cur !== "main" ? cur : r.stack.branch))
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team.slug])
+
   // The detect operation's final status carries the result; OperationLog shows the log itself.
   useEventStream(
     detectOp ? `/api/teams/${team.slug}/servers/${detectOp.server_id}/operations/${detectOp.id}/stream` : null,
@@ -158,6 +174,13 @@ export default function NewAppPage() {
     <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
       <div className="grid gap-px border-b border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-grid-bg px-6 py-6 [&>*]:max-w-2xl">
+          {stack ? (
+            <Alert>
+              <InfoIcon />
+              <AlertTitle>{t("site.stacks.fromStack", { name: stack.name })}</AlertTitle>
+              {stack.stack.notes ? <AlertDescription>{stack.stack.notes}</AlertDescription> : null}
+            </Alert>
+          ) : null}
           {noServers ? (
             <Alert data-testid="no-servers">
               <InfoIcon />

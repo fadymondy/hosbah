@@ -1,0 +1,46 @@
+# Written from Mailpit's own documentation (mailpit.axllent.org: "Runtime options", "Docker images",
+# "Sending messages via the HTTP API") and cmd/root.go of the pinned tag. Run by Hosbah with exactly
+# these constraints on 2026-09-22: /readyz 200, the UI 401 without and 200 with the generated
+# password, POST /api/v1/send stored a message.
+id: mailpit
+name: Mailpit
+summary: A mail catcher with a web inbox and an HTTP send API, for testing what a site sends.
+description: >-
+  Mailpit stores every message it is given and shows it in a web inbox (HTML preview, headers,
+  attachments, search); nothing is delivered to a real mailbox. Hosbah protects the inbox and the API
+  with HTTP basic authentication: the user is "hosbah" and the password is generated, sealed, and set
+  on the site as MAILPIT_PASSWORD (read it from the site's variables). Messages are kept on a volume,
+  the newest 500. In this step an install publishes its HTTP port only, so the site hands messages
+  over through the HTTP send API (POST {MAILPIT_URL}/api/v1/send with the same basic authentication);
+  Mailpit's SMTP port (1025) is not reachable from the site yet.
+homepage: https://mailpit.axllent.org
+licence: MIT
+kind: app
+version: "1.0.0"
+verified: true
+image: axllent/mailpit:v1.31.2
+port: 8025
+healthcheck: /readyz
+env:
+  - name: MAILPIT_PASSWORD
+    generate: { length: 32, charset: alnum }
+    secret: true
+    inject_as: MAILPIT_PASSWORD
+  - name: MP_UI_AUTH
+    value: "hosbah:{MAILPIT_PASSWORD}"
+    secret: true
+  - name: MP_DATABASE
+    value: /data/mailpit.db
+  - name: MP_MAX_MESSAGES
+    value: "500"
+volumes:
+  - name: data
+    mount_path: /data
+limits:
+  memory_mb: 256
+  cpus: 0.5
+exposes:
+  - env: MAILPIT_URL
+    template: "https://{host}"
+  - env: MAILPIT_USER
+    template: "hosbah"

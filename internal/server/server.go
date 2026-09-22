@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/fadymondy/hosbah/catalog"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -26,10 +27,10 @@ import (
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
 	"github.com/fadymondy/hosbah/internal/monitors"
-	"github.com/fadymondy/hosbah/internal/schedules"
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/schedules"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -97,6 +98,9 @@ func Boot() *app.App {
 	deploys.Start()
 	a.Deploy = deploys
 
+	if _, err := catalog.Builtin(); err != nil { // a bad embedded recipe never starts (and never passes the tests)
+		panic("cloudy: recipe catalog: " + err.Error())
+	}
 	databases := dbsvc.New(a, svc, deploys)
 	databases.StartScheduler()
 	a.DBSvc = databases

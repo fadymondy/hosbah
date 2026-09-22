@@ -37,6 +37,7 @@ type Executor struct {
 	emit         func(agentproto.Event)
 	handlers     map[string]Handler
 	browsers     *browserHost // owns the token gateways of this server's browsers
+	recipes      *recipeHost  // installed catalog recipes; runs this binary's own copy of a recipe
 	// Restart is called after an operation that asked for it (agent.update) has reported its
 	// final status.
 	Restart func()
@@ -118,7 +119,14 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	e.browsers = newBrowserHost()
 	for kind, h := range map[string]Handler{
 		agentproto.KindBrowserCreate: e.browsers.create, agentproto.KindBrowserRemove: e.browsers.remove, agentproto.KindBrowserStatus: e.browsers.status,
-		agentproto.KindAppRemove: e.browsers.withAppRemove(appRemove), // a deleted app's browsers go with it
+	} {
+		e.handlers[kind] = h
+	}
+	e.recipes = newRecipeHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindRecipeInstall: e.recipes.install, agentproto.KindRecipeRemove: e.recipes.remove, agentproto.KindRecipeStatus: e.recipes.status,
+		// a deleted app's browsers and installed recipes go with it
+		agentproto.KindAppRemove: e.recipes.withAppRemove(e.browsers.withAppRemove(appRemove)),
 	} {
 		e.handlers[kind] = h
 	}
@@ -239,7 +247,7 @@ func (e *Executor) Work(ctx context.Context) {
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
-		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus:
+		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus:
 		return "" // read-only: never queued behind a long action
 	case agentproto.KindBrowserCreate, agentproto.KindBrowserRemove:
 		// One lane per browser: its create and remove never interleave, and a first image pull of
@@ -251,6 +259,15 @@ func laneOf(op agentproto.SignedOp) string {
 			return "browser:" + p.BrowserID
 		}
 		return "browser:?"
+	case agentproto.KindRecipeInstall, agentproto.KindRecipeRemove:
+		// One lane per install, for the same reasons.
+		var p struct {
+			InstallID string `json:"install_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.InstallID != "" {
+			return "install:" + p.InstallID
+		}
+		return "install:?"
 	case agentproto.KindAppExec:
 		// A cron job never waits behind a 45-minute build, nor holds one up. The control plane lets one
 		// run of a schedule go at a time; different schedules may overlap.

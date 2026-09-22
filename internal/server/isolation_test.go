@@ -218,6 +218,8 @@ func TestIsolationSweep(t *testing.T) {
 		"volume":     func(string) []string { return []string{volA.ID, volA.Name} },
 		"bucket":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
 		"browser":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
+		"install":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c3", "a-env-install"} },
+		"recipe":     func(string) []string { return []string{"searxng", "no-such-recipe"} }, // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
 		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
@@ -344,6 +346,8 @@ func TestIsolationSweep(t *testing.T) {
 		"set_app_realtime": {"app": appA.App.ID, "kind": "ws", "process": "stolen", "port": 6001, "path": "/stolen"},
 		"list_app_browsers": {"app": appA.App.ID}, "create_app_browser": {"app": appA.App.ID, "name": "stolen"},
 		"remove_app_browser": {"app": appA.App.Name, "browser": "a-env-browser", "confirm": "a-env-browser"},
+		"list_app_installs": {"app": appA.App.ID}, "install_recipe": {"app": appA.App.ID, "recipe": "mailpit", "name": "stolen", "confirm": "stolen"},
+		"remove_install": {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

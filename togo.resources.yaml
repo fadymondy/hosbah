@@ -295,6 +295,70 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppInstall
+      table: app_installs
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: recipe_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: recipe_version
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: host_port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: proxy_host_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: secrets
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: env_injected
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: AppRealtime
       table: app_realtime
       fields:
