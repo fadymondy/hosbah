@@ -118,11 +118,15 @@ function Frame({ children }: { children: ReactNode }) {
       }
       bleed
     >
-      <div className="grid min-h-[60vh] md:grid-cols-[13rem_minmax(0,1fr)]">
+      {/* A real sidebar on desktop: its column runs the full height of the page (the divider with it),
+          and the list itself stays in view under the top bar, scrolling on its own when it is longer
+          than the screen. On phones it is a scrolling row of tabs above the section. */}
+      <div className="grid md:min-h-[calc(100dvh-3.5rem)] md:grid-cols-[13rem_minmax(0,1fr)]">
+        <aside className="border-b border-line md:border-e md:border-b-0">
         <nav
           aria-label={t("site.nav.label")}
           data-testid="site-nav"
-          className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 [scrollbar-width:none] md:flex-col md:gap-0 md:overflow-visible md:border-e md:border-b-0 md:px-0 md:py-3 [&::-webkit-scrollbar]:hidden"
+          className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] md:sticky md:top-14 md:max-h-[calc(100dvh-3.5rem)] md:flex-col md:gap-0 md:overflow-x-hidden md:overflow-y-auto md:px-0 md:py-3 [&::-webkit-scrollbar]:hidden"
         >
           {SITE_GROUPS.map((g) => {
             const items = sections.filter((s) => s.group === g)
@@ -153,6 +157,7 @@ function Frame({ children }: { children: ReactNode }) {
             )
           })}
         </nav>
+        </aside>
         <div className="min-w-0">
           <ErrorBand message={error} />
           {children}
