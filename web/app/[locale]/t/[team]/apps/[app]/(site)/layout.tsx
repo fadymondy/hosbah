@@ -10,6 +10,8 @@ import { AppStatusBadge } from "@/components/app-status"
 import { useErrorText } from "@/components/form-error"
 import { ImportedBadge, originSummary } from "@/components/imported"
 import { ServerMark } from "@/components/server-mark"
+import { ServerProvider } from "@/components/server-tabs/context"
+import { ServerHeader } from "@/components/server-tabs/header"
 import { SiteProvider, useSite } from "@/components/site/context"
 import { sectionsFor, SITE_GROUPS } from "@/components/site/sections"
 import { ErrorBand, LoadingRows, Notice } from "@/components/states"
@@ -77,11 +79,14 @@ function Frame({ children }: { children: ReactNode }) {
     }
   }
 
+  // The server's header and tabs stay on top of every site page (the site is one of its apps).
   return (
+    <ServerProvider serverId={app.server_id}>
+    <ServerHeader serverId={app.server_id} active="apps" />
     <PageBody
       eyebrow={
         <Link href={`${base}/servers/${app.server_id}/apps`} className="hover:underline">
-          <span dir="ltr">{app.server_name ?? t("nav.servers")}</span>
+          {t("nav.apps")}
         </Link>
       }
       title={
@@ -154,5 +159,6 @@ function Frame({ children }: { children: ReactNode }) {
         </div>
       </div>
     </PageBody>
+    </ServerProvider>
   )
 }
