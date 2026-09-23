@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { notFound } from "next/navigation"
 import { Suspense, type ReactNode } from "react"
+import { Inter } from "next/font/google"
 
 import "../globals.css"
 import { Providers } from "@/components/providers"
@@ -8,6 +9,10 @@ import { RegisterServiceWorker } from "@/components/pwa"
 import en from "@/lang/en.json"
 import ar from "@/lang/ar.json"
 import { dirFor, isLocale, LOCALES } from "@/lib/i18n-config"
+
+// The English UI font; Arabic keeps Lusail from the grid. next/font self-hosts it at build time,
+// so no request goes to Google when a page loads.
+const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--font-inter" })
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
@@ -51,7 +56,7 @@ export default async function RootLayout({
       lang={locale}
       dir={dirFor(locale)}
       data-brand="cloudy"
-      className="grid-surface"
+      className={`grid-surface ${inter.variable}`}
       suppressHydrationWarning
     >
       <body className="antialiased">

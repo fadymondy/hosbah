@@ -114,3 +114,9 @@
     transition: none;
   }
 }
+
+/* English pages use Inter; Arabic keeps Lusail from the grid. Lusail stays in the stack so Arabic
+   text inside an English page (a name, a quote) still renders in the brand face. */
+html[lang="en"] {
+  --grid-font-sans: var(--font-inter), "Lusail", system-ui, sans-serif;
+}
