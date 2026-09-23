@@ -478,7 +478,7 @@ function NotificationsBell() {
       >
         <BellIcon className="size-4" />
         {unread > 0 ? (
-          <span className="absolute -end-0.5 -top-0.5 min-w-4 bg-primary px-1 text-center font-mono text-[10px] leading-4 text-primary-foreground tabular-nums">
+          <span className="absolute -end-0.5 -top-0.5 min-w-4 bg-primary px-1 text-center font-mono text-[11px] leading-4 text-primary-foreground tabular-nums">
             {unread > 99 ? "99+" : unread}
           </span>
         ) : null}

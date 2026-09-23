@@ -120,3 +120,40 @@
 html[lang="en"] {
   --grid-font-sans: var(--font-inter), "Lusail", system-ui, sans-serif;
 }
+
+/* ── Readable type ──
+   One scale for web, desktop and mobile: body text 15px, small text 13px, nothing smaller than
+   11.5px (Latin mono labels, uppercase). The grid's own classes are raised here rather than in
+   app/grid (a synced copy); `.grid-surface` (on <html>) outranks their single-class selectors. */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
+}
+.grid-surface .grid-micro {
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+}
+.grid-surface .grid-micro:lang(ar),
+.grid-surface :lang(ar) .grid-micro {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.grid-surface .grid-meta,
+.grid-surface .grid-chip {
+  font-size: 0.8125rem;
+}
+.grid-surface .grid-btn,
+.grid-surface .grid-input {
+  font-size: 0.9375rem;
+}
+/* Phones: form fields at 16px, or iOS zooms the page in when one is focused. */
+@media (max-width: 767px) {
+  .grid-surface .grid-input,
+  .grid-surface input:not([type="checkbox"]):not([type="radio"]),
+  .grid-surface select,
+  .grid-surface textarea {
+    font-size: 16px;
+  }
+}

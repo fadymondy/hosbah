@@ -115,7 +115,7 @@ export function SiteBrowsers() {
                       <span dir="ltr" className="font-medium">
                         {b.name}
                       </span>
-                      <div dir="ltr" className="max-w-56 truncate text-start font-mono text-[11px] text-grid-muted" title={b.image}>
+                      <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-grid-muted" title={b.image}>
                         {b.image}
                       </div>
                     </TableCell>
@@ -140,7 +140,7 @@ export function SiteBrowsers() {
                       </span>
                       <div className="text-grid-muted">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-[11px] text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
                       {b.env.join(" ")}
                     </TableCell>
                     {manage ? (

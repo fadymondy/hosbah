@@ -50,7 +50,7 @@ function Meter({ label, value, detail, icon }: { label: string; value: number; d
       <div className="h-1.5 w-full bg-line" aria-hidden>
         <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
-      <span dir="ltr" className="truncate text-start font-mono text-[11px] text-grid-muted">
+      <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
         {detail}
       </span>
     </div>

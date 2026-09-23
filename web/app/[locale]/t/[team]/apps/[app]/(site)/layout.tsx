@@ -140,7 +140,7 @@ function Frame({ children }: { children: ReactNode }) {
                     >
                       <s.icon className="size-4 shrink-0" />
                       <span className="flex-1">{t(`site.nav.${s.key || "overview"}`)}</span>
-                      {!s.ready ? <span className="hidden text-[10px] text-grid-muted uppercase md:inline">{t("site.soon")}</span> : null}
+                      {!s.ready ? <span className="hidden text-xs text-grid-muted uppercase md:inline">{t("site.soon")}</span> : null}
                     </Link>
                   )
                 })}

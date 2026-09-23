@@ -180,7 +180,7 @@ export function SiteStorage() {
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-[11px] text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
                       {b.env.join(" ")}
                     </TableCell>
                     {manage ? (

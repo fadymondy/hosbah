@@ -447,7 +447,7 @@ function ScheduleDialog({ path, schedule, onSaved }: { path: string; schedule?: 
               <Input id="sch-cron" dir="ltr" required value={cron} onChange={(e) => setCron(e.target.value)} className="font-mono" />
               <div className="flex flex-wrap gap-1">
                 {PRESETS.map((p) => (
-                  <button key={p} type="button" dir="ltr" onClick={() => setCron(p)} className="border border-line px-1.5 py-0.5 font-mono text-[11px] text-grid-muted hover:bg-grid-soft hover:text-grid-fg">
+                  <button key={p} type="button" dir="ltr" onClick={() => setCron(p)} className="border border-line px-1.5 py-0.5 font-mono text-xs text-grid-muted hover:bg-grid-soft hover:text-grid-fg">
                     {p}
                   </button>
                 ))}

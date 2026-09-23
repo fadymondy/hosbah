@@ -49,7 +49,7 @@ export function DeploymentsFeed({ items, base }: { items: FeedItem[]; base: stri
               {d.commit_sha ? d.commit_sha.slice(0, 7) : `#${d.number}`}
             </span>
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="flex size-5 shrink-0 items-center justify-center border border-line bg-background text-[10px] font-medium text-grid-brand uppercase">
+              <span className="flex size-5 shrink-0 items-center justify-center border border-line bg-background text-xs font-medium text-grid-brand uppercase">
                 {d.app.name.slice(0, 1)}
               </span>
               <span dir="ltr" className="truncate text-grid-fg">

@@ -160,7 +160,7 @@ export function SiteStacks() {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-[11px] text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
                       {i.env_injected.join(" ")}
                     </TableCell>
                     {manage ? (

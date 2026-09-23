@@ -252,7 +252,7 @@ function Card({
           <Row icon={<PlugIcon />}>
             <span className="flex flex-wrap gap-1">
               {s.ports.map((p) => (
-                <span key={p} dir="ltr" className="border border-line bg-background px-1.5 py-0.5 font-mono text-[11px] text-grid-fg">
+                <span key={p} dir="ltr" className="border border-line bg-background px-1.5 py-0.5 font-mono text-xs text-grid-fg">
                   {p}
                 </span>
               ))}
