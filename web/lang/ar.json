@@ -134,7 +134,17 @@
     "signedInAs": "مسجّل الدخول باسم",
     "chooseTeam": "اختر فريقًا",
     "collapseNav": "تصغير الشريط الجانبي",
-    "expandNav": "توسيع الشريط الجانبي"
+    "expandNav": "توسيع الشريط الجانبي",
+    "scope": {
+      "workloads": "أحمال العمل",
+      "sources": "المصادر",
+      "manage": "الإدارة",
+      "breadcrumb": "موقعك الحالي",
+      "switchServer": "تبديل الخادم",
+      "switchSite": "تبديل الموقع",
+      "allServers": "كل الخوادم",
+      "allSites": "كل المواقع على هذا الخادم"
+    }
   },
   "nav": {
     "team": "الفريق",

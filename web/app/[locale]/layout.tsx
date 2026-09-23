@@ -59,7 +59,8 @@ export default async function RootLayout({
       className={`grid-surface ${inter.variable}`}
       suppressHydrationWarning
     >
-      <body className="antialiased">
+      {/* Extensions (Grammarly and the like) stamp attributes on <body> before React hydrates. */}
+      <body className="antialiased" suppressHydrationWarning>
         <Providers locale={locale} dict={locale === "ar" ? ar : en}>
           {/* useSearchParams (language switch, ?next=) needs a boundary for static rendering. */}
           <Suspense>{children}</Suspense>

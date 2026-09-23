@@ -7,6 +7,7 @@ import { AlertCircleIcon } from "lucide-react"
 import { PageBody } from "@/components/app-shell"
 import { ServerProvider, useServerPage } from "@/components/server-tabs/context"
 import { ServerHeader } from "@/components/server-tabs/header"
+import { useProvideServerScope } from "@/components/shell/scope"
 import { ErrorBand, LoadingRows, Notice } from "@/components/states"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -25,6 +26,12 @@ function Frame({ serverId, children }: { serverId: string; children: ReactNode }
   const { team } = useTeam()
   const { server, missing, error } = useServerPage()
   useDocumentTitle(`${server?.name ?? t("nav.servers")} — ${team.name}`)
+  // The shell's breadcrumb and sidebar show this server.
+  useProvideServerScope(
+    server
+      ? { id: server.id, name: server.name, status: server.status, online: server.online, color: server.color, icon: server.icon, logo_url: server.logo_url }
+      : null,
+  )
 
   if (missing) {
     return (

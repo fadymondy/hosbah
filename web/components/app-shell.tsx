@@ -45,6 +45,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { GroupLabel, NavLink } from "@/components/shell/nav-link"
+import { ShellScopeProvider } from "@/components/shell/scope"
+import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { apiFetch } from "@/lib/api"
 import type { Notification } from "@/lib/apps"
@@ -85,65 +88,68 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
   }
 
   return (
-    <div className="grid-shell" data-collapsed={collapsed}>
-      <aside
-        data-collapsed={collapsed}
-        className="group/nav grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
-      >
-        <div className="flex h-14 shrink-0 items-center border-b border-line px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
-          <Brand />
-        </div>
-        <ShellNav />
-      </aside>
-
-      <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-line bg-background px-3 sm:px-4">
-          <div className="flex min-w-0 items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="md:hidden"
-              aria-label={t("shell.navigation")}
-              onClick={() => setNavOpen(true)}
-            >
-              <MenuIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="hidden md:inline-flex rtl:[&_svg]:-scale-x-100"
-              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-              aria-pressed={collapsed}
-              title={`${collapsed ? t("shell.expandNav") : t("shell.collapseNav")} (Ctrl+B)`}
-              onClick={toggleNav}
-            >
-              {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-            </Button>
-            <TeamSwitcher />
-          </div>
-          <div className="flex items-center gap-1">
-            <ReportProblem />
-            <NotificationsBell />
-            <LanguageMenu />
-            <ThemeToggle />
-            <UserMenu />
-          </div>
-        </header>
-        <Announcement />
-        <main className="flex min-w-0 flex-1 flex-col">{children}</main>
-      </div>
-      {/* Mahaam Feedback SDK, for signed-in people only: the shell only renders behind the session. */}
-      <MahaamFeedback />
-
-      <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent side={locale === "ar" ? "right" : "left"} className="w-72 gap-0 p-0">
-          <SheetTitle className="flex h-14 items-center border-b border-line px-4">
+    <ShellScopeProvider>
+      <div className="grid-shell" data-collapsed={collapsed}>
+        <aside
+          data-collapsed={collapsed}
+          className="group/nav grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex h-14 shrink-0 items-center border-b border-line px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
             <Brand />
-          </SheetTitle>
-          <ShellNav onNavigate={() => setNavOpen(false)} />
-        </SheetContent>
-      </Sheet>
-    </div>
+          </div>
+          <ShellNav />
+        </aside>
+
+        <div className="flex min-w-0 flex-col">
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-line bg-background px-3 sm:px-4">
+            <div className="flex min-w-0 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="md:hidden"
+                aria-label={t("shell.navigation")}
+                onClick={() => setNavOpen(true)}
+              >
+                <MenuIcon />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="hidden md:inline-flex rtl:[&_svg]:-scale-x-100"
+                aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+                aria-pressed={collapsed}
+                title={`${collapsed ? t("shell.expandNav") : t("shell.collapseNav")} (Ctrl+B)`}
+                onClick={toggleNav}
+              >
+                {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+              </Button>
+              <TeamSwitcher />
+              <ScopeCrumbs />
+            </div>
+            <div className="flex items-center gap-1">
+              <ReportProblem />
+              <NotificationsBell />
+              <LanguageMenu />
+              <ThemeToggle />
+              <UserMenu />
+            </div>
+          </header>
+          <Announcement />
+          <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+        </div>
+        {/* Mahaam Feedback SDK, for signed-in people only: the shell only renders behind the session. */}
+        <MahaamFeedback />
+
+        <Sheet open={navOpen} onOpenChange={setNavOpen}>
+          <SheetContent side={locale === "ar" ? "right" : "left"} className="w-72 gap-0 p-0">
+            <SheetTitle className="flex h-14 items-center border-b border-line px-4">
+              <Brand />
+            </SheetTitle>
+            <ShellNav onNavigate={() => setNavOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      </div>
+    </ShellScopeProvider>
   )
 }
 
@@ -183,56 +189,15 @@ function Brand() {
   )
 }
 
-function NavLink({
-  href,
-  icon,
-  children,
-  exact = false,
-  onNavigate,
-}: {
-  href: string
-  icon: ReactNode
-  children: ReactNode
-  exact?: boolean
-  onNavigate?: () => void
-}) {
-  const pathname = usePathname() ?? ""
-  const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/")
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      title={typeof children === "string" ? children : undefined}
-      className={cn(
-        "flex items-center gap-2.5 border-s-2 px-3 py-2 text-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0",
-        "group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0 group-data-[collapsed=true]/nav:py-2.5",
-        active
-          ? "border-grid-action bg-grid-soft font-medium text-grid-fg"
-          : "border-transparent text-grid-body hover:bg-grid-soft hover:text-grid-fg",
-      )}
-    >
-      {icon}
-      <span className="truncate group-data-[collapsed=true]/nav:hidden">{children}</span>
-    </Link>
-  )
-}
-
-function GroupLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="grid-micro mt-4 border-t border-line px-4 pt-4 pb-1 group-data-[collapsed=true]/nav:mt-2 group-data-[collapsed=true]/nav:p-0">
-      <span className="group-data-[collapsed=true]/nav:hidden">{children}</span>
-    </p>
-  )
-}
-
 /** The team's sections, then its settings, then the platform (admins only). Inside /admin the
- * sidebar is the platform's own: its sections, then its settings. */
+ * sidebar is the platform's own: its sections, then its settings. Inside a server or a site the
+ * sidebar is that level's own sections, with the way back up at its top. */
 function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t, locale } = useI18n()
   const teamCtx = useOptionalTeam()
   const { me } = useSession()
   const pathname = usePathname() ?? ""
+  const scope = useScope()
   const L = (props: { href: string; icon: ReactNode; children: ReactNode; exact?: boolean }) => (
     <NavLink {...props} onNavigate={onNavigate} />
   )
@@ -270,6 +235,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
     )
   }
+
+  if (scope.kind === "server") return <ServerNav serverId={scope.serverId} onNavigate={onNavigate} />
+  if (scope.kind === "site") return <SiteNav site={scope.site} onNavigate={onNavigate} />
 
   return (
     <nav className="flex flex-col py-3" aria-label={t("shell.navigation")}>

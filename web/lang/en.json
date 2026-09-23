@@ -134,7 +134,17 @@
     "signedInAs": "Signed in as",
     "chooseTeam": "Choose a team",
     "collapseNav": "Minimise sidebar",
-    "expandNav": "Expand sidebar"
+    "expandNav": "Expand sidebar",
+    "scope": {
+      "workloads": "Workloads",
+      "sources": "Sources",
+      "manage": "Manage",
+      "breadcrumb": "Where you are",
+      "switchServer": "Switch server",
+      "switchSite": "Switch site",
+      "allServers": "All servers",
+      "allSites": "All sites on this server"
+    }
   },
   "nav": {
     "team": "Team",

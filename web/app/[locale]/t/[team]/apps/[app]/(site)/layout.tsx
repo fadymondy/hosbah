@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useParams, usePathname } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useState, type ReactNode } from "react"
 import { AlertCircleIcon, ExternalLinkIcon, RocketIcon } from "lucide-react"
 
@@ -10,10 +10,8 @@ import { AppStatusBadge } from "@/components/app-status"
 import { useErrorText } from "@/components/form-error"
 import { ImportedBadge, originSummary } from "@/components/imported"
 import { ServerMark } from "@/components/server-mark"
-import { ServerProvider } from "@/components/server-tabs/context"
-import { ServerHeader } from "@/components/server-tabs/header"
+import { useProvideSiteScope } from "@/components/shell/scope"
 import { SiteProvider, useSite } from "@/components/site/context"
-import { sectionsFor, SITE_GROUPS } from "@/components/site/sections"
 import { ErrorBand, LoadingRows, Notice } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -22,9 +20,9 @@ import { isImported, type Deployment } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
-import { cn } from "@/lib/utils"
 
-/** A site: its header, a sub-sidebar with one item per section, and the section's own page. */
+/** A site: its header and the section's own page. The sections are the shell's sidebar while a site is
+ * open (components/shell/scope-nav.tsx), under the breadcrumb Team › Server › Site. */
 export default function SiteLayout({ children }: { children: ReactNode }) {
   const { app } = useParams<{ app: string }>()
   return (
@@ -37,12 +35,17 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 function Frame({ children }: { children: ReactNode }) {
   const { t, locale } = useI18n()
   const { team } = useTeam()
-  const pathname = usePathname() ?? ""
   const errorText = useErrorText()
   const operate = canOperate(team.role)
   const { detail, missing, error, setError, connected, path, pushDeployment } = useSite()
   const [busy, setBusy] = useState(false)
   const app = detail?.app
+  useProvideSiteScope(
+    app
+      ? { name: app.name, title: app.title, color: app.color, icon: app.icon, logo_url: app.logo_url, imported: isImported(app), serverId: app.server_id }
+      : null,
+    app ? { id: app.server_id, name: app.server_name ?? "" } : null,
+  )
   useDocumentTitle(`${app?.title || app?.name || t("nav.apps")} — ${team.name}`)
 
   if (missing) {
@@ -63,8 +66,6 @@ function Frame({ children }: { children: ReactNode }) {
 
   const imported = isImported(app)
   const base = `/${locale}/t/${team.slug}`
-  const root = `${base}/apps/${encodeURIComponent(app.name)}`
-  const sections = sectionsFor(imported)
   const host = detail.domains[0]
 
   async function deploy() {
@@ -79,14 +80,11 @@ function Frame({ children }: { children: ReactNode }) {
     }
   }
 
-  // The server's header and tabs stay on top of every site page (the site is one of its apps).
   return (
-    <ServerProvider serverId={app.server_id}>
-    <ServerHeader serverId={app.server_id} active="apps" />
     <PageBody
       eyebrow={
         <Link href={`${base}/servers/${app.server_id}/apps`} className="hover:underline">
-          {t("nav.apps")}
+          <span dir="ltr">{app.server_name || t("nav.apps")}</span>
         </Link>
       }
       title={
@@ -118,52 +116,8 @@ function Frame({ children }: { children: ReactNode }) {
       }
       bleed
     >
-      {/* A real sidebar on desktop: its column runs the full height of the page (the divider with it),
-          and the list itself stays in view under the top bar, scrolling on its own when it is longer
-          than the screen. On phones it is a scrolling row of tabs above the section. */}
-      <div className="grid md:min-h-[calc(100dvh-3.5rem)] md:grid-cols-[13rem_minmax(0,1fr)]">
-        <aside className="border-b border-line md:border-e md:border-b-0">
-        <nav
-          aria-label={t("site.nav.label")}
-          data-testid="site-nav"
-          className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] md:sticky md:top-14 md:max-h-[calc(100dvh-3.5rem)] md:flex-col md:gap-0 md:overflow-x-hidden md:overflow-y-auto md:px-0 md:py-3 [&::-webkit-scrollbar]:hidden"
-        >
-          {SITE_GROUPS.map((g) => {
-            const items = sections.filter((s) => s.group === g)
-            if (!items.length) return null
-            return (
-              <div key={g} className="flex shrink-0 gap-1 md:flex-col md:gap-0">
-                {g !== "site" ? <p className="grid-micro hidden px-4 pt-4 pb-1 md:block">{t(`site.groups.${g}`)}</p> : null}
-                {items.map((s) => {
-                  const href = s.key ? `${root}/${s.key}` : root
-                  const on = s.key ? pathname === href || pathname.startsWith(href + "/") : pathname === root
-                  return (
-                    <Link
-                      key={s.key || "overview"}
-                      href={href}
-                      aria-current={on ? "page" : undefined}
-                      className={cn(
-                        "flex shrink-0 items-center gap-2.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap md:border-s-2 md:border-b-0 md:px-4",
-                        on ? "border-[var(--grid-brand)] bg-grid-soft font-medium text-grid-fg" : "border-transparent text-grid-body hover:bg-grid-soft hover:text-grid-fg",
-                      )}
-                    >
-                      <s.icon className="size-4 shrink-0" />
-                      <span className="flex-1">{t(`site.nav.${s.key || "overview"}`)}</span>
-                      {!s.ready ? <span className="hidden text-xs text-grid-muted uppercase md:inline">{t("site.soon")}</span> : null}
-                    </Link>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </nav>
-        </aside>
-        <div className="min-w-0">
-          <ErrorBand message={error} />
-          {children}
-        </div>
-      </div>
+      <ErrorBand message={error} />
+      {children}
     </PageBody>
-    </ServerProvider>
   )
 }
