@@ -22,34 +22,73 @@ import (
 
 // ServerOut is a server as the API shows it. Never the agent's key material or the sealed SSH key.
 type ServerOut struct {
-	ID           string              `json:"id"`
-	Name         string              `json:"name"`
-	Provider     string              `json:"provider" enum:"byo,proxmox"`
-	Kind         string              `json:"kind" enum:"byo,vm,lxc"`
-	Status       string              `json:"status" enum:"pending,provisioning,enrolled,failed"`
-	Online       bool                `json:"online" doc:"The agent heartbeated within the last 45 seconds."`
-	Hostname     *string             `json:"hostname"`
-	IPAddress    *string             `json:"ip_address"`
-	OS           *string             `json:"os"`
-	OSVersion    *string             `json:"os_version"`
-	Arch         *string             `json:"arch"`
-	Kernel       *string             `json:"kernel"`
-	AgentVersion *string             `json:"agent_version"`
-	CredentialID *string             `json:"credential_id"`
-	ProviderRef  *string             `json:"provider_ref"`
-	Error        *string             `json:"error"`
-	Metrics      *agentproto.Metrics `json:"metrics"`
-	Checks       []agentproto.Check  `json:"checks"`
-	Facts        *agentproto.Facts   `json:"facts,omitempty"`
-	LastSeenAt   *time.Time          `json:"last_seen_at"`
-	EnrolledAt   *time.Time          `json:"enrolled_at"`
-	CreatedAt    time.Time           `json:"created_at"`
-	Enrollment   *EnrollmentOut      `json:"enrollment,omitempty" doc:"Set while an install link is open. Never the token itself."`
-	GitHub       ServerGitHubOut     `json:"github" doc:"The server's own GitHub connection (the GitHub CLI on it), as last reported."`
-	Tunnel       *TunnelSummary      `json:"tunnel" doc:"The server's tunnel (an active frp one first), or null without one."`
-	Color        *string             `json:"color" doc:"#RRGGBB, or null for the default."`
-	Icon         *string             `json:"icon" doc:"An icon key (see PATCH), or null for the default."`
-	LogoURL      *string             `json:"logo_url" doc:"The image shown instead of the icon: the uploaded logo's relative URL (see PUT .../logo), else the external https logo_url, or null."`
+	ID               string              `json:"id"`
+	Name             string              `json:"name"`
+	Provider         string              `json:"provider" enum:"byo,proxmox"`
+	Kind             string              `json:"kind" enum:"byo,vm,lxc"`
+	Status           string              `json:"status" enum:"pending,provisioning,enrolled,failed"`
+	Online           bool                `json:"online" doc:"The agent heartbeated within the last 45 seconds."`
+	Hostname         *string             `json:"hostname"`
+	IPAddress        *string             `json:"ip_address"`
+	OS               *string             `json:"os"`
+	OSVersion        *string             `json:"os_version"`
+	Arch             *string             `json:"arch"`
+	Kernel           *string             `json:"kernel"`
+	AgentVersion     *string             `json:"agent_version"`
+	CredentialID     *string             `json:"credential_id"`
+	ProviderRef      *string             `json:"provider_ref"`
+	Error            *string             `json:"error"`
+	Metrics          *agentproto.Metrics `json:"metrics"`
+	Checks           []agentproto.Check  `json:"checks"`
+	Facts            *agentproto.Facts   `json:"facts,omitempty"`
+	LastSeenAt       *time.Time          `json:"last_seen_at"`
+	EnrolledAt       *time.Time          `json:"enrolled_at"`
+	CreatedAt        time.Time           `json:"created_at"`
+	Enrollment       *EnrollmentOut      `json:"enrollment,omitempty" doc:"Set while an install link is open. Never the token itself."`
+	GitHub           ServerGitHubOut     `json:"github" doc:"The server's own GitHub connection (the GitHub CLI on it), as last reported."`
+	Tunnel           *TunnelSummary      `json:"tunnel" doc:"The server's tunnel (an active frp one first), or null without one."`
+	Color            *string             `json:"color" doc:"#RRGGBB, or null for the default."`
+	Icon             *string             `json:"icon" doc:"An icon key (see PATCH), or null for the default."`
+	LogoURL          *string             `json:"logo_url" doc:"The image shown instead of the icon: the uploaded logo's relative URL (see PUT .../logo), else the external https logo_url, or null."`
+	ParentServerID   *string             `json:"parent_server_id" doc:"The Proxmox node server this server is a guest of, or null."`
+	ParentServerName *string             `json:"parent_server_name,omitempty" doc:"The parent's name, when parent_server_id is set."`
+	GuestVMID        *int64              `json:"guest_vmid" doc:"This server's Proxmox VMID on its parent node, or null."`
+	GuestType        *string             `json:"guest_type" enum:"lxc,qemu" doc:"lxc or qemu, or null."`
+	Guests           []GuestOut          `json:"guests,omitempty" doc:"For a Proxmox node: every guest it discovered, enrolled or not."`
+}
+
+// GuestOut is one Proxmox guest a node server discovered, whether or not it is also enrolled as a
+// server of the team.
+type GuestOut struct {
+	VMID      string  `json:"vmid"`
+	Name      string  `json:"name"`
+	Type      string  `json:"type" enum:"lxc,qemu"`
+	Status    string  `json:"status"`
+	Address   string  `json:"address,omitempty"`
+	CPUs      int     `json:"cpus,omitempty"`
+	MemBytes  uint64  `json:"mem_bytes,omitempty"`
+	DiskBytes uint64  `json:"disk_bytes,omitempty"`
+	ServerID  *string `json:"server_id,omitempty" doc:"Set when this guest is also enrolled as a server of the team."`
+}
+
+// guestsOf reads the Proxmox guests out of a node's facts (agentproto.Service, kind "guest").
+func guestsOf(s db.Server) []GuestOut {
+	if s.Facts == nil {
+		return nil
+	}
+	var f agentproto.Facts
+	if json.Unmarshal([]byte(*s.Facts), &f) != nil {
+		return nil
+	}
+	var out []GuestOut
+	for _, svc := range f.Services {
+		if svc.Kind != "guest" || svc.ID == "" {
+			continue
+		}
+		out = append(out, GuestOut{VMID: svc.ID, Name: svc.Name, Type: svc.Type, Status: svc.Status,
+			Address: svc.Address, CPUs: svc.CPUs, MemBytes: svc.MemBytes, DiskBytes: svc.DiskBytes})
+	}
+	return out
 }
 
 // EnrollmentOut says when the open install link expires.
@@ -71,6 +110,11 @@ func toServerOut(s db.Server, now time.Time, detail bool) ServerOut {
 		AgentVersion: s.AgentVersion, CredentialID: s.CredentialID, ProviderRef: s.ProviderRef, Error: s.Error,
 		LastSeenAt: s.LastSeenAt, EnrolledAt: s.EnrolledAt, CreatedAt: s.CreatedAt, Checks: []agentproto.Check{},
 		Color: s.Color, Icon: s.Icon, LogoURL: s.LogoUrl,
+		ParentServerID: s.ParentServerID, GuestType: s.GuestType,
+	}
+	if s.GuestVmid.Valid {
+		v := int64(s.GuestVmid.Int32)
+		out.GuestVMID = &v
 	}
 	out.GitHub = toServerGitHubOut(deploy.GitHubStateOf(s, now))
 	if s.Metrics != nil {
@@ -134,10 +178,14 @@ func (d *deps) registerServers(api huma.API) {
 			}
 			now := time.Now()
 			for _, r := range rows {
-				out.Body.Servers = append(out.Body.Servers, toServerOut(r, now, false))
+				o := toServerOut(r, now, false)
+				o.Guests = guestsOf(r)
+				out.Body.Servers = append(out.Body.Servers, o)
 			}
 			attachTunnels(ctx, q, m.TeamID, out.Body.Servers)
 			attachLogos(ctx, q, m.TeamID, out.Body.Servers)
+			attachParentNames(ctx, q, m.TeamID, out.Body.Servers)
+			attachGuestServerIDs(ctx, q, m.TeamID, out.Body.Servers)
 			out.Body.AgentVersion = d.ops.AvailableAgentVersion()
 			return nil
 		})
@@ -296,12 +344,163 @@ func (d *deps) registerServers(api huma.API) {
 		}
 		return nil, err
 	})
+
+	type guestsOutBody struct {
+		Body struct {
+			Guests []GuestOut `json:"guests"`
+		}
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "list-server-guests", Method: http.MethodGet, Path: "/api/teams/{team}/servers/{server}/guests",
+		Summary: "A Proxmox node's discovered guests, enrolled or not", Tags: []string{"Servers"},
+	}, func(ctx context.Context, in *ServerPath) (*guestsOutBody, error) {
+		out := &guestsOutBody{}
+		out.Body.Guests = []GuestOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			s, err := serverIn(ctx, q, m, in.Server)
+			if err != nil {
+				return err
+			}
+			guests := guestsOf(s)
+			rows, err := q.ListServersOfTeam(ctx, m.TeamID)
+			if err == nil {
+				byVMID := map[string]string{}
+				for _, r := range rows {
+					if r.ParentServerID != nil && *r.ParentServerID == s.ID && r.GuestVmid.Valid {
+						byVMID[fmt.Sprint(r.GuestVmid.Int32)] = r.ID
+					}
+				}
+				for i := range guests {
+					if id, ok := byVMID[guests[i].VMID]; ok {
+						guests[i].ServerID = &id
+					}
+				}
+			}
+			out.Body.Guests = guests
+			return nil
+		})
+		return out, err
+	})
+
+	type parentIn struct {
+		ServerPath
+		Body struct {
+			ParentServerID *string `json:"parent_server_id" doc:"The node server this is a guest of, or null to unlink."`
+			GuestVMID      *int64  `json:"guest_vmid,omitempty" doc:"Its Proxmox VMID on that node."`
+		}
+	}
+	type parentOut struct{ Body ServerOut }
+	huma.Register(api, huma.Operation{
+		OperationID: "set-server-parent", Method: http.MethodPut, Path: "/api/teams/{team}/servers/{server}/parent",
+		Summary: "Manually link (or unlink) a server as the guest of a Proxmox node in the same team (owner or admin)",
+		Tags:    []string{"Servers"},
+	}, func(ctx context.Context, in *parentIn) (*parentOut, error) {
+		out := &parentOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			s, err := serverIn(ctx, q, m, in.Server)
+			if err != nil {
+				return err
+			}
+			var parentID *string
+			var vmid sql.NullInt32
+			var guestType *string
+			if in.Body.ParentServerID != nil && *in.Body.ParentServerID != "" {
+				parent, err := serverIn(ctx, q, m, *in.Body.ParentServerID)
+				if err != nil {
+					return huma.Error422UnprocessableEntity("parent server not found in this team")
+				}
+				if parent.ID == s.ID {
+					return huma.Error422UnprocessableEntity("a server cannot be its own parent")
+				}
+				parentID = &parent.ID
+				if in.Body.GuestVMID != nil {
+					vmid = sql.NullInt32{Int32: int32(*in.Body.GuestVMID), Valid: true}
+				}
+				// guest_type stays whatever it was (or null): a manual link only names the parent and
+				// VMID, and auto-link (or the next facts sync) will not touch it either way since it is
+				// now manual.
+				guestType = s.GuestType
+			}
+			row, err := q.SetServerParent(ctx, db.SetServerParentParams{ID: s.ID, TeamID: m.TeamID,
+				ParentServerID: parentID, GuestVmid: vmid, GuestType: guestType, Manual: true})
+			if err != nil {
+				return huma.Error500InternalServerError("could not update the server's parent")
+			}
+			out.Body = d.serverDetail(ctx, q, m, row)
+			return tenancy.Record(ctx, q, m.TeamID, id.ID, "server.parent_set", "server", s.ID,
+				map[string]any{"parent_server_id": deref(parentID)})
+		})
+		return out, err
+	})
 }
 
 // serverDetail is the detail view (also the SSE snapshot).
+// attachParentNames fills in ParentServerName for servers whose ParentServerID is set.
+func attachParentNames(ctx context.Context, q *db.Queries, teamID string, servers []ServerOut) {
+	var ids []string
+	for _, s := range servers {
+		if s.ParentServerID != nil {
+			ids = append(ids, *s.ParentServerID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	names := map[string]string{}
+	for _, s := range servers {
+		names[s.ID] = s.Name
+	}
+	for i := range servers {
+		if servers[i].ParentServerID != nil {
+			if n, ok := names[*servers[i].ParentServerID]; ok {
+				servers[i].ParentServerName = &n
+			}
+		}
+	}
+}
+
+// attachGuestServerIDs fills in ServerID for a node's discovered guests that are also enrolled as
+// servers of the team (matched on VMID against those servers' guest_vmid/parent_server_id).
+func attachGuestServerIDs(ctx context.Context, q *db.Queries, teamID string, servers []ServerOut) {
+	byParentVMID := map[string]string{}
+	for _, s := range servers {
+		if s.ParentServerID != nil && s.GuestVMID != nil {
+			byParentVMID[*s.ParentServerID+":"+fmt.Sprint(*s.GuestVMID)] = s.ID
+		}
+	}
+	if len(byParentVMID) == 0 {
+		return
+	}
+	for i := range servers {
+		if len(servers[i].Guests) == 0 {
+			continue
+		}
+		for j := range servers[i].Guests {
+			if id, ok := byParentVMID[servers[i].ID+":"+servers[i].Guests[j].VMID]; ok {
+				servers[i].Guests[j].ServerID = &id
+			}
+		}
+	}
+}
+
 func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membership, s db.Server) ServerOut {
 	out := toServerOut(s, time.Now(), true)
+	out.Guests = guestsOf(s)
 	out.Tunnel = serverTunnel(ctx, q, m.TeamID, s.ID)
+	if out.ParentServerID != nil {
+		if p, err := serverIn(ctx, q, m, *out.ParentServerID); err == nil {
+			out.ParentServerName = &p.Name
+		}
+	}
+	if all, err := q.ListServersOfTeam(ctx, m.TeamID); err == nil {
+		outs := make([]ServerOut, 0, len(all))
+		for _, r := range all {
+			outs = append(outs, toServerOut(r, time.Now(), false))
+		}
+		outs = append(outs, out)
+		attachGuestServerIDs(ctx, q, m.TeamID, outs)
+		out = outs[len(outs)-1]
+	}
 	if etag, err := q.ServerLogoVersion(ctx, db.ServerLogoVersionParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil {
 		out.LogoURL = serverLogoURL(m.TeamID, s.ID, etag) // an uploaded logo wins over the external logo_url
 	}

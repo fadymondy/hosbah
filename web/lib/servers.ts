@@ -96,6 +96,25 @@ export type Server = {
   enrolled_at: string | null
   created_at: string
   enrollment?: { expires_at: string }
+  /** Proxmox node/guest hierarchy (MH-574 A1): a guest's link to its node, and, on the node, its
+   * discovered guests. */
+  parent_server_id?: string | null
+  parent_server_name?: string | null
+  guest_vmid?: number | null
+  guest_type?: "lxc" | "qemu" | null
+  guests?: Guest[]
+}
+
+export type Guest = {
+  vmid: string
+  name: string
+  type: "lxc" | "qemu"
+  status: string
+  address?: string
+  cpus?: number
+  mem_bytes?: number
+  disk_bytes?: number
+  server_id?: string | null
 }
 
 export type Install = { url: string; command: string; command_root: string; expires_at: string }

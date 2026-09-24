@@ -16,6 +16,7 @@ export type ScopeServer = {
   color?: string | null
   icon?: string | null
   logo_url?: string | null
+  facts?: { proxmox?: { installed: boolean } }
 }
 export type ScopeSite = {
   name: string

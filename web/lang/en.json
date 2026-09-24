@@ -225,6 +225,23 @@
       "vm": "Virtual machine",
       "lxc": "LXC container"
     },
+    "guestOf": "Guest of {node} · CT {vmid}",
+    "guests": {
+      "tab": "Guests",
+      "title": "Guests",
+      "description": "Every guest this node reported (pvesh get /cluster/resources), enrolled or not.",
+      "empty": "No guests discovered yet.",
+      "vmid": "VMID",
+      "type": "Type",
+      "status": "Status",
+      "address": "Address",
+      "resources": "Resources",
+      "open": "Open",
+      "enrol": "Enrol",
+      "notEnrolled": "Not enrolled",
+      "parentLink": "Guest of {node}",
+      "types": { "lxc": "LXC", "qemu": "VM" }
+    },
     "new": {
       "title": "Add a server",
       "description": "Hosbah manages a server through a small agent that connects out to Hosbah — no inbound SSH needed.",
@@ -395,6 +412,7 @@
       "overview": "Overview",
       "apps": "Apps",
       "databases": "Databases",
+      "guests": "Guests",
       "proxy": "Proxy hosts",
       "tunnels": "Tunnels",
       "github": "GitHub",

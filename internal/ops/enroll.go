@@ -264,6 +264,11 @@ func (s *Service) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		if _, err := importer.Sync(r.Context(), s.a.SQLDB, enrolTeam, resp.ServerID, req.Facts.Services); err != nil {
 			s.log.Warn("imported workloads not synced", "server", resp.ServerID, "err", err)
 		}
+		// A Proxmox node's discovered guests are matched to the team's other servers
+		// (internal/importer/guests.go), so an already-enrolled guest shows up under its node.
+		if _, err := importer.AutoLinkGuests(r.Context(), s.a.SQLDB, enrolTeam, resp.ServerID, req.Facts.Services); err != nil {
+			s.log.Warn("guests not auto-linked", "server", resp.ServerID, "err", err)
+		}
 		s.broker.Publish(ServerTopic(resp.ServerID))
 		writeJSON(http.StatusCreated, resp)
 	}

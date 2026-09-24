@@ -138,23 +138,47 @@ export default function HomePage() {
 
   const online = servers?.filter((s) => s.online).length ?? 0
 
+  // Nodes and their enrolled guest servers (MH-574 A1): a guest with a parent that is also one of
+  // the team's servers nests under its node instead of appearing as an unrelated row.
+  const byId = useMemo(() => {
+    const m: Record<string, Server> = {}
+    for (const s of servers ?? []) m[s.id] = s
+    return m
+  }, [servers])
+  const childrenOf = useMemo(() => {
+    const m: Record<string, Server[]> = {}
+    for (const s of servers ?? []) {
+      if (s.parent_server_id && byId[s.parent_server_id]) {
+        ;(m[s.parent_server_id] ??= []).push(s)
+      }
+    }
+    return m
+  }, [servers, byId])
+  const isNestedGuest = (s: Server) => Boolean(s.parent_server_id && byId[s.parent_server_id])
+
   // Search and filters over the servers; the list grows as you scroll (PAGE at a time).
   const [q, setQ] = useState("")
   const [state, setState] = useState<"" | "online" | "offline">("")
   const [provider, setProvider] = useState<"" | "proxmox" | "byo">("")
   const [tunnelled, setTunnelled] = useState(false)
   const [shown, setShown] = useState(PAGE)
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return (servers ?? []).filter((s) => {
+  const matches = useCallback(
+    (s: Server) => {
+      const needle = q.trim().toLowerCase()
       if (state === "online" && !s.online) return false
       if (state === "offline" && s.online) return false
       if (provider && s.provider !== provider) return false
       if (tunnelled && !tunnelOf[s.id]) return false
       if (!needle) return true
       return [s.name, s.ip_address, s.hostname, s.os, s.facts?.os_pretty].some((v) => v?.toLowerCase().includes(needle))
-    })
-  }, [servers, q, state, provider, tunnelled, tunnelOf])
+    },
+    [q, state, provider, tunnelled, tunnelOf],
+  )
+  const filtered = useMemo(() => {
+    // Top-level rows only: a nested guest never shows up as its own row, only under its node — but
+    // its node still shows if only the guest matches the filters.
+    return (servers ?? []).filter((s) => !isNestedGuest(s) && (matches(s) || (childrenOf[s.id] ?? []).some(matches)))
+  }, [servers, matches, childrenOf, byId])
   useEffect(() => setShown(PAGE), [q, state, provider, tunnelled])
   const sentinel = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -252,18 +276,34 @@ export default function HomePage() {
           {filtered.length === 0 ? (
             <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p>
           ) : (
-            <div className="grid gap-4 px-6 pt-6 pb-6 lg:grid-cols-2">
-              {filtered.slice(0, shown).map((s) => (
-                <ServerCard
-                  key={s.id}
-                  server={s}
-                  base={base}
-                  tunnel={s.tunnel ?? tunnelOf[s.id] ?? null}
-                  spark={spark[s.id] ?? null}
-                  lastDeploy={lastDeployOf[s.id] ?? null}
-                  streamUrl={`${api}/servers/${s.id}/stream`}
-                />
-              ))}
+            <div className="flex flex-col gap-4 px-6 pt-6 pb-6">
+              {filtered.slice(0, shown).flatMap((s) => {
+                const kids = (childrenOf[s.id] ?? []).filter(matches)
+                return [
+                  <ServerCard
+                    key={s.id}
+                    server={s}
+                    base={base}
+                    tunnel={s.tunnel ?? tunnelOf[s.id] ?? null}
+                    spark={spark[s.id] ?? null}
+                    lastDeploy={lastDeployOf[s.id] ?? null}
+                    streamUrl={`${api}/servers/${s.id}/stream`}
+                  />,
+                  ...kids.map((g) => (
+                    <ServerCard
+                      key={g.id}
+                      server={g}
+                      base={base}
+                      tunnel={g.tunnel ?? tunnelOf[g.id] ?? null}
+                      spark={spark[g.id] ?? null}
+                      lastDeploy={lastDeployOf[g.id] ?? null}
+                      streamUrl={`${api}/servers/${g.id}/stream`}
+                      guestOf={{ nodeName: s.name, vmid: g.guest_vmid, type: g.guest_type }}
+                      indent
+                    />
+                  )),
+                ]
+              })}
             </div>
           )}
           {shown < filtered.length ? <div ref={sentinel} className="h-8" aria-hidden /> : null}

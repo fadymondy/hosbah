@@ -46,6 +46,10 @@ ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_server_fk FOREIGN KEY (
 -- Server metrics history goes with its server.
 ALTER TABLE server_metrics ADD CONSTRAINT server_metrics_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 
+-- A guest server's parent must be a node server in the same team; unenrolling the node unlinks its
+-- guests rather than blocking or cascading.
+ALTER TABLE servers ADD CONSTRAINT servers_parent_fk FOREIGN KEY (parent_server_id, team_id) REFERENCES servers (id, team_id) ON DELETE SET NULL;
+
 ALTER TABLE server_logos ADD CONSTRAINT server_logos_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 -- An app's uploaded logo goes with its app.
 ALTER TABLE app_logos ADD CONSTRAINT app_logos_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;

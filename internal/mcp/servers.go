@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -151,6 +152,91 @@ func ServerTools() []Tool {
 					return "No operations yet.", nil
 				}
 				return b.String(), nil
+			},
+		},
+
+		{
+			Name:        "server_guests",
+			Description: "A Proxmox node's discovered guests (from its own agent, /cluster/resources), enrolled or not: vmid, name, type, status, address, resources.",
+			Scope:       scopes.Read,
+			InputSchema: schema([]string{"server"}, serverArg),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				s, err := findServer(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				guests := serverGuests(s)
+				if len(guests) == 0 {
+					return s.Name + " has no discovered guests.", nil
+				}
+				rows, err := env.Q.ListServersOfTeam(ctx, env.Caller.TeamID)
+				byVMID := map[string]string{}
+				if err == nil {
+					for _, r := range rows {
+						if r.ParentServerID != nil && *r.ParentServerID == s.ID && r.GuestVmid.Valid {
+							byVMID[fmt.Sprint(r.GuestVmid.Int32)] = r.Name
+						}
+					}
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%s guests:\n", s.Name)
+				for _, g := range guests {
+					enrolled := "not enrolled"
+					if n, ok := byVMID[g.ID]; ok {
+						enrolled = "enrolled as " + n
+					}
+					fmt.Fprintf(&b, "  CT/VM %-6s %-9s %-8s %-24s %-15s %s\n", g.ID, g.Type, g.Status, g.Name, orDash(strPtr(g.Address)), enrolled)
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "server_set_parent", Scope: scopes.Write,
+			Description: "Manually link (or unlink) a server as the guest of a Proxmox node in the same team (owner or admin). Pass parent to link, or an empty parent to unlink.",
+			InputSchema: schema([]string{"server"}, map[string]any{
+				"server":     str("Server id or name (the guest)"),
+				"parent":     str("Node server id or name to be a guest of, or empty to unlink"),
+				"guest_vmid": map[string]any{"type": "integer", "description": "Its Proxmox VMID on that node (optional)"},
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
+					return "", err
+				}
+				s, err := findServer(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				var parentID *string
+				var vmid sql.NullInt32
+				var guestType *string
+				if p := args.Str("parent"); p != "" {
+					parent, err := env.Q.ServerInTeamByRef(ctx, db.ServerInTeamByRefParams{TeamID: env.Caller.TeamID, Ref: p})
+					if err != nil {
+						return "", errors.New("parent server not found")
+					}
+					if parent.ID == s.ID {
+						return "", errors.New("a server cannot be its own parent")
+					}
+					parentID = &parent.ID
+					guestType = s.GuestType
+					if v, ok := args["guest_vmid"]; ok {
+						vmid = sql.NullInt32{Int32: int32(args.Int("guest_vmid", 0, 0, 999999)), Valid: true}
+						_ = v
+					}
+				}
+				row, err := env.Q.SetServerParent(ctx, db.SetServerParentParams{ID: s.ID, TeamID: env.Caller.TeamID,
+					ParentServerID: parentID, GuestVmid: vmid, GuestType: guestType, Manual: true})
+				if err != nil {
+					return "", errors.New("could not update the server's parent")
+				}
+				if err := tenancy.Record(ctx, env.Q, env.Caller.TeamID, actor(env), "server.parent_set", "server", s.ID,
+					auditChanges(env, map[string]any{"parent_server_id": strDeref(parentID)})); err != nil {
+					return "", err
+				}
+				if parentID == nil {
+					return fmt.Sprintf("%s unlinked from its parent.", row.Name), nil
+				}
+				return fmt.Sprintf("%s linked as a guest of %s.", row.Name, *parentID), nil
 			},
 		},
 
@@ -325,6 +411,38 @@ func bytesOf(b uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+// serverGuests reads the Proxmox guests out of a node's facts.
+func serverGuests(s db.Server) []agentproto.Service {
+	if s.Facts == nil {
+		return nil
+	}
+	var f agentproto.Facts
+	if json.Unmarshal([]byte(*s.Facts), &f) != nil {
+		return nil
+	}
+	var out []agentproto.Service
+	for _, sv := range f.Services {
+		if sv.Kind == "guest" && sv.ID != "" {
+			out = append(out, sv)
+		}
+	}
+	return out
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func strDeref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func dockerOf(d agentproto.DockerFacts) string {

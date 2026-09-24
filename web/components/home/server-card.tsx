@@ -69,6 +69,8 @@ export function ServerCard({
   spark,
   lastDeploy,
   streamUrl,
+  guestOf,
+  indent,
 }: {
   server: Server & { facts?: Server["facts"] & { hardware?: Hardware; primary_ip?: string } }
   base: string
@@ -77,6 +79,10 @@ export function ServerCard({
   lastDeploy?: { app: App; deployment: Deployment } | null
   /** The server's live stream (SSE); its readings move the charts in real time. */
   streamUrl?: string
+  /** Set for a guest server: its parent node's name and VMID, shown as a chip. */
+  guestOf?: { nodeName: string; vmid?: number | null; type?: "lxc" | "qemu" | null } | null
+  /** Nested one level under its node in the tree layout. */
+  indent?: boolean
 }) {
   const { t, locale } = useI18n()
   const ago = useTimeAgo(locale)
@@ -107,7 +113,7 @@ export function ServerCard({
 
   return (
     <article
-      className="flex min-w-0 flex-col border border-line bg-grid-card"
+      className={`flex min-w-0 flex-col border border-line bg-grid-card${indent ? " ms-6 border-s-2 border-s-[var(--grid-brand)]" : ""}`}
       style={server.color ? { borderTopColor: server.color, borderTopWidth: 3 } : undefined}
       data-server={server.name}
     >
@@ -124,6 +130,11 @@ export function ServerCard({
                 className={online ? "size-2 shrink-0 bg-[var(--grid-ok,#3fb950)]" : "size-2 shrink-0 bg-grid-muted opacity-60"}
               />
               <span className="text-xs text-grid-muted">{online ? t("home.online") : t(`servers.statuses.${server.status}`, undefined, t("home.offline"))}</span>
+              {guestOf ? (
+                <span className="inline-flex shrink-0 items-center gap-1 border border-line bg-grid-soft px-1.5 py-0.5 text-[10px] uppercase text-grid-muted">
+                  {t("servers.guestOf", { node: guestOf.nodeName, vmid: guestOf.vmid ?? "?" })}
+                </span>
+              ) : null}
             </span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
               {ip ? (

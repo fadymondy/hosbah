@@ -316,6 +316,10 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 		if _, ierr := importer.SyncFacts(ctx, s.a.SQLDB, ac.teamID, ac.serverID, importFacts); ierr != nil {
 			s.log.Warn("imported workloads not synced", "server", ac.serverID, "err", ierr)
 		}
+		// A Proxmox node's discovered guests are matched to the team's other servers.
+		if _, ierr := importer.AutoLinkFacts(ctx, s.a.SQLDB, ac.teamID, ac.serverID, importFacts); ierr != nil {
+			s.log.Warn("guests not auto-linked", "server", ac.serverID, "err", ierr)
+		}
 	}
 	if requeued {
 		s.Wake()

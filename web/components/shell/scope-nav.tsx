@@ -12,6 +12,7 @@ import {
   ChevronsUpDownIcon,
   DatabaseIcon,
   GithubIcon,
+  LayersIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
   NetworkIcon,
@@ -48,6 +49,7 @@ const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads
   "": { icon: LayoutDashboardIcon, group: "" },
   apps: { icon: AppWindowIcon, group: "workloads" },
   databases: { icon: DatabaseIcon, group: "workloads" },
+  guests: { icon: LayersIcon, group: "workloads" },
   proxy: { icon: NetworkIcon, group: "workloads" },
   tunnels: { icon: CableIcon, group: "workloads" },
   github: { icon: GithubIcon, group: "sources" },
@@ -115,7 +117,10 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
   const root = `${base}/servers/${serverId}`
   const loaded = server?.id === serverId ? server : null
   const enrolled = loaded?.status === "enrolled"
-  const tabs = SERVER_TABS.filter((tab) => enrolled || tab === "" || tab === "operations" || tab === "settings")
+  const isNode = Boolean(loaded?.facts?.proxmox?.installed)
+  const tabs = SERVER_TABS.filter((tab) => tab !== "guests" || isNode).filter(
+    (tab) => enrolled || tab === "" || tab === "operations" || tab === "settings",
+  )
 
   return (
     <nav className="flex flex-col pb-3" aria-label={t("servers.tabs.label")} data-testid="server-nav">

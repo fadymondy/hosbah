@@ -225,6 +225,23 @@
       "vm": "آلة افتراضية",
       "lxc": "حاوية LXC"
     },
+    "guestOf": "ضيف على {node} · CT {vmid}",
+    "guests": {
+      "tab": "الضيوف",
+      "title": "الضيوف",
+      "description": "كل ضيف اكتشفته هذه العُقدة (pvesh get /cluster/resources)، مسجَّلًا كان أو لا.",
+      "empty": "لم يُكتشف أي ضيف بعد.",
+      "vmid": "معرّف VMID",
+      "type": "النوع",
+      "status": "الحالة",
+      "address": "العنوان",
+      "resources": "الموارد",
+      "open": "فتح",
+      "enrol": "تسجيل",
+      "notEnrolled": "غير مسجَّل",
+      "parentLink": "ضيف على {node}",
+      "types": { "lxc": "LXC", "qemu": "VM" }
+    },
     "new": {
       "title": "إضافة خادم",
       "description": "يدير حوسبة الخادم عبر وكيل صغير يتصل بـحوسبة من الخادم نفسه — لا حاجة إلى فتح SSH للدخول.",
@@ -395,6 +412,7 @@
       "overview": "نظرة عامة",
       "apps": "التطبيقات",
       "databases": "قواعد البيانات",
+      "guests": "الضيوف",
       "proxy": "مضيفو الوكيل",
       "tunnels": "الأنفاق",
       "github": "GitHub",

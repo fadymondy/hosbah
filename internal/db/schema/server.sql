@@ -30,6 +30,10 @@ CREATE TABLE servers (
     created_by text NOT NULL,
     last_seen_at timestamptz,
     enrolled_at timestamptz,
+    parent_server_id text,
+    guest_vmid integer,
+    guest_type text,
+    guest_link_manual boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -56,3 +60,10 @@ CREATE INDEX servers_team_idx ON servers (team_id, created_at);
 ALTER TABLE servers ADD CONSTRAINT servers_color_check CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$');
 ALTER TABLE servers ADD CONSTRAINT servers_icon_check CHECK (icon IS NULL OR icon IN ('server', 'database', 'globe', 'cloud', 'cpu', 'box', 'rocket', 'shield', 'code', 'terminal', 'layers', 'zap', 'flame', 'leaf', 'star', 'heart', 'briefcase', 'home', 'store', 'graduation-cap', 'building', 'gamepad', 'music', 'camera'));
 ALTER TABLE servers ADD CONSTRAINT servers_logo_url_check CHECK (logo_url IS NULL OR (logo_url LIKE 'https://%' AND length(logo_url) <= 500));
+
+-- parent_server_id / guest_vmid / guest_type: a Proxmox guest's link to the node server that
+-- discovered it (both enrolled servers in the same team). guest_link_manual marks a link a member
+-- set or cleared by hand, so auto-link never overwrites it. Enforced same-team by the composite FK
+-- below (parent_server_id, team_id) -> servers (id, team_id).
+ALTER TABLE servers ADD CONSTRAINT servers_guest_type_check CHECK (guest_type IS NULL OR guest_type IN ('lxc', 'qemu'));
+CREATE INDEX servers_parent_idx ON servers (parent_server_id);

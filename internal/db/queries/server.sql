@@ -106,3 +106,27 @@ UPDATE servers SET name = sqlc.arg('name'), color = sqlc.narg('color'), icon = s
     logo_url = sqlc.narg('logo_url'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
 RETURNING *;
+
+-- name: SetServerParent :one
+-- Team scope: link (or, with both args NULL, unlink) a guest server to its node. The composite FK
+-- (parent_server_id, team_id) -> servers (id, team_id) keeps the parent in the same team.
+UPDATE servers SET parent_server_id = sqlc.narg('parent_server_id')::text, guest_vmid = sqlc.narg('guest_vmid')::int,
+    guest_type = sqlc.narg('guest_type')::text, guest_link_manual = sqlc.arg('manual')::boolean, updated_at = now()
+WHERE id = sqlc.arg('id')::text AND team_id = sqlc.arg('team_id')::text
+RETURNING *;
+
+-- name: AutoLinkServerParent :one
+-- Auto-link from a node's discovered guests: never overwrites a manual link (guest_link_manual).
+UPDATE servers SET parent_server_id = sqlc.arg('parent_server_id')::text, guest_vmid = sqlc.arg('guest_vmid')::int,
+    guest_type = sqlc.arg('guest_type')::text, updated_at = now()
+WHERE id = sqlc.arg('id')::text AND team_id = sqlc.arg('team_id')::text AND guest_link_manual = false
+RETURNING *;
+
+-- name: ServersOfTeamForAutoLink :many
+-- Every other server in the team the auto-linker can match a node's discovered guests against.
+SELECT id, name, hostname, ip_address, parent_server_id, guest_link_manual FROM servers
+WHERE team_id = sqlc.arg('team_id')::text AND id != sqlc.arg('exclude_id')::text;
+
+-- name: ServersWithParent :many
+-- Team scope: every server whose parent_server_id points at the given node (its enrolled guests).
+SELECT * FROM servers WHERE team_id = sqlc.arg('team_id')::text AND parent_server_id = sqlc.arg('parent_server_id')::text;

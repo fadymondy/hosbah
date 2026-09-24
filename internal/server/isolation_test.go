@@ -331,6 +331,7 @@ func TestIsolationSweep(t *testing.T) {
 		"github_status": {"server": srvA, "refresh": true}, "github_connect": {"server": srvA, "token": "ghp_sweep"},
 		"github_disconnect": {"server": srvA}, "github_repos": {"server": srvA}, "github_branches": {"server": srvA, "repo": "octocat/api"},
 		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
+		"server_guests": {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
 		"get_app_repository": {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
 		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
 		"get_app_dns": {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},

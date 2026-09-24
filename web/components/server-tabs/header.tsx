@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
 /** Each section is its own page under /servers/{id}; "" is the overview. */
-export const SERVER_TABS = ["", "apps", "databases", "proxy", "tunnels", "github", "discovered", "operations", "settings"] as const
+export const SERVER_TABS = ["", "apps", "databases", "guests", "proxy", "tunnels", "github", "discovered", "operations", "settings"] as const
 export type ServerTab = (typeof SERVER_TABS)[number]
 
 /**
@@ -47,6 +47,14 @@ export function ServerHeader({ serverId }: { serverId: string }) {
             </span>
           </span>
         </Link>
+        {server.parent_server_id ? (
+          <Link
+            href={`${root.replace(/\/servers\/[^/]+$/, "")}/servers/${server.parent_server_id}`}
+            className="inline-flex shrink-0 items-center gap-1.5 border border-line bg-grid-soft px-2 py-1 text-xs text-grid-muted hover:text-grid-fg"
+          >
+            {t("servers.guests.parentLink", { node: server.parent_server_name ?? server.parent_server_id })}
+          </Link>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-grid-muted" aria-live="polite">
             {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
