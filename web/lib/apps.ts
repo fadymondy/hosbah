@@ -9,6 +9,7 @@ export type DeploymentStatus = "queued" | "running" | "succeeded" | "failed" | "
 export type DeploymentKind = "deploy" | "rollback" | "restart"
 export type DeploymentTrigger = "manual" | "hook" | "mcp" | "github"
 export type DeploymentStep = "provision" | "build" | "release" | "start" | "switch" | "drain" | "rollback" | "restart"
+export type DeploymentTrack = "fast" | "full"
 export type TLSMode = "auto" | "internal" | "off"
 
 export type Deployment = {
@@ -21,6 +22,8 @@ export type Deployment = {
   trigger: DeploymentTrigger
   kind: DeploymentKind
   status: DeploymentStatus
+  track: DeploymentTrack | null
+  track_reason: string | null
   step: DeploymentStep | null
   image: string | null
   runtime: string | null

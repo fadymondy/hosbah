@@ -525,6 +525,10 @@
         "mcp": "MCP",
         "github": "GitHub"
       },
+      "tracks": {
+        "fast": "سريع",
+        "full": "كامل"
+      },
       "steps": {
         "provision": "تجهيز الخادم",
         "build": "البناء",
@@ -1804,6 +1808,9 @@
       "deploy": "نشر",
       "deployTitle": "نشر الإيداع {sha}؟",
       "deploying": "جارٍ نشر {sha}",
+      "fullRebuild": "إعادة بناء كاملة",
+      "fullRebuildTitle": "إعادة بناء كاملة للإيداع {sha}؟",
+      "fullRebuildHint": "يتخطّى المسار السريع ويعيد بناء الصورة من الصفر.",
       "changes": "التغييرات منذ الإصدار الحي",
       "changesHint": "{commits} إيداعات، {files} ملفات",
       "truncated": "القائمة مختصرة؛ افتح المقارنة على GitHub للبقية.",

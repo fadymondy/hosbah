@@ -249,10 +249,12 @@ func AppTools() []Tool {
 			Name: "deploy_app", Scope: scopes.Deploy,
 			Description: "Deploy a ref (default: the app's branch): build, release, health-gate, switch, drain. With wait=true, returns when it has finished (up to wait_seconds).",
 			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg, "ref": str("Branch, tag or full 40-character commit sha, e.g. one from list_app_commits (optional)"),
+				"track": map[string]any{"type": "string", "enum": []string{"auto", "fast", "full"}, "default": "auto",
+					"description": "Override the app's deploy configuration for this run only: auto defers to it, fast and full are stored as asked."},
 				"wait": map[string]any{"type": "boolean", "default": false}, "wait_seconds": map[string]any{"type": "integer", "default": 600, "maximum": 1800}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				return queueAndMaybeWait(ctx, env, args, func(s *deploy.Service, a db.App) (db.Deployment, error) {
-					return s.QueueDeployment(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, "deploy", args.Str("ref"), nil)
+					return s.QueueDeployment(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, "deploy", args.Str("ref"), nil, args.Str("track"))
 				})
 			},
 		},
@@ -351,7 +353,7 @@ func AppTools() []Tool {
 				}
 				out := fmt.Sprintf("Created %s (id %s) on server %s from %s @ %s.\nDeploy hook (shown once — POST to it to deploy): %s\n", a.Name, a.ID, args.Str("server"), orDash(a.RepoURL), orDash(a.Branch), hook)
 				if args.Bool("deploy") {
-					d, err := s.QueueDeployment(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, "deploy", "", nil)
+					d, err := s.QueueDeployment(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, "deploy", "", nil, "")
 					if err != nil {
 						return "", err
 					}
@@ -590,6 +592,9 @@ func short(s *string) string {
 
 func deploymentLine(d db.Deployment) string {
 	line := fmt.Sprintf("#%-4d %-8s %-9s %-10s ref %-12s commit %s", d.Number, d.Kind, d.Status, orDash(d.Step), d.Ref, short(d.CommitSha))
+	if d.Track != nil {
+		line += fmt.Sprintf("  track %s (%s)", *d.Track, orDash(d.TrackReason))
+	}
 	if d.Error != nil {
 		line += "  — " + *d.Error
 	}
@@ -670,6 +675,9 @@ func queueAndMaybeWait(ctx context.Context, env *Env, args Args, fn func(*deploy
 		return "", err
 	}
 	out := fmt.Sprintf("%s #%d of %s queued (id %s, ref %s).\n", strings.ToUpper(d.Kind[:1])+d.Kind[1:], d.Number, a.Name, d.ID, d.Ref)
+	if d.Track != nil {
+		out += fmt.Sprintf("Track: %s (%s).\n", *d.Track, orDash(d.TrackReason))
+	}
 	if !args.Bool("wait") {
 		return out + "Follow it with get_deployment / deploy_logs.", nil
 	}

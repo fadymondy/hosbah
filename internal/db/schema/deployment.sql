@@ -15,6 +15,8 @@ CREATE TABLE deployments (
     image text,
     runtime text,
     error text,
+    track text,
+    track_reason text,
     release_id text,
     target_release_id text,
     cancel_requested boolean NOT NULL DEFAULT false,
@@ -32,6 +34,7 @@ CREATE TABLE deployments (
 ALTER TABLE deployments ADD CONSTRAINT deployments_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_kind_check CHECK (kind IN ('deploy', 'rollback', 'restart'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_trigger_check CHECK (trigger IN ('manual', 'hook', 'mcp', 'github'));
+ALTER TABLE deployments ADD CONSTRAINT deployments_track_check CHECK (track IS NULL OR track IN ('fast', 'full'));
 CREATE UNIQUE INDEX deployments_app_number_key ON deployments (app_id, number);
 CREATE UNIQUE INDEX deployments_id_team_key ON deployments (id, team_id);
 CREATE UNIQUE INDEX deployments_one_running ON deployments (app_id) WHERE status = 'running';

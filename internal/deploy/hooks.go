@@ -83,7 +83,7 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 		if err := tenancy.SetTeam(r.Context(), tx, a.TeamID); err != nil {
 			return err
 		}
-		d, err := s.QueueDeployment(r.Context(), q, a.TeamID, Actor{Via: "hook"}, a, "deploy", ref, nil)
+		d, err := s.QueueDeployment(r.Context(), q, a.TeamID, Actor{Via: "hook"}, a, "deploy", ref, nil, "")
 		if err != nil {
 			if ae, ok := err.(*ActionError); ok {
 				status, out = ae.Status, map[string]string{"error": ae.Msg}
@@ -274,7 +274,7 @@ func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte
 			return err
 		}
 		for _, a := range apps {
-			if _, err := s.QueueDeployment(ctx, q, inst.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil); err != nil {
+			if _, err := s.QueueDeployment(ctx, q, inst.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil, ""); err != nil {
 				var ae *ActionError
 				if errors.As(err, &ae) {
 					continue // this app cannot deploy now (its page says why); the others still do

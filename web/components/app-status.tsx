@@ -1,7 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import type { AppStatus, DeploymentStatus } from "@/lib/apps"
+import type { AppStatus, DeploymentStatus, DeploymentTrack } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 
 type Variant = "default" | "secondary" | "outline" | "destructive"
@@ -40,6 +40,17 @@ export function DeploymentStatusBadge({ status }: { status: DeploymentStatus }) 
   return (
     <Badge variant={depVariant[status] ?? "outline"} data-status={status}>
       {t(`apps.deploy.statuses.${status}`, undefined, status)}
+    </Badge>
+  )
+}
+
+/** Fast/Full track badge for a deployment row; the reason (why this track was chosen) shows as a tooltip. */
+export function DeploymentTrackBadge({ track, reason }: { track: DeploymentTrack | null; reason?: string | null }) {
+  const { t } = useI18n()
+  if (!track) return null
+  return (
+    <Badge variant="outline" data-track={track} title={reason ?? undefined}>
+      {t(`apps.deploy.tracks.${track}`, undefined, track)}
     </Badge>
   )
 }

@@ -73,6 +73,8 @@ type DeploymentOut struct {
 	Trigger         string     `json:"trigger" enum:"manual,hook,mcp,github"`
 	Kind            string     `json:"kind" enum:"deploy,rollback,restart"`
 	Status          string     `json:"status" enum:"queued,running,succeeded,failed,cancelled"`
+	Track           *string    `json:"track" enum:"fast,full" doc:"Whether this run took the fast (in-place) or full (rebuild) path. Null for rollback and restart."`
+	TrackReason     *string    `json:"track_reason" doc:"Why this track was chosen."`
 	Step            *string    `json:"step"`
 	Image           *string    `json:"image"`
 	Runtime         *string    `json:"runtime"`
@@ -183,7 +185,7 @@ func asImported(err error) error {
 
 func toDeploymentOut(d db.Deployment) DeploymentOut {
 	return DeploymentOut{ID: d.ID, AppID: d.AppID, Number: d.Number, Ref: d.Ref, CommitSHA: d.CommitSha, CommitMessage: d.CommitMessage,
-		Trigger: d.Trigger, Kind: d.Kind, Status: d.Status, Step: d.Step, Image: d.Image, Runtime: d.Runtime, Error: d.Error,
+		Trigger: d.Trigger, Kind: d.Kind, Status: d.Status, Track: d.Track, TrackReason: d.TrackReason, Step: d.Step, Image: d.Image, Runtime: d.Runtime, Error: d.Error,
 		ReleaseID: d.ReleaseID, TargetReleaseID: d.TargetReleaseID, CancelRequested: d.CancelRequested, CreatedAt: d.CreatedAt,
 		StartedAt: d.StartedAt, FinishedAt: d.FinishedAt}
 }
@@ -438,7 +440,7 @@ func (d *deps) registerApps(api huma.API) {
 			}
 			out.Body.App, out.Body.DeployHookURL = toAppOut(a, ""), hook
 			if b.Deploy {
-				dep, err := s.QueueDeployment(ctx, q, m.TeamID, webActor(id), a, "deploy", "", nil)
+				dep, err := s.QueueDeployment(ctx, q, m.TeamID, webActor(id), a, "deploy", "", nil, "")
 				if err != nil {
 					return actionErr(err, "could not queue the deploy")
 				}
@@ -599,7 +601,8 @@ func (d *deps) registerApps(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
-			Ref string `json:"ref,omitempty" maxLength:"200" doc:"Branch, tag or a full 40-character commit sha (e.g. one from …/repository/commits) — the build checks out exactly this ref instead of the branch head. Default: the app's branch. A short sha cannot be fetched."`
+			Ref   string `json:"ref,omitempty" maxLength:"200" doc:"Branch, tag or a full 40-character commit sha (e.g. one from …/repository/commits) — the build checks out exactly this ref instead of the branch head. Default: the app's branch. A short sha cannot be fetched."`
+			Track string `json:"track,omitempty" enum:"auto,fast,full" doc:"Override the app's deploy configuration for this run only: auto defers to it, fast and full are stored as asked. Default: auto."`
 		}
 	}) (*deploymentOut, error) {
 		out := &deploymentOut{Status: http.StatusCreated}
@@ -608,7 +611,7 @@ func (d *deps) registerApps(api huma.API) {
 			if err != nil {
 				return err
 			}
-			dep, err := d.deploys().QueueDeployment(ctx, q, m.TeamID, webActor(id), a, "deploy", in.Body.Ref, nil)
+			dep, err := d.deploys().QueueDeployment(ctx, q, m.TeamID, webActor(id), a, "deploy", in.Body.Ref, nil, in.Body.Track)
 			if err != nil {
 				return actionErr(err, "could not queue the deploy")
 			}

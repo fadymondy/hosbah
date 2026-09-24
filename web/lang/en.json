@@ -525,6 +525,10 @@
         "mcp": "MCP",
         "github": "GitHub"
       },
+      "tracks": {
+        "fast": "Fast",
+        "full": "Full"
+      },
       "steps": {
         "provision": "Preparing the server",
         "build": "Building",
@@ -1804,6 +1808,9 @@
       "deploy": "Deploy",
       "deployTitle": "Deploy commit {sha}?",
       "deploying": "Deploying {sha}",
+      "fullRebuild": "Full rebuild",
+      "fullRebuildTitle": "Full rebuild of commit {sha}?",
+      "fullRebuildHint": "Skips the fast track and rebuilds the image from scratch.",
       "changes": "Changes since the live release",
       "changesHint": "{commits} commits, {files} files",
       "truncated": "The list is cut short; open the compare on GitHub for the rest.",

@@ -228,7 +228,15 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 
 // QueueDeployment asks for a deploy, rollback or restart. A deployment still waiting for the same
 // app is superseded (the newest request wins); a running one finishes first.
-func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, kind, ref string, target *string) (db.Deployment, error) {
+//
+// trackOverride is the caller's explicit choice for a "deploy" kind — "", "auto", "fast" or
+// "full". "" and "auto" defer to the app's saved deploy configuration (app_deploy_configs.mode)
+// and deploy.ChooseTrack; "fast" and "full" are stored as asked, bypassing that decision (the
+// caller is taking responsibility for it). rollback and restart never build, so they carry no
+// track. The control plane cannot yet diff a deploy's changed paths against the last successful
+// release (that needs the GitHub compare A7 wires up), so the automatic decision always treats
+// changes as unknown, which — short of an explicit "fast" override — means "full" until then.
+func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, kind, ref string, target *string, trackOverride string) (db.Deployment, error) {
 	if err := refuseImported(a); err != nil {
 		return db.Deployment{}, err
 	}
@@ -246,8 +254,13 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 	if createdBy == "" {
 		createdBy = actor.Via
 	}
+	var track, trackReason *string
+	if kind == "deploy" {
+		t, reason := s.chooseTrack(ctx, q, teamID, a, trackOverride)
+		track, trackReason = &t, &reason
+	}
 	d, err := q.InsertDeployment(ctx, db.InsertDeploymentParams{ID: newUUID(), TeamID: teamID, AppID: a.ID, ServerID: a.ServerID,
-		Ref: ref, Trigger: actor.trigger(), Kind: kind, TargetReleaseID: target, CreatedBy: createdBy})
+		Ref: ref, Trigger: actor.trigger(), Kind: kind, TargetReleaseID: target, CreatedBy: createdBy, Track: track, TrackReason: trackReason})
 	if err != nil {
 		return db.Deployment{}, err
 	}
@@ -255,12 +268,34 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 	if len(superseded) > 0 {
 		extra["superseded"] = superseded
 	}
+	if track != nil {
+		extra["track"] = *track
+	}
 	if err := tenancy.Record(ctx, q, teamID, createdBy, "deployment.queued", "deployment", d.ID, actor.audit(extra)); err != nil {
 		return db.Deployment{}, err
 	}
 	s.Wake()
 	s.ops.Broker().Publish(ops.AppTopic(a.ID))
 	return d, nil
+}
+
+// chooseTrack resolves a "deploy" kind's track: an explicit fast/full override is stored as
+// asked; "" and "auto" fall back to the app's saved deploy configuration mode (default "auto")
+// fed through ChooseTrack. See QueueDeployment's doc comment for why changed paths are always
+// treated as unknown today.
+func (s *Service) chooseTrack(ctx context.Context, q *db.Queries, teamID string, a db.App, trackOverride string) (string, string) {
+	switch trackOverride {
+	case TrackFast:
+		return TrackFast, "fast rebuild requested"
+	case TrackFull:
+		return TrackFull, "full rebuild requested"
+	}
+	mode := "auto"
+	if cfg, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: teamID}); err == nil {
+		mode = cfg.Mode
+	}
+	lastOK := a.CurrentReleaseID != nil
+	return ChooseTrack(mode, nil, lastOK)
 }
 
 // DeploymentByRef resolves a deployment of an app by id or number ("12" or "#12").
@@ -340,7 +375,7 @@ func (s *Service) Rollback(ctx context.Context, q *db.Queries, teamID string, ac
 	case "pruned":
 		return db.Deployment{}, db.Release{}, conflict(fmt.Sprintf("release v%d's image was pruned (the newest %d are kept) — deploy its commit again", target.Version, agentproto.DefaultKeepImages))
 	}
-	d, err := s.QueueDeployment(ctx, q, teamID, actor, a, "rollback", fmt.Sprintf("v%d", target.Version), &target.ID)
+	d, err := s.QueueDeployment(ctx, q, teamID, actor, a, "rollback", fmt.Sprintf("v%d", target.Version), &target.ID, "")
 	return d, target, err
 }
 
@@ -354,7 +389,7 @@ func (s *Service) Restart(ctx context.Context, q *db.Queries, teamID string, act
 	if err != nil || live.TeamID != teamID {
 		return db.Deployment{}, conflict("nothing is live to restart — deploy first")
 	}
-	return s.QueueDeployment(ctx, q, teamID, actor, a, "restart", fmt.Sprintf("v%d", live.Version), nil)
+	return s.QueueDeployment(ctx, q, teamID, actor, a, "restart", fmt.Sprintf("v%d", live.Version), nil, "")
 }
 
 // ---- env -------------------------------------------------------------------------------------------

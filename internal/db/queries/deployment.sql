@@ -15,10 +15,11 @@ DELETE FROM deployments WHERE id = $1;
 
 -- Hosbah tenant queries.
 -- name: InsertDeployment :one
-INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, target_release_id, created_by)
+INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, target_release_id, created_by, track, track_reason)
 VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('server_id'),
     (SELECT coalesce(max(d.number), 0) + 1 FROM deployments d WHERE d.app_id = sqlc.arg('app_id')),
-    sqlc.arg('ref'), sqlc.arg('trigger'), sqlc.arg('kind'), 'queued', sqlc.narg('target_release_id'), sqlc.arg('created_by'))
+    sqlc.arg('ref'), sqlc.arg('trigger'), sqlc.arg('kind'), 'queued', sqlc.narg('target_release_id'), sqlc.arg('created_by'),
+    sqlc.narg('track'), sqlc.narg('track_reason'))
 RETURNING *;
 
 -- name: SupersedeQueuedDeployments :many

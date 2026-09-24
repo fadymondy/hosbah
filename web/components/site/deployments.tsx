@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { RotateCcwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
 
-import { DeploymentStatusBadge } from "@/components/app-status"
+import { DeploymentStatusBadge, DeploymentTrackBadge } from "@/components/app-status"
 import { ReleasesPanel } from "@/components/apps/releases"
 import { ConfirmButton } from "@/components/confirm-button"
 import { DeploymentLog } from "@/components/deployment-log"
@@ -124,6 +124,7 @@ export function SiteDeployments() {
                         </span>
                         <span className="font-medium">{t(`apps.deploy.kinds.${d.kind}`, undefined, d.kind)}</span>
                         <DeploymentStatusBadge status={d.status} />
+                        <DeploymentTrackBadge track={d.track} reason={d.track_reason} />
                         <span className="ms-auto text-xs text-grid-muted">{t(`apps.deploy.triggers.${d.trigger}`, undefined, d.trigger)}</span>
                       </span>
                       <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">

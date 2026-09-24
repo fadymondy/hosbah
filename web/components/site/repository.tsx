@@ -2,7 +2,17 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { ExternalLinkIcon, FileDiffIcon, GitBranchIcon, GitCommitHorizontalIcon, GitPullRequestIcon, GithubIcon, RefreshCwIcon, RocketIcon } from "lucide-react"
+import {
+  ExternalLinkIcon,
+  FileDiffIcon,
+  GitBranchIcon,
+  GitCommitHorizontalIcon,
+  GitPullRequestIcon,
+  GithubIcon,
+  HammerIcon,
+  RefreshCwIcon,
+  RocketIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
@@ -102,9 +112,9 @@ export function SiteRepository() {
     void load()
   }, [load])
 
-  async function deploy(c: Commit) {
+  async function deploy(c: Commit, track?: "full") {
     try {
-      pushDeployment(await apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: { ref: c.sha } }))
+      pushDeployment(await apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: track ? { ref: c.sha, track } : { ref: c.sha } }))
       toast.success(t("site.repo.deploying", { sha: c.short_sha }))
       void load()
     } catch (err) {
@@ -217,14 +227,24 @@ export function SiteRepository() {
                       </span>
                     ) : null}
                     {operate && !c.is_live ? (
-                      <ConfirmButton
-                        icon={<RocketIcon />}
-                        label={t("site.repo.deploy")}
-                        title={t("site.repo.deployTitle", { sha: c.short_sha })}
-                        description={c.message}
-                        confirmLabel={t("apps.actions.deploy")}
-                        onConfirm={() => deploy(c)}
-                      />
+                      <span className="flex items-center gap-1">
+                        <ConfirmButton
+                          icon={<RocketIcon />}
+                          label={t("site.repo.deploy")}
+                          title={t("site.repo.deployTitle", { sha: c.short_sha })}
+                          description={c.message}
+                          confirmLabel={t("apps.actions.deploy")}
+                          onConfirm={() => deploy(c)}
+                        />
+                        <ConfirmButton
+                          icon={<HammerIcon />}
+                          label={t("site.repo.fullRebuild")}
+                          title={t("site.repo.fullRebuildTitle", { sha: c.short_sha })}
+                          description={t("site.repo.fullRebuildHint")}
+                          confirmLabel={t("site.repo.fullRebuild")}
+                          onConfirm={() => deploy(c, "full")}
+                        />
+                      </span>
                     ) : null}
                   </li>
                 ))}
