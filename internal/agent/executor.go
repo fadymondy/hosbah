@@ -81,6 +81,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAgentUpdate:     e.agentUpdate,
 		agentproto.KindAppDetect:       appDetect,
 		agentproto.KindAppBuild:        appBuild,
+		agentproto.KindAppFastBuild:    appFastBuild,
 		agentproto.KindAppRelease:      appRelease,
 		agentproto.KindAppStart:        appStart,
 		agentproto.KindRouteSet:        routeSet,
@@ -298,7 +299,7 @@ func laneOf(op agentproto.SignedOp) string {
 		// Host lane: it needs git and Railpack, which the provisioning steps queued just before it
 		// (same lane, so in order) install on a fresh server.
 		return "host"
-	case agentproto.KindAppBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
+	case agentproto.KindAppBuild, agentproto.KindAppFastBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
 		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove,
 		agentproto.KindRealtimeRoute:
 		var p struct {

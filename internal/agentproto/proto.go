@@ -60,7 +60,7 @@ const (
 
 // AgentKinds is what an agent will execute. Anything else is refused before it runs.
 var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, KindAgentUpdate,
-	KindAppDetect, KindAppBuild, KindAppRelease, KindAppStart, KindRouteSet, KindAppDrain,
+	KindAppDetect, KindAppBuild, KindAppFastBuild, KindAppRelease, KindAppStart, KindRouteSet, KindAppDrain,
 	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel, KindAppExec,
 	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove, KindProxySet, KindDBDrop, KindTunnelFrp, KindTunnelTailscale,
 	KindWorkloadPower, KindWorkloadLogs, KindWorkloadStats, KindGuestResize, KindGuestSnapshot, KindGuestBackup,

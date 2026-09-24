@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -22,6 +23,10 @@ const (
 	KindAppRemove   = "app.remove"   // remove the app's route, containers and images (the app was deleted)
 	KindOpCancel    = "op.cancel"    // cancel a running operation (handled at once, not queued behind it)
 	KindAppExec     = "app.exec"     // run an argv inside the live release's web container (docker exec, no TTY), bounded in time and output
+	// KindAppFastBuild (MH-573 A7): the fast track. Reuses a cached checkout, runs the app's own
+	// install/build/migrate steps inside its CURRENT live image (no host toolchains, no BuildKit
+	// rebuild), and commits the result to a new tag. See FastBuildParams / FastBuildResult.
+	KindAppFastBuild = "app.fast_build"
 )
 
 // Provision steps added in P2 (params.step of provision.step). Idempotent like P1's.
@@ -107,6 +112,111 @@ type BuildResult struct {
 	ImageID string   `json:"image_id,omitempty"`
 	Pruned  []string `json:"pruned,omitempty"`
 }
+
+// FullTrackPatterns match a changed path that forces a full rebuild: build definitions, lockfiles
+// and toolchain/version pins that a fast, in-place restart cannot safely pick up. Shared by
+// deploy.ChooseTrack (the control plane, before a deploy is dispatched — it never has changed
+// paths today) and the agent's app.fast_build handler (which computes changed paths itself, from
+// its cached checkout, and aborts to the same rule).
+var FullTrackPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^dockerfile`),
+	regexp.MustCompile(`(?i)dockerfile[^/]*$`),
+	regexp.MustCompile(`(?i)^docker-compose`),
+	regexp.MustCompile(`(?i)^\.dockerignore$`),
+	regexp.MustCompile(`(?i)^railpack\.(json|toml|jsonc)$`),
+	regexp.MustCompile(`(?i)^nixpacks\.toml$`),
+	regexp.MustCompile(`(?i)^package-lock\.json$`),
+	regexp.MustCompile(`(?i)^pnpm-lock\.yaml$`),
+	regexp.MustCompile(`(?i)^yarn\.lock$`),
+	regexp.MustCompile(`(?i)^bun\.lockb$`),
+	regexp.MustCompile(`(?i)^go\.sum$`),
+	regexp.MustCompile(`(?i)^composer\.lock$`),
+	regexp.MustCompile(`(?i)^poetry\.lock$`),
+	regexp.MustCompile(`(?i)^requirements.*\.txt$`),
+	regexp.MustCompile(`(?i)^gemfile\.lock$`),
+	regexp.MustCompile(`(?i)^\.tool-versions$`),
+	regexp.MustCompile(`(?i)^\.nvmrc$`),
+	regexp.MustCompile(`(?i)^apt\.txt$`),
+	regexp.MustCompile(`(?i)^packages\.txt$`),
+}
+
+// FullTrackMatch reports the first FullTrackPatterns entry a changed path matches, checked
+// against the path's base name.
+func FullTrackMatch(changed []string) (string, bool) {
+	for _, p := range changed {
+		base := path.Base(strings.TrimSpace(p))
+		if base == "" {
+			continue
+		}
+		for _, re := range FullTrackPatterns {
+			if re.MatchString(base) {
+				return p, true
+			}
+		}
+	}
+	return "", false
+}
+
+// FastBuildStep is one enabled step of the app's deploy configuration (deploy.DeployStep,
+// mapped over the wire so agentproto stays free of a dependency on package deploy).
+type FastBuildStep struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Run  string `json:"run"`
+}
+
+// FastBuildParams / FastBuildResult: app.fast_build. Steps run, in order, inside a container
+// started from BaseImage (the app's current live image) with the fresh checkout copied in; the
+// container is then committed as Image — no BuildKit, no host toolchains.
+type FastBuildParams struct {
+	AppID        string `json:"app_id"`
+	App          string `json:"app"`
+	DeploymentID string `json:"deployment_id"`
+	GitSource
+	Image     string          `json:"image"`      // hosbah/<app>:<deployment_id>, the new tag
+	BaseImage string          `json:"base_image"`  // the app's current live image
+	Steps     []FastBuildStep `json:"steps,omitempty"`
+	// Env is an EnvBox sealed to this agent, context EnvContext(app, deployment, "fast_build"),
+	// exported to every step (install, build, migrate) — not the release env, which app.release
+	// still seals and opens on its own.
+	Env string `json:"env,omitempty"`
+}
+
+// FastBuildResult reports what changed since the cached checkout's previous build, and either the
+// new image or, when a full-rebuild-triggering path changed, an abort: the control plane falls
+// back to app.build (Dockerfile/Railpack) and records why.
+type FastBuildResult struct {
+	Commit      string   `json:"commit"`
+	PrevCommit  string   `json:"prev_commit,omitempty"`
+	Message     string   `json:"message,omitempty"`
+	Changed     []string `json:"changed,omitempty"`
+	Image       string   `json:"image,omitempty"`
+	ImageID     string   `json:"image_id,omitempty"`
+	Aborted     bool     `json:"aborted,omitempty"`
+	AbortPath   string   `json:"abort_path,omitempty"`
+	AbortReason string   `json:"abort_reason,omitempty"`
+}
+
+// Validate checks the fields common to every app op (see StartParams.Validate) plus fast_build's own.
+func (p FastBuildParams) Validate() error {
+	if !ValidID(p.AppID) || !ValidAppName(p.App) || !ValidID(p.DeploymentID) {
+		return errors.New("bad app or deployment id")
+	}
+	if !IsAppImage(p.App, p.Image) {
+		return fmt.Errorf("image %q is not one of this app's", p.Image)
+	}
+	if p.BaseImage == "" {
+		return errors.New("no base image to build from")
+	}
+	for _, st := range p.Steps {
+		if st.Key != "" && !stepKeyRE.MatchString(st.Key) {
+			return fmt.Errorf("bad step key %q", st.Key)
+		}
+	}
+	return nil
+}
+
+var stepKeyRE = regexp.MustCompile(`^[a-z_]{1,32}$`)
 
 // ReleaseParams: app.release — the release command in a one-off container (fail = old release stays).
 type ReleaseParams struct {

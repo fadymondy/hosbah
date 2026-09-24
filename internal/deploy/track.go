@@ -1,9 +1,7 @@
 package deploy
 
 import (
-	"path"
-	"regexp"
-	"strings"
+	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
 /*
@@ -14,54 +12,16 @@ internal/mcp) and the pipeline can both call it with whatever changed-paths info
 have (or none, if the control plane cannot compute a diff).
 */
 
-// fullTrackPatterns match a changed path that forces a full rebuild: build definitions, lockfiles
-// and toolchain/version pins that a fast, in-place restart cannot safely pick up.
-var fullTrackPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)^dockerfile`),
-	regexp.MustCompile(`(?i)dockerfile[^/]*$`),
-	regexp.MustCompile(`(?i)^docker-compose`),
-	regexp.MustCompile(`(?i)^\.dockerignore$`),
-	regexp.MustCompile(`(?i)^railpack\.(json|toml|jsonc)$`),
-	regexp.MustCompile(`(?i)^nixpacks\.toml$`),
-	regexp.MustCompile(`(?i)^package-lock\.json$`),
-	regexp.MustCompile(`(?i)^pnpm-lock\.yaml$`),
-	regexp.MustCompile(`(?i)^yarn\.lock$`),
-	regexp.MustCompile(`(?i)^bun\.lockb$`),
-	regexp.MustCompile(`(?i)^go\.sum$`),
-	regexp.MustCompile(`(?i)^composer\.lock$`),
-	regexp.MustCompile(`(?i)^poetry\.lock$`),
-	regexp.MustCompile(`(?i)^requirements.*\.txt$`),
-	regexp.MustCompile(`(?i)^gemfile\.lock$`),
-	regexp.MustCompile(`(?i)^\.tool-versions$`),
-	regexp.MustCompile(`(?i)^\.nvmrc$`),
-	// apt/system packages
-	regexp.MustCompile(`(?i)^apt\.txt$`),
-	regexp.MustCompile(`(?i)^packages\.txt$`),
-}
-
 // TrackFast and TrackFull are the values ChooseTrack (and a deploy trigger's track override) return.
 const (
 	TrackFast = "fast"
 	TrackFull = "full"
 )
 
-// fullTrackMatch reports the first fullTrackPatterns entry a changed path matches, checked
-// against the path's base name (build files live at a repo's top level almost always, and a
-// nested lockfile is just as build-affecting).
-func fullTrackMatch(changed []string) (string, bool) {
-	for _, p := range changed {
-		base := path.Base(strings.TrimSpace(p))
-		if base == "" {
-			continue
-		}
-		for _, re := range fullTrackPatterns {
-			if re.MatchString(base) {
-				return p, true
-			}
-		}
-	}
-	return "", false
-}
+// fullTrackMatch reports the first agentproto.FullTrackPatterns entry a changed path matches. The
+// pattern list lives in agentproto so the agent's app.fast_build handler can apply the exact same
+// rule to the changed paths it computes from its cached checkout.
+func fullTrackMatch(changed []string) (string, bool) { return agentproto.FullTrackMatch(changed) }
 
 // ChooseTrack decides a deployment's track. mode is the app's deploy configuration mode
 // (auto | fast | full); changed is the set of paths that differ from the last successful

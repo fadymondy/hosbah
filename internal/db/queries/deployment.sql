@@ -63,6 +63,12 @@ SELECT * FROM deployments WHERE id = $1;
 -- name: SetDeploymentStep :exec
 UPDATE deployments SET step = $2, updated_at = now() WHERE id = $1;
 
+-- name: SetDeploymentTrack :exec
+-- The dispatcher falls back from fast to full after app.fast_build aborts (MH-573 A7): the stored
+-- track and reason are updated to match what actually ran.
+UPDATE deployments SET track = sqlc.arg('track'), track_reason = sqlc.arg('track_reason'), updated_at = now()
+WHERE id = sqlc.arg('id');
+
 -- name: SetDeploymentBuild :exec
 UPDATE deployments SET commit_sha = sqlc.narg('commit_sha'), commit_message = sqlc.narg('commit_message'),
     image = sqlc.narg('image'), runtime = sqlc.narg('runtime'), updated_at = now()

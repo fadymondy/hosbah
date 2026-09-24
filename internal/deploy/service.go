@@ -510,6 +510,99 @@ func (r *runner) envBox(ctx context.Context, process string) (string, error) {
 	return agentproto.SealBox(r.agentKey, agentproto.EnvContext(r.app.ID, r.dep.ID, process), raw)
 }
 
+// fastBuild (MH-573 A7) tries the fast track: app.fast_build runs the app's own install/build/
+// migrate steps inside its current live image on the target server and commits the result,
+// skipping the Dockerfile/Railpack rebuild. It returns false (never an error, unless the op itself
+// failed to run) when the fast track cannot apply — no previous release, no deploy script
+// configured, or the agent's own diff saw a build-affecting path — so the caller falls back to a
+// full build; either way the deployment's stored track is corrected to match what actually ran.
+func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.GitSource, built *agentproto.BuildResult) (bool, error) {
+	if reason, ok := fastBuildBlockedByRelease(r.live); ok {
+		r.downgradeTrack(ctx, reason)
+		return false, nil
+	}
+	var cfg db.AppDeployConfig
+	cfgErr := r.tx(ctx, func(q *db.Queries) error {
+		var err error
+		cfg, err = q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
+		return err
+	})
+	fbSteps, reason, ok := fastBuildSteps(cfg.Steps, cfgErr)
+	if !ok {
+		r.downgradeTrack(ctx, reason)
+		return false, nil
+	}
+	box, err := r.envBox(ctx, "fast_build")
+	if err != nil {
+		return false, err
+	}
+	var res agentproto.FastBuildResult
+	if err := r.op(ctx, "build", agentproto.KindAppFastBuild, agentproto.FastBuildParams{
+		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, GitSource: src,
+		Image: image, BaseImage: r.live.Image, Steps: fbSteps, Env: box,
+	}, &res); err != nil {
+		return false, fmt.Errorf("fast build: %w", err)
+	}
+	if res.Aborted {
+		reason := res.AbortReason
+		if reason == "" {
+			reason = "a build-affecting file changed"
+		}
+		r.logf("info", "fast track aborted (%s) — falling back to a full build", reason)
+		r.downgradeTrack(ctx, reason)
+		return false, nil
+	}
+	*built = agentproto.BuildResult{
+		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast"},
+		Image:        res.Image, ImageID: res.ImageID,
+	}
+	return true, nil
+}
+
+// fastBuildBlockedByRelease reports whether the fast track cannot apply because there is no
+// previous successful release to build from (app.fast_build needs a live image as its base).
+// Pure so the dispatcher's decision is unit-testable without a database.
+func fastBuildBlockedByRelease(live *db.Release) (reason string, blocked bool) {
+	if live == nil || live.Image == "" {
+		return "no previous successful release", true
+	}
+	return "", false
+}
+
+// fastBuildSteps parses an app_deploy_configs.steps JSON column into the install/build/migrate/
+// on_failure steps app.fast_build runs, or reports why the fast track cannot apply: no deploy
+// script configuration row (cfgErr, e.g. sql.ErrNoRows) or an unreadable one. Pure so the
+// dispatcher's decision is unit-testable without a database.
+func fastBuildSteps(stepsJSON string, cfgErr error) (steps []agentproto.FastBuildStep, reason string, ok bool) {
+	if cfgErr != nil {
+		return nil, "no deploy script configured", false
+	}
+	var parsed []DeployStep
+	if err := json.Unmarshal([]byte(stepsJSON), &parsed); err != nil {
+		return nil, "the deploy script configuration is unreadable", false
+	}
+	for _, s := range parsed {
+		if !s.Enabled || strings.TrimSpace(s.Run) == "" {
+			continue
+		}
+		switch s.Key {
+		case "install", "build", "migrate", "on_failure":
+			steps = append(steps, agentproto.FastBuildStep{Key: s.Key, Name: s.Name, Run: s.Run})
+		}
+	}
+	return steps, "", true
+}
+
+// downgradeTrack corrects the deployment's stored track (and reason) once a fast attempt could not
+// run, so deployments.track always matches what the pipeline actually did.
+func (r *runner) downgradeTrack(ctx context.Context, reason string) {
+	full := TrackFull
+	_ = r.tx(ctx, func(q *db.Queries) error {
+		return q.SetDeploymentTrack(ctx, db.SetDeploymentTrackParams{ID: r.dep.ID, Track: &full, TrackReason: &reason})
+	})
+	r.dep.Track, r.dep.TrackReason = &full, &reason
+}
+
 // ---- deploy ------------------------------------------------------------------------------------------
 
 func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
@@ -553,12 +646,22 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		src.Token = box
 		r.logf("info", "cloning with a fresh token of the team's GitHub App installation")
 	}
-	if err := r.op(ctx, "build", agentproto.KindAppBuild, agentproto.BuildParams{
-		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
-		GitSource: src,
-		Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
-	}, &built); err != nil {
-		return nil, fmt.Errorf("build: %w", err)
+	fast := r.dep.Track != nil && *r.dep.Track == TrackFast
+	if fast {
+		ok, err := r.fastBuild(ctx, image, src, &built)
+		if err != nil {
+			return nil, err
+		}
+		fast = ok // aborted or unavailable: falls through to the full build below
+	}
+	if !fast {
+		if err := r.op(ctx, "build", agentproto.KindAppBuild, agentproto.BuildParams{
+			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
+			GitSource: src,
+			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
+		}, &built); err != nil {
+			return nil, fmt.Errorf("build: %w", err)
+		}
 	}
 	runtime := built.Runtime
 	if built.Provider != "" {

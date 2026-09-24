@@ -233,9 +233,10 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 // "full". "" and "auto" defer to the app's saved deploy configuration (app_deploy_configs.mode)
 // and deploy.ChooseTrack; "fast" and "full" are stored as asked, bypassing that decision (the
 // caller is taking responsibility for it). rollback and restart never build, so they carry no
-// track. The control plane cannot yet diff a deploy's changed paths against the last successful
-// release (that needs the GitHub compare A7 wires up), so the automatic decision always treats
-// changes as unknown, which — short of an explicit "fast" override — means "full" until then.
+// track. QueueDeployment itself still cannot diff a deploy's changed paths against the last
+// successful release ahead of time — an "auto" deployment resolves to "full" here — but a "fast"
+// deployment's own agent op (app.fast_build) computes that diff on the server, from its cached
+// checkout, and aborts back to a full build when it sees a build-affecting path (runner.fastBuild).
 func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, kind, ref string, target *string, trackOverride string) (db.Deployment, error) {
 	if err := refuseImported(a); err != nil {
 		return db.Deployment{}, err
