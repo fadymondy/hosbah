@@ -123,6 +123,9 @@ func TestIsolationSweep(t *testing.T) {
 	// A saved overview canvas, so the swept …/apps/{app}/canvas routes have something to leak.
 	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/canvas", map[string]any{"layout": map[string]any{
 		"nodes": map[string]any{"app": map[string]any{"x": 1, "y": 2}}, "viewport": map[string]any{"x": 0, "y": 0, "zoom": 1}}}, 200, nil)
+	// A saved deploy configuration, so the swept …/apps/{app}/deploy-config routes have something to leak.
+	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/deploy-config", map[string]any{"mode": "auto", "preset": "node",
+		"steps": []map[string]any{{"key": "install", "name": "Install", "run": "npm ci", "enabled": true}}}, 200, nil)
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 	// A monitor of app A (alerts & monitors): an http check of its own hostname.
@@ -212,6 +215,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
 		"snapshot":   func(string) []string { return []string{"pre-up"} },
 		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
+		"version":    func(string) []string { return []string{"1"} },
 		"name":       func(string) []string { return []string{"SECRET_A"} },
 		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
 		"hostname":   func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
@@ -351,6 +355,8 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_app_browser": {"app": appA.App.Name, "browser": "a-env-browser", "confirm": "a-env-browser"},
 		"list_app_installs": {"app": appA.App.ID}, "install_recipe": {"app": appA.App.ID, "recipe": "mailpit", "name": "stolen", "confirm": "stolen"},
 		"remove_install": {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
+		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},
+		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
