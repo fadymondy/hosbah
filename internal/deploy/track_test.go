@@ -13,7 +13,7 @@ func TestChooseTrack(t *testing.T) {
 	}{
 		{"explicit full mode", "full", []string{"main.go"}, true, TrackFull, "full rebuild requested"},
 		{"no previous release", "auto", []string{"main.go"}, false, TrackFull, "no previous successful release"},
-		{"unknown changes", "auto", nil, true, TrackFull, "changes unknown"},
+		{"unknown changes", "auto", nil, true, TrackFast, "agent checks the changes"},
 		{"empty changes is known", "auto", []string{}, true, TrackFast, "no build-affecting changes"},
 		{"dockerfile changed", "auto", []string{"Dockerfile"}, true, TrackFull, "Dockerfile changed"},
 		{"dockerfile variant", "auto", []string{"Dockerfile.prod"}, true, TrackFull, "Dockerfile.prod changed"},

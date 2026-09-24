@@ -38,7 +38,9 @@ func ChooseTrack(mode string, changed []string, lastOK bool) (track, reason stri
 		return TrackFull, "no previous successful release"
 	}
 	if changed == nil {
-		return TrackFull, "changes unknown"
+		// The agent diffs its cached checkout and falls back to a full build itself when a
+		// build-affecting file changed, so an unknown diff is worth trying fast.
+		return TrackFast, "agent checks the changes"
 	}
 	if path, ok := fullTrackMatch(changed); ok {
 		return TrackFull, path + " changed"
