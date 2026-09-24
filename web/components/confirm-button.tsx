@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react"
 
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,7 +16,10 @@ import {
 } from "@/components/ui/dialog"
 import { useI18n } from "@/lib/i18n"
 
-/** A destructive action behind a confirmation dialog. Errors stay in the dialog. */
+/**
+ * A destructive action behind a confirmation dialog. Errors stay in the dialog. With open and
+ * onOpenChange its caller opens it, and no button is rendered.
+ */
 export function ConfirmButton({
   label,
   title,
@@ -23,6 +28,7 @@ export function ConfirmButton({
   onConfirm,
   size = "sm",
   icon,
+  ...controlled
 }: {
   label: string
   title: string
@@ -31,11 +37,11 @@ export function ConfirmButton({
   onConfirm: () => Promise<void>
   size?: "sm" | "default"
   icon?: ReactNode
-}) {
+} & Controlled) {
   const { t } = useI18n()
-  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, () => setError(null))
 
   async function run() {
     setBusy(true)
@@ -52,10 +58,12 @@ export function ConfirmButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size={size} />}>
-        {icon}
-        {label}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button variant="outline" size={size} />}>
+          {icon}
+          {label}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

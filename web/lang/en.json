@@ -457,6 +457,7 @@
       "txtName": "TXT name",
       "txtValue": "TXT value",
       "addTitle": "Add a domain",
+      "dialogHint": "Caddy serves it from now on; verify it on the Proxy page to get a public certificate.",
       "add": "Add domain",
       "remove": "Remove",
       "removeTitle": "Remove this domain?",
@@ -1608,6 +1609,70 @@
       "none": "—",
       "hosts": "{n} hostnames",
       "runsOn": "Runs on"
+    },
+    "canvas": {
+      "hint": "Drag boxes to arrange them, click one to manage it, add a component with +, or drag from the site's handle to a database to connect it.",
+      "hintReadOnly": "Click any box to manage it. You can arrange the view; your role cannot save it or change the site.",
+      "label": "Site canvas",
+      "list": "The site's components",
+      "internet": "The internet",
+      "noDomain": "No domain yet",
+      "notConnected": "Not connected",
+      "disconnect": "Disconnect",
+      "saveFailed": "The layout could not be saved.",
+      "addComponent": "Add component",
+      "addHint": "Pick what to add; it appears on the canvas already connected to the site.",
+      "search": "Search components",
+      "resetLayout": "Reset layout",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Fit to view",
+      "minimap": "Mini map",
+      "attachTitle": "Connect a database",
+      "attachHint": "The site gets a sealed connection variable from its next deploy or restart. You can also drag from the site's handle to a database box.",
+      "noAttachable": "Every running database on this server is already connected, or there is none yet.",
+      "groups": {
+        "site": "Components",
+        "catalog": "From the catalog"
+      },
+      "kinds": {
+        "domain": "Domain",
+        "worker": "Worker",
+        "db": "Database",
+        "volume": "Volume",
+        "bucket": "S3 bucket",
+        "browser": "Browser",
+        "install": "Installed app",
+        "monitor": "Monitor",
+        "schedule": "Schedule"
+      },
+      "status": {
+        "ok": "Healthy",
+        "warn": "Needs attention",
+        "error": "Failing",
+        "busy": "In progress",
+        "off": "Off"
+      },
+      "add": {
+        "domain": "Route a hostname to this site through Caddy",
+        "database": "Connect a database or cache running on this server",
+        "volume": "Keep files across deploys",
+        "bucket": "An S3 bucket on this server's MinIO, with its own key",
+        "needsMinio": "Needs a MinIO service on this server first",
+        "browser": "Headless Chromium the site can drive",
+        "monitor": "An uptime check or a CPU, memory or disk alert",
+        "schedule": "A cron job run inside the live release",
+        "realtime": "Send websocket traffic to one of the site's workers",
+        "realtimeEdit": "Already set up: change it",
+        "stack": "Start a new site from this stack"
+      },
+      "a11y": {
+        "node": "Press Enter to open its section, Delete to remove it, or the arrow keys to move it.",
+        "nodeReadOnly": "Press Enter to open its section, or the arrow keys to move it.",
+        "edge": "Press Delete to remove this connection.",
+        "controls": "Canvas controls",
+        "handle": "Connection point"
+      }
     },
     "planned": {
       "repository": {

@@ -46,6 +46,23 @@ function firstPort(ports?: string[]): number | undefined {
   return undefined
 }
 
+/**
+ * Whether a data service can be attached to a site from here: one Hosbah runs (not imported),
+ * running, and a database or cache (a MinIO service is reached through buckets instead).
+ */
+export function attachable(s: DataService) {
+  return !isImported(s) && s.kind !== "minio" && s.status === "running"
+}
+
+/**
+ * Attach a data service to an app: the API injects a sealed DATABASE_URL / REDIS_URL, applied on the
+ * next deploy or restart. Returns the variable's name.
+ */
+export async function attachDataService(team: string, service: DataService, app: string) {
+  const r = await apiFetch<{ variable: string }>(`/api/teams/${team}/data-services/${service.name}/attach`, { method: "POST", body: { app } })
+  return r.variable
+}
+
 /** Connected databases: the data services on the site's server, attached with one click. */
 export function SiteDatabases() {
   const { t, locale } = useI18n()
@@ -63,8 +80,8 @@ export function SiteDatabases() {
     apiFetch<{ services: DataService[] }>(`/api/teams/${team.slug}/data-services`)
       .then((r) => setServices((r.services ?? []).filter((s) => s.server_id === app.server_id)))
       .catch(() => setServices([]))
-    apiFetch<{ env: EnvVar[] }>(`${path}/env`)
-      .then((r) => setVars((r.env ?? []).map((e) => e.name)))
+    apiFetch<{ variables: EnvVar[] }>(`${path}/env`)
+      .then((r) => setVars((r.variables ?? []).map((e) => e.name)))
       .catch(() => setVars([]))
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,8 +91,7 @@ export function SiteDatabases() {
     setBusy(s.id)
     setError(null)
     try {
-      const r = await apiFetch<{ variable: string }>(`/api/teams/${team.slug}/data-services/${s.name}/attach`, { method: "POST", body: { app: app.name } })
-      toast.success(t("site.attached", { variable: r.variable }))
+      toast.success(t("site.attached", { variable: await attachDataService(team.slug, s, app.name) }))
       load()
     } catch (err) {
       setError(errorText(err))
@@ -159,7 +175,7 @@ export function SiteDatabases() {
                           {t("lists.manage")}
                         </Button>
                         {manage && !isImported(s) && s.kind !== "minio" ? (
-                          <Button size="sm" disabled={busy === s.id || s.status !== "running"} onClick={() => void attach(s)}>
+                          <Button size="sm" disabled={busy === s.id || !attachable(s)} onClick={() => void attach(s)}>
                             <LinkIcon />
                             {t("site.attach")}
                           </Button>

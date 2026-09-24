@@ -1,0 +1,87 @@
+/* The site overview canvas (React Flow) in the grid's colours, light and dark alike: every value is a
+   grid token, which the theme already switches. */
+.hosbah-canvas .react-flow {
+  --xy-background-color: var(--grid-bg);
+  --xy-background-pattern-color: var(--grid-line);
+  --xy-edge-stroke: var(--grid-muted);
+  --xy-edge-stroke-selected: var(--grid-brand);
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: var(--grid-brand);
+  --xy-connectionline-stroke-width: 2;
+  --xy-minimap-background-color: var(--grid-card);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--grid-bg) 70%, transparent);
+  --xy-minimap-mask-stroke-color: var(--grid-line);
+  --xy-minimap-node-background-color: var(--grid-soft);
+  --xy-minimap-node-stroke-color: var(--grid-line);
+  --xy-controls-button-background-color: var(--grid-card);
+  --xy-controls-button-background-color-hover: var(--grid-soft);
+  --xy-controls-button-color: var(--grid-fg);
+  --xy-controls-button-color-hover: var(--grid-fg);
+  --xy-controls-button-border-color: var(--grid-line);
+  --xy-controls-box-shadow: none;
+  --xy-attribution-background-color: transparent;
+  --xy-handle-background-color: var(--grid-brand);
+  --xy-handle-border-color: var(--grid-card);
+}
+
+.hosbah-canvas .react-flow__controls,
+.hosbah-canvas .react-flow__minimap {
+  border: 1px solid var(--grid-line);
+}
+
+/* xyflow fills control icons; lucide's are stroked. */
+.hosbah-canvas .react-flow__controls-button svg.lucide {
+  fill: none;
+  max-width: 14px;
+  max-height: 14px;
+}
+
+.hosbah-canvas .react-flow__node:focus-visible,
+.hosbah-canvas .react-flow__edge:focus-visible {
+  outline: 2px solid var(--grid-brand);
+  outline-offset: 3px;
+}
+
+/* Traffic flows through these (visitors → domain → Caddy → app). */
+.hosbah-canvas .react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--grid-brand);
+}
+
+/* Handles: only the app's (where a connection starts) and a database's that is not connected yet
+   (where one may end) show; while connecting, every box shows where it would take one, and a box
+   that refuses it turns red. */
+.hosbah-canvas .hosbah-handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  border: 2px solid var(--grid-card);
+  background: var(--grid-brand);
+}
+.hosbah-canvas .hosbah-handle-hidden {
+  opacity: 0;
+}
+.hosbah-canvas .hosbah-handle-open {
+  width: 12px;
+  height: 12px;
+}
+.hosbah-canvas.is-connecting .hosbah-handle.target {
+  opacity: 1;
+  background: var(--grid-muted);
+}
+.hosbah-canvas.is-connecting .hosbah-handle-open.target {
+  background: var(--grid-brand);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--grid-brand) 30%, transparent);
+}
+.hosbah-canvas .react-flow__handle.connectingto:not(.valid) {
+  background: var(--grid-danger);
+}
+.hosbah-canvas .react-flow__connection.invalid .react-flow__connection-path {
+  stroke: var(--grid-danger);
+  stroke-dasharray: 5 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hosbah-canvas .react-flow__edge.animated .react-flow__edge-path {
+    animation: none;
+  }
+}

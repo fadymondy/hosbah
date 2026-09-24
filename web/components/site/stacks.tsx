@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BlocksIcon, BoxIcon, ExternalLinkIcon, LayersIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
@@ -23,7 +24,7 @@ import type { DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
-type Recipe = {
+export type Recipe = {
   id: string
   name: string
   summary: string
@@ -35,7 +36,7 @@ type Recipe = {
   needs: { postgres?: boolean; redis?: boolean }
   has_web_ui: boolean
 }
-type Install = {
+export type Install = {
   id: string
   name: string
   recipe: string
@@ -49,6 +50,11 @@ type Install = {
   error: string | null
   running: boolean | null
   restarts: number | null
+}
+
+/** The data services an installed app may use: running, Hosbah-managed ones on the site's server. */
+export function installServices(all: DataService[], serverId: string) {
+  return all.filter((s) => s.server_id === serverId && !isImported(s) && s.status === "running")
 }
 
 /**
@@ -89,7 +95,7 @@ export function SiteStacks() {
         setRecipes([])
       })
     apiFetch<{ services: DataService[] }>(`/api/teams/${team.slug}/data-services`)
-      .then((r) => setServices((r.services ?? []).filter((s) => s.server_id === app.server_id && !isImported(s) && s.status === "running")))
+      .then((r) => setServices(installServices(r.services ?? [], app.server_id)))
       .catch(() => setServices([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, team.slug, app.server_id])
@@ -166,13 +172,7 @@ export function SiteStacks() {
                     {manage ? (
                       <TableCell>
                         <div className="flex justify-end">
-                          <RemoveInstall
-                            name={i.name}
-                            onRemove={async (deleteData) => {
-                              await apiFetch(`${path}/installs/${i.id}`, { method: "DELETE", body: { confirm: i.name, delete_data: deleteData } })
-                              await load()
-                            }}
-                          />
+                          <RemoveInstall path={path} install={i} onRemoved={load} />
                         </div>
                       </TableCell>
                     ) : null}
@@ -246,10 +246,20 @@ export function SiteStacks() {
   )
 }
 
-function InstallDialog({ path, recipe, services, onSaved }: { path: string; recipe: Recipe; services: DataService[]; onSaved: () => Promise<void> }) {
+/**
+ * Install an "app" recipe next to the site. services: the running, Hosbah-managed data services on
+ * the site's server (for recipes that need Postgres or Redis). Also opened from the overview canvas.
+ */
+export function InstallDialog({
+  path,
+  recipe,
+  services,
+  onSaved,
+  ...controlled
+}: { path: string; recipe: Recipe; services: DataService[]; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
   const [name, setName] = useState(recipe.id)
   const [hostname, setHostname] = useState("")
   const [postgres, setPostgres] = useState("")
@@ -288,10 +298,12 @@ function InstallDialog({ path, recipe, services, onSaved }: { path: string; reci
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
-        <PlusIcon />
-        {t("site.stacks.install")}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <PlusIcon />
+          {t("site.stacks.install")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -301,7 +313,7 @@ function InstallDialog({ path, recipe, services, onSaved }: { path: string; reci
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="in-name">{t("site.monitors.name")}</FieldLabel>
-              <Input id="in-name" dir="ltr" required pattern="[a-z][a-z0-9-]{0,30}" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input id="in-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             {recipe.needs.postgres ? (
               <ServicePick label="Postgres" items={pg} value={postgres} onChange={setPostgres} />
@@ -351,21 +363,28 @@ function ServicePick({ label, items, value, onChange }: { label: string; items: 
   )
 }
 
-function RemoveInstall({ name, onRemove }: { name: string; onRemove: (deleteData: boolean) => Promise<void> }) {
+/** Remove an installed app: type its name; its data only on request. Also opened from the overview canvas. */
+export function RemoveInstall({ path, install, onRemoved, ...controlled }: { path: string; install: Install; onRemoved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const name = install.name
   const [typed, setTyped] = useState("")
   const [data, setData] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, () => {
+    setTyped("")
+    setData(false)
+    setError(null)
+  })
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      await onRemove(data)
+      await apiFetch(`${path}/installs/${install.id}`, { method: "DELETE", body: { confirm: name, delete_data: data } })
+      await onRemoved()
       setOpen(false)
     } catch (err) {
       setError(errorText(err))
@@ -375,21 +394,13 @@ function RemoveInstall({ name, onRemove }: { name: string; onRemove: (deleteData
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) {
-          setTyped("")
-          setData(false)
-          setError(null)
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        <Trash2Icon />
-        {t("site.storage.remove")}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <Trash2Icon />
+          {t("site.storage.remove")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>

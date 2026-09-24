@@ -120,6 +120,9 @@ func TestIsolationSweep(t *testing.T) {
 	if resp, b := ua.raw("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/logo", "image/png", []byte("\x89PNG\r\n\x1a\nalpha")); resp.StatusCode != 200 {
 		t.Fatalf("app logo: %d %s", resp.StatusCode, b)
 	}
+	// A saved overview canvas, so the swept …/apps/{app}/canvas routes have something to leak.
+	ua.mustJSON("PUT", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/canvas", map[string]any{"layout": map[string]any{
+		"nodes": map[string]any{"app": map[string]any{"x": 1, "y": 2}}, "viewport": map[string]any{"x": 0, "y": 0, "zoom": 1}}}, 200, nil)
 	var domA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/domains", map[string]any{"hostname": "a-" + suffix + ".example.test", "tls": "off"}, 201, &domA)
 	// A monitor of app A (alerts & monitors): an http check of its own hostname.

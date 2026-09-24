@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ArchiveIcon, HardDriveIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
@@ -22,8 +23,8 @@ import { humanBytes, type DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
-type Volume = { id: string; name: string; mount_path: string; volume: string; mounted: boolean; bytes: number | null }
-type Bucket = { id: string; service: string; bucket: string; access_key: string; env_prefix: string; env: string[]; status: "creating" | "ready" | "failed" | "removing"; error: string | null }
+export type Volume = { id: string; name: string; mount_path: string; volume: string; mounted: boolean; bytes: number | null }
+export type Bucket = { id: string; service: string; bucket: string; access_key: string; env_prefix: string; env: string[]; status: "creating" | "ready" | "failed" | "removing"; error: string | null }
 
 /**
  * Storage: what the site keeps outside its releases. Volumes are mounted into every release and
@@ -114,15 +115,7 @@ export function SiteStorage() {
                     {manage ? (
                       <TableCell>
                         <div className="flex justify-end">
-                          <RemoveDialog
-                            name={v.name}
-                            warn={v.mounted ? t("site.storage.volumeMounted") : t("site.storage.volumeDataHint")}
-                            allowData={!v.mounted}
-                            onRemove={async (deleteData) => {
-                              await apiFetch(`${path}/storage/volumes/${v.id}`, { method: "DELETE", body: { confirm: v.name, delete_data: deleteData } })
-                              await load()
-                            }}
-                          />
+                          <RemoveVolume path={path} volume={v} onRemoved={load} />
                         </div>
                       </TableCell>
                     ) : null}
@@ -186,16 +179,7 @@ export function SiteStorage() {
                     {manage ? (
                       <TableCell>
                         <div className="flex justify-end">
-                          <RemoveDialog
-                            name={b.bucket}
-                            warn={t("site.storage.bucketRemoveHint")}
-                            allowData
-                            allowForce
-                            onRemove={async (deleteData, force) => {
-                              await apiFetch(`${path}/storage/buckets/${b.id}`, { method: "DELETE", body: { confirm: b.bucket, delete_data: deleteData, force: deleteData && force } })
-                              await load()
-                            }}
-                          />
+                          <RemoveBucket path={path} bucket={b} onRemoved={load} />
                         </div>
                       </TableCell>
                     ) : null}
@@ -211,10 +195,11 @@ export function SiteStorage() {
   )
 }
 
-function AddVolume({ path, onSaved }: { path: string; onSaved: () => Promise<void> }) {
+/** Add a volume (mounted from the next deploy). Also opened from the overview canvas. */
+export function AddVolume({ path, onSaved, ...controlled }: { path: string; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
   const [name, setName] = useState("")
   const [mount, setMount] = useState("")
   const [busy, setBusy] = useState(false)
@@ -240,10 +225,12 @@ function AddVolume({ path, onSaved }: { path: string; onSaved: () => Promise<voi
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
-        <PlusIcon />
-        {t("site.storage.addVolume")}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <PlusIcon />
+          {t("site.storage.addVolume")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -253,7 +240,7 @@ function AddVolume({ path, onSaved }: { path: string; onSaved: () => Promise<voi
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="vol-name">{t("site.monitors.name")}</FieldLabel>
-              <Input id="vol-name" dir="ltr" required pattern="[a-z][a-z0-9-]{0,30}" placeholder="uploads" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input id="vol-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" placeholder="uploads" value={name} onChange={(e) => setName(e.target.value)} />
               <FieldDescription>{t("site.storage.nameHint")}</FieldDescription>
             </Field>
             <Field>
@@ -277,10 +264,11 @@ function AddVolume({ path, onSaved }: { path: string; onSaved: () => Promise<voi
   )
 }
 
-function AddBucket({ path, services, onSaved }: { path: string; services: DataService[]; onSaved: () => Promise<void> }) {
+/** Add a bucket on one of the server's MinIO services. Also opened from the overview canvas. */
+export function AddBucket({ path, services, onSaved, ...controlled }: { path: string; services: DataService[]; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
   const [service, setService] = useState(services[0]?.name ?? "")
   const [bucket, setBucket] = useState("")
   const [prefix, setPrefix] = useState("S3")
@@ -306,10 +294,12 @@ function AddBucket({ path, services, onSaved }: { path: string; services: DataSe
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
-        <PlusIcon />
-        {t("site.storage.addBucket")}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <PlusIcon />
+          {t("site.storage.addBucket")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -334,7 +324,7 @@ function AddBucket({ path, services, onSaved }: { path: string; services: DataSe
             </Field>
             <Field>
               <FieldLabel htmlFor="bkt-name">{t("site.storage.bucket")}</FieldLabel>
-              <Input id="bkt-name" dir="ltr" required minLength={3} maxLength={63} pattern="[a-z0-9][a-z0-9-]*[a-z0-9]" placeholder="my-site-uploads" value={bucket} onChange={(e) => setBucket(e.target.value)} />
+              <Input id="bkt-name" dir="ltr" required minLength={3} maxLength={63} pattern="[a-z0-9][a-z0-9\-]*[a-z0-9]" placeholder="my-site-uploads" value={bucket} onChange={(e) => setBucket(e.target.value)} />
             </Field>
             <Field>
               <FieldLabel htmlFor="bkt-prefix">{t("site.storage.prefix")}</FieldLabel>
@@ -357,6 +347,41 @@ function AddBucket({ path, services, onSaved }: { path: string; services: DataSe
   )
 }
 
+/** Remove a volume (typed name; its data only when it is not mounted). Also opened from the overview canvas. */
+export function RemoveVolume({ path, volume: v, onRemoved, ...controlled }: { path: string; volume: Volume; onRemoved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  return (
+    <RemoveDialog
+      {...controlled}
+      name={v.name}
+      warn={v.mounted ? t("site.storage.volumeMounted") : t("site.storage.volumeDataHint")}
+      allowData={!v.mounted}
+      onRemove={async (deleteData) => {
+        await apiFetch(`${path}/storage/volumes/${v.id}`, { method: "DELETE", body: { confirm: v.name, delete_data: deleteData } })
+        await onRemoved()
+      }}
+    />
+  )
+}
+
+/** Remove a bucket (typed name; its data, even when not empty, only on request). Also opened from the overview canvas. */
+export function RemoveBucket({ path, bucket: b, onRemoved, ...controlled }: { path: string; bucket: Bucket; onRemoved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  return (
+    <RemoveDialog
+      {...controlled}
+      name={b.bucket}
+      warn={t("site.storage.bucketRemoveHint")}
+      allowData
+      allowForce
+      onRemove={async (deleteData, force) => {
+        await apiFetch(`${path}/storage/buckets/${b.id}`, { method: "DELETE", body: { confirm: b.bucket, delete_data: deleteData, force: deleteData && force } })
+        await onRemoved()
+      }}
+    />
+  )
+}
+
 /** Remove a volume or bucket: type its name; deleting its data is a separate, explicit choice. */
 function RemoveDialog({
   name,
@@ -364,21 +389,27 @@ function RemoveDialog({
   allowData,
   allowForce,
   onRemove,
+  ...controlled
 }: {
   name: string
   warn: string
   allowData: boolean
   allowForce?: boolean
   onRemove: (deleteData: boolean, force: boolean) => Promise<void>
-}) {
+} & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState("")
   const [data, setData] = useState(false)
   const [force, setForce] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, () => {
+    setTyped("")
+    setData(false)
+    setForce(false)
+    setError(null)
+  })
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -395,22 +426,13 @@ function RemoveDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) {
-          setTyped("")
-          setData(false)
-          setForce(false)
-          setError(null)
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        <Trash2Icon />
-        {t("site.storage.remove")}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <Trash2Icon />
+          {t("site.storage.remove")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>

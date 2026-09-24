@@ -5,10 +5,13 @@ import { CheckCircle2Icon, GlobeIcon, InfoIcon, ShieldCheckIcon } from "lucide-r
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
-import { useErrorText } from "@/components/form-error"
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
+import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
@@ -17,6 +20,149 @@ import type { Domain, Integrations, TLSMode } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 
 const TLS: TLSMode[] = ["auto", "internal", "off"]
+
+/** How an imported workload's hostname reaches it (see DomainsPanel). */
+export type DomainPort = { required: boolean; suggested?: number }
+
+/** A hostname Hosbah accepts (the API checks again). */
+export function hostnameOK(h: string) {
+  return /^(?=.{3,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(h.trim())
+}
+
+/** Route a hostname to the app. */
+export function addDomain(path: string, hostname: string, tls: TLSMode, port?: number) {
+  return apiFetch<Domain>(`${path}/domains`, {
+    method: "POST",
+    body: { hostname: hostname.trim().toLowerCase(), tls, ...(port ? { port } : {}) },
+  })
+}
+
+/** Stop routing a hostname to the app (plain confirmation). Also opened from the overview canvas. */
+export function RemoveDomain({ path, domain: d, onRemoved, ...controlled }: { path: string; domain: Domain; onRemoved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  return (
+    <ConfirmButton
+      {...controlled}
+      label={t("apps.domains.remove")}
+      title={t("apps.domains.removeTitle")}
+      description={t("apps.domains.removeHint", { host: d.hostname })}
+      confirmLabel={t("apps.domains.remove")}
+      onConfirm={async () => {
+        try {
+          await apiFetch(`${path}/domains/${d.id}`, { method: "DELETE" })
+        } catch (err) {
+          throw new Error(errorText(err))
+        }
+        await onRemoved()
+      }}
+    />
+  )
+}
+
+/** The add-a-domain form as a dialog, opened from the overview canvas (the proxy page has it inline). */
+export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: string; port?: DomainPort; onSaved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [hostname, setHostname] = useState("")
+  const [tls, setTls] = useState<TLSMode>("auto")
+  const [portValue, setPortValue] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { open, setOpen } = useDialogOpen(controlled, () => {
+    setHostname("")
+    setTls("auto")
+    setPortValue(port?.suggested ? String(port.suggested) : "")
+    setError(null)
+  })
+  const ok = hostnameOK(hostname)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await addDomain(path, hostname, tls, port && portValue ? Number(portValue) : undefined)
+      setOpen(false)
+      await onSaved()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{t("apps.domains.addTitle")}</DialogTitle>
+            <DialogDescription>{t("apps.domains.dialogHint")}</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="cdom-host">{t("apps.domains.hostname")}</FieldLabel>
+              <Input
+                id="cdom-host"
+                dir="ltr"
+                required
+                maxLength={253}
+                placeholder="app.example.com"
+                value={hostname}
+                onChange={(e) => setHostname(e.target.value)}
+                aria-invalid={hostname !== "" && !ok}
+                autoComplete="off"
+              />
+            </Field>
+            {port ? (
+              <Field>
+                <FieldLabel htmlFor="cdom-port">{t("controls.domainPort")}</FieldLabel>
+                <Input
+                  id="cdom-port"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  dir="ltr"
+                  className="w-32 font-mono"
+                  required={port.required}
+                  value={portValue}
+                  onChange={(e) => setPortValue(e.target.value)}
+                />
+                <FieldDescription>{t(port.required ? "controls.domainPortGuest" : "controls.domainPortContainer")}</FieldDescription>
+              </Field>
+            ) : null}
+            <Field>
+              <FieldLabel>{t("apps.domains.tlsLabel")}</FieldLabel>
+              <Select value={tls} onValueChange={(v) => v && setTls(v as TLSMode)}>
+                <SelectTrigger className="w-full" aria-label={t("apps.domains.tlsLabel")}>
+                  <SelectValue>{(v: string) => t(`apps.domains.tls.${v}`)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TLS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {t(`apps.domains.tls.${m}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t(`apps.domains.tlsHint.${tls}`)}</FieldDescription>
+            </Field>
+          </FieldGroup>
+          <FormError message={error} />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={busy || !ok || (!!port?.required && !portValue)}>
+              {busy ? t("common.working") : t("apps.domains.add")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 /**
  * `port`: an imported workload's hostname is routed to one of its ports — required for a guest
@@ -31,7 +177,7 @@ export function DomainsPanel({
   team: string
   path: string
   manage: boolean
-  port?: { required: boolean; suggested?: number }
+  port?: DomainPort
 }) {
   const { t } = useI18n()
   const fmt = useFormatDate()
@@ -63,17 +209,14 @@ export function DomainsPanel({
       .catch(() => setAppsDomain(null))
   }, [load, team])
 
-  const hostOK = /^(?=.{3,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(hostname.trim())
+  const hostOK = hostnameOK(hostname)
 
   async function add(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      await apiFetch(`${path}/domains`, {
-        method: "POST",
-        body: { hostname: hostname.trim().toLowerCase(), tls, ...(port && portValue ? { port: Number(portValue) } : {}) },
-      })
+      await addDomain(path, hostname, tls, port && portValue ? Number(portValue) : undefined)
       setHostname("")
       await load()
     } catch (err) {
@@ -145,20 +288,7 @@ export function DomainsPanel({
                         {t("apps.domains.verify")}
                       </Button>
                     ) : null}
-                    <ConfirmButton
-                      label={t("apps.domains.remove")}
-                      title={t("apps.domains.removeTitle")}
-                      description={t("apps.domains.removeHint", { host: d.hostname })}
-                      confirmLabel={t("apps.domains.remove")}
-                      onConfirm={async () => {
-                        try {
-                          await apiFetch(`${path}/domains/${d.id}`, { method: "DELETE" })
-                        } catch (err) {
-                          throw new Error(errorText(err))
-                        }
-                        await load()
-                      }}
-                    />
+                    <RemoveDomain path={path} domain={d} onRemoved={load} />
                   </span>
                 ) : null}
               </div>

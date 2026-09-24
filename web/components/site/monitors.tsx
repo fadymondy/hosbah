@@ -5,6 +5,7 @@ import { ActivityIcon, BellRingIcon, CpuIcon, GlobeIcon, HardDriveIcon, MemorySt
 import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
@@ -24,7 +25,7 @@ import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
 type Kind = "http" | "cpu" | "memory" | "disk"
-type Monitor = {
+export type Monitor = {
   id: string
   name: string
   kind: Kind
@@ -203,21 +204,7 @@ export function SiteMonitors() {
                               {t("site.monitors.checkNow")}
                             </Button>
                             <MonitorDialog path={path} hosts={hosts} monitor={m} onSaved={load} />
-                            <ConfirmButton
-                              icon={<Trash2Icon />}
-                              label={t("common.delete")}
-                              title={t("site.monitors.deleteTitle", { name: m.name })}
-                              description={t("site.monitors.deleteBody")}
-                              confirmLabel={t("common.delete")}
-                              onConfirm={async () => {
-                                try {
-                                  await apiFetch(`${path}/monitors/${m.id}`, { method: "DELETE" })
-                                } catch (err) {
-                                  throw new Error(errorText(err))
-                                }
-                                await load()
-                              }}
-                            />
+                            <DeleteMonitor path={path} monitor={m} onDeleted={load} />
                           </div>
                         </TableCell>
                       ) : null}
@@ -269,11 +256,43 @@ export function SiteMonitors() {
   )
 }
 
-/** Create or edit one monitor. */
-function MonitorDialog({ path, hosts, monitor, onSaved }: { path: string; hosts: string[]; monitor?: Monitor; onSaved: () => Promise<void> }) {
+/** Delete a monitor (and its incidents). Also opened from the overview canvas. */
+export function DeleteMonitor({ path, monitor: m, onDeleted, ...controlled }: { path: string; monitor: Monitor; onDeleted: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  return (
+    <ConfirmButton
+      {...controlled}
+      icon={<Trash2Icon />}
+      label={t("common.delete")}
+      title={t("site.monitors.deleteTitle", { name: m.name })}
+      description={t("site.monitors.deleteBody")}
+      confirmLabel={t("common.delete")}
+      onConfirm={async () => {
+        try {
+          await apiFetch(`${path}/monitors/${m.id}`, { method: "DELETE" })
+        } catch (err) {
+          throw new Error(errorText(err))
+        }
+        await onDeleted()
+      }}
+    />
+  )
+}
+
+/**
+ * Create or edit one monitor. hosts: the site's own URLs, offered as targets (the first is the
+ * default). Also opened from the overview canvas.
+ */
+export function MonitorDialog({
+  path,
+  hosts,
+  monitor,
+  onSaved,
+  ...controlled
+}: { path: string; hosts: string[]; monitor?: Monitor; onSaved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
   const [name, setName] = useState("")
   const [kind, setKind] = useState<Kind>("http")
   const [target, setTarget] = useState("")
@@ -286,6 +305,7 @@ function MonitorDialog({ path, hosts, monitor, onSaved }: { path: string; hosts:
   const [enabled, setEnabled] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, reset)
 
   function reset() {
     setError(null)
@@ -330,17 +350,13 @@ function MonitorDialog({ path, hosts, monitor, onSaved }: { path: string; hosts:
 
   const http = kind === "http"
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) reset()
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant={monitor ? "outline" : "default"} />}>
-        {monitor ? <PencilIcon /> : <PlusIcon />}
-        {monitor ? t("lists.edit") : t("site.monitors.add")}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" variant={monitor ? "outline" : "default"} />}>
+          {monitor ? <PencilIcon /> : <PlusIcon />}
+          {monitor ? t("lists.edit") : t("site.monitors.add")}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>

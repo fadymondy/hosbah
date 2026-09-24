@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { EyeIcon, InfoIcon, KeyRoundIcon, PencilIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import type { Controlled } from "@/components/dialog-state"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,32 @@ import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api"
 import { ENV_NAME, type EnvVar } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
+
+/**
+ * Remove one variable (from the next deploy or restart). Also how the overview canvas disconnects a
+ * database: by removing the variable that points at it.
+ */
+export function RemoveEnvVar({ path, name, onRemoved, ...controlled }: { path: string; name: string; onRemoved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  return (
+    <ConfirmButton
+      {...controlled}
+      label={t("apps.env.remove")}
+      title={t("apps.env.removeTitle", { name })}
+      description={t("apps.env.removeHint")}
+      confirmLabel={t("apps.env.remove")}
+      onConfirm={async () => {
+        try {
+          await apiFetch(`${path}/env/${encodeURIComponent(name)}`, { method: "DELETE" })
+        } catch (err) {
+          throw new Error(errorText(err))
+        }
+        await onRemoved()
+      }}
+    />
+  )
+}
 
 /** The app's environment: names only, values write-only (owners/admins can reveal one, audited). */
 export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
@@ -132,22 +159,7 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
                           <PencilIcon />
                           {t("apps.env.edit")}
                         </Button>
-                        <ConfirmButton
-                          label={t("apps.env.remove")}
-                          title={t("apps.env.removeTitle", { name: v.name })}
-                          description={t("apps.env.removeHint")}
-                          confirmLabel={t("apps.env.remove")}
-                          onConfirm={async () => {
-                            try {
-                              await apiFetch(`${path}/env/${encodeURIComponent(v.name)}`, {
-                                method: "DELETE",
-                              })
-                            } catch (err) {
-                              throw new Error(errorText(err))
-                            }
-                            await load()
-                          }}
-                        />
+                        <RemoveEnvVar path={path} name={v.name} onRemoved={load} />
                       </div>
                     </TableCell>
                   ) : null}

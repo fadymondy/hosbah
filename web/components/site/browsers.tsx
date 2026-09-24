@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
@@ -20,7 +21,7 @@ import { humanBytes } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
-type Browser = {
+export type Browser = {
   id: string
   name: string
   image: string
@@ -146,13 +147,7 @@ export function SiteBrowsers() {
                     {manage ? (
                       <TableCell>
                         <div className="flex justify-end">
-                          <RemoveBrowser
-                            name={b.name}
-                            onRemove={async () => {
-                              await apiFetch(`${path}/browsers/${b.id}`, { method: "DELETE", body: { confirm: b.name } })
-                              await load()
-                            }}
-                          />
+                          <RemoveBrowser path={path} browser={b} onRemoved={load} />
                         </div>
                       </TableCell>
                     ) : null}
@@ -172,10 +167,11 @@ export function SiteBrowsers() {
   )
 }
 
-function AddBrowser({ path, onSaved }: { path: string; onSaved: () => Promise<void> }) {
+/** Add a browser (headless Chromium next to the site). Also opened from the overview canvas. */
+export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
   const [name, setName] = useState("")
   const [memory, setMemory] = useState("1024")
   const [cpus, setCpus] = useState("1")
@@ -214,10 +210,12 @@ function AddBrowser({ path, onSaved }: { path: string; onSaved: () => Promise<vo
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" />}>
-        <PlusIcon />
-        {t("site.browsers.add")}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" />}>
+          <PlusIcon />
+          {t("site.browsers.add")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -227,7 +225,7 @@ function AddBrowser({ path, onSaved }: { path: string; onSaved: () => Promise<vo
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="br-name">{t("site.monitors.name")}</FieldLabel>
-              <Input id="br-name" dir="ltr" required pattern="[a-z][a-z0-9-]{0,30}" placeholder="crawler" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input id="br-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" placeholder="crawler" value={name} onChange={(e) => setName(e.target.value)} />
               <FieldDescription>{t("site.storage.nameHint")}</FieldDescription>
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -269,20 +267,26 @@ function AddBrowser({ path, onSaved }: { path: string; onSaved: () => Promise<vo
   )
 }
 
-function RemoveBrowser({ name, onRemove }: { name: string; onRemove: () => Promise<void> }) {
+/** Remove a browser: type its name. Also opened from the overview canvas. */
+export function RemoveBrowser({ path, browser, onRemoved, ...controlled }: { path: string; browser: Browser; onRemoved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const name = browser.name
   const [typed, setTyped] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, () => {
+    setTyped("")
+    setError(null)
+  })
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      await onRemove()
+      await apiFetch(`${path}/browsers/${browser.id}`, { method: "DELETE", body: { confirm: name } })
+      await onRemoved()
       setOpen(false)
     } catch (err) {
       setError(errorText(err))
@@ -292,20 +296,13 @@ function RemoveBrowser({ name, onRemove }: { name: string; onRemove: () => Promi
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) {
-          setTyped("")
-          setError(null)
-        }
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        <Trash2Icon />
-        {t("site.storage.remove")}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <Trash2Icon />
+          {t("site.storage.remove")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>

@@ -5,6 +5,7 @@ import { CalendarClockIcon, HistoryIcon, PauseIcon, PencilIcon, PlayIcon, PlusIc
 import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
@@ -24,8 +25,8 @@ import { canOperate } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
-type RunStatus = "queued" | "running" | "succeeded" | "failed" | "timeout" | "skipped"
-type Schedule = {
+export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "timeout" | "skipped"
+export type Schedule = {
   id: string
   name: string
   cron: string
@@ -208,21 +209,7 @@ export function SiteSchedules() {
                                 {s.enabled ? t("site.schedules.pause") : t("site.schedules.resume")}
                               </Button>
                               <ScheduleDialog path={path} schedule={s} onSaved={load} />
-                              <ConfirmButton
-                                icon={<Trash2Icon />}
-                                label={t("common.delete")}
-                                title={t("site.monitors.deleteTitle", { name: s.name })}
-                                description={t("site.schedules.deleteBody")}
-                                confirmLabel={t("common.delete")}
-                                onConfirm={async () => {
-                                  try {
-                                    await apiFetch(`${path}/schedules/${s.id}`, { method: "DELETE" })
-                                  } catch (err) {
-                                    throw new Error(errorText(err))
-                                  }
-                                  await load()
-                                }}
-                              />
+                              <DeleteSchedule path={path} schedule={s} onDeleted={load} />
                             </>
                           ) : null}
                         </div>
@@ -353,12 +340,38 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
   )
 }
 
-/** Create or edit a schedule; the cron expression is checked as you type, with its next fire times. */
-function ScheduleDialog({ path, schedule, onSaved }: { path: string; schedule?: Schedule; onSaved: () => Promise<void> }) {
+/** Delete a schedule (and its runs). Also opened from the overview canvas. */
+export function DeleteSchedule({ path, schedule: s, onDeleted, ...controlled }: { path: string; schedule: Schedule; onDeleted: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  return (
+    <ConfirmButton
+      {...controlled}
+      icon={<Trash2Icon />}
+      label={t("common.delete")}
+      title={t("site.monitors.deleteTitle", { name: s.name })}
+      description={t("site.schedules.deleteBody")}
+      confirmLabel={t("common.delete")}
+      onConfirm={async () => {
+        try {
+          await apiFetch(`${path}/schedules/${s.id}`, { method: "DELETE" })
+        } catch (err) {
+          throw new Error(errorText(err))
+        }
+        await onDeleted()
+      }}
+    />
+  )
+}
+
+/**
+ * Create or edit a schedule; the cron expression is checked as you type, with its next fire times.
+ * Also opened from the overview canvas.
+ */
+export function ScheduleDialog({ path, schedule, onSaved, ...controlled }: { path: string; schedule?: Schedule; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const fmt = useFormatDate()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [cron, setCron] = useState("")
   const [timezone, setTimezone] = useState("UTC")
@@ -369,6 +382,7 @@ function ScheduleDialog({ path, schedule, onSaved }: { path: string; schedule?: 
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, reset)
 
   function reset() {
     setError(null)
@@ -415,17 +429,13 @@ function ScheduleDialog({ path, schedule, onSaved }: { path: string; schedule?: 
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) reset()
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" variant={schedule ? "outline" : "default"} />}>
-        {schedule ? <PencilIcon /> : <PlusIcon />}
-        {schedule ? t("lists.edit") : t("site.schedules.add")}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button size="sm" variant={schedule ? "outline" : "default"} />}>
+          {schedule ? <PencilIcon /> : <PlusIcon />}
+          {schedule ? t("lists.edit") : t("site.schedules.add")}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
