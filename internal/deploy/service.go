@@ -944,6 +944,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		return nil, err
 	}
 	r.publish()
+	r.s.scanAfterDeploy(r.dep.TeamID, r.app.ID, r.dep.ServerID, rel.ID, rel.Image) // MH-580 J5, best-effort, non-blocking
 
 	r.step(ctx, "drain")
 	if err := r.op(ctx, "drain", agentproto.KindAppDrain, agentproto.DrainParams{AppID: r.app.ID, Keep: created, GraceSeconds: 10}, nil); err != nil {

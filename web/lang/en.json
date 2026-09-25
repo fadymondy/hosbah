@@ -2654,6 +2654,7 @@
       "web-vitals": "Web Vitals",
       "apm": "APM",
       "monitors": "Alerts & monitors",
+      "security": "Security",
       "proxy": "Proxy manager",
       "cache": "Edge cache",
       "rules": "Rules",
@@ -3129,6 +3130,39 @@
       "uptime24h": "24h",
       "uptime7d": "7d",
       "uptime30d": "30d"
+    },
+    "security": {
+      "hint": "Scan the current live release's image for known vulnerabilities with Trivy.",
+      "scanNow": "Scan now",
+      "done": "Scan finished",
+      "failed": "Scan failed",
+      "emptyTitle": "No scans yet",
+      "emptyHint": "Run a scan, or deploy again — every successful deploy scans its image automatically.",
+      "clean": "No known vulnerabilities",
+      "truncated": "Only the top findings are shown.",
+      "history": "Earlier scans",
+      "severityCol": "Severity",
+      "package": "Package",
+      "installed": "Installed",
+      "fixed": "Fixed in",
+      "id": "ID",
+      "status": {
+        "running": "Running",
+        "ok": "Done",
+        "failed": "Failed"
+      },
+      "severity": {
+        "CRITICAL": "Critical",
+        "HIGH": "High",
+        "MEDIUM": "Medium",
+        "LOW": "Low",
+        "UNKNOWN": "Unknown"
+      },
+      "trigger": {
+        "member": "manual",
+        "mcp": "MCP",
+        "deploy": "after deploy"
+      }
     },
     "schedules": {
       "add": "Add schedule",

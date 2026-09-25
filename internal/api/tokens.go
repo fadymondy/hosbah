@@ -119,4 +119,55 @@ func (d *deps) registerTokens(api huma.API) {
 		})
 		return nil, err
 	})
+
+	// rotate-mcp-token (MH-580 J7): mint a new token with the same name/scopes/lifetime, revoke the
+	// old one, and return the new secret once — the same "issue, then kill the old one" shape as
+	// database user password rotation. Never partial: if the new token cannot be inserted, the old
+	// one is left alone; only once it exists is the old one revoked.
+	type tokenRotatedOut struct {
+		Body struct {
+			McpTokenOut
+			Token string `json:"token" doc:"The new secret. Shown once."`
+		}
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "rotate-mcp-token", Method: http.MethodPost, Path: "/api/teams/{team}/mcp-tokens/{id}/rotate",
+		Summary: "Rotate a team MCP token: mint a replacement with the same name and scopes, then revoke this one (owner or admin)", Tags: []string{"MCP"},
+	}, func(ctx context.Context, in *struct {
+		TeamPath
+		ID string `path:"id" maxLength:"64"`
+	}) (*tokenRotatedOut, error) {
+		out := &tokenRotatedOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageTokens, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			old, err := q.GetMcpToken(ctx, in.ID)
+			if err != nil || old.TeamID != m.TeamID || old.RevokedAt != nil {
+				return errNotFound
+			}
+			days := 90
+			if old.ExpiresAt != nil {
+				if d := time.Until(*old.ExpiresAt); d > 0 {
+					days = int(d.Hours()/24) + 1
+				}
+			}
+			plain, hash := tokens.New(tokens.PrefixUserMCP)
+			exp := time.Now().Add(time.Duration(days) * 24 * time.Hour).UTC()
+			row, err := q.InsertMcpToken(ctx, db.InsertMcpTokenParams{
+				TeamID: m.TeamID, UserID: id.ID, Name: old.Name, TokenHash: hash, Scopes: old.Scopes, ExpiresAt: &exp,
+			})
+			if err != nil {
+				return huma.Error500InternalServerError("could not mint the replacement token")
+			}
+			if _, err := q.RevokeMcpToken(ctx, db.RevokeMcpTokenParams{ID: old.ID, TeamID: m.TeamID}); err != nil {
+				return huma.Error500InternalServerError("could not revoke the previous token")
+			}
+			if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "mcp_token.rotated", "mcp_token", row.ID,
+				map[string]any{"name": row.Name, "previous_id": old.ID}); err != nil {
+				return huma.Error500InternalServerError("audit failed")
+			}
+			out.Body.McpTokenOut = toTokenOut(row)
+			out.Body.Token = plain
+			return nil
+		})
+		return out, err
+	})
 }
