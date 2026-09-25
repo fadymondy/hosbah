@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
@@ -18,6 +20,12 @@ import (
 // HTTP management API published on 127.0.0.1 only — never on the server's public interface. The
 // agent is the only thing that ever talks to that API; domains, mailboxes and aliases reach it
 // through the typed operations below, never through a shell interpolation of a value a person typed.
+//
+// The client below talks the real Stalwart v0.13 management API (base path /api, HTTP Basic auth as
+// the "admin" fallback user), verified against Stalwart's own openapi.yml and source at tag v0.13.4
+// (no source copied — only the wire contract): everything is a "principal" (individual, domain, list,
+// group) under /api/principal, DKIM lives at /api/dkim and /api/dns/records, and there is no
+// /api/health — readiness is polled via /api/principal.
 
 // stalwartBaseURL is always loopback-only: mail.install never publishes the admin port elsewhere.
 func stalwartBaseURL(port int) string { return fmt.Sprintf("http://127.0.0.1:%d", port) }
@@ -35,18 +43,21 @@ func newStalwartClient(ctx context.Context, port int, secret string) *stalwartCl
 	return &stalwartClient{ctx: ctx, base: stalwartBaseURL(port), secret: secret, http: &http.Client{Timeout: 20 * time.Second}}
 }
 
-func (c *stalwartClient) do(method, path string, body any) ([]byte, error) {
+// do makes one call and hands back the raw status and body; every higher-level method below decides
+// for itself which statuses are success, since that differs per Stalwart endpoint (e.g. a delete
+// treats 404 as already-done, a DKIM generation treats "already exists" as fine).
+func (c *stalwartClient) do(method, path string, body any) (int, []byte, error) {
 	var rdr io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		rdr = bytes.NewReader(raw)
 	}
 	req, err := http.NewRequestWithContext(c.ctx, method, c.base+path, rdr) //#nosec G107 -- base is always 127.0.0.1, fixed by mail.install
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	req.SetBasicAuth("admin", c.secret)
 	if body != nil {
@@ -54,72 +65,201 @@ func (c *stalwartClient) do(method, path string, body any) ([]byte, error) {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("could not reach the mail server's management API: %w", err)
+		return 0, nil, fmt.Errorf("could not reach the mail server's management API: %w", err)
 	}
 	defer resp.Body.Close()
 	out, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode == http.StatusNotFound && (method == http.MethodDelete) {
-		return out, nil // idempotent delete
+	return resp.StatusCode, out, nil
+}
+
+// okOrErr turns a non-2xx status into a descriptive error; call is the "METHOD path" for the message.
+func okOrErr(status int, out []byte, call string) error {
+	if status >= 200 && status < 300 {
+		return nil
 	}
-	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("the mail server's management API answered %d: %s", resp.StatusCode, clip(string(out), 200))
-	}
-	return out, nil
+	return fmt.Errorf("the mail server's management API answered %d for %s: %s", status, call, clip(string(out), 200))
 }
 
-// CreateDomain adds a domain and returns its DKIM selector and base64 public key. Idempotent:
-// creating an already-present domain, or fetching its DKIM key when it already exists, both succeed.
-func (c *stalwartClient) CreateDomain(domain string) error {
-	_, err := c.do(http.MethodPut, "/api/domain/"+domain, map[string]any{"name": domain})
-	return err
-}
+// principalPath builds /api/principal/{name}, escaping name (an email address, or a bare domain).
+func principalPath(name string) string { return "/api/principal/" + url.PathEscape(name) }
 
-func (c *stalwartClient) DeleteDomain(domain string) error {
-	_, err := c.do(http.MethodDelete, "/api/domain/"+domain, nil)
-	return err
-}
-
-// EnsureDKIM generates (or returns the existing) DKIM key for a domain.
-func (c *stalwartClient) EnsureDKIM(domain string) (selector, publicKey string, err error) {
-	raw, err := c.do(http.MethodPost, "/api/dkim/"+domain, map[string]any{"algorithm": "ed25519"})
+// principalExists reports whether a principal (domain, mailbox or alias/list) already exists, so
+// creation stays idempotent without depending on Stalwart's error text for "already exists".
+func (c *stalwartClient) principalExists(name string) (bool, error) {
+	status, out, err := c.do(http.MethodGet, principalPath(name), nil)
 	if err != nil {
-		return "", "", err
+		return false, err
 	}
-	var out struct {
-		Selector  string `json:"selector"`
-		PublicKey string `json:"public_key"`
+	switch status {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, okOrErr(status, out, "GET "+principalPath(name))
 	}
-	if err := json.Unmarshal(raw, &out); err != nil || out.Selector == "" || out.PublicKey == "" {
-		return "", "", errors.New("the mail server did not return a DKIM key")
-	}
-	return out.Selector, out.PublicKey, nil
 }
 
-// UpsertMailbox creates or updates a mailbox (Stalwart's "individual" principal). password, when
-// empty, leaves the login untouched (an update that only changes the quota).
-func (c *stalwartClient) UpsertMailbox(email string, quotaMB int, password string) error {
-	body := map[string]any{"type": "individual", "email": email, "quota": quotaMB * 1024 * 1024}
+// deletePrincipal removes any principal by name; a 404 is treated as already-deleted so repeated
+// deletes (and cleanup of a row whose agent op never ran) stay idempotent.
+func (c *stalwartClient) deletePrincipal(name string) error {
+	status, out, err := c.do(http.MethodDelete, principalPath(name), nil)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound {
+		return nil
+	}
+	return okOrErr(status, out, "DELETE "+principalPath(name))
+}
+
+// CreateDomain adds a domain principal. Idempotent: creating an already-present domain succeeds.
+func (c *stalwartClient) CreateDomain(domain string) error {
+	exists, err := c.principalExists(domain)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	status, out, err := c.do(http.MethodPost, "/api/principal", map[string]any{"type": "domain", "name": domain})
+	if err != nil {
+		return err
+	}
+	return okOrErr(status, out, "POST /api/principal (domain)")
+}
+
+func (c *stalwartClient) DeleteDomain(domain string) error { return c.deletePrincipal(domain) }
+
+// EnsureDKIM generates a DKIM key for domain if it has none, then reads the DKIM record back from
+// Stalwart's own DNS endpoint (the source of truth for the exact TXT content it signs with), along
+// with every other record Stalwart reports for the domain. Idempotent: /api/dkim errors when a key
+// already exists, so a failed generate call is tolerated and the record is read back regardless.
+func (c *stalwartClient) EnsureDKIM(domain string) (selector, record string, all []agentproto.MailDNSRecord, err error) {
+	status, out, err := c.do(http.MethodPost, "/api/dkim", map[string]any{
+		"id": nil, "algorithm": "Ed25519", "domain": domain, "selector": nil,
+	})
+	if err != nil {
+		return "", "", nil, err
+	}
+	if status >= 300 && status != http.StatusBadRequest && status != http.StatusConflict {
+		return "", "", nil, okOrErr(status, out, "POST /api/dkim")
+	}
+	return c.dnsRecords(domain)
+}
+
+// dnsRecords reads GET /api/dns/records/{domain} and picks out the DKIM TXT record among them
+// (its owner name is "<selector>._domainkey.<domain>.").
+func (c *stalwartClient) dnsRecords(domain string) (selector, dkimRecord string, all []agentproto.MailDNSRecord, err error) {
+	status, out, err := c.do(http.MethodGet, "/api/dns/records/"+url.PathEscape(domain), nil)
+	if err != nil {
+		return "", "", nil, err
+	}
+	if err := okOrErr(status, out, "GET /api/dns/records"); err != nil {
+		return "", "", nil, err
+	}
+	var env struct {
+		Data []agentproto.MailDNSRecord `json:"data"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		return "", "", nil, fmt.Errorf("the mail server returned an unexpected DNS records response: %w", err)
+	}
+	all = env.Data
+	for _, r := range env.Data {
+		if r.Type != "TXT" || !strings.Contains(r.Name, "._domainkey.") {
+			continue
+		}
+		sel, _, ok := strings.Cut(strings.TrimSuffix(r.Name, "."), "._domainkey.")
+		if !ok {
+			continue
+		}
+		selector, dkimRecord = sel, r.Content
+		break
+	}
+	if selector == "" || dkimRecord == "" {
+		return "", "", nil, errors.New("the mail server did not return a DKIM record")
+	}
+	return selector, dkimRecord, all, nil
+}
+
+// CreateMailbox creates a mailbox: an "individual" principal named by its full email address (unique,
+// simplest lookup), with that address as its one email and (when given) its login password.
+func (c *stalwartClient) CreateMailbox(email string, quotaMB int, password string) error {
+	body := map[string]any{
+		"type": "individual", "name": email, "emails": []string{email},
+		"quota": int64(quotaMB) * 1024 * 1024, "roles": []string{"user"},
+	}
 	if password != "" {
 		body["secrets"] = []string{password}
 	}
-	_, err := c.do(http.MethodPut, "/api/principal/"+email, body)
-	return err
+	status, out, err := c.do(http.MethodPost, "/api/principal", body)
+	if err != nil {
+		return err
+	}
+	return okOrErr(status, out, "POST /api/principal (mailbox)")
 }
 
-func (c *stalwartClient) DeleteMailbox(email string) error {
-	_, err := c.do(http.MethodDelete, "/api/principal/"+email, nil)
-	return err
+// UpdateMailbox patches an existing mailbox's quota and, when given, its password.
+func (c *stalwartClient) UpdateMailbox(email string, quotaMB int, password string) error {
+	actions := []map[string]any{{"action": "set", "field": "quota", "value": int64(quotaMB) * 1024 * 1024}}
+	if password != "" {
+		actions = append(actions, map[string]any{"action": "set", "field": "secrets", "value": []string{password}})
+	}
+	status, out, err := c.do(http.MethodPatch, principalPath(email), actions)
+	if err != nil {
+		return err
+	}
+	return okOrErr(status, out, "PATCH /api/principal (mailbox)")
 }
 
-// UpsertAlias creates an alias/forward. Stalwart fans an alias's mail out to each destination.
-func (c *stalwartClient) UpsertAlias(email string, destinations []string) error {
-	_, err := c.do(http.MethodPut, "/api/alias/"+email, map[string]any{"email": email, "destinations": destinations})
-	return err
+func (c *stalwartClient) DeleteMailbox(email string) error { return c.deletePrincipal(email) }
+
+// CreateAlias models an alias to a local mailbox and a forward to external addresses the same way: a
+// Stalwart "list" principal named by the alias address, whose mail fans out to its externalMembers.
+// Destinations always go in externalMembers (arbitrary addresses), even one that happens to be a
+// mailbox on this same server: Stalwart delivers to an externalMember that resolves to a local
+// address exactly like a normal delivery, so one code path covers both a same-domain alias and an
+// outside forward without first resolving which destinations are local principals.
+func (c *stalwartClient) CreateAlias(email string, destinations []string) error {
+	body := map[string]any{"type": "list", "name": email, "emails": []string{email}, "externalMembers": destinations}
+	status, out, err := c.do(http.MethodPost, "/api/principal", body)
+	if err != nil {
+		return err
+	}
+	return okOrErr(status, out, "POST /api/principal (alias)")
 }
 
-func (c *stalwartClient) DeleteAlias(email string) error {
-	_, err := c.do(http.MethodDelete, "/api/alias/"+email, nil)
-	return err
+func (c *stalwartClient) DeleteAlias(email string) error { return c.deletePrincipal(email) }
+
+// setServerHostname sets server.hostname through Stalwart's generic settings API and reloads it live.
+// Stalwart's settings API takes a small typed-update language (its openapi.yml "settings-put" schema:
+// a list of {type, prefix, values, assert_empty} operations) that nothing else in this client needs,
+// so it is kept isolated to this one function and exercised against the fake in mail_test.go.
+func (c *stalwartClient) setServerHostname(hostname string) error {
+	body := []map[string]any{{
+		"type": "insert", "prefix": nil,
+		"values":       [][2]string{{"server.hostname", hostname}},
+		"assert_empty": false,
+	}}
+	status, out, err := c.do(http.MethodPost, "/api/settings", body)
+	if err != nil {
+		return err
+	}
+	if err := okOrErr(status, out, "POST /api/settings"); err != nil {
+		return err
+	}
+	status, out, err = c.do(http.MethodGet, "/api/reload", nil)
+	if err != nil {
+		return err
+	}
+	return okOrErr(status, out, "GET /api/reload")
+}
+
+// ready polls Stalwart's admin API until it answers: there is no /api/health in v0.13, so this uses
+// the same GET /api/principal?limit=1 call a caller would use to list principals.
+func (c *stalwartClient) ready() bool {
+	status, _, err := c.do(http.MethodGet, "/api/principal?limit=1", nil)
+	return err == nil && status == http.StatusOK
 }
 
 // ---- mail.install ----------------------------------------------------------------------------------
@@ -154,29 +294,34 @@ func mailInstall(oc *OpContext) (any, int, error) {
 	}
 
 	oc.Info("starting %s on 127.0.0.1:%d (admin API)", p.Image, p.AdminPort)
+	// On FIRST boot only, Stalwart reads STALWART_ADMIN_PASSWORD and writes it into its own config in
+	// the /opt/stalwart volume as the "admin" fallback-admin secret; there is no STALWART_HOSTNAME or
+	// STALWART_ADMIN_SECRET env var. The hostname is set afterwards through the settings API below, so
+	// it (unlike the admin password) can be changed later without recreating the container. 443/80 are
+	// never published — Caddy owns those; only the admin API (8080) is published, and only on loopback.
 	args := []string{"run", "-d", "--name", p.Container, "--restart", "unless-stopped",
 		"--label", agentproto.LabelDataService + "=" + p.MailServerID,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
 		"-v", p.Volume + ":/opt/stalwart",
 		"-p", fmt.Sprintf("127.0.0.1:%d:8080", p.AdminPort),
-		"-p", "25:25", "-p", "465:465", "-p", "587:587", "-p", "993:993", "-p", "4190:4190",
-		"-e", "STALWART_HOSTNAME", "-e", "STALWART_ADMIN_SECRET", p.Image}
-	env := []string{"STALWART_HOSTNAME=" + p.Hostname, "STALWART_ADMIN_SECRET=" + secret}
+		"-p", "25:25", "-p", "465:465", "-p", "587:587", "-p", "143:143", "-p", "993:993", "-p", "4190:4190",
+		"-e", "STALWART_ADMIN_PASSWORD", p.Image}
+	env := []string{"STALWART_ADMIN_PASSWORD=" + secret}
 	if code, err := oc.RunEnv(env, "docker", args...); err != nil {
 		return nil, code, errors.New("could not start the mail server container")
 	}
 
 	deadline := time.Now().Add(60 * time.Second)
 	client := newStalwartClient(oc.Ctx, p.AdminPort, secret)
-	for {
-		if _, err := client.do(http.MethodGet, "/api/health", nil); err == nil {
-			break
-		}
+	for !client.ready() {
 		if time.Now().After(deadline) {
 			dumpLogs(oc, p.Container, 40)
 			return nil, 1, errors.New("the mail server did not become ready in time")
 		}
 		time.Sleep(2 * time.Second)
+	}
+	if err := client.setServerHostname(p.Hostname); err != nil {
+		return nil, 1, fmt.Errorf("could not set the mail server's hostname: %w", err)
 	}
 	oc.Info("%s is ready", p.Container)
 	return agentproto.MailInstallResult{Container: p.Container, Volume: p.Volume}, 0, nil
@@ -208,12 +353,12 @@ func mailDomain(oc *OpContext) (any, int, error) {
 		if err := client.CreateDomain(p.Domain); err != nil {
 			return nil, 1, err
 		}
-		selector, pub, err := client.EnsureDKIM(p.Domain)
+		selector, record, all, err := client.EnsureDKIM(p.Domain)
 		if err != nil {
 			return nil, 1, err
 		}
 		oc.Info("added domain %s (DKIM selector %s)", p.Domain, selector)
-		return agentproto.MailDomainResult{DKIMSelector: selector, DKIMPublicKey: pub}, 0, nil
+		return agentproto.MailDomainResult{DKIMSelector: selector, DKIMRecord: record, DNSRecords: all}, 0, nil
 	}
 }
 
@@ -248,8 +393,14 @@ func mailMailbox(oc *OpContext) (any, int, error) {
 			}
 			password = box["password"]
 		}
-		if err := client.UpsertMailbox(p.Email, p.QuotaMB, password); err != nil {
-			return nil, 1, err
+		var upsertErr error
+		if p.Action == "create" {
+			upsertErr = client.CreateMailbox(p.Email, p.QuotaMB, password)
+		} else {
+			upsertErr = client.UpdateMailbox(p.Email, p.QuotaMB, password)
+		}
+		if upsertErr != nil {
+			return nil, 1, upsertErr
 		}
 		oc.Info("%s mailbox %s (quota %d MB)", map[string]string{"create": "created", "update": "updated"}[p.Action], p.Email, p.QuotaMB)
 		return agentproto.MailboxResult{Email: p.Email}, 0, nil
@@ -279,7 +430,7 @@ func mailAlias(oc *OpContext) (any, int, error) {
 		oc.Info("removed alias %s", p.Email)
 		return agentproto.MailAliasResult{Email: p.Email}, 0, nil
 	default:
-		if err := client.UpsertAlias(p.Email, p.Destinations); err != nil {
+		if err := client.CreateAlias(p.Email, p.Destinations); err != nil {
 			return nil, 1, err
 		}
 		oc.Info("set alias %s -> %v", p.Email, p.Destinations)

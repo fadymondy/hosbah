@@ -11,10 +11,12 @@ import (
 
 // Domain is a mail domain as the API shows it.
 type Domain struct {
-	ID            string  `json:"id"`
-	MailServerID  string  `json:"mail_server_id"`
-	Domain        string  `json:"domain"`
-	DKIMSelector  *string `json:"dkim_selector"`
+	ID           string  `json:"id"`
+	MailServerID string  `json:"mail_server_id"`
+	Domain       string  `json:"domain"`
+	DKIMSelector *string `json:"dkim_selector"`
+	// DKIMPublicKey is the DKIM TXT record's full content, exactly as Stalwart's own DNS endpoint
+	// reported it (not just the bare public key).
 	DKIMPublicKey *string `json:"dkim_public_key"`
 	Status        string  `json:"status" enum:"new,creating,active,failed,removing"`
 	Error         *string `json:"error"`
@@ -98,7 +100,9 @@ func (s *Service) createDomain(ctx context.Context, teamID string, srv db.MailSe
 		if err != nil {
 			return q.SetMailDomainStatus(ctx, db.SetMailDomainStatusParams{ID: row.ID, TeamID: teamID, Status: "failed", Error: strptr(err.Error())})
 		}
-		return q.SetMailDomainDKIM(ctx, db.SetMailDomainDKIMParams{ID: row.ID, TeamID: teamID, DkimSelector: strptr(res.DKIMSelector), DkimPublicKey: strptr(res.DKIMPublicKey)})
+		// dkim_public_key stores the DKIM TXT record's full content exactly as Stalwart's own
+		// /api/dns/records reported it (not just a bare public key) — see MailDomainResult.DKIMRecord.
+		return q.SetMailDomainDKIM(ctx, db.SetMailDomainDKIMParams{ID: row.ID, TeamID: teamID, DkimSelector: strptr(res.DKIMSelector), DkimPublicKey: strptr(res.DKIMRecord)})
 	})
 }
 

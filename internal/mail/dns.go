@@ -67,9 +67,13 @@ func Records(dom db.MailDomain, mailHostname string) []Record {
 		{Type: "TXT", Name: "_dmarc." + dom.Domain, Value: "v=DMARC1; p=quarantine; rua=mailto:postmaster@" + dom.Domain, Purpose: "dmarc", Status: "unknown"},
 	}
 	if dom.DkimSelector != nil && dom.DkimPublicKey != nil {
+		// dom.DkimPublicKey holds the DKIM TXT record's full content exactly as Stalwart's own
+		// /api/dns/records reported it (e.g. "v=DKIM1; k=ed25519; h=sha256; p=..."), not a bare
+		// public key Hosbah would have to format itself: Stalwart picks the exact attribute set it
+		// signs with, so Hosbah checks/publishes that string verbatim rather than reconstructing it.
 		recs = append(recs, Record{
 			Type: "TXT", Name: dkimRecordName(*dom.DkimSelector, dom.Domain),
-			Value: "v=DKIM1; k=ed25519; p=" + *dom.DkimPublicKey, Purpose: "dkim", Status: "unknown",
+			Value: *dom.DkimPublicKey, Purpose: "dkim", Status: "unknown",
 		})
 	}
 	return recs

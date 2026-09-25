@@ -24,6 +24,11 @@ const (
 
 // MailImage pins the Stalwart image tag the agent runs. Kept in one place so every install (and
 // every test) agrees on the exact, checked-in version.
+//
+// TLS note (follow-up, not implemented here): IMAP/SMTP TLS is whatever Stalwart itself issues —
+// its own ACME client or a self-signed fallback inside the container — independent of the
+// certificate Caddy manages for the same hostname. A later change should have the agent hand
+// Stalwart the certificate Caddy already holds instead of letting it mint a second one.
 const MailImage = "stalwartlabs/stalwart:v0.13.4"
 
 // MailContainerName / MailVolumeName: the fixed docker names for one team's mail server.
@@ -104,10 +109,25 @@ func (p MailDomainParams) Validate() error {
 	return nil
 }
 
+// MailDNSRecord is one DNS record Stalwart's own /api/dns/records/{domain} reports for a domain
+// (MX, SPF, DKIM, ...). It is Stalwart's source of truth for the records it actually needs to route
+// and sign mail; Hosbah's own internal/mail/dns.go still computes MX/SPF/DMARC independently (DMARC
+// stays authoritative from Hosbah since Stalwart's endpoint never reports one) and only defers to
+// Stalwart for the DKIM record, whose exact tag set (h=, k=, p=) must match what Stalwart itself signs.
+type MailDNSRecord struct {
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
 // MailDomainResult carries the DKIM key Stalwart generated for a created domain (delete: empty).
 type MailDomainResult struct {
-	DKIMSelector  string `json:"dkim_selector,omitempty"`
-	DKIMPublicKey string `json:"dkim_public_key,omitempty" doc:"Base64 public key, as it belongs in the domain's DKIM TXT record."`
+	DKIMSelector string `json:"dkim_selector,omitempty"`
+	// DKIMRecord is the DKIM TXT record's full content exactly as Stalwart's /api/dns/records
+	// reports it (e.g. "v=DKIM1; k=ed25519; h=sha256; p=..."), not just the bare public key: Stalwart
+	// picks the exact attribute set, so Hosbah publishes/checks that string verbatim.
+	DKIMRecord string          `json:"dkim_record,omitempty"`
+	DNSRecords []MailDNSRecord `json:"dns_records,omitempty" doc:"Every record Stalwart's own DNS endpoint reports for the domain (MX, SPF, DKIM, ...)."`
 }
 
 // ---- mail.mailbox ---------------------------------------------------------------------------------

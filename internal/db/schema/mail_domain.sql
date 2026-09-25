@@ -14,8 +14,9 @@ CREATE TABLE mail_domains (
 );
 
 -- Hosbah (MH-577 I2/I3): a domain served by one of the team's mail servers. dkim_selector and
--- dkim_public_key are filled in once Stalwart generates the DKIM key (mail.domain op); they drive
--- the DNS record checker and the DKIM TXT record shown/published for the domain.
+-- dkim_public_key are filled in once Stalwart generates the DKIM key (mail.domain op); dkim_public_key
+-- holds the DKIM TXT record's full content exactly as Stalwart's /api/dns/records reported it (not
+-- just the bare key), so Hosbah's DNS record checker and DKIM TXT record display/publish use it as-is.
 ALTER TABLE mail_domains ADD CONSTRAINT mail_domains_status_check CHECK (status IN ('new', 'creating', 'active', 'failed', 'removing'));
 ALTER TABLE mail_domains ADD CONSTRAINT mail_domains_domain_check CHECK (domain ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$');
 CREATE UNIQUE INDEX mail_domains_team_domain_key ON mail_domains (team_id, domain);
