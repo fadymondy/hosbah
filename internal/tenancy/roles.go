@@ -36,6 +36,7 @@ const (
 	AbilityManageApps      = "manage_apps"      // create/delete apps, their settings, env vars and domains
 	AbilityManageProducts  = "manage_products"  // SaaS products: provision/suspend/resume/upgrade instances (MH-576 D7)
 	AbilityDestroyProducts = "destroy_products" // destroy a SaaS product instance, mint/revoke product keys (owner/admin only)
+	AbilityManageMail      = "manage_mail"      // MH-577: install a mail server, manage its domains/mailboxes/aliases (owner/admin only)
 )
 
 func roleIn(roles ...string) authz.PolicyFunc {
@@ -67,6 +68,7 @@ func init() {
 		AbilityManageApps:      roleIn(RoleOwner, RoleAdmin),
 		AbilityManageProducts:  roleIn(RoleOwner, RoleAdmin, RoleDeployer),
 		AbilityDestroyProducts: roleIn(RoleOwner, RoleAdmin),
+		AbilityManageMail:      roleIn(RoleOwner, RoleAdmin),
 	})
 }
 

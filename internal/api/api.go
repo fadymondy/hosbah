@@ -61,6 +61,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerProductKeysPublic(api)
 	d.registerWorkloads(api)
 	d.registerDatabases(api)
+	d.registerMail(api)
 	d.registerResources(api)
 	d.registerProxyHosts(api)
 	d.registerFirewall(api)

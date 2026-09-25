@@ -48,6 +48,8 @@ type App struct {
 	Deploy any
 	// DBSvc is the *dbsvc.Service (typed any for the same reason): P3 data services and backups.
 	DBSvc any
+	// Mail is the *mail.Service (typed any for the same reason): MH-577 team mail servers.
+	Mail any
 	// Monitors is the *monitors.Service (typed any for the same reason): a site's alerts and monitors.
 	Monitors any
 	// Schedules is the *schedules.Service (typed any for the same reason): a site's cron jobs.

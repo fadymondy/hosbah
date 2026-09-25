@@ -113,6 +113,7 @@ func Boot() *app.App {
 	databases.StartScheduler()
 	databases.StartMetricsSampler()
 	a.DBSvc = databases
+	a.Mail = mail.New(a, svc, deploys)
 	// Servers connected before workload import existed: convert what their facts already list.
 	if _, err := importer.Backfill(context.Background(), a.SQLDB, a.Log); err != nil {
 		a.Log.Warn("imported workloads backfill failed", "err", err)

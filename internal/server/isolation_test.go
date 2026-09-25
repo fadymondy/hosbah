@@ -293,7 +293,9 @@ func TestIsolationSweep(t *testing.T) {
 		"key":         func(string) []string { return []string{keyA.ID} },
 		"upgrade":     func(string) []string { return []string{upgradeA.ID} },
 		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
-		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
+		"owner":       func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
+		"mailbox":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
+		"alias":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -628,6 +630,38 @@ func TestIsolationSweep(t *testing.T) {
 			t.Errorf("MCP %s as team B on an unknown data service should error: %+v", name, res)
 		}
 	}
+	// MH-577 mail MCP tools: a server/domain/mailbox/alias ref team B may not see is not found; nothing acts.
+	for name, args := range map[string]map[string]any{
+		"mail_server_install":  {"server": "alpha-" + suffix, "hostname": "mail.example.test"},
+		"mail_server_remove":   {"server": "no-such-mail-server"},
+		"mail_domain_add":      {"server": "no-such-mail-server", "domain": "example.test"},
+		"mail_domain_remove":   {"domain": "no-such-mail-domain.test"},
+		"mail_dns_records":     {"domain": "no-such-mail-domain.test"},
+		"mail_dns_check":       {"domain": "no-such-mail-domain.test"},
+		"mail_dns_publish":     {"domain": "no-such-mail-domain.test"},
+		"mailboxes_list":       {"domain": "no-such-mail-domain.test"},
+		"mailbox_add":          {"domain": "no-such-mail-domain.test", "local_part": "postmaster"},
+		"mailbox_remove":       {"domain": "no-such-mail-domain.test", "mailbox": "postmaster"},
+		"mailbox_set_password": {"domain": "no-such-mail-domain.test", "mailbox": "postmaster"},
+		"mailbox_set_quota":    {"domain": "no-such-mail-domain.test", "mailbox": "postmaster", "quota_mb": 512},
+		"mail_aliases_list":    {"domain": "no-such-mail-domain.test"},
+		"mail_alias_add":       {"domain": "no-such-mail-domain.test", "local_part": "sales", "kind": "forward", "destinations": []string{"x@example.test"}},
+		"mail_alias_remove":    {"domain": "no-such-mail-domain.test", "alias": "00000000-0000-4000-8000-0000000000f3"},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError {
+			t.Errorf("MCP %s as team B on an unknown mail ref should error: %+v", name, res)
+		}
+	}
+	// Filtered by a server ref B cannot see, mail_domains_list must come back empty, never an error
+	// that could distinguish "exists but not yours" from "no such server" (a leak either way).
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "mail_domains_list", map[string]any{"server": "no-such-mail-server"}); res.IsError || !strings.Contains(res.Text, "No mail domains") {
+		t.Errorf("mail_domains_list filtered by an unknown server as B should answer empty, not error: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "mail_servers_list", nil); res.IsError {
+		t.Errorf("mail_servers_list as B (no mail servers of its own) should not error: %+v", res)
+	}
+
 	// A deploy-hook token is not a session: hooks of unknown tokens are 404, the TLS ask says no.
 	if code := httpStatus(t, "POST", ts.URL+"/hooks/deploy/cdh_nope", ""); code != 404 {
 		t.Errorf("unknown deploy hook -> %d", code)

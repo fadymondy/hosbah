@@ -113,6 +113,10 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppExec:         newExecHost().appExec,
 		agentproto.KindAppProcesses:    appProcesses,
 		agentproto.KindAppLimits:       appLimits,
+		agentproto.KindMailInstall:     mailInstall,
+		agentproto.KindMailDomain:      mailDomain,
+		agentproto.KindMailbox:         mailMailbox,
+		agentproto.KindMailAlias:       mailAlias,
 		agentproto.KindDBLimits:        dbLimits,
 		agentproto.KindCacheSet:        cacheSet,
 		agentproto.KindCachePurge:      cachePurge,
@@ -408,6 +412,14 @@ func laneOf(op agentproto.SignedOp) string {
 			return "rules:" + p.TargetID
 		}
 		return "rules:?"
+	case agentproto.KindMailInstall, agentproto.KindMailDomain, agentproto.KindMailbox, agentproto.KindMailAlias:
+		var p struct {
+			MailServerID string `json:"mail_server_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.MailServerID != "" {
+			return "mail:" + p.MailServerID
+		}
+		return "mail:?"
 	}
 	return "host"
 }
