@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 )
@@ -28,11 +29,50 @@ type fsHost struct {
 
 func newFSHost() *fsHost { return &fsHost{} }
 
-func (h *fsHost) resolve(p string) string {
-	if h.root == "" {
-		return p
+func (h *fsHost) resolve(p string) (string, error) {
+	real := p
+	if h.root != "" {
+		real = filepath.Join(h.root, filepath.FromSlash(p))
 	}
-	return filepath.Join(h.root, filepath.FromSlash(p))
+	if h.followsIntoDenied(real) {
+		return "", fmt.Errorf("%s is off limits", p)
+	}
+	return real, nil
+}
+
+// followsIntoDenied: Validate only sees the path as written, so a symlink (/tmp/x -> /etc/hosbah)
+// would walk straight past the denylist. The deepest existing ancestor is resolved through its
+// links, the not-yet-existing rest appended, and the result checked against the denylist again.
+func (h *fsHost) followsIntoDenied(real string) bool {
+	existing, rest := real, ""
+	for {
+		if _, err := os.Lstat(existing); err == nil {
+			break
+		}
+		parent := filepath.Dir(existing)
+		if parent == existing {
+			return false
+		}
+		rest = filepath.Join(filepath.Base(existing), rest)
+		existing = parent
+	}
+	resolved, err := filepath.EvalSymlinks(existing)
+	if err != nil {
+		return true // a dangling or looping link: refuse rather than guess where it points
+	}
+	resolved = filepath.Join(resolved, rest)
+	if h.root != "" {
+		root, err := filepath.EvalSymlinks(h.root)
+		if err != nil {
+			return true
+		}
+		rel, err := filepath.Rel(root, resolved)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return true
+		}
+		resolved = "/" + filepath.ToSlash(rel)
+	}
+	return agentproto.FSDenied(filepath.ToSlash(resolved))
 }
 
 // ---- fs.list ---------------------------------------------------------------------------------------
@@ -45,7 +85,10 @@ func (h *fsHost) list(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	real := h.resolve(p.Path)
+	real, err := h.resolve(p.Path)
+	if err != nil {
+		return nil, 2, err
+	}
 	des, err := os.ReadDir(real)
 	if err != nil {
 		return nil, 1, fsErr("could not list", p.Path, err)
@@ -86,7 +129,10 @@ func (h *fsHost) read(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	real := h.resolve(p.Path)
+	real, err := h.resolve(p.Path)
+	if err != nil {
+		return nil, 2, err
+	}
 	info, err := os.Lstat(real)
 	if err != nil {
 		return nil, 1, fsErr("could not read", p.Path, err)
@@ -154,7 +200,10 @@ func (h *fsHost) write(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, 2, errors.New("content must be base64")
 	}
-	real := h.resolve(p.Path)
+	real, err := h.resolve(p.Path)
+	if err != nil {
+		return nil, 2, err
+	}
 	mode := os.FileMode(0o644)
 	existing, statErr := os.Lstat(real)
 	created := statErr != nil
@@ -211,7 +260,10 @@ func (h *fsHost) mkdir(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	real := h.resolve(p.Path)
+	real, err := h.resolve(p.Path)
+	if err != nil {
+		return nil, 2, err
+	}
 	if err := os.Mkdir(real, 0o755); err != nil {
 		if os.IsExist(err) {
 			return nil, 1, fmt.Errorf("%s already exists", p.Path)
@@ -234,7 +286,10 @@ func (h *fsHost) delete(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	real := h.resolve(p.Path)
+	real, err := h.resolve(p.Path)
+	if err != nil {
+		return nil, 2, err
+	}
 	if _, err := os.Lstat(real); err != nil {
 		if os.IsNotExist(err) {
 			return agentproto.FSDeleteResult{}, 0, nil // already gone
@@ -274,7 +329,14 @@ func (h *fsHost) rename(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	from, to := h.resolve(p.From), h.resolve(p.To)
+	from, err := h.resolve(p.From)
+	if err != nil {
+		return nil, 2, err
+	}
+	to, err := h.resolve(p.To)
+	if err != nil {
+		return nil, 2, err
+	}
 	if _, err := os.Lstat(to); err == nil {
 		return nil, 1, fmt.Errorf("%s already exists", p.To)
 	}

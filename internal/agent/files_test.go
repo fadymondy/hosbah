@@ -180,3 +180,32 @@ func mustOC(t *testing.T, params any) *OpContext {
 	oc, _ := opCtx(t, params)
 	return oc
 }
+
+func TestFSSymlinkIntoDeniedDirIsRefused(t *testing.T) {
+	h := newTestFSHost(t)
+	secret := filepath.Join(h.root, "etc", "hosbah")
+	if err := os.MkdirAll(secret, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(secret, "agent.key"), []byte("k"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(h.root, "tmp"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(h.root, "tmp", "x")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	if _, _, err := h.read(mustOC(t, agentproto.FSReadParams{Path: "/tmp/x/agent.key", MaxBytes: 100})); err == nil {
+		t.Fatal("read through a symlink into /etc/hosbah must be refused")
+	}
+	if _, _, err := h.list(mustOC(t, agentproto.FSListParams{Path: "/tmp/x"})); err == nil {
+		t.Fatal("listing a symlink to /etc/hosbah must be refused")
+	}
+	if _, _, err := h.write(mustOC(t, agentproto.FSWriteParams{Path: "/tmp/x/new.key", Content: "YQ=="})); err == nil {
+		t.Fatal("writing a new file through the symlink must be refused")
+	}
+	if _, _, err := h.rename(mustOC(t, agentproto.FSRenameParams{From: "/tmp/x/agent.key", To: "/tmp/stolen"})); err == nil {
+		t.Fatal("renaming out of the denied dir through the symlink must be refused")
+	}
+}
