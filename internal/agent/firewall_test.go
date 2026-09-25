@@ -26,6 +26,10 @@ table inet hosbah {
         type filter hook input priority filter; policy accept;
         ct state established,related accept
         iif "lo" accept
+        meta l4proto { icmp, ipv6-icmp } accept comment "hosbah: icmp (ping, ipv6 neighbour discovery)"
+        udp dport { 68, 546 } accept comment "hosbah: dhcp client"
+        iifname "docker0" accept comment "hosbah: containers to host"
+        iifname "br-*" accept comment "hosbah: containers to host"
         tcp dport 22 accept comment "hosbah: ssh (always allowed)"
         tcp dport {80, 443} accept comment "hosbah: web (caddy)"
         ip saddr 10.0.0.0/24 tcp dport 5432 accept comment "postgres"
@@ -54,6 +58,10 @@ table inet hosbah {
         type filter hook input priority filter; policy drop;
         ct state established,related accept
         iif "lo" accept
+        meta l4proto { icmp, ipv6-icmp } accept comment "hosbah: icmp (ping, ipv6 neighbour discovery)"
+        udp dport { 68, 546 } accept comment "hosbah: dhcp client"
+        iifname "docker0" accept comment "hosbah: containers to host"
+        iifname "br-*" accept comment "hosbah: containers to host"
         tcp dport 2222 accept comment "hosbah: ssh (always allowed)"
         tcp dport 23 drop
         udp dport 23 drop

@@ -20,6 +20,8 @@ touches any other nft table (chains, NAT rules, Docker's own tables, anything) a
 
 Safety net, always rendered first in the input chain, ahead of anything the team asked for:
   - loopback is always accepted
+  - ICMP/ICMPv6, DHCP client replies and Docker bridge traffic to the host are always accepted, so
+    a drop policy never cuts the host's own networking or its containers
   - established/related connections are always accepted (so replies to outbound traffic — the
     agent's own websocket included — are never dropped)
   - the SSH port (detected from sshd_config, or given explicitly) is always accepted
@@ -31,6 +33,14 @@ be cut by this feature.
 */
 
 const nftTable = "inet hosbah"
+
+// firewallHostNet is the part of the safety net that keeps the host's own networking alive under a
+// drop policy.
+const firewallHostNet = `        meta l4proto { icmp, ipv6-icmp } accept comment "hosbah: icmp (ping, ipv6 neighbour discovery)"
+        udp dport { 68, 546 } accept comment "hosbah: dhcp client"
+        iifname "docker0" accept comment "hosbah: containers to host"
+        iifname "br-*" accept comment "hosbah: containers to host"
+`
 
 // sshdConfigPath is where sshd's own port is read from; overridable in tests.
 var sshdConfigPath = "/etc/ssh/sshd_config"
@@ -133,6 +143,9 @@ func renderFirewallNFT(p agentproto.FirewallApplyParams, sshPort int) string {
 	b.WriteString(fmt.Sprintf("        type filter hook input priority filter; policy %s;\n", p.DefaultPolicy))
 	b.WriteString("        ct state established,related accept\n")
 	b.WriteString(`        iif "lo" accept` + "\n")
+	// Traffic the host itself depends on: ICMP (IPv6 dies without neighbour discovery), DHCP lease
+	// renewals, and containers on Docker bridges reaching services on the host.
+	b.WriteString(firewallHostNet)
 	b.WriteString(fmt.Sprintf("        tcp dport %d accept comment \"hosbah: ssh (always allowed)\"\n", sshPort))
 	if p.KeepWebPorts {
 		b.WriteString(`        tcp dport {80, 443} accept comment "hosbah: web (caddy)"` + "\n")
