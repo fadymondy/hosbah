@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -65,9 +66,20 @@ type cacheConfig struct {
 	BypassCookies []string `json:"bypass_cookies,omitempty"`
 }
 
-// cacheSet turns an app's edge cache on or off, or changes its settings while it is on. It always
-// re-renders the whole route table into Caddy (dial target) and, when at least one app on this
-// server caches, into Varnish's VCL — so a stale rule never outlives the app it belonged to.
+// cacheSet turns an app's edge cache on or off, or changes its settings while it is on.
+//
+// Enabling is ordered deliberately: the shared Varnish container and its VCL (already knowing this
+// app, with the right TTL/bypass rules) must be fully ready BEFORE the public route is ever pointed
+// at Varnish's fixed address — otherwise there is a window, between the route flip and the container
+// actually answering, where every request to the app 502s. So the container is started (or confirmed
+// running), the VCL is written and loaded, and only then does the one applyRoutes call that flips the
+// dial target run; if anything before that point fails, the route table is never touched at all. And
+// applyRoutes itself only ever persists a route change Caddy has already accepted — a rejected config
+// load returns an error here with the previous route table (both on disk and inside Caddy) untouched,
+// so a bad cache.set can never leave a server half-migrated onto a cache that isn't there.
+//
+// Disabling never needs any of this: it only ever removes the "dial Varnish" flag from an app already
+// known to route table, which is always safe to apply immediately.
 func cacheSet(oc *OpContext) (any, int, error) {
 	p, err := decode[agentproto.CacheParams](oc)
 	if err != nil {
@@ -76,58 +88,133 @@ func cacheSet(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	found := true
-	if err := applyRoutes(oc, func(t *routeTable) {
-		e, ok := t.Apps[p.AppID]
-		if !ok {
-			found = false
-			return
-		}
-		if p.Enabled {
-			e.Cache = &cacheConfig{Enabled: true, TTLSeconds: p.TTLSeconds, BypassPaths: p.BypassPaths, BypassCookies: p.BypassCookies}
-		} else {
-			e.Cache = nil
-		}
-		t.Apps[p.AppID] = e
-	}); err != nil {
-		return nil, 1, err
-	}
-	if !found {
-		return nil, 2, errors.New("this app has no route on this server yet — deploy it first")
-	}
 	t, err := loadRoutes()
 	if err != nil {
 		return nil, 1, err
 	}
-	anyEnabled := false
-	for _, e := range t.Apps {
-		if e.Cache != nil && e.Cache.Enabled {
-			anyEnabled = true
-			break
-		}
+	if _, ok := t.Apps[p.AppID]; !ok {
+		return nil, 2, errors.New("this app has no route on this server yet — deploy it first")
 	}
-	if !anyEnabled {
-		if _, rerr := execOutput(oc, "docker", "rm", "-f", cacheContainer); rerr == nil {
-			oc.Info("no app on this server caches anymore; removed the Varnish container")
+
+	if !p.Enabled {
+		if err := applyRoutes(oc, func(t *routeTable) {
+			e := t.Apps[p.AppID]
+			e.Cache = nil
+			t.Apps[p.AppID] = e
+		}); err != nil {
+			return nil, 1, err
 		}
-		return map[string]any{"enabled": false}, 0, nil
+		if t2, lerr := loadRoutes(); lerr == nil {
+			anyEnabled := false
+			for _, e := range t2.Apps {
+				if e.Cache != nil && e.Cache.Enabled {
+					anyEnabled = true
+					break
+				}
+			}
+			if !anyEnabled {
+				if _, rerr := execOutput(oc, "docker", "rm", "-f", cacheContainer); rerr == nil {
+					oc.Info("no app on this server caches anymore; removed the Varnish container")
+				}
+			}
+		}
+		return finishCacheSet(oc, false, 0)
 	}
+
+	// Fixed loopback ports: refuse to touch either the container or a route unless both are free, or
+	// already ours (our own container; our own Caddy origin server, already up for another app).
+	if err := checkCachePorts(oc, t); err != nil {
+		return nil, 2, err
+	}
+
+	cfg := &cacheConfig{Enabled: true, TTLSeconds: p.TTLSeconds, BypassPaths: p.BypassPaths, BypassCookies: p.BypassCookies}
+	candidate := cloneRouteTable(t)
+	ce := candidate.Apps[p.AppID]
+	ce.Cache = cfg
+	candidate.Apps[p.AppID] = ce
+
 	if err := ensureCacheContainer(oc); err != nil {
 		return nil, 1, err
 	}
-	if err := writeVCL(t); err != nil {
+	if err := writeVCL(candidate); err != nil {
 		return nil, 1, fmt.Errorf("could not write the cache configuration: %w", err)
 	}
 	if err := reloadVarnish(oc); err != nil {
 		return nil, 1, err
 	}
+
+	if err := applyRoutes(oc, func(t *routeTable) {
+		e := t.Apps[p.AppID]
+		e.Cache = cfg
+		t.Apps[p.AppID] = e
+	}); err != nil {
+		return nil, 1, err
+	}
+
+	// Re-render once more from the table actually now live: applyRoutes re-reads routes.json itself
+	// (under its own lock), so if anything else about the table changed between the reads above and
+	// this flip landing, Varnish's VCL must never lag what Caddy is really dialing.
+	if final, ferr := loadRoutes(); ferr == nil {
+		if werr := writeVCL(final); werr == nil {
+			_ = reloadVarnish(oc)
+		}
+	}
+
+	return finishCacheSet(oc, true, p.TTLSeconds)
+}
+
+func cloneRouteTable(t routeTable) routeTable {
+	out := routeTable{AskURL: t.AskURL, Apps: make(map[string]routeEntry, len(t.Apps)), Proxies: t.Proxies}
+	for id, e := range t.Apps {
+		out.Apps[id] = e
+	}
+	return out
+}
+
+func finishCacheSet(oc *OpContext, enabled bool, ttl int64) (any, int, error) {
 	stats, _ := readCacheStats(oc)
 	state := "disabled"
-	if p.Enabled {
-		state = fmt.Sprintf("enabled (ttl %ds)", p.TTLSeconds)
+	if enabled {
+		state = fmt.Sprintf("enabled (ttl %ds)", ttl)
 	}
 	oc.Info("edge cache %s for this app", state)
-	return map[string]any{"enabled": p.Enabled, "hits": stats.Hits, "misses": stats.Misses}, 0, nil
+	return map[string]any{"enabled": enabled, "hits": stats.Hits, "misses": stats.Misses}, 0, nil
+}
+
+// cachePortInUse reports whether something is already listening at addr. Overridable in tests.
+var cachePortInUse = func(addr string) bool {
+	conn, err := net.DialTimeout("tcp", addr, 300*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// cacheContainerIsRunning wraps containerRunning(oc, cacheContainer). Overridable in tests.
+var cacheContainerIsRunning = func(oc *OpContext) bool { return containerRunning(oc, cacheContainer) }
+
+// checkCachePorts refuses to start the cache container or switch any route onto Varnish unless port
+// 6081 (Varnish itself) and port 8180 (Caddy's loopback-only origin mirror, see caddy.go) are either
+// free or already held by our own pieces. Without this, whatever already has one of these fixed
+// loopback ports bound would otherwise be silently shadowed (or, for 8180, could make Caddy's very
+// next config load fail outright, taking every route on the server down with it) — cache.set instead
+// fails clearly, up front, before anything is touched.
+func checkCachePorts(oc *OpContext, t routeTable) error {
+	if !cacheContainerIsRunning(oc) && cachePortInUse(cacheVarnishAddr) {
+		return fmt.Errorf("port %d (%s) is already in use by something other than the edge cache container; free it and try again", cacheHTTPPort, cacheVarnishAddr)
+	}
+	originUp := false
+	for _, e := range t.Apps {
+		if e.Cache != nil && e.Cache.Enabled {
+			originUp = true
+			break
+		}
+	}
+	if !originUp && cachePortInUse(cacheOriginAddr) {
+		return fmt.Errorf("port 8180 (%s) is already in use by something other than Caddy's cache origin server; free it and try again", cacheOriginAddr)
+	}
+	return nil
 }
 
 // cachePurge bans every one of the app's hostnames from Varnish's cache.
@@ -176,17 +263,28 @@ func ensureCacheContainer(oc *OpContext) error {
 			return err
 		}
 	}
-	args := []string{"run", "-d", "--restart", "unless-stopped", "--name", cacheContainer,
-		"--label", agentproto.NamePrefix + "cache=1",
-		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
-	}
-	args = append(args, "-p", "127.0.0.1:"+strconv.Itoa(cacheHTTPPort)+":80")
-	args = append(args, "-v", cacheVCLPath()+":"+cacheVCLContainerPath+":ro")
-	args = append(args, cacheImage, "varnishd", "-F", "-f", cacheVCLContainerPath, "-a", ":80", "-s", "malloc,256m")
-	if _, err := oc.Run("docker", args...); err != nil {
+	if _, err := oc.Run("docker", cacheContainerArgs()...); err != nil {
 		return fmt.Errorf("could not start the cache container: %w", err)
 	}
 	return waitVarnishReady(oc)
+}
+
+// cacheContainerArgs is the whole `docker run` argv (minus "docker" itself) for the shared Varnish
+// container. It runs with --network host, not a published port: on the default bridge network a
+// container's own 127.0.0.1 is its own network namespace's loopback, never the host's — so the
+// backend this container's Varnish dials (cacheOriginAddr, Caddy's loopback-only origin mirror on
+// the HOST) would be unreachable and every cached request would 502. --network host puts the
+// container directly on the host's network namespace, so both varnishd's own listen address
+// (cacheVarnishAddr) and the backend it dials are the real, single 127.0.0.1.
+func cacheContainerArgs() []string {
+	args := []string{"run", "-d", "--restart", "unless-stopped", "--name", cacheContainer,
+		"--network", "host",
+		"--label", agentproto.NamePrefix + "cache=1",
+		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
+	}
+	args = append(args, "-v", cacheVCLPath()+":"+cacheVCLContainerPath+":ro")
+	args = append(args, cacheImage, "varnishd", "-F", "-f", cacheVCLContainerPath, "-a", cacheVarnishAddr, "-s", "malloc,256m")
+	return args
 }
 
 func waitVarnishReady(oc *OpContext) error {
@@ -265,12 +363,39 @@ func passthroughVCL() string {
 	return "vcl 4.1;\n\nbackend default {\n    .host = \"127.0.0.1\";\n    .port = \"8180\";\n}\n\nsub vcl_recv {\n    return (pass);\n}\n"
 }
 
+// vclRegexEscape escapes every PCRE/regex metacharacter so a bypass path's literal characters are
+// matched literally once interpolated into a VCL regex (Varnish's req.url ~ "..."). Combined with
+// ValidCacheBypassPath's narrow charset (agentproto/cache.go — letters, digits, / _ . -, nothing
+// that could ever close the quoted string or start a VCL comment/statement), the only metacharacter
+// this can see today is '.', but every one is escaped so a future charset relaxation can never
+// accidentally turn a bypass path into something other than the literal path it names.
+func vclRegexEscape(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if strings.ContainsRune(`\.+*?()|[]{}^$`, r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // renderVCL is the whole Varnish configuration for this server: one backend (the origin mirror,
 // always at cacheOriginAddr — see caddy.go) and, per cache-enabled app, an if-branch matching its
 // hostnames that sets the TTL and bypasses on its configured paths and cookies. Any request whose
 // Host does not match a known, cache-enabled hostname is passed straight through uncached — Caddy
 // only ever sends such a request to Varnish for an app whose cache is on, but a stale VCL between
 // two loads must never accidentally cache the wrong thing.
+//
+// Three rules apply to every request, before any per-app branch: only GET/HEAD is ever a candidate
+// for caching (anything else — POST, PUT, DELETE… — always passes straight through); a request that
+// carries Authorization always passes through (a cached response must never leak between two
+// different bearer identities); and hostnames/bypass paths/bypass cookies are re-checked here with
+// the same validators CacheParams.Validate uses on both sides of the wire, so a corrupt or
+// hand-edited routes.json can never turn into a VCL injection even if something upstream of this
+// function forgot to validate. Client identity (X-Forwarded-For/-Proto) is threaded through
+// explicitly for the same reason the Caddy origin server sets trusted_proxies (see caddy.go): the
+// origin mirror behind Varnish must see the real client, not Varnish's own loopback connection.
 func renderVCL(t routeTable) string {
 	var ids []string
 	for id, e := range t.Apps {
@@ -283,12 +408,22 @@ func renderVCL(t routeTable) string {
 	var b strings.Builder
 	b.WriteString("vcl 4.1;\nimport std;\n\nbackend default {\n    .host = \"127.0.0.1\";\n    .port = \"8180\";\n}\n\n")
 	b.WriteString("sub vcl_recv {\n    unset req.http.X-Hosbah-TTL;\n")
+	b.WriteString("    if (req.http.X-Forwarded-For) {\n        set req.http.X-Forwarded-For = req.http.X-Forwarded-For + \", \" + client.ip;\n    } else {\n        set req.http.X-Forwarded-For = client.ip;\n    }\n")
+	b.WriteString("    if (!req.http.X-Forwarded-Proto) {\n        set req.http.X-Forwarded-Proto = \"http\";\n    }\n")
+	b.WriteString("    if (req.method != \"GET\" && req.method != \"HEAD\") {\n        return (pass);\n    }\n")
+	b.WriteString("    if (req.http.Authorization) {\n        return (pass);\n    }\n")
 	hasApps := false
-	for i, id := range ids {
+	for _, id := range ids {
 		e := t.Apps[id]
 		hosts := make([]string, 0, len(e.Hosts))
 		for _, h := range e.Hosts {
+			if !agentproto.ValidHostname(h.Hostname) {
+				continue // defense in depth: never trust a hand-edited/corrupt routes.json
+			}
 			hosts = append(hosts, h.Hostname)
+		}
+		if len(hosts) == 0 {
+			continue
 		}
 		sort.Strings(hosts)
 		conds := make([]string, len(hosts))
@@ -296,17 +431,23 @@ func renderVCL(t routeTable) string {
 			conds[j] = fmt.Sprintf("req.http.host == %q", h)
 		}
 		kw := "if"
-		if i > 0 {
+		if hasApps {
 			kw = "elsif"
 		}
 		hasApps = true
 		fmt.Fprintf(&b, "    %s (%s) {\n", kw, strings.Join(conds, " || "))
 		fmt.Fprintf(&b, "        set req.http.X-Hosbah-TTL = %q;\n", strconv.FormatInt(e.Cache.TTLSeconds, 10))
 		for _, path := range e.Cache.BypassPaths {
-			fmt.Fprintf(&b, "        if (req.url ~ \"^%s\") {\n            return (pass);\n        }\n", path)
+			if !agentproto.ValidCacheBypassPath(path) {
+				continue
+			}
+			fmt.Fprintf(&b, "        if (req.url ~ \"^%s\") {\n            return (pass);\n        }\n", vclRegexEscape(path))
 		}
 		for _, c := range e.Cache.BypassCookies {
-			fmt.Fprintf(&b, "        if (req.http.Cookie ~ \"%s\") {\n            return (pass);\n        }\n", c)
+			if !agentproto.ValidCacheBypassCookie(c) {
+				continue
+			}
+			fmt.Fprintf(&b, "        if (req.http.Cookie ~ \"%s\") {\n            return (pass);\n        }\n", vclRegexEscape(c))
 		}
 		b.WriteString("    }\n")
 	}
@@ -315,6 +456,11 @@ func renderVCL(t routeTable) string {
 	} else {
 		b.WriteString("    return (pass);\n")
 	}
-	b.WriteString("}\n\nsub vcl_backend_response {\n    if (bereq.http.X-Hosbah-TTL) {\n        set beresp.ttl = std.duration(bereq.http.X-Hosbah-TTL + \"s\", 60s);\n    }\n}\n")
+	b.WriteString("}\n\nsub vcl_backend_response {\n")
+	b.WriteString("    if (bereq.http.X-Hosbah-TTL) {\n        set beresp.ttl = std.duration(bereq.http.X-Hosbah-TTL + \"s\", 60s);\n    }\n")
+	// A response that sets a cookie must never be shared across visitors, whatever TTL was just set
+	// above and whatever the app's own Cache-Control says.
+	b.WriteString("    if (beresp.http.Set-Cookie) {\n        set beresp.ttl = 0s;\n        set beresp.uncacheable = true;\n        return (deliver);\n    }\n")
+	b.WriteString("}\n")
 	return b.String()
 }

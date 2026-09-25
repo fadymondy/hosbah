@@ -44,6 +44,14 @@ type CacheParams struct {
 	BypassCookies []string `json:"bypass_cookies,omitempty"`
 }
 
+// ValidCacheBypassPath reports whether s is narrow enough to interpolate into a VCL regex. Exported
+// so both sides of the wire (this Validate, and the agent's renderVCL, which re-checks defensively
+// right before it writes VCL to disk) use exactly one definition of "safe".
+func ValidCacheBypassPath(s string) bool { return cacheBypassPathRE.MatchString(s) }
+
+// ValidCacheBypassCookie reports whether s is narrow enough to interpolate into a VCL regex.
+func ValidCacheBypassCookie(s string) bool { return cacheBypassCookieRE.MatchString(s) }
+
 // Validate checks a cache.set on both sides of the wire.
 func (p CacheParams) Validate() error {
 	if !ValidID(p.AppID) {
@@ -59,7 +67,7 @@ func (p CacheParams) Validate() error {
 		return errors.New("too many bypass paths")
 	}
 	for _, path := range p.BypassPaths {
-		if !cacheBypassPathRE.MatchString(path) {
+		if !ValidCacheBypassPath(path) {
 			return errors.New("bypass paths must start with / and hold only letters, numbers, - _ . /")
 		}
 	}
@@ -67,7 +75,7 @@ func (p CacheParams) Validate() error {
 		return errors.New("too many bypass cookies")
 	}
 	for _, c := range p.BypassCookies {
-		if !cacheBypassCookieRE.MatchString(c) {
+		if !ValidCacheBypassCookie(c) {
 			return errors.New("bypass cookie names must hold only letters, numbers, - and _")
 		}
 	}

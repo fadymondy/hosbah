@@ -252,18 +252,23 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		if rt != nil && rt.Validate() != nil {
 			rt = nil
 		}
-		// The origin server (127.0.0.1:8180, loopback only) always mirrors the app's real upstream,
-		// by the same hostnames, regardless of the cache toggle: it is what Varnish itself dials, so
-		// its backend never needs reconfiguring when a deploy rotates Upstream's ephemeral port —
-		// only this mirror route (re-rendered on every route.set, like the rest of the table) does.
-		if len(e.Hosts) > 0 {
+		// The origin server (127.0.0.1:8180, loopback only) mirrors a cache-enabled app's real
+		// upstream, by the same hostnames: it is what Varnish itself dials, so its backend never
+		// needs reconfiguring when a deploy rotates Upstream's ephemeral port — only this mirror
+		// route (re-rendered on every route.set, like the rest of the table) does. It is deliberately
+		// NOT rendered for an app whose cache is off: every app on every server would otherwise get a
+		// new listener and a new set of Caddy routes it never asked for, purely to sit unused — on a
+		// production server that new listener alone is blast radius (and if port 8180 happened to be
+		// taken, Caddy's whole config load would fail, breaking routing for every app on the box).
+		cacheOn := e.Cache != nil && e.Cache.Enabled
+		if cacheOn && len(e.Hosts) > 0 {
 			originHosts := append(append([]string{}, plain...), secure...)
 			originRoutes = append(originRoutes, route(id, "-origin", originHosts, e.Upstream))
 		}
 		// The public route dials Varnish instead of the app directly once its edge cache is on
 		// (MH-576 D8); Varnish's own backend is always the origin mirror above.
 		dial := e.Upstream
-		if e.Cache != nil && e.Cache.Enabled {
+		if cacheOn {
 			dial = cacheVarnishAddr
 		}
 		if len(plain) > 0 {
@@ -329,7 +334,24 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	}
 	if len(originRoutes) > 0 {
 		// No access-log block: the origin mirror is never a request's public entry point.
-		servers[caddyOrigin] = map[string]any{"listen": []string{cacheOriginAddr}, "routes": originRoutes}
+		//
+		// automatic_https.disable: this server matches on Host at a plain loopback port, never :443 —
+		// without disabling it, Caddy's automatic HTTPS can still try to manage/serve a certificate
+		// for these host matchers, which is both pointless (nothing public ever reaches :8180) and a
+		// way for a config load to start failing on its own (an ACME attempt with no way to succeed).
+		//
+		// trusted_proxies: the only thing that ever dials this server is Varnish, itself only ever
+		// dialed by this same agent's own public hosbah_http/hosbah_https — so it is trusted to pass
+		// through the real client's X-Forwarded-For/-Proto/-Host set by the public server, rather than
+		// have Caddy overwrite them with what it sees (127.0.0.1, http). Without this, an app that
+		// only accepts secure requests at its real APP_URL (Laravel and friends) would see a plain
+		// http request behind the cache and redirect-loop trying to force https.
+		servers[caddyOrigin] = map[string]any{
+			"listen":          []string{cacheOriginAddr},
+			"routes":          originRoutes,
+			"automatic_https": map[string]any{"disable": true},
+			"trusted_proxies": map[string]any{"source": "static", "ranges": []string{"127.0.0.1/32", "::1"}},
+		}
 	}
 	apps := map[string]any{"http": map[string]any{"servers": servers}}
 

@@ -85,10 +85,11 @@ func stepBuildTools(oc *OpContext) (any, int, error) {
 
 // ---- caddy.install -------------------------------------------------------------------------------
 
-const (
-	caddyBin   = "/usr/local/bin/caddy"
-	caddyAdmin = "http://localhost:2019"
-)
+const caddyBin = "/usr/local/bin/caddy"
+
+// caddyAdmin is Caddy's admin API base URL. A var, not a const, so tests can point applyRoutes/
+// caddyLoad at a fake Caddy without a real one running on the machine.
+var caddyAdmin = "http://localhost:2019"
 
 // caddySetup is where Hosbah's Caddy lives on a server: its systemd unit and the config file the
 // agent rewrites.
