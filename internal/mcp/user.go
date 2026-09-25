@@ -25,7 +25,7 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "hosbah",
 		Version:       "0.1.0",
-		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...),
+		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...),
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {
