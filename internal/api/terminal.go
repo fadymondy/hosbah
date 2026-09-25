@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -95,7 +96,8 @@ func (d *deps) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled})
+	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{CompressionMode: websocket.CompressionDisabled,
+		OriginPatterns: terminalOrigins(d.ops.PublicURL())})
 	if err != nil {
 		return
 	}
@@ -181,4 +183,16 @@ func (d *deps) auditTerminal(ctx context.Context, teamRef, userID, serverID, act
 	_ = d.inTeam(ctx, teamRef, "", func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
 		return tenancy.Record(ctx, q, m.TeamID, userID, action, "server", serverID, changes)
 	})
+}
+
+// terminalOrigins: the session cookie authenticates this socket, so a page on another site must not
+// be able to open one (the library's default already refuses an Origin that differs from Host).
+// Behind the web app's /api proxy Host is the API's own address, so the public app origin is
+// allowed by name as well.
+func terminalOrigins(publicURL string) []string {
+	u, err := url.Parse(publicURL)
+	if err != nil || u.Host == "" {
+		return nil
+	}
+	return []string{u.Host}
 }
