@@ -47,6 +47,8 @@ func Timeout(kind string) time.Duration {
 		return 2 * time.Minute
 	case agentproto.KindTunnelFrp, agentproto.KindTunnelTailscale:
 		return 5 * time.Minute
+	case agentproto.KindSFTPUser:
+		return 2 * time.Minute // a system user, a home directory and an sshd_config.d rewrite plus `sshd -t`
 	case agentproto.KindAppExec:
 		return 61 * time.Minute // the longest schedule timeout and a minute; each run sets its own (EnqueueSpec.Timeout)
 	case agentproto.KindAppLogs:

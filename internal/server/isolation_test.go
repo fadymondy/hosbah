@@ -236,6 +236,7 @@ func TestIsolationSweep(t *testing.T) {
 		"recipe":     func(string) []string { return []string{"searxng", "no-such-recipe"} },                  // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
 		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
+		"sftp_user":  func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
 		"service": func(string) []string {
@@ -345,6 +346,9 @@ func TestIsolationSweep(t *testing.T) {
 		"server_files_list": {"server": srvA, "path": "/etc"}, "server_file_read": {"server": srvA, "path": "/etc/hostname"},
 		"server_file_write": {"server": srvA, "path": "/tmp/sweep", "content": "eA=="}, "server_file_delete": {"server": srvA, "path": "/tmp/sweep"},
 		"server_file_mkdir": {"server": srvA, "path": "/tmp/sweepdir"}, "server_file_rename": {"server": srvA, "from": "/tmp/a", "to": "/tmp/b"},
+		"sftp_users_list": {"server": srvA}, "sftp_user_create": {"server": srvA, "username": "stolen", "root_dir": "/tmp", "generate_password": true},
+		"sftp_user_update": {"server": srvA, "user": "sweep_sftp", "root_dir": "/tmp"},
+		"sftp_user_delete": {"server": srvA, "user": "sweep_sftp", "confirm": "sweep_sftp"},
 		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
 		"server_guests": {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
 		"server_import_status": {"server": srvA}, "server_import_run": {"server": srvA},

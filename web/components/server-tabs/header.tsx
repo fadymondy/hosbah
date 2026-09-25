@@ -22,6 +22,7 @@ export const SERVER_TABS = [
   "discovered",
   "import",
   "files",
+  "sftp",
   "terminal",
   "operations",
   "settings",

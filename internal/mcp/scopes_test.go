@@ -96,6 +96,7 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"drop_database": true, "delete_data_service": true, "db_user_delete": true, "db_execute": true,
 		// Imported workloads: destroying the real guest or container, and deleting a guest snapshot.
 		"permanently_destroy_app": true, "permanently_destroy_data_service": true, "delete_snapshot": true,
+		"sftp_user_delete": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {
