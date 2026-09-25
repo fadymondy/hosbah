@@ -7,6 +7,7 @@ import {
   AppWindowIcon,
   ArrowLeftIcon,
   CableIcon,
+  ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
   ChevronsUpDownIcon,
@@ -50,6 +51,7 @@ import { useOptionalTeam } from "@/lib/team"
 /** Each server section's icon, and the group it sits in on the server's sidebar. */
 const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads" | "sources" | "manage" }> = {
   "": { icon: LayoutDashboardIcon, group: "" },
+  metrics: { icon: ChartNoAxesColumnIcon, group: "" },
   apps: { icon: AppWindowIcon, group: "workloads" },
   databases: { icon: DatabaseIcon, group: "workloads" },
   guests: { icon: LayersIcon, group: "workloads" },

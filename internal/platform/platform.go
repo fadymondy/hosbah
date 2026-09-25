@@ -158,13 +158,32 @@ type AuditPage struct {
 	Total int64        `json:"total"`
 }
 
-func ListAudit(ctx context.Context, q *db.Queries, limit, offset int) (AuditPage, error) {
+// AuditFilter narrows ListAudit: an actor (id or a substring of their email), an action prefix, a
+// target type and id, a created_at range, and a free-text search. Every field is "" (or a zero
+// time) to mean "no filter".
+type AuditFilter struct {
+	Actor      string
+	Action     string
+	TargetType string
+	TargetID   string
+	Since      time.Time
+	Until      time.Time
+	Q          string
+}
+
+func ListAudit(ctx context.Context, q *db.Queries, f AuditFilter, limit, offset int) (AuditPage, error) {
 	lim, off := Page(limit, offset)
-	rows, err := q.ListPlatformAudit(ctx, db.ListPlatformAuditParams{Lim: lim, Off: off})
+	since, until := f.Since, boundUntil(f.Until)
+	rows, err := q.ListPlatformAudit(ctx, db.ListPlatformAuditParams{
+		Actor: f.Actor, Action: f.Action, TargetType: f.TargetType, TargetID: f.TargetID, Since: since, Until: until, Q: f.Q,
+		Lim: lim, Off: off,
+	})
 	if err != nil {
 		return AuditPage{}, internal("list the audit log")
 	}
-	total, err := q.CountPlatformAudit(ctx)
+	total, err := q.CountPlatformAudit(ctx, db.CountPlatformAuditParams{
+		Actor: f.Actor, Action: f.Action, TargetType: f.TargetType, TargetID: f.TargetID, Since: since, Until: until, Q: f.Q,
+	})
 	if err != nil {
 		return AuditPage{}, internal("count the audit log")
 	}
@@ -177,3 +196,13 @@ func ListAudit(ctx context.Context, q *db.Queries, limit, offset int) (AuditPage
 }
 
 func isNoRows(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+// boundUntil is an "until" filter's upper bound: a far-future time when t is the zero value (no
+// filter was given), so "created_at <= until" always holds; otherwise t itself. "since" needs no
+// such treatment — the zero value already sorts before every real timestamp.
+func boundUntil(t time.Time) time.Time {
+	if t.IsZero() {
+		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+	}
+	return t
+}

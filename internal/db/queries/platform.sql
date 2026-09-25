@@ -28,11 +28,30 @@ SELECT a.id, a.actor_id, coalesce(u.email, '')::text AS actor_email, a.action, a
     a.details, a.ip, a.created_at
 FROM platform_audit a
 LEFT JOIN users u ON u.id = a.actor_id
+WHERE (sqlc.arg('actor')::text = '' OR a.actor_id = sqlc.arg('actor')::text OR coalesce(u.email, '') ILIKE '%' || sqlc.arg('actor')::text || '%')
+  AND (sqlc.arg('action')::text = '' OR a.action LIKE sqlc.arg('action')::text || '%')
+  AND (sqlc.arg('target_type')::text = '' OR a.target_type = sqlc.arg('target_type')::text)
+  AND (sqlc.arg('target_id')::text = '' OR a.target_id = sqlc.arg('target_id')::text)
+  AND a.created_at >= sqlc.arg('since')::timestamptz
+  AND a.created_at <= sqlc.arg('until')::timestamptz
+  AND (sqlc.arg('q')::text = '' OR a.action ILIKE '%' || sqlc.arg('q')::text || '%' OR a.target_type ILIKE '%' || sqlc.arg('q')::text || '%'
+       OR a.target_id ILIKE '%' || sqlc.arg('q')::text || '%' OR a.details::text ILIKE '%' || sqlc.arg('q')::text || '%'
+       OR coalesce(u.email, '') ILIKE '%' || sqlc.arg('q')::text || '%')
 ORDER BY a.created_at DESC, a.id
 LIMIT sqlc.arg('lim')::int OFFSET sqlc.arg('off')::int;
 
 -- name: CountPlatformAudit :one
-SELECT count(*) FROM platform_audit;
+SELECT count(*) FROM platform_audit a
+LEFT JOIN users u ON u.id = a.actor_id
+WHERE (sqlc.arg('actor')::text = '' OR a.actor_id = sqlc.arg('actor')::text OR coalesce(u.email, '') ILIKE '%' || sqlc.arg('actor')::text || '%')
+  AND (sqlc.arg('action')::text = '' OR a.action LIKE sqlc.arg('action')::text || '%')
+  AND (sqlc.arg('target_type')::text = '' OR a.target_type = sqlc.arg('target_type')::text)
+  AND (sqlc.arg('target_id')::text = '' OR a.target_id = sqlc.arg('target_id')::text)
+  AND a.created_at >= sqlc.arg('since')::timestamptz
+  AND a.created_at <= sqlc.arg('until')::timestamptz
+  AND (sqlc.arg('q')::text = '' OR a.action ILIKE '%' || sqlc.arg('q')::text || '%' OR a.target_type ILIKE '%' || sqlc.arg('q')::text || '%'
+       OR a.target_id ILIKE '%' || sqlc.arg('q')::text || '%' OR a.details::text ILIKE '%' || sqlc.arg('q')::text || '%'
+       OR coalesce(u.email, '') ILIKE '%' || sqlc.arg('q')::text || '%');
 
 -- name: AdminOverviewCounts :one
 SELECT

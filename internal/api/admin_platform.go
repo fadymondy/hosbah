@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -295,11 +296,23 @@ func (d *deps) registerPlatformAdmin(api huma.API) {
 	type auditOut struct{ Body platform.AuditPage }
 	huma.Register(api, huma.Operation{
 		OperationID: "admin-list-audit", Method: http.MethodGet, Path: "/api/admin/audit",
-		Summary: "The platform audit log (what platform admins changed), newest first", Tags: tags,
-	}, func(ctx context.Context, in *AdminPageQuery) (*auditOut, error) {
+		Summary: "The platform audit log (what platform admins changed), newest first; filter by actor, action prefix, target, date range or free text", Tags: tags,
+	}, func(ctx context.Context, in *struct {
+		AdminPageQuery
+		Actor      string `query:"actor" maxLength:"320" doc:"An actor id, or a substring of their email."`
+		Action     string `query:"action" maxLength:"100" doc:"Prefix match, e.g. \"team.\"."`
+		TargetType string `query:"target_type" maxLength:"100"`
+		TargetID   string `query:"target_id" maxLength:"200"`
+		Since      string `query:"since" maxLength:"40" doc:"ISO-8601; entries at or after this time."`
+		Until      string `query:"until" maxLength:"40" doc:"ISO-8601; entries at or before this time."`
+		Q          string `query:"q" maxLength:"200" doc:"Free-text search across action, target, details and actor email."`
+	}) (*auditOut, error) {
 		out := &auditOut{}
 		return out, d.asAdmin(ctx, func(q *db.Queries, _ string) (err error) {
-			out.Body, err = platform.ListAudit(ctx, q, in.Limit, in.Offset)
+			since, _ := time.Parse(time.RFC3339, in.Since)
+			until, _ := time.Parse(time.RFC3339, in.Until)
+			f := platform.AuditFilter{Actor: in.Actor, Action: in.Action, TargetType: in.TargetType, TargetID: in.TargetID, Since: since, Until: until, Q: in.Q}
+			out.Body, err = platform.ListAudit(ctx, q, f, in.Limit, in.Offset)
 			return err
 		})
 	})
