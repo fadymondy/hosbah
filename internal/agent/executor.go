@@ -35,9 +35,13 @@ type Executor struct {
 	controlPlane string
 	now          func() time.Time
 	emit         func(agentproto.Event)
-	handlers     map[string]Handler
-	browsers     *browserHost // owns the token gateways of this server's browsers
-	recipes      *recipeHost  // installed catalog recipes; runs this binary's own copy of a recipe
+	// termSend delivers a term.* frame straight to the connection, bypassing the event journal
+	// (set by the Agent that owns this executor; nil, and dropped, until then).
+	termSend func(agentproto.Frame)
+	handlers map[string]Handler
+	browsers     *browserHost  // owns the token gateways of this server's browsers
+	recipes      *recipeHost   // installed catalog recipes; runs this binary's own copy of a recipe
+	terminals    *terminalHost // interactive terminal.open sessions
 	// Restart is called after an operation that asked for it (agent.update) has reported its
 	// final status.
 	Restart func()
@@ -147,8 +151,18 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	} {
 		e.handlers[kind] = h
 	}
+	e.terminals = newTerminalHost(func(f agentproto.Frame) {
+		if e.termSend != nil {
+			e.termSend(f)
+		}
+	})
+	e.handlers[agentproto.KindTerminalOpen] = e.terminals.open
 	return e
 }
+
+// TermFrame routes a term.data / term.resize / term.close frame from the control plane to its
+// session (the agent's reader calls this for every such frame).
+func (e *Executor) TermFrame(f agentproto.Frame) { e.terminals.Handle(f) }
 
 // SetKey gives the executor this agent's private key (to open env boxes sealed to it).
 func (e *Executor) SetKey(priv ed25519.PrivateKey) { e.priv = priv }
@@ -287,6 +301,16 @@ func laneOf(op agentproto.SignedOp) string {
 	case agentproto.KindFSList, agentproto.KindFSRead, agentproto.KindFSWrite, agentproto.KindFSMkdir,
 		agentproto.KindFSDelete, agentproto.KindFSRename:
 		return "" // browsing and editing files never waits behind a build or a provisioning step
+	case agentproto.KindTerminalOpen:
+		// One lane per session: it runs for as long as someone is typing, so it must never share a
+		// lane with another session or with a build — but it also must not block one.
+		var p struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.SessionID != "" {
+			return "term:" + p.SessionID
+		}
+		return "term:?"
 	case agentproto.KindGitHubInstall, agentproto.KindGitHubLogin, agentproto.KindGitHubLogout:
 		// Their own lane: a device login waits up to 15 minutes for a human and must not block
 		// provisioning; install then login (queued in that order) still run in order. apt's lock is

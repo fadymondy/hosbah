@@ -21,6 +21,7 @@ export const SERVER_TABS = [
   "discovered",
   "import",
   "files",
+  "terminal",
   "operations",
   "settings",
 ] as const

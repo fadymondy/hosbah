@@ -83,6 +83,9 @@ type Service struct {
 	now    func() time.Time
 	dist   distCache
 	live   liveMetrics
+	// terminals is the in-memory registry of open web terminal sessions (internal/ops/terminal.go).
+	// Never persisted: a session a restart interrupts is simply over.
+	terminals *terminalRegistry
 
 	runnersMu sync.RWMutex
 	runners   map[string]ControlPlaneRunner
@@ -108,7 +111,7 @@ func New(a *app.App, cfg Config) (*Service, error) {
 	return &Service{
 		a: a, cfg: cfg, signer: priv, pubB64: pub, hub: newHub(), broker: NewBroker(),
 		wake: make(chan struct{}, 1), log: log.With("component", "ops"), now: time.Now,
-		runners: map[string]ControlPlaneRunner{},
+		runners: map[string]ControlPlaneRunner{}, terminals: newTerminalRegistry(),
 	}, nil
 }
 

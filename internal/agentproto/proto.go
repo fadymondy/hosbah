@@ -52,6 +52,15 @@ const (
 	// (agent -> server, Traffic only), sent once a minute. Control planes that predate it ignore
 	// it (an unknown frame type is simply not switched on).
 	TypeTraffic = "traffic"
+	// TypeTermData carries one chunk of a terminal.open session's bytes, either direction, base64
+	// in TermData, tagged by SessionID. Never logged, never persisted.
+	TypeTermData = "term_data"
+	// TypeTermResize (browser -> agent, through the control plane) changes a session's PTY size.
+	TypeTermResize = "term_resize"
+	// TypeTermClose ends a session, either direction: the control plane asking the agent to kill
+	// it, or the agent reporting the process exited or the session was refused/timed out. TermReason
+	// is a short, human phrase — never anything the process printed.
+	TypeTermClose = "term_close"
 )
 
 // Operation kinds. Typed only: there is no free-form shell.
@@ -74,7 +83,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindVolumeUsage, KindVolumeRemove, KindBucketCreate, KindBucketRemove, KindRealtimeRoute,
 	KindBrowserCreate, KindBrowserRemove, KindBrowserStatus,
 	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus,
-	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename}
+	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename, KindTerminalOpen}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.
@@ -114,6 +123,14 @@ type Frame struct {
 	Traffic      []TrafficMinute `json:"traffic,omitempty"`
 	Resume       []ResumeEntry   `json:"resume,omitempty"`
 	Error        string          `json:"error,omitempty"`
+	// SessionID, TermCols/TermRows, TermData (base64) and TermReason carry TypeTermData /
+	// TypeTermResize / TypeTermClose. Kept on Frame, not a sub-struct, so relaying one costs no
+	// extra allocation on the hot path an interactive session leans on.
+	SessionID  string `json:"session_id,omitempty"`
+	TermCols   int    `json:"term_cols,omitempty"`
+	TermRows   int    `json:"term_rows,omitempty"`
+	TermData   string `json:"term_data,omitempty"`
+	TermReason string `json:"term_reason,omitempty"`
 }
 
 // SignedOp is an operation as the agent receives it.

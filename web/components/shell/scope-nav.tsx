@@ -20,6 +20,7 @@ import {
   NetworkIcon,
   RadarIcon,
   SettingsIcon,
+  SquareTerminalIcon,
   WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -58,6 +59,7 @@ const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads
   discovered: { icon: RadarIcon, group: "sources" },
   import: { icon: DownloadIcon, group: "sources" },
   files: { icon: FolderIcon, group: "sources" },
+  terminal: { icon: SquareTerminalIcon, group: "sources" },
   operations: { icon: WorkflowIcon, group: "manage" },
   settings: { icon: SettingsIcon, group: "manage" },
 }

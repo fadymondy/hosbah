@@ -37,6 +37,8 @@ require (
 	rsc.io/qr v0.2.0
 )
 
+require github.com/creack/pty v1.1.24
+
 require (
 	github.com/agnivade/levenshtein v1.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect

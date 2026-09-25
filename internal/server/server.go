@@ -124,6 +124,9 @@ func Boot() *app.App {
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)
+	// A websocket upgrade is not a JSON request/response, so the web terminal is a raw route,
+	// mounted next to the Huma ones under the same /api/teams prefix (member tier).
+	api.MountTerminal(k.Router, a, svc)
 
 	k.Router.Post("/api/mcp", mcp.UserServer().Handler(a))
 	k.Router.Get("/api/mcp", mcp.UserServer().Handler(a)) // 405: no server-initiated stream

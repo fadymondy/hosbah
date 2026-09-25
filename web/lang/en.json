@@ -420,6 +420,7 @@
       "discovered": "Discovered",
       "import": "Import",
       "files": "Files",
+      "terminal": "Terminal",
       "operations": "Operations",
       "settings": "Settings",
       "danger": "Danger zone"
@@ -458,6 +459,18 @@
       "deleteFolderTitle": "Delete {name}?",
       "deleteFolderBody": "The folder and everything in it are removed from the server. This cannot be undone.",
       "deleted": "{name} deleted."
+    },
+    "terminal": {
+      "title": "Terminal",
+      "hint": "A live shell on the server, run through its agent. Owner or admin only. Nothing typed or shown here is stored — only that a session was opened and closed.",
+      "noAccessTitle": "Owner or admin only",
+      "noAccessHint": "A terminal is root on the server, so only owners and admins can open one.",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "closed": "Closed",
+      "reconnect": "Reconnect",
+      "offlineNotice": "The server's agent is not connected — a terminal needs it online.",
+      "closedNotice": "The session ended: {reason}"
     },
     "import": {
       "title": "Import",
