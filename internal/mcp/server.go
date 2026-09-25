@@ -387,6 +387,21 @@ func (a Args) Bool(k string) bool {
 	return v
 }
 
+// Float64 returns a float argument clamped to [min, max], or def (MH-575 H10: dollar amounts).
+func (a Args) Float64(k string, def, min, max float64) float64 {
+	v, ok := a[k].(float64)
+	if !ok {
+		return def
+	}
+	if v < min {
+		v = min
+	}
+	if v > max {
+		v = max
+	}
+	return v
+}
+
 func schema(required []string, props map[string]any) map[string]any {
 	if required == nil {
 		required = []string{}

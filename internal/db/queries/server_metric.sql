@@ -97,3 +97,40 @@ ON CONFLICT (server_id, step, at) DO UPDATE SET
 -- name: PruneServerMetrics :execrows
 -- System scope (the retention job): 15-minute rows older than @before are dropped.
 DELETE FROM server_metrics WHERE step = 900 AND at < sqlc.arg('before')::timestamptz;
+
+-- name: TeamServerUsageSummary :many
+-- Team scope (MH-575 H10 cost/usage): every server's avg/p95 CPU and memory, and the latest disk
+-- reading, over a window. Weighted by samples so a 15-minute compacted row counts as much as its
+-- constituent minutes did. percentile_cont ignores NULLs and ORDER BY on an expression cannot use
+-- sqlc.arg for the weight column, so cpu_percent/mem "weighted" percentiles are approximated by
+-- repeating each reading is not done (would blow up cost); avg is samples-weighted, p95 is the
+-- unweighted percentile_cont over the rows in the window, which is accurate enough for a right-sizing
+-- hint at minute/15-minute granularity.
+SELECT sm.server_id,
+    count(*)::bigint AS readings,
+    (sum(sm.cpu_percent * sm.samples) / nullif(sum(sm.samples), 0))::float8 AS avg_cpu_percent,
+    coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY sm.cpu_percent), 0)::float8 AS p95_cpu_percent,
+    (sum(sm.mem_used::float8 * sm.samples) / nullif(sum(sm.samples), 0))::float8 AS avg_mem_used,
+    coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY sm.mem_used), 0)::float8 AS p95_mem_used,
+    max(sm.mem_total)::bigint AS mem_total,
+    (array_agg(sm.disk_used ORDER BY sm.at DESC))[1]::bigint AS latest_disk_used,
+    (array_agg(sm.disk_total ORDER BY sm.at DESC))[1]::bigint AS latest_disk_total
+FROM server_metrics sm
+WHERE sm.team_id = sqlc.arg('team_id') AND sm.at >= sqlc.arg('since')
+GROUP BY sm.server_id;
+
+-- name: ServerUsageSummary :one
+-- Team scope: one server's avg/p95 CPU and memory, and the latest disk reading, over a window. This
+-- is a plain aggregate (no GROUP BY), so it always returns exactly one row even with zero matching
+-- metrics — every aggregate is coalesced to 0 so that row scans cleanly instead of erroring on NULL.
+SELECT
+    count(*)::bigint AS readings,
+    coalesce((sum(sm.cpu_percent * sm.samples) / nullif(sum(sm.samples), 0))::float8, 0)::float8 AS avg_cpu_percent,
+    coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY sm.cpu_percent), 0)::float8 AS p95_cpu_percent,
+    coalesce((sum(sm.mem_used::float8 * sm.samples) / nullif(sum(sm.samples), 0))::float8, 0)::float8 AS avg_mem_used,
+    coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY sm.mem_used), 0)::float8 AS p95_mem_used,
+    coalesce(max(sm.mem_total), 0)::bigint AS mem_total,
+    coalesce((array_agg(sm.disk_used ORDER BY sm.at DESC))[1], 0)::bigint AS latest_disk_used,
+    coalesce((array_agg(sm.disk_total ORDER BY sm.at DESC))[1], 0)::bigint AS latest_disk_total
+FROM server_metrics sm
+WHERE sm.team_id = sqlc.arg('team_id') AND sm.server_id = sqlc.arg('server_id') AND sm.at >= sqlc.arg('since');

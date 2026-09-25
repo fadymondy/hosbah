@@ -404,6 +404,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
 		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
 		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},
+		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

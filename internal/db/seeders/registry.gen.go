@@ -48,6 +48,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedBackupSchedule(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedCostLineItem(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedCredential(ctx, a); err != nil {
 		return err
 	}
@@ -130,6 +133,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 		return err
 	}
 	if err := SeedServer(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedServerCost(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedServerMetric(ctx, a); err != nil {
