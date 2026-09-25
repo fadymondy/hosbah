@@ -12,6 +12,7 @@ import {
   LayoutGridIcon,
   LayoutTemplateIcon,
   LockKeyholeIcon,
+  MailIcon,
   MegaphoneIcon,
   TriangleAlertIcon,
   LogOutIcon,
@@ -255,6 +256,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
             {t("nav.scripts")}
+          </L>
+          <L href={`${base}/mail`} icon={<MailIcon />}>
+            {t("nav.mail")}
           </L>
           <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
             {t("nav.templates")}

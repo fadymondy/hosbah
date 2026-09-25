@@ -1,0 +1,99 @@
+/** Contract types for team mail servers (internal/api/mail.go, internal/mail) — MH-577 I1-I3. */
+
+export type MailServerStatus = "new" | "installing" | "running" | "failed" | "removing"
+
+export type MailServer = {
+  id: string
+  server_id: string
+  hostname: string
+  admin_port: number
+  status: MailServerStatus
+  error: string | null
+}
+
+export type MailDomainStatus = "new" | "creating" | "active" | "failed" | "removing"
+
+export type MailDomain = {
+  id: string
+  mail_server_id: string
+  domain: string
+  dkim_selector: string | null
+  dkim_public_key: string | null
+  status: MailDomainStatus
+  error: string | null
+}
+
+export type MailboxStatus = "new" | "creating" | "ready" | "failed" | "removing"
+
+export type Mailbox = {
+  id: string
+  mail_domain_id: string
+  local_part: string
+  email: string
+  quota_mb: number
+  status: MailboxStatus
+  error: string | null
+}
+
+export type MailboxCreated = {
+  mailbox: Mailbox
+  password: string
+}
+
+export type MailAliasKind = "alias" | "forward"
+
+export type MailAlias = {
+  id: string
+  mail_domain_id: string
+  local_part: string
+  email: string
+  kind: MailAliasKind
+  destinations: string[]
+  status: MailboxStatus
+  error: string | null
+}
+
+export type DnsRecordType = "MX" | "TXT"
+export type DnsRecordPurpose = "mx" | "spf" | "dkim" | "dmarc"
+export type DnsRecordStatus = "unknown" | "ok" | "missing" | "mismatch"
+
+export type MailDnsRecord = {
+  type: DnsRecordType
+  name: string
+  value: string
+  priority?: number
+  purpose: DnsRecordPurpose
+  status: DnsRecordStatus
+  found?: string
+}
+
+export type MailPtrCheck = {
+  server_ip?: string
+  hostname: string
+  status: DnsRecordStatus
+  found?: string
+}
+
+export type MailDomainDns = {
+  records: MailDnsRecord[]
+  ptr: MailPtrCheck
+}
+
+export type MailDnsPublishResult = {
+  published: string[]
+  skipped?: string[]
+  zone?: string
+}
+
+export function mailStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "running" || status === "active" || status === "ready") return "default"
+  if (status === "failed") return "destructive"
+  if (status === "new" || status === "installing" || status === "creating" || status === "removing") return "secondary"
+  return "outline"
+}
+
+export function dnsStatusVariant(status: DnsRecordStatus): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "ok") return "default"
+  if (status === "missing" || status === "mismatch") return "destructive"
+  return "outline"
+}

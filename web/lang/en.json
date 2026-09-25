@@ -155,6 +155,7 @@
     "overview": "Overview",
     "sharedServices": "Shared services",
     "scripts": "Scripts",
+    "mail": "Mail",
     "templates": "Templates",
     "products": "Products",
     "members": "Members",
@@ -1790,6 +1791,92 @@
       "servers": "Servers",
       "noServers": "No enrolled servers on this team yet.",
       "pickServer": "Choose at least one server."
+    }
+  },
+  "mail": {
+    "hint": "Run your own mail server, on your own server. Install Stalwart, add domains, mailboxes and aliases, and check or publish the DNS records each domain needs. Installing, adding and removing needs owner or admin; any member can view.",
+    "statusLabel": "Status",
+    "status": {
+      "new": "New",
+      "installing": "Installing",
+      "running": "Running",
+      "failed": "Failed",
+      "removing": "Removing",
+      "creating": "Creating",
+      "active": "Active",
+      "ready": "Ready"
+    },
+    "servers": {
+      "title": "Mail servers",
+      "hint": "A Stalwart mail server installed on one of the team's own enrolled servers.",
+      "hostname": "Hostname",
+      "onServer": "On server",
+      "install": "Install a mail server",
+      "installHint": "Installs Stalwart on the chosen server and opens its admin API on an internal port. The hostname is the server's own HELO/PTR name, e.g. mail.example.com.",
+      "hostnameHint": "Must match this server's reverse DNS (PTR) for outgoing mail to be trusted.",
+      "noServers": "No enrolled servers on this team yet.",
+      "emptyTitle": "No mail server yet",
+      "emptyHint": "Install Stalwart on one of the team's enrolled servers to start hosting mail.",
+      "deleteTitle": "Remove {name}?",
+      "deleteBody": "Removes the mail server and every domain, mailbox and alias hosted on it. This cannot be undone."
+    },
+    "domains": {
+      "title": "Domains",
+      "hint": "Domains hosted on the team's mail servers, each with its own mailboxes and aliases.",
+      "add": "Add domain",
+      "addHint": "Adds a domain to the chosen mail server. DNS records still need to be checked and published for mail to flow.",
+      "domain": "Domain",
+      "empty": "No mail domains yet.",
+      "needServer": "Install a mail server first, then add a domain to it.",
+      "deleteTitle": "Remove {name}?",
+      "deleteBody": "Removes the domain and every mailbox and alias on it. This cannot be undone."
+    },
+    "dns": {
+      "records": "DNS records",
+      "noRecords": "No records to show yet.",
+      "check": "Check",
+      "publish": "Publish to Cloudflare",
+      "published": "DNS records published.",
+      "publishedTitle": "Published",
+      "status": {
+        "unknown": "Not checked",
+        "ok": "OK",
+        "missing": "Missing",
+        "mismatch": "Mismatch"
+      }
+    },
+    "mailboxes": {
+      "title": "Mailboxes",
+      "add": "Add mailbox",
+      "addHint": "Hosbah generates a password and shows it once. It is never stored in the clear.",
+      "localPart": "Address",
+      "quota": "Quota (MB)",
+      "quotaHint": "Storage limit for this mailbox, in megabytes.",
+      "email": "Email",
+      "empty": "No mailboxes yet.",
+      "resetPassword": "Reset password",
+      "passwordTitle": "New password for {name}",
+      "passwordHint": "Shown once. Copy it now — Hosbah does not keep it.",
+      "deleteTitle": "Remove {name}?",
+      "deleteBody": "The mailbox and its mail are removed from the server. This cannot be undone."
+    },
+    "aliases": {
+      "title": "Aliases and forwards",
+      "add": "Add alias",
+      "addHint": "An alias fans out to one or more mailboxes on this domain. A forward sends to external addresses.",
+      "localPart": "Address",
+      "kind": "Kind",
+      "kinds": {
+        "alias": "Alias",
+        "forward": "Forward"
+      },
+      "destinations": "Destinations",
+      "destHintAlias": "One or more mailbox addresses on this domain, separated by commas.",
+      "destHintForward": "One or more external email addresses, separated by commas.",
+      "email": "Address",
+      "empty": "No aliases yet.",
+      "deleteTitle": "Remove {name}?",
+      "deleteBody": "This cannot be undone."
     }
   },
   "siteTemplates": {
