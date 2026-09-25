@@ -1290,6 +1290,31 @@
       "readwrite": "Read-write",
       "readonly": "Read-only",
       "none": "None (revoked)"
+    },
+    "data": {
+      "title": "Data",
+      "noDatabases": "Create a database first.",
+      "searchTables": "Search tables…",
+      "noTables": "No tables yet.",
+      "table": "Table",
+      "rowsEstimate": "Rows (est.)",
+      "size": "Size",
+      "backToTables": "Back to tables",
+      "noColumns": "This table has no columns.",
+      "null": "NULL",
+      "prevPage": "Previous",
+      "nextPage": "Next",
+      "rowCount": "{count} rows",
+      "truncated": "truncated",
+      "durationMs": "{ms} ms",
+      "sqlConsoleTitle": "SQL console",
+      "sqlPlaceholder": "SELECT * FROM …",
+      "runQuery": "Run",
+      "runHint": "Ctrl/Cmd+Enter also runs it. Read-only by default — rolled back after it runs.",
+      "allowWrites": "Allow writes",
+      "allowWritesHint": "This statement will be committed, not rolled back. Make sure it's what you mean to run.",
+      "confirmWriteTitle": "Run this statement?",
+      "confirmWriteHint": "It commits instead of rolling back, and is recorded in the audit log."
     }
   },
   "approvals": {

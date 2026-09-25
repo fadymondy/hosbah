@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/togo-framework/auth"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
 	"github.com/fadymondy/hosbah/internal/deploy"
@@ -112,6 +113,58 @@ type ServicePath struct {
 type BackupPath struct {
 	ServicePath
 	Backup string `path:"backup" maxLength:"64"`
+}
+
+// DatabasePath / TablePath address a database (and a table — optionally schema-qualified for
+// Postgres, "schema.table") under a service, for the table browser and SQL console (MH-574 F2).
+type DatabasePath struct {
+	ServicePath
+	Database string `path:"database" maxLength:"64"`
+}
+type TablePath struct {
+	DatabasePath
+	Table string `path:"table" maxLength:"130" doc:"Table name, or schema.table for Postgres."`
+}
+
+// ColumnOut / TableOut / QueryResultOut are the table browser and SQL console's shapes.
+type ColumnOut struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+type TableOut struct {
+	Schema       string `json:"schema,omitempty"`
+	Name         string `json:"name"`
+	RowsEstimate int64  `json:"rows_estimate"`
+	SizeBytes    int64  `json:"size_bytes"`
+}
+type QueryResultOut struct {
+	Columns    []ColumnOut `json:"columns"`
+	Rows       [][]*string `json:"rows"`
+	RowCount   int         `json:"row_count"`
+	Truncated  bool        `json:"truncated" doc:"Set when the row count or the total result size hit their cap."`
+	DurationMS int64       `json:"duration_ms"`
+}
+
+func toColumnOuts(cols []agentproto.DBQueryColumn) []ColumnOut {
+	out := make([]ColumnOut, len(cols))
+	for i, c := range cols {
+		out[i] = ColumnOut{Name: c.Name, Type: c.Type}
+	}
+	return out
+}
+func toTableOuts(tabs []agentproto.DBTableInfo) []TableOut {
+	out := make([]TableOut, len(tabs))
+	for i, t := range tabs {
+		out[i] = TableOut{Schema: t.Schema, Name: t.Name, RowsEstimate: t.RowsEstimate, SizeBytes: t.SizeBytes}
+	}
+	return out
+}
+func toQueryResultOut(r agentproto.DBQueryResult) QueryResultOut {
+	rows := r.Rows
+	if rows == nil {
+		rows = [][]*string{}
+	}
+	return QueryResultOut{Columns: toColumnOuts(r.Columns), Rows: rows, RowCount: r.RowCount, Truncated: r.Truncated, DurationMS: r.DurationMS}
 }
 
 // ---- plumbing ------------------------------------------------------------------------------------
@@ -584,6 +637,115 @@ func (d *deps) registerDatabases(api huma.API) {
 				return dbErr(err, "could not set the schedule")
 			}
 			out.Body = toScheduleOut(row)
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- table browser and SQL console (MH-574 F2): postgres/mysql only, owner/admin only
+	// (AbilityRevealSecrets — the same tier F1 uses for a user's password: table contents can hold
+	// secrets). write=true is the same ability; there is no broader tier to further gate it with.
+	type dsTablesOut struct {
+		Body struct {
+			Tables []TableOut `json:"tables"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-database-tables", Method: http.MethodGet,
+		Path: "/api/teams/{team}/data-services/{service}/databases/{database}/tables", Tags: tags,
+		Summary: "A database's tables: schema, name, estimated row count and size (owner or admin)",
+	}, func(ctx context.Context, in *DatabasePath) (*dsTablesOut, error) {
+		out := &dsTablesOut{}
+		out.Body.Tables = []TableOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			res, err := d.dbs().Query(ctx, q, m.TeamID, webActor(id), svc, dbsvc.QueryInput{Database: in.Database, Mode: "tables"})
+			if err != nil {
+				return dbErr(err, "could not list tables")
+			}
+			out.Body.Tables = toTableOuts(res.Tables)
+			return nil
+		})
+		return out, err
+	})
+
+	type dsColumnsOut struct {
+		Body struct {
+			Columns []ColumnOut `json:"columns"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-table-columns", Method: http.MethodGet,
+		Path: "/api/teams/{team}/data-services/{service}/databases/{database}/tables/{table}/columns", Tags: tags,
+		Summary: "A table's columns: name and type (owner or admin)",
+	}, func(ctx context.Context, in *TablePath) (*dsColumnsOut, error) {
+		out := &dsColumnsOut{}
+		out.Body.Columns = []ColumnOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			res, err := d.dbs().Query(ctx, q, m.TeamID, webActor(id), svc, dbsvc.QueryInput{Database: in.Database, Mode: "columns", Table: in.Table})
+			if err != nil {
+				return dbErr(err, "could not list columns")
+			}
+			out.Body.Columns = toColumnOuts(res.Columns)
+			return nil
+		})
+		return out, err
+	})
+
+	type dsRowsOut struct{ Body QueryResultOut }
+	huma.Register(api, huma.Operation{OperationID: "list-table-rows", Method: http.MethodGet,
+		Path: "/api/teams/{team}/data-services/{service}/databases/{database}/tables/{table}/rows", Tags: tags,
+		Summary: "A page of a table's rows, read-only (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		TablePath
+		Limit  int `query:"limit" minimum:"1" maximum:"500" doc:"Default 100."`
+		Offset int `query:"offset" minimum:"0"`
+	}) (*dsRowsOut, error) {
+		out := &dsRowsOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			res, err := d.dbs().Query(ctx, q, m.TeamID, webActor(id), svc, dbsvc.QueryInput{
+				Database: in.Database, Mode: "rows", Table: in.Table, Limit: in.Limit, Offset: in.Offset})
+			if err != nil {
+				return dbErr(err, "could not list rows")
+			}
+			out.Body = toQueryResultOut(res)
+			return nil
+		})
+		return out, err
+	})
+
+	type dsQueryOut struct{ Body QueryResultOut }
+	huma.Register(api, huma.Operation{OperationID: "run-database-query", Method: http.MethodPost,
+		Path: "/api/teams/{team}/data-services/{service}/databases/{database}/query", Tags: tags,
+		Summary: "Run one SQL statement (owner or admin). Read-only by default (rolled back); write=true commits and is audited with the statement text.",
+	}, func(ctx context.Context, in *struct {
+		DatabasePath
+		Body struct {
+			SQL   string `json:"sql" minLength:"1" maxLength:"65536"`
+			Write bool   `json:"write,omitempty" doc:"Commit instead of rolling back. Destructive — confirm in the UI before sending."`
+		}
+	}) (*dsQueryOut, error) {
+		out := &dsQueryOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			res, err := d.dbs().Query(ctx, q, m.TeamID, webActor(id), svc, dbsvc.QueryInput{
+				Database: in.Database, Mode: "sql", SQL: in.Body.SQL, Write: in.Body.Write})
+			if err != nil {
+				return dbErr(err, "could not run the statement")
+			}
+			out.Body = toQueryResultOut(res)
 			return nil
 		})
 		return out, err

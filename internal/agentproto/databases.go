@@ -19,6 +19,7 @@ const (
 	KindDBRemove    = "db.remove"    // stop and remove a service's container and its volume (the service was deleted)
 	KindDBDrop      = "db.drop"      // drop one database (bucket) and its users inside a running service
 	KindDBUser      = "db.user"      // create, rotate, delete, grant or revoke a user's password/grants (MH-574 F1)
+	KindDBQuery     = "db.query"     // table browser and SQL console: tables/columns/rows/sql (MH-574 F2)
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -420,4 +421,136 @@ func (p DBDropParams) Validate() error {
 		}
 	}
 	return nil
+}
+
+// ---- db.query (MH-574 F2: table browser and SQL console) -----------------------------------------
+
+const (
+	DBQueryMaxLimit      = 500             // rows mode
+	DBQueryMaxSQLBytes   = 64 * 1024       // one statement
+	DBQueryMaxTimeout    = 60              // seconds
+	DBQueryMaxResultSize = 1 * 1024 * 1024 // total encoded result, capped
+	DBQueryMaxCellBytes  = 4 * 1024        // per cell, truncated
+)
+
+// ValidDBQueryMode: the four things db.query can do.
+func ValidDBQueryMode(s string) bool {
+	switch s {
+	case "tables", "columns", "rows", "sql":
+		return true
+	}
+	return false
+}
+
+// ValidDBIdent: a single identifier segment (schema or table name) — the same strict class as
+// ValidDBName, so nothing here is ever interpolated unescaped into a query.
+func ValidDBIdent(s string) bool { return ValidDBName(s) }
+
+// ValidDBQualifiedTable splits "table" or "schema.table" and validates each part with ValidDBIdent.
+// MySQL/MariaDB has no schema qualifier in this sense (Database already names it), so callers there
+// pass an unqualified table only.
+func ValidDBQualifiedTable(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) == 0 || len(parts) > 2 {
+		return false
+	}
+	for _, p := range parts {
+		if !ValidDBIdent(p) {
+			return false
+		}
+	}
+	return true
+}
+
+// SplitQualifiedTable returns (schema, table); schema is "" when unqualified.
+func SplitQualifiedTable(s string) (string, string) {
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		return s[:i], s[i+1:]
+	}
+	return "", s
+}
+
+// DBQueryParams: db.query. Table is required for columns/rows (optionally schema-qualified for
+// Postgres). SQL is required for mode "sql" and is fed to the client on stdin, never an argv — the
+// only thing db.query ever puts in an argv is the fixed client binary and its flags. Write=true runs
+// in a normal transaction (COMMIT); otherwise the statement runs read-only and is always rolled back.
+type DBQueryParams struct {
+	ServiceID      string `json:"service_id"`
+	Kind           string `json:"kind"`
+	Container      string `json:"container"`
+	Database       string `json:"database"`
+	Mode           string `json:"mode"`
+	Table          string `json:"table,omitempty"`
+	Limit          int    `json:"limit,omitempty"`
+	Offset         int    `json:"offset,omitempty"`
+	SQL            string `json:"sql,omitempty"`
+	Write          bool   `json:"write,omitempty"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+	RootSecret     string `json:"root_secret"`
+}
+
+func (p DBQueryParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case p.Kind != "postgres" && p.Kind != "mysql":
+		return errors.New("the table browser and SQL console apply to postgres and mysql")
+	case !ValidDBName(p.Database):
+		return fmt.Errorf("bad database name %q", p.Database)
+	case !ValidDBQueryMode(p.Mode):
+		return fmt.Errorf("bad mode %q", p.Mode)
+	case p.Container == "":
+		return errors.New("bad container")
+	case p.RootSecret == "":
+		return errors.New("db.query needs the root secret")
+	case p.Limit < 0 || p.Limit > DBQueryMaxLimit:
+		return fmt.Errorf("limit must be between 0 and %d", DBQueryMaxLimit)
+	case p.Offset < 0:
+		return errors.New("offset must not be negative")
+	case p.TimeoutSeconds < 1 || p.TimeoutSeconds > DBQueryMaxTimeout:
+		return fmt.Errorf("timeout_seconds must be between 1 and %d", DBQueryMaxTimeout)
+	}
+	switch p.Mode {
+	case "columns", "rows":
+		if p.Table == "" || !ValidDBQualifiedTable(p.Table) {
+			return fmt.Errorf("bad table %q", p.Table)
+		}
+		if p.Kind == "mysql" && strings.Contains(p.Table, ".") {
+			return errors.New("mysql tables are not schema-qualified")
+		}
+	case "sql":
+		if p.SQL == "" {
+			return errors.New("sql is required")
+		}
+		if len(p.SQL) > DBQueryMaxSQLBytes {
+			return fmt.Errorf("sql must be at most %d bytes", DBQueryMaxSQLBytes)
+		}
+	}
+	return nil
+}
+
+// DBQueryColumn: one result column.
+type DBQueryColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+
+// DBTableInfo: one row of a "tables" listing.
+type DBTableInfo struct {
+	Schema       string `json:"schema,omitempty"`
+	Name         string `json:"name"`
+	RowsEstimate int64  `json:"rows_estimate"`
+	SizeBytes    int64  `json:"size_bytes"`
+}
+
+// DBQueryResult: db.query's answer. Rows cells are nil for SQL NULL; every non-nil cell is a string,
+// truncated to DBQueryMaxCellBytes. Truncated is set when either the row count or the total encoded
+// size hit their cap.
+type DBQueryResult struct {
+	Columns    []DBQueryColumn `json:"columns,omitempty"`
+	Rows       [][]*string     `json:"rows,omitempty"`
+	RowCount   int             `json:"row_count"`
+	Truncated  bool            `json:"truncated"`
+	DurationMS int64           `json:"duration_ms"`
+	Tables     []DBTableInfo   `json:"tables,omitempty"`
 }

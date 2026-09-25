@@ -1290,6 +1290,31 @@
       "readwrite": "قراءة وكتابة",
       "readonly": "قراءة فقط",
       "none": "بلا (مُلغاة)"
+    },
+    "data": {
+      "title": "البيانات",
+      "noDatabases": "أنشئ قاعدة بيانات أولًا.",
+      "searchTables": "ابحث في الجداول…",
+      "noTables": "لا توجد جداول بعد.",
+      "table": "الجدول",
+      "rowsEstimate": "الصفوف (تقديري)",
+      "size": "الحجم",
+      "backToTables": "العودة إلى الجداول",
+      "noColumns": "لا أعمدة في هذا الجدول.",
+      "null": "NULL",
+      "prevPage": "السابق",
+      "nextPage": "التالي",
+      "rowCount": "{count} صف",
+      "truncated": "مُقتطَع",
+      "durationMs": "{ms} مللي ثانية",
+      "sqlConsoleTitle": "طرفية SQL",
+      "sqlPlaceholder": "SELECT * FROM …",
+      "runQuery": "تشغيل",
+      "runHint": "يعمل أيضًا بالضغط على Ctrl/Cmd+Enter. للقراءة فقط افتراضيًا — يُتراجَع عنه بعد التشغيل.",
+      "allowWrites": "السماح بالكتابة",
+      "allowWritesHint": "سيُثبَّت هذا الأمر ولن يُتراجَع عنه. تأكّد أنه ما تقصده فعلًا.",
+      "confirmWriteTitle": "تشغيل هذا الأمر؟",
+      "confirmWriteHint": "يُثبَّت بدل التراجع، ويُسجَّل في سجل التدقيق."
     }
   },
   "approvals": {

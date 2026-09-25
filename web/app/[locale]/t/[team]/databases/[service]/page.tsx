@@ -31,6 +31,7 @@ import type { App } from "@/lib/apps"
 import { humanBytes, type DataService, type DataServiceDetail, type DatabaseUser } from "@/lib/databases"
 import { isImported } from "@/lib/apps"
 import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imported-view"
+import { DataConsole } from "@/components/databases/data-console"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -86,6 +87,9 @@ export default function DataServicePage() {
   if (imported && !(s as { has_credentials?: boolean }).has_credentials)
     return <ImportedDatabaseView service={s} onChanged={() => void load()} />
   const isRedis = s.kind === "redis"
+  // The table browser and SQL console (MH-574 F2) only work against Postgres and MySQL/MariaDB; the
+  // backend refuses redis/minio queries with a clear message, so this is only mounted for those kinds.
+  const canQueryData = manage && (s.kind === "postgres" || s.kind === "mysql")
 
   const actions = manage ? (
     <ConfirmButton
@@ -161,6 +165,12 @@ export default function DataServicePage() {
             }
           >
             <UsersTable teamSlug={team.slug} serviceRef={s.id} service={s} detail={detail} manage={manage} onDone={load} />
+          </Section>
+        ) : null}
+
+        {canQueryData ? (
+          <Section title={t("databases.data.title")}>
+            <DataConsole teamSlug={team.slug} serviceRef={s.id} databases={detail.databases} manage={manage} />
           </Section>
         ) : null}
 

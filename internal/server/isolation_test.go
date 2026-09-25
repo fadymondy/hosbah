@@ -241,6 +241,8 @@ func TestIsolationSweep(t *testing.T) {
 		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA} }, // services B may not see (one of A's imported, one shared)
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		"user":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d2", "some_user"} }, // a database user under {service}: not tenant B's either way
+		"database":   func(string) []string { return []string{"some_db"} },                                          // a database under {service}: not tenant B's either way
+		"table":      func(string) []string { return []string{"some_table"} },                                       // a table under {database}: not tenant B's either way
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
 		// both: an approval authorises destroying something, so being able to tell "exists but
 		// not yours" from "does not exist" would be a way to enumerate another team's pending
@@ -438,6 +440,9 @@ func TestIsolationSweep(t *testing.T) {
 		"db_user_create": {"database": "svc-x", "target_database": "x", "user": "u1"}, "db_user_rotate_password": {"database": "svc-x", "user": "u1"},
 		"db_user_delete": {"database": "svc-x", "user": "u1", "confirm": "u1"}, "db_user_grant": {"database": "svc-x", "user": "u1", "grants": "readonly"},
 		"db_user_revoke": {"database": "svc-x", "user": "u1"},
+		"db_tables":      {"database": "svc-x", "target_database": "x"}, "db_table_columns": {"database": "svc-x", "target_database": "x", "table": "t"},
+		"db_table_rows": {"database": "svc-x", "target_database": "x", "table": "t"}, "db_query": {"database": "svc-x", "target_database": "x", "sql": "select 1"},
+		"db_execute": {"database": "svc-x", "target_database": "x", "sql": "select 1", "confirm": "svc-x"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {

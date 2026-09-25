@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
 	"github.com/fadymondy/hosbah/internal/importer"
@@ -117,7 +118,7 @@ func DatabaseTools() []Tool {
 			Description: "Provision a managed data service (postgres, mysql, redis, or minio for S3-compatible buckets) on one of the team's servers. create_db adds databases and users inside it.",
 			InputSchema: schema([]string{"name", "server", "kind"}, map[string]any{
 				"name": str("Lowercase letters, digits, dashes"), "server": str("Server name or id"),
-				"kind": map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis", "minio"}, "description": "minio = S3-compatible object storage (buckets)"},
+				"kind":    map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis", "minio"}, "description": "minio = S3-compatible object storage (buckets)"},
 				"version": str("Image tag (optional; a current version by default)")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
@@ -328,7 +329,7 @@ func DatabaseTools() []Tool {
 			Name: "restore_backup", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
 			Description: "Restore a backup into a throwaway container and verify it (restore-test). confirm must equal the data service's name.",
 			InputSchema: schema([]string{"database", "confirm"}, map[string]any{"database": dbArg,
-				"backup": str("Backup id (optional; the newest succeeded backup by default)"),
+				"backup":  str("Backup id (optional; the newest succeeded backup by default)"),
 				"confirm": str("The data service's name, exactly")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
@@ -377,7 +378,188 @@ func DatabaseTools() []Tool {
 				return "Deleted database user " + args.Str("confirm") + " on " + svc.Name + ".", nil
 			},
 		},
+
+		// ---- table browser and SQL console (MH-574 F2): postgres/mysql only. Owner/admin only
+		// (AbilityRevealSecrets, checked inside Run) regardless of the token's scope — table contents
+		// can hold secrets, so it is treated as reveal-grade like a user's password. db_query never
+		// writes; db_execute is the one destructive tool that can (confirm = the service's name).
+		{
+			Name: "db_tables", Scope: scopes.Read,
+			Description: "A database's tables: schema, name, estimated row count and size. Postgres and MySQL only.",
+			InputSchema: schema([]string{"database", "target_database"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Query(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbsvc.QueryInput{Database: args.Str("target_database"), Mode: "tables"})
+				if err != nil {
+					return "", err
+				}
+				if len(res.Tables) == 0 {
+					return "No tables.", nil
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%d table(s):\n", len(res.Tables))
+				for _, t := range res.Tables {
+					name := t.Name
+					if t.Schema != "" {
+						name = t.Schema + "." + t.Name
+					}
+					fmt.Fprintf(&b, "  %-32s ~%d rows  %d bytes\n", name, t.RowsEstimate, t.SizeBytes)
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "db_table_columns", Scope: scopes.Read,
+			Description: "A table's columns: name and type.",
+			InputSchema: schema([]string{"database", "target_database", "table"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id"), "table": str("Table name, or schema.table for Postgres")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Query(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbsvc.QueryInput{Database: args.Str("target_database"), Mode: "columns", Table: args.Str("table")})
+				if err != nil {
+					return "", err
+				}
+				if len(res.Columns) == 0 {
+					return "No columns.", nil
+				}
+				var b strings.Builder
+				for _, c := range res.Columns {
+					fmt.Fprintf(&b, "  %-32s %s\n", c.Name, c.Type)
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "db_table_rows", Scope: scopes.Read,
+			Description: "A page of a table's rows, read-only.",
+			InputSchema: schema([]string{"database", "target_database", "table"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id"), "table": str("Table name, or schema.table for Postgres"),
+				"limit": map[string]any{"type": "integer", "default": 100, "maximum": 500}, "offset": map[string]any{"type": "integer", "default": 0}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Query(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbsvc.QueryInput{
+					Database: args.Str("target_database"), Mode: "rows", Table: args.Str("table"),
+					Limit: args.Int("limit", 100, 1, 500), Offset: args.Int("offset", 0, 0, 1<<30)})
+				if err != nil {
+					return "", err
+				}
+				return renderQueryResult(res), nil
+			},
+		},
+		{
+			Name: "db_query", Scope: scopes.Read,
+			Description: "Run one read-only SQL statement (always rolled back). db_execute is the write version.",
+			InputSchema: schema([]string{"database", "target_database", "sql"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id"), "sql": str("One SQL statement")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Query(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbsvc.QueryInput{
+					Database: args.Str("target_database"), Mode: "sql", SQL: args.Str("sql"), Write: false})
+				if err != nil {
+					return "", err
+				}
+				return renderQueryResult(res), nil
+			},
+		},
+
+		// ---- destructive: the one tool that can write ----
+		{
+			Name: "db_execute", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
+			Description: "Run one SQL statement that writes (commits instead of rolling back). Audited with the statement text. confirm must equal the data service's name.",
+			InputSchema: schema([]string{"database", "target_database", "sql", "confirm"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id"), "sql": str("One SQL statement"), "confirm": str("The data service's name, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, svc.Name); err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Query(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbsvc.QueryInput{
+					Database: args.Str("target_database"), Mode: "sql", SQL: args.Str("sql"), Write: true})
+				if err != nil {
+					return "", err
+				}
+				return renderQueryResult(res), nil
+			},
+		},
 	}
+}
+
+// renderQueryResult formats a table/SQL result as a small text table, capped like the JSON API.
+func renderQueryResult(res agentproto.DBQueryResult) string {
+	var b strings.Builder
+	if len(res.Columns) == 0 {
+		fmt.Fprintf(&b, "%d row(s), %dms\n", res.RowCount, res.DurationMS)
+		return b.String()
+	}
+	names := make([]string, len(res.Columns))
+	for i, c := range res.Columns {
+		names[i] = c.Name
+	}
+	fmt.Fprintln(&b, strings.Join(names, " | "))
+	for _, row := range res.Rows {
+		cells := make([]string, len(row))
+		for i, c := range row {
+			if c == nil {
+				cells[i] = "NULL"
+			} else {
+				cells[i] = *c
+			}
+		}
+		fmt.Fprintln(&b, strings.Join(cells, " | "))
+	}
+	fmt.Fprintf(&b, "(%d row(s), %dms%s)\n", res.RowCount, res.DurationMS, map[bool]string{true: ", truncated", false: ""}[res.Truncated])
+	return b.String()
 }
 
 // ---- helpers -----------------------------------------------------------------------------------
