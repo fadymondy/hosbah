@@ -146,3 +146,58 @@ func TestVisitorHashNeverStoresRawInput(t *testing.T) {
 		t.Fatal("hash must not equal the raw input")
 	}
 }
+
+func TestHostAppOf_SharedHostGoesToTheAppCaddyServes(t *testing.T) {
+	rt := routeTable{Apps: map[string]routeEntry{
+		"b-app": {Hosts: []agentproto.Route{{Hostname: "shared.example.com"}, {Hostname: "b.example.com"}}},
+		"a-app": {Hosts: []agentproto.Route{{Hostname: "Shared.example.com"}}},
+	}}
+	for i := 0; i < 20; i++ { // map order varies run to run; the answer must not
+		m := hostAppOf(rt)
+		if m["shared.example.com"] != "a-app" || m["b.example.com"] != "b-app" {
+			t.Fatalf("hostAppOf = %v, want shared->a-app (first in sorted order), b->b-app", m)
+		}
+	}
+}
+
+func TestAccessEventIP_ForwardedOnlyBehindPrivateProxy(t *testing.T) {
+	ev := func(remote string, h map[string][]string) accessEvent {
+		var e accessEvent
+		e.Request.RemoteIP, e.Request.ClientIP, e.Request.Headers = remote, remote, h
+		return e
+	}
+	fwd := map[string][]string{"X-Forwarded-For": {"105.1.2.3, 172.71.0.1"}}
+	if got := ev("10.10.10.100", fwd).ip(); got != "105.1.2.3" {
+		t.Errorf("behind a private proxy ip = %q, want the forwarded client", got)
+	}
+	if got := ev("10.10.10.100", map[string][]string{"Cf-Connecting-Ip": {"9.9.9.9"}, "X-Real-Ip": {"8.8.8.8"}}).ip(); got != "9.9.9.9" {
+		t.Errorf("ip = %q, want Cf-Connecting-Ip first", got)
+	}
+	if got := ev("203.0.113.5", fwd).ip(); got != "203.0.113.5" {
+		t.Errorf("from a public peer ip = %q, want the peer (forwarded headers are spoofable there)", got)
+	}
+}
+
+func TestTrafficCollector_LeavesAPartialLastLineForNextPoll(t *testing.T) {
+	base := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
+	full := accessLine("app1.example.com:443", "/a", 200, float64(base.Unix()), 5, "ua", "", "1.1.1.1")
+	next := accessLine("app1.example.com", "/b", 200, float64(base.Unix())+1, 5, "ua", "", "1.1.1.1")
+	p := filepath.Join(t.TempDir(), "access.log")
+	if err := os.WriteFile(p, []byte(full+"\n"+next[:10]), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	accessLogFile = func() string { return p }
+	t.Cleanup(func() { accessLogFile = func() string { return accessLogPath } })
+	withRoutes(t, "app-1", "app1.example.com")
+
+	c := newTrafficCollector()
+	c.poll()
+	if err := os.WriteFile(p, []byte(full+"\n"+next+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c.poll()
+	b := c.collect(base.Add(2 * time.Minute))
+	if len(b) != 1 || b[0].Requests != 2 {
+		t.Fatalf("buckets = %+v, want one bucket with 2 requests (host:port matched, the half line read once finished)", b)
+	}
+}

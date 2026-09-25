@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net"
+	"net/netip"
 	"os"
 	"sort"
 	"strings"
@@ -61,11 +63,26 @@ func (e accessEvent) referrer() string {
 	return ""
 }
 
+// ip is the visitor's address. Behind a proxy on a private network (Nginx Proxy Manager, a
+// Cloudflare tunnel) every request comes from the proxy, so the forwarded headers are used, but only
+// then: from a public peer they are client-controlled and ignored.
 func (e accessEvent) ip() string {
-	if e.Request.ClientIP != "" {
-		return e.Request.ClientIP
+	ip := e.Request.ClientIP
+	if ip == "" {
+		ip = e.Request.RemoteIP
 	}
-	return e.Request.RemoteIP
+	if addr, err := netip.ParseAddr(ip); err != nil || !(addr.IsPrivate() || addr.IsLoopback()) {
+		return ip
+	}
+	for _, h := range []string{"Cf-Connecting-Ip", "X-Real-Ip", "X-Forwarded-For"} {
+		if v := e.Request.Headers[h]; len(v) > 0 {
+			first := strings.TrimSpace(strings.Split(v[0], ",")[0])
+			if _, err := netip.ParseAddr(first); err == nil {
+				return first
+			}
+		}
+	}
+	return ip
 }
 
 // path strips a query string, so /x?a=1 and /x?a=2 count as the same top path.
@@ -205,10 +222,24 @@ func hostApp() map[string]string {
 	if err != nil {
 		return nil
 	}
+	return hostAppOf(t)
+}
+
+// hostAppOf credits a hostname two apps both claim to the one Caddy actually serves it from: the
+// first in renderCaddy's order (sorted app ids), not whichever a map walk happens to reach last.
+func hostAppOf(t routeTable) map[string]string {
+	ids := make([]string, 0, len(t.Apps))
+	for id := range t.Apps {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
 	out := map[string]string{}
-	for id, e := range t.Apps {
-		for _, h := range e.Hosts {
-			out[h.Hostname] = id
+	for _, id := range ids {
+		for _, h := range t.Apps[id].Hosts {
+			host := strings.ToLower(h.Hostname)
+			if _, taken := out[host]; !taken {
+				out[host] = id
+			}
 		}
 	}
 	return out
@@ -240,14 +271,22 @@ func (c *trafficCollector) poll() {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64*1024), 1<<20)
 	var read int64
+	end := st.Size()
 	for sc.Scan() {
 		line := sc.Bytes()
+		if offset+read+int64(len(line)) >= end { // no newline yet: Caddy is mid-write, read it next time
+			break
+		}
 		read += int64(len(line)) + 1
 		var e accessEvent
 		if json.Unmarshal(line, &e) != nil {
 			continue
 		}
-		appID := hosts[e.Request.Host]
+		host := strings.ToLower(e.Request.Host)
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		appID := hosts[host]
 		if appID == "" {
 			continue
 		}
