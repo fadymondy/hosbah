@@ -525,6 +525,9 @@ func (p DBQueryParams) Validate() error {
 		if len(p.SQL) > DBQueryMaxSQLBytes {
 			return fmt.Errorf("sql must be at most %d bytes", DBQueryMaxSQLBytes)
 		}
+		if _, err := SingleSQLStatement(p.Kind, p.SQL); err != nil {
+			return err
+		}
 	}
 	return nil
 }

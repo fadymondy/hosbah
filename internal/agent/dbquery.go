@@ -155,7 +155,11 @@ WHERE table_schema = %s AND table_name = %s ORDER BY ordinal_position`, pgQuoteL
 		}
 		return &agentproto.DBQueryResult{Columns: colsFrom(cols), Rows: rows}, nil
 	case "sql":
-		cols, rows, err := runPostgresQuery(oc, p, root, p.Database, p.SQL, p.Write)
+		stmt, err := agentproto.SingleSQLStatement("postgres", p.SQL)
+		if err != nil {
+			return nil, err
+		}
+		cols, rows, err := runPostgresQuery(oc, p, root, p.Database, stmt, p.Write)
 		if err != nil {
 			return nil, err
 		}
@@ -202,9 +206,9 @@ func runPostgresQuery(oc *OpContext, p agentproto.DBQueryParams, root map[string
 	timeoutMS := p.TimeoutSeconds * 1000
 	var script strings.Builder
 	if write {
-		fmt.Fprintf(&script, "BEGIN;\nSET LOCAL statement_timeout = %d;\n%s;\nCOMMIT;\n", timeoutMS, sql)
+		fmt.Fprintf(&script, "BEGIN;\nSET LOCAL statement_timeout = %d;\n%s\n;\nCOMMIT;\n", timeoutMS, sql)
 	} else {
-		fmt.Fprintf(&script, "BEGIN READ ONLY;\nSET LOCAL statement_timeout = %d;\n%s;\nROLLBACK;\n", timeoutMS, sql)
+		fmt.Fprintf(&script, "BEGIN READ ONLY;\nSET LOCAL statement_timeout = %d;\n%s\n;\nROLLBACK;\n", timeoutMS, sql)
 	}
 	args := append([]string{"-X", "-q", "-v", "ON_ERROR_STOP=1", "--csv", "-P", "footer=off", "-P", "null=" + dbQueryNullSentinel},
 		pgLogin(root, database)...)
@@ -294,7 +298,11 @@ func dbQueryMySQL(oc *OpContext, p agentproto.DBQueryParams, root map[string]str
 		}
 		return &agentproto.DBQueryResult{Columns: colsFrom(cols), Rows: rows}, nil
 	case "sql":
-		cols, rows, err := runMySQLQuery(oc, p, root, p.SQL, p.Write)
+		stmt, err := agentproto.SingleSQLStatement("mysql", p.SQL)
+		if err != nil {
+			return nil, err
+		}
+		cols, rows, err := runMySQLQuery(oc, p, root, stmt, p.Write)
 		if err != nil {
 			return nil, err
 		}
@@ -312,9 +320,9 @@ func runMySQLQuery(oc *OpContext, p agentproto.DBQueryParams, root map[string]st
 	timeoutMS := p.TimeoutSeconds * 1000
 	var script strings.Builder
 	if write {
-		fmt.Fprintf(&script, "START TRANSACTION;\nSET SESSION MAX_EXECUTION_TIME=%d;\n%s;\nCOMMIT;\n", timeoutMS, sql)
+		fmt.Fprintf(&script, "START TRANSACTION;\nSET SESSION MAX_EXECUTION_TIME=%d;\n%s\n;\nCOMMIT;\n", timeoutMS, sql)
 	} else {
-		fmt.Fprintf(&script, "SET SESSION TRANSACTION READ ONLY;\nSTART TRANSACTION;\nSET SESSION MAX_EXECUTION_TIME=%d;\n%s;\nROLLBACK;\n", timeoutMS, sql)
+		fmt.Fprintf(&script, "SET SESSION TRANSACTION READ ONLY;\nSTART TRANSACTION;\nSET SESSION MAX_EXECUTION_TIME=%d;\n%s\n;\nROLLBACK;\n", timeoutMS, sql)
 	}
 	env := []string{"MYSQL_PWD=" + root["password"]}
 	args := append([]string{"--batch"}, mysqlLogin(root)...)
