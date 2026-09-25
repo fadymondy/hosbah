@@ -30,35 +30,20 @@ func TestDBTargetArgvNativeGuest(t *testing.T) {
 	}
 }
 
-// TestDBTargetArgvDockerInGuest: a guest whose engine itself runs in Docker nests pct exec around a
-// docker exec, with env carried as -e flags on the innermost (docker) exec, exactly as a plain
-// container — pct exec still gets none, since it has no such flag.
-func TestDBTargetArgvDockerInGuest(t *testing.T) {
-	bin, argv := dbTargetArgv([]string{"MYSQL_PWD=secret"}, dbTargetOf("102", "hosbah-db-my1"), []string{"mysql", "-u", "root"})
-	if bin != "pct" {
-		t.Fatalf("bin = %q, want pct", bin)
-	}
-	want := []string{"exec", "102", "--", "docker", "exec", "-i", "-e", "MYSQL_PWD", "hosbah-db-my1", "mysql", "-u", "root"}
-	if !reflect.DeepEqual(argv, want) {
-		t.Fatalf("argv = %v, want %v", argv, want)
-	}
-}
-
+// TestDBTargetIsNativeGuest: a guest is always native now — validDBExecTarget (agentproto) refuses a
+// guest with a non-empty Container before an op is ever built, so isNativeGuest only needs to check
+// VMID.
 func TestDBTargetIsNativeGuest(t *testing.T) {
 	if dbTargetOf("", "c1").isNativeGuest() {
 		t.Fatal("a container is not a native guest")
 	}
-	if dbTargetOf("102", "c1").isNativeGuest() {
-		t.Fatal("a guest running its engine in docker is not native")
-	}
 	if !dbTargetOf("102", "").isNativeGuest() {
-		t.Fatal("a guest with no container is native")
+		t.Fatal("a guest is native")
 	}
 }
 
-// TestClientLoginContainer: a container (or docker-in-guest) still logs in with the stored
-// credentials, password on env, never on argv — clientLogin does not know or care which of the two
-// it is, since dbTargetArgv already made that distinction.
+// TestClientLoginContainer: a container still logs in with the stored credentials, password on env,
+// never on argv.
 func TestClientLoginContainer(t *testing.T) {
 	root := map[string]string{"user": "app", "password": "secret", "database": "appdb"}
 	t1 := dbTargetOf("", "hosbah-db-pg1")
@@ -70,17 +55,6 @@ func TestClientLoginContainer(t *testing.T) {
 		t.Fatalf("postgres env = %v", env)
 	}
 	for _, s := range login {
-		if s == "secret" {
-			t.Fatal("the password must never be on the login argv")
-		}
-	}
-
-	t2 := dbTargetOf("102", "hosbah-db-my1") // docker-in-guest
-	login2, env2 := clientLogin("mysql", t2, root, "")
-	if !reflect.DeepEqual(env2, []string{"MYSQL_PWD=secret"}) {
-		t.Fatalf("mysql env = %v", env2)
-	}
-	for _, s := range login2 {
 		if s == "secret" {
 			t.Fatal("the password must never be on the login argv")
 		}
@@ -135,5 +109,26 @@ func TestClientArgvNativeGuestPostgres(t *testing.T) {
 	argvContainer := clientArgv("postgres", t2, []string{"psql", "-U", "postgres"})
 	if !reflect.DeepEqual(argvContainer, []string{"psql", "-U", "postgres"}) {
 		t.Fatalf("container postgres argv must be unwrapped: %v", argvContainer)
+	}
+}
+
+// TestPctStatusRunning: pct status exits 0 even for a stopped guest, so checkDBTarget must read the
+// status line itself, not just the exit code.
+func TestPctStatusRunning(t *testing.T) {
+	cases := []struct {
+		name string
+		out  string
+		want bool
+	}{
+		{"running", "status: running\n", true},
+		{"running with other fields", "102: status: running\nlock: \n", true},
+		{"stopped", "status: stopped\n", false},
+		{"empty", "", false},
+		{"case insensitive", "Status: Running\n", true},
+	}
+	for _, c := range cases {
+		if got := pctStatusRunning(c.out); got != c.want {
+			t.Errorf("%s: pctStatusRunning(%q) = %v, want %v", c.name, c.out, got, c.want)
+		}
 	}
 }

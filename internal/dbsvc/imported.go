@@ -43,8 +43,26 @@ func isImported(svc db.DataService) bool { return svc.Source == SourceImported }
 // HasCredentials reports whether Hosbah holds a credential for the service (always, for a managed one).
 func HasCredentials(svc db.DataService) bool { return svc.RootSealed != nil && *svc.RootSealed != "" }
 
-// usable decides whether the database features reach a service: every managed one, and an imported
-// container of a supported engine that has credentials.
+// CredentialsRequired reports whether the service still needs POST …/credentials before its database
+// features work: every managed service, and every imported container without credentials — but never
+// a native Proxmox LXC guest, since by the time usable() would otherwise reach the credentials check,
+// the guest is already known native (QEMU and any other guest type are refused earlier): the agent
+// authenticates as the matching OS user instead (Postgres peer auth, MySQL/MariaDB auth_socket), so a
+// guest imported with no stored credential at all still works, and web/MCP must not gate it behind the
+// credentials form.
+func CredentialsRequired(svc db.DataService) bool {
+	if !isImported(svc) {
+		return false
+	}
+	if deploy.WorkloadOfService(svc).OriginKind == "guest" {
+		return false
+	}
+	return !HasCredentials(svc)
+}
+
+// usable decides whether the database features reach a service: every managed one, an imported
+// container of a supported engine that has credentials, and an imported native Proxmox LXC guest
+// (peer auth / auth_socket needs no stored credential at all).
 func usable(svc db.DataService) error {
 	if !isImported(svc) {
 		return nil
@@ -64,7 +82,9 @@ func usable(svc db.DataService) error {
 		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, "database features for an imported "+svc.Kind+" are not supported yet")
 	case w.State == importer.StateMissing:
 		return deploy.Coded(http.StatusConflict, deploy.CodeWorkloadMissing, svc.Name+" is no longer reported by its server")
-	case !HasCredentials(svc):
+	// By this point w.OriginKind == "guest" can only mean a native LXC guest (qemu and any other guest
+	// type were already refused above), so it never needs the stored-credentials check below.
+	case w.OriginKind != "guest" && !HasCredentials(svc):
 		return deploy.Coded(http.StatusConflict, CodeCredentialsRequired, svc.Name+" is imported: give Hosbah its credentials first (POST …/credentials)")
 	}
 	return nil

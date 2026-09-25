@@ -61,8 +61,15 @@ func DatabaseTools() []Tool {
 				var b strings.Builder
 				fmt.Fprintf(&b, "%s  (id %s)\nkind: %s %s\nstatus: %s\n", svc.Name, svc.ID, svc.Kind, svc.Version, svc.Status)
 				if svc.Source == importer.SourceImported {
-					fmt.Fprintf(&b, "imported: Hosbah found it running and holds no credential; it never backs it up or changes it\n%s\nlast seen: %s\n",
-						importedLine(svc.Name, svc.OriginKind, svc.Origin, svc.ImportedState, svc.Kind+" "+svc.Version), lastSeen(svc.LastSeenAt))
+					cred := "Hosbah holds credentials for it"
+					switch {
+					case dbsvc.CredentialsRequired(svc):
+						cred = "give it credentials first (set_database_credentials) before databases, users or backups work"
+					case !dbsvc.HasCredentials(svc):
+						cred = "a native Proxmox LXC guest — Hosbah reaches it as the matching OS user (peer auth / auth_socket), no stored credential needed"
+					}
+					fmt.Fprintf(&b, "imported: Hosbah found it running; it never backs it up on its own; %s\n%s\nlast seen: %s\n",
+						cred, importedLine(svc.Name, svc.OriginKind, svc.Origin, svc.ImportedState, svc.Kind+" "+svc.Version), lastSeen(svc.LastSeenAt))
 				}
 				if svc.Host != nil && svc.Port != nil {
 					fmt.Fprintf(&b, "endpoint: %s:%d (private)\n", *svc.Host, *svc.Port)

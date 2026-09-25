@@ -13,11 +13,12 @@ import (
 // dbTarget is where an imported service's engine client should run for db.create, db.drop, db.user,
 // db.query, db.insights and db.cancel_query: a Docker container directly on this server (VMID "",
 // Container the name — a Hosbah-managed service, or an imported container), or a Proxmox LXC guest
-// reached with `pct exec` on this node — either the engine installed natively there (Container "") or,
-// if the guest itself runs it in Docker, nested as `pct exec <vmid> -- docker exec <container> …`
-// (Container set). A QEMU guest never reaches here: agentproto.Validate refuses guest_type "qemu" on
-// both sides before any operation is even built — there is no client to run inside one without its
-// guest agent (a possible future addition).
+// reached with `pct exec` on this node, against the engine installed natively there. A guest that
+// itself runs the engine in Docker is refused earlier, by agentproto.Validate: pct exec has no flag to
+// carry an environment variable into a nested `docker exec`, so a password given that way would arrive
+// empty — Container is always "" once VMID is set. A QEMU guest never reaches here either:
+// agentproto.Validate refuses guest_type "qemu" on both sides before any operation is even built —
+// there is no client to run inside one without its guest agent (a possible future addition).
 type dbTarget struct {
 	VMID      string
 	Container string
@@ -25,11 +26,14 @@ type dbTarget struct {
 
 func dbTargetOf(vmid, container string) dbTarget { return dbTarget{VMID: vmid, Container: container} }
 
-// isNativeGuest: the engine is installed directly in the guest, not run through Docker there.
-func (t dbTarget) isNativeGuest() bool { return t.VMID != "" && t.Container == "" }
+// isNativeGuest: the target is a Proxmox guest (its engine is always installed directly there —
+// agentproto.Validate refuses any other shape before this is ever built).
+func (t dbTarget) isNativeGuest() bool { return t.VMID != "" }
 
-// checkDBTarget refuses a pct target unless this agent is on a Proxmox node (pct exists) and the
-// guest exists here — before any argv is ever built around it.
+// checkDBTarget refuses a pct target unless this agent is on a Proxmox node (pct exists), the guest
+// exists here, and it is actually running — before any argv is ever built around it. `pct status`
+// exits 0 even for a stopped guest (unlike a failed lookup), so the status line itself, not the exit
+// code, is what says whether the guest is up.
 func checkDBTarget(oc *OpContext, t dbTarget) error {
 	if t.VMID == "" {
 		return nil
@@ -41,26 +45,27 @@ func checkDBTarget(oc *OpContext, t dbTarget) error {
 	if err != nil {
 		return fmt.Errorf("guest %s was not found on this node (%s)", t.VMID, strings.TrimSpace(firstLine(string(out))))
 	}
+	if !pctStatusRunning(string(out)) {
+		return fmt.Errorf("guest %s is stopped", t.VMID)
+	}
 	return nil
 }
 
+// pctStatusRunning parses `pct status <vmid>` output ("status: running" / "status: stopped" / …).
+func pctStatusRunning(out string) bool {
+	return strings.Contains(strings.ToLower(out), "status: running")
+}
+
 // dbTargetArgv builds the fixed argv that runs args inside t, with env (only ever meaningful for a
-// docker exec — pct exec has no such flag) as -e flags on the innermost docker exec.
+// docker exec — pct exec has no such flag) as -e flags on the container's docker exec.
 func dbTargetArgv(env []string, t dbTarget, args []string) (bin string, full []string) {
-	switch {
-	case t.VMID == "":
+	if t.VMID == "" {
 		full = append([]string{"exec", "-i"}, envArgs(mapEnv(env))...)
 		full = append(full, t.Container)
 		full = append(full, args...)
 		return "docker", full
-	case t.Container != "":
-		inner := append([]string{"exec", "-i"}, envArgs(mapEnv(env))...)
-		inner = append(inner, t.Container)
-		inner = append(inner, args...)
-		return "pct", append([]string{"exec", t.VMID, "--", "docker"}, inner...)
-	default:
-		return "pct", append([]string{"exec", t.VMID, "--"}, args...)
 	}
+	return "pct", append([]string{"exec", t.VMID, "--"}, args...)
 }
 
 // execInTarget runs args against t, feeding stdin and env like execIn, and returns the combined
@@ -147,19 +152,11 @@ func clientArgv(kind string, t dbTarget, args []string) []string {
 }
 
 // dbTargetRunning reports whether the service is up: a container is checked with docker inspect
-// (containerRunning); a native guest with `pct status` (already done by checkDBTarget, so here it is
-// just "does pct exec succeed"); an engine nested in a guest's Docker is checked with docker inspect
-// run through pct exec.
+// (containerRunning); a native guest with `pct status` — checkDBTarget already parses its status line
+// and refuses a missing or stopped guest, so here it is just "did checkDBTarget accept it".
 func dbTargetRunning(oc *OpContext, t dbTarget) bool {
 	if t.VMID == "" {
 		return containerRunning(oc, t.Container)
 	}
-	if checkDBTarget(oc, t) != nil {
-		return false
-	}
-	if t.Container == "" {
-		return true // pct status already confirmed the guest is up; the engine's own client call will fail clearly if it is not
-	}
-	out, err := exec.CommandContext(oc.Ctx, "pct", "exec", t.VMID, "--", "docker", "inspect", "-f", "{{.State.Running}}", t.Container).CombinedOutput() //#nosec G204 -- vmid and container are validated identifiers
-	return err == nil && strings.TrimSpace(string(out)) == "true"
+	return checkDBTarget(oc, t) == nil
 }

@@ -83,11 +83,12 @@ export default function DataServicePage() {
 
   const s = detail.service
   // An imported database is shown read-only: Hosbah has no credentials for it and never changes it.
-  // An imported database without its admin login: power/stats/logs and the credentials form. With
-  // it, the full database tools below apply, with the workload controls on top.
+  // An imported database that still needs its admin login gets power/stats/logs and the credentials
+  // form (credentials_required — false for a native Proxmox LXC guest, which authenticates as the
+  // matching OS user instead and never needs one). Once it is not required, the full database tools
+  // below apply, with the workload controls on top.
   const imported = isImported(s)
-  if (imported && !(s as { has_credentials?: boolean }).has_credentials)
-    return <ImportedDatabaseView service={s} onChanged={() => void load()} />
+  if (imported && s.credentials_required) return <ImportedDatabaseView service={s} onChanged={() => void load()} />
   const isRedis = s.kind === "redis"
   // The table browser and SQL console (MH-574 F2) only work against Postgres and MySQL/MariaDB; the
   // backend refuses redis/minio queries with a clear message, so this is only mounted for those kinds.

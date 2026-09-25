@@ -598,9 +598,16 @@ func (s *Service) spawn(fn func(context.Context)) {
 	}()
 }
 
-// sealRoot re-seals the service's root credential to the target agent's key.
+// sealRoot re-seals the service's root credential to the target agent's key. An imported native
+// Proxmox LXC guest with no stored credential needs none sealed at all — the agent authenticates as
+// the matching OS user instead (Postgres peer auth, MySQL/MariaDB auth_socket) — so it returns ("",
+// nil) rather than importedRoot's "give it credentials first" error. If a member did give it
+// credentials anyway, they are harmless to seal and used as before.
 func (s *Service) sealRoot(agentKey string, dek []byte, teamID string, svc db.DataService) (string, error) {
 	if isImported(svc) {
+		if !HasCredentials(svc) && deploy.WorkloadOfService(svc).OriginKind == "guest" {
+			return "", nil
+		}
 		// An imported service: the credentials a member gave (user, password, database), checked by db.probe.
 		root, err := importedRoot(dek, teamID, svc)
 		if err != nil {
@@ -663,10 +670,10 @@ func contOf(svc db.DataService) string {
 // execTarget derives where db.create, db.drop, db.user, db.query, db.insights and db.cancel_query
 // should run their client for svc: a Docker container on the server itself (target "", the container
 // contOf resolves — every managed service, and an imported container), or an imported Proxmox LXC
-// guest (target "guest", its vmid, guest_type "lxc" and — only if the guest itself runs the engine in
-// Docker, which the importer does not produce today but agentproto still validates — the container
-// name inside it). A QEMU guest never reaches here: usable() refuses it before any of these six
-// operations is ever built.
+// guest (target "guest", its vmid, guest_type "lxc", container always "" — the engine installed
+// natively there; a guest running its engine in Docker is refused before this is ever built, since pct
+// exec has no way to carry a password into a nested docker exec). A QEMU guest never reaches here:
+// usable() refuses it before any of these six operations is ever built.
 func execTarget(svc db.DataService) (target, vmid, guestType, container string) {
 	w := deploy.WorkloadOfService(svc)
 	if isImported(svc) && w.OriginKind == "guest" {

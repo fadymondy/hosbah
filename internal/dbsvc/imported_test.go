@@ -60,7 +60,7 @@ func TestUsableDecisionTable(t *testing.T) {
 		{"managed service always usable", svcFixture(), ""},
 		{"imported container, no credentials", svcFixture(imported("container", "c1", "")), "credentials"},
 		{"imported container, with credentials", svcFixture(imported("container", "c1", ""), withCredentials), ""},
-		{"imported lxc guest, no credentials", svcFixture(imported("guest", "102", lxcOrigin("102"))), "credentials"},
+		{"imported lxc guest, no credentials", svcFixture(imported("guest", "102", lxcOrigin("102"))), ""},
 		{"imported lxc guest, with credentials", svcFixture(imported("guest", "102", lxcOrigin("102")), withCredentials), ""},
 		{"imported qemu guest refused", svcFixture(imported("guest", "103", qemuOrigin("103")), withCredentials), "QEMU"},
 		{"minio in an lxc guest refused", svcFixture(imported("guest", "102", lxcOrigin("102")), withCredentials, func(svc *db.DataService) { svc.Kind = "minio" }), "MinIO"},
@@ -78,6 +78,30 @@ func TestUsableDecisionTable(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
 				t.Fatalf("expected an error containing %q, got %v", c.wantErr, err)
+			}
+		})
+	}
+}
+
+// TestCredentialsRequired: false for a managed service, an imported LXC guest either way (native
+// auth needs no stored credential — harmless if one is stored anyway), and true only for an imported
+// container without credentials.
+func TestCredentialsRequired(t *testing.T) {
+	cases := []struct {
+		name string
+		svc  db.DataService
+		want bool
+	}{
+		{"managed service", svcFixture(), false},
+		{"imported container, no credentials", svcFixture(imported("container", "c1", "")), true},
+		{"imported container, with credentials", svcFixture(imported("container", "c1", ""), withCredentials), false},
+		{"imported lxc guest, no credentials", svcFixture(imported("guest", "102", lxcOrigin("102"))), false},
+		{"imported lxc guest, with credentials", svcFixture(imported("guest", "102", lxcOrigin("102")), withCredentials), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := CredentialsRequired(c.svc); got != c.want {
+				t.Fatalf("CredentialsRequired() = %v, want %v", got, c.want)
 			}
 		})
 	}
