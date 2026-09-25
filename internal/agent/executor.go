@@ -139,6 +139,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	} {
 		e.handlers[kind] = h
 	}
+	fs := newFSHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindFSList: fs.list, agentproto.KindFSRead: fs.read, agentproto.KindFSWrite: fs.write,
+		agentproto.KindFSMkdir: fs.mkdir, agentproto.KindFSDelete: fs.delete, agentproto.KindFSRename: fs.rename,
+	} {
+		e.handlers[kind] = h
+	}
 	return e
 }
 
@@ -276,6 +283,9 @@ func laneOf(op agentproto.SignedOp) string {
 	case agentproto.KindGitHubStatus, agentproto.KindGitHubRepos, agentproto.KindGitHubBranches,
 		agentproto.KindGitHubCommits, agentproto.KindGitHubCompare, agentproto.KindGitHubPulls:
 		return "" // read-only gh calls: a pending device login must not hold up the repository picker
+	case agentproto.KindFSList, agentproto.KindFSRead, agentproto.KindFSWrite, agentproto.KindFSMkdir,
+		agentproto.KindFSDelete, agentproto.KindFSRename:
+		return "" // browsing and editing files never waits behind a build or a provisioning step
 	case agentproto.KindGitHubInstall, agentproto.KindGitHubLogin, agentproto.KindGitHubLogout:
 		// Their own lane: a device login waits up to 15 minutes for a human and must not block
 		// provisioning; install then login (queued in that order) still run in order. apt's lock is

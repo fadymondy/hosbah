@@ -73,7 +73,8 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindGitHubCommits, KindGitHubCompare, KindGitHubPulls, KindCaddyCerts,
 	KindVolumeUsage, KindVolumeRemove, KindBucketCreate, KindBucketRemove, KindRealtimeRoute,
 	KindBrowserCreate, KindBrowserRemove, KindBrowserStatus,
-	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus}
+	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus,
+	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.
