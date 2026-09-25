@@ -16,6 +16,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/crypto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
@@ -39,6 +40,16 @@ func (e *ActionError) Error() string { return e.Msg }
 func notFound(what string) error { return &ActionError{Status: 404, Msg: what + " not found"} }
 func conflict(msg string) error  { return &ActionError{Status: 409, Msg: msg} }
 func invalid(msg string) error   { return &ActionError{Status: 422, Msg: msg} }
+
+// asActionError copies a *quota.Error (or any other error) as-is when it is not one, so quota
+// refusals reach the REST and MCP layers with the same 403 and message every other ActionError has.
+func asActionError(err error) error {
+	var qe *quota.Error
+	if errors.As(err, &qe) {
+		return &ActionError{Status: qe.Status, Msg: qe.Msg}
+	}
+	return err
+}
 
 // Actor is who asked: a member in the browser, an MCP token, a deploy hook, the GitHub App.
 type Actor struct {
@@ -118,6 +129,9 @@ func (s *Service) CreateApp(ctx context.Context, q *db.Queries, teamID string, a
 	}
 	if srv.Status != "enrolled" {
 		return db.App{}, "", conflict("that server's agent has not enrolled yet")
+	}
+	if err := quota.CheckApps(ctx, q, teamID); err != nil {
+		return db.App{}, "", asActionError(err)
 	}
 	plain, hash := tokens.New(HookTokenPrefix)
 	a, err := q.InsertApp(ctx, db.InsertAppParams{ID: newUUID(), TeamID: teamID, ServerID: srv.ID, Name: in.Name,

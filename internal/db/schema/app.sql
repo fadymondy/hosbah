@@ -25,6 +25,9 @@ CREATE TABLE apps (
     description text,
     color text,
     icon text,
+    resources_memory_mb bigint,
+    resources_cpus double precision,
+    resources_processes jsonb NOT NULL DEFAULT '{}',
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -65,3 +68,10 @@ ALTER TABLE apps ADD CONSTRAINT apps_title_check CHECK (title IS NULL OR char_le
 ALTER TABLE apps ADD CONSTRAINT apps_description_check CHECK (description IS NULL OR char_length(description) BETWEEN 1 AND 280);
 ALTER TABLE apps ADD CONSTRAINT apps_color_check CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$');
 ALTER TABLE apps ADD CONSTRAINT apps_icon_check CHECK (icon IS NULL OR icon IN ('server', 'database', 'globe', 'cloud', 'cpu', 'box', 'rocket', 'shield', 'code', 'terminal', 'layers', 'zap', 'flame', 'leaf', 'star', 'heart', 'briefcase', 'home', 'store', 'graduation-cap', 'building', 'gamepad', 'music', 'camera'));
+
+-- Resource limits (MH-574 E13): NULL = unlimited (Docker's own default). resources_processes is a
+-- map of process name ("web", "worker:<name>") to {"memory_mb":int,"cpus":float} — per-process
+-- overrides saved through the app's settings; hosbah.toml's [resources] can override these per deploy
+-- without touching the saved defaults (internal/deploy/config.go Resolve).
+ALTER TABLE apps ADD CONSTRAINT apps_resources_memory_check CHECK (resources_memory_mb IS NULL OR resources_memory_mb BETWEEN 32 AND 1048576);
+ALTER TABLE apps ADD CONSTRAINT apps_resources_cpus_check CHECK (resources_cpus IS NULL OR resources_cpus BETWEEN 0.05 AND 256);

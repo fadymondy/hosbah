@@ -581,6 +581,7 @@ func startArgs(p agentproto.StartParams, name string, env map[string]string) (ar
 	for _, m := range p.Mounts {
 		args = append(args, "--mount", "type=volume,source="+m.Volume+",target="+m.MountPath)
 	}
+	args = append(args, p.Resources.DockerArgs()...)
 	args = append(args, envArgs(env)...)
 	if p.Command != "" {
 		args = append(args, "--entrypoint", "/bin/sh", p.Image, "-c", p.Command)
@@ -1018,4 +1019,33 @@ func removeImages(oc *OpContext, refs []string) []string {
 		}
 	}
 	return removed
+}
+
+// appLimits: app.limits — a live `docker update` of the named containers (no restart). A container
+// that no longer exists (already drained by a deploy that raced this) is skipped, not a failure.
+func appLimits(oc *OpContext) (any, int, error) {
+	p, err := decode[agentproto.AppLimitsParams](oc)
+	if err != nil {
+		return nil, 2, err
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	args := append([]string{"update"}, p.Resources.DockerArgs()...)
+	if len(args) == 1 {
+		return agentproto.AppLimitsResult{}, 0, nil // unlimited on both — nothing to change
+	}
+	var applied []string
+	for _, name := range p.Containers {
+		if !containerRunning(oc, name) {
+			oc.Info("%s is not running — skipped", name)
+			continue
+		}
+		if _, err := oc.Run("docker", append(append([]string{}, args...), name)...); err != nil {
+			return nil, 1, fmt.Errorf("could not update %s", name)
+		}
+		applied = append(applied, name)
+		oc.Info("updated limits on %s", name)
+	}
+	return agentproto.AppLimitsResult{Applied: applied}, 0, nil
 }

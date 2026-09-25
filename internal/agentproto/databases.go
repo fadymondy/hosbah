@@ -147,6 +147,8 @@ type DBProvisionParams struct {
 	Bind       string `json:"bind"`
 	Port       int    `json:"port"`
 	RootSecret string `json:"root_secret"`
+	// Resources (MH-574 E13): memory/CPU caps for the service's container. Zero value = unlimited.
+	Resources ResourceLimits `json:"resources,omitempty"`
 }
 
 func (p DBProvisionParams) Validate() error {
@@ -166,7 +168,7 @@ func (p DBProvisionParams) Validate() error {
 	case p.Kind != "redis" && p.RootSecret == "":
 		return errors.New("postgres and mysql need a root secret")
 	}
-	return nil
+	return p.Resources.Validate()
 }
 
 // DBProvisionResult reports the private endpoint the control plane records on the service.

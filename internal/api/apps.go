@@ -26,42 +26,42 @@ import (
 
 // AppOut is an app as the API shows it. Never the deploy-hook token or its hash.
 type AppOut struct {
-	ID                 string         `json:"id"`
-	Name               string         `json:"name" doc:"The slug used in URLs, containers and hostnames; never changes."`
-	Title              *string        `json:"title" doc:"Display name (at most 80 characters); null: show name."`
-	Description        *string        `json:"description" doc:"A short note (at most 280 characters)."`
-	Color              *string        `json:"color" doc:"#RRGGBB (uppercase), or null for the default."`
-	Icon               *string        `json:"icon" doc:"Icon key (the servers' list), or null for the default."`
-	LogoURL            *string        `json:"logo_url" doc:"The uploaded logo (PUT …/apps/{app}/logo), shown instead of the icon: a relative URL versioned by the image's hash, or null."`
-	ServerID           string         `json:"server_id"`
-	ServerName         string         `json:"server_name,omitempty"`
-	RepoURL            *string        `json:"repo_url" doc:"null for an imported app"`
-	Branch             *string        `json:"branch" doc:"null for an imported app"`
-	Runtime            *string        `json:"runtime"`
-	Port               int64          `json:"port"`
-	HealthcheckPath    string         `json:"healthcheck_path"`
-	HealthcheckTimeout int64          `json:"healthcheck_timeout"`
-	AutodeployPaused   bool           `json:"autodeploy_paused"`
-	Status             string         `json:"status" enum:"new,deploying,running,failed,stopped"`
-	CurrentReleaseID   *string        `json:"current_release_id"`
-	Source             string          `json:"source" enum:"git,imported" doc:"imported: found running on the server; controlled through power, stats, logs, snapshots, resize, backup, recreate, destroy and domains, never deployed from git"`
-	OriginKind         *string         `json:"origin_kind" doc:"imported only: container, systemd or guest"`
+	ID                 string           `json:"id"`
+	Name               string           `json:"name" doc:"The slug used in URLs, containers and hostnames; never changes."`
+	Title              *string          `json:"title" doc:"Display name (at most 80 characters); null: show name."`
+	Description        *string          `json:"description" doc:"A short note (at most 280 characters)."`
+	Color              *string          `json:"color" doc:"#RRGGBB (uppercase), or null for the default."`
+	Icon               *string          `json:"icon" doc:"Icon key (the servers' list), or null for the default."`
+	LogoURL            *string          `json:"logo_url" doc:"The uploaded logo (PUT …/apps/{app}/logo), shown instead of the icon: a relative URL versioned by the image's hash, or null."`
+	ServerID           string           `json:"server_id"`
+	ServerName         string           `json:"server_name,omitempty"`
+	RepoURL            *string          `json:"repo_url" doc:"null for an imported app"`
+	Branch             *string          `json:"branch" doc:"null for an imported app"`
+	Runtime            *string          `json:"runtime"`
+	Port               int64            `json:"port"`
+	HealthcheckPath    string           `json:"healthcheck_path"`
+	HealthcheckTimeout int64            `json:"healthcheck_timeout"`
+	AutodeployPaused   bool             `json:"autodeploy_paused"`
+	Status             string           `json:"status" enum:"new,deploying,running,failed,stopped"`
+	CurrentReleaseID   *string          `json:"current_release_id"`
+	Source             string           `json:"source" enum:"git,imported" doc:"imported: found running on the server; controlled through power, stats, logs, snapshots, resize, backup, recreate, destroy and domains, never deployed from git"`
+	OriginKind         *string          `json:"origin_kind" doc:"imported only: container, systemd or guest"`
 	Origin             *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
-	ImportedState      *string         `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
-	LastSeenAt         *time.Time      `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
-	CreatedAt          time.Time      `json:"created_at"`
-	LatestDeployment   *DeploymentOut `json:"latest_deployment,omitempty"`
-	Domains            []DomainOut    `json:"domains,omitempty"`
+	ImportedState      *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt         *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
+	CreatedAt          time.Time        `json:"created_at"`
+	LatestDeployment   *DeploymentOut   `json:"latest_deployment,omitempty"`
+	Domains            []DomainOut      `json:"domains,omitempty"`
 }
 
 // AppDetailOut is the app page: the app, what serves it, and how it is built.
 type AppDetailOut struct {
-	App         AppOut      `json:"app"`
-	Live        *ReleaseOut `json:"live_release"`
-	Previous    *ReleaseOut `json:"previous_release" doc:"What one-click rollback would re-point to."`
-	Domains     []DomainOut `json:"domains"`
+	App         AppOut       `json:"app"`
+	Live        *ReleaseOut  `json:"live_release"`
+	Previous    *ReleaseOut  `json:"previous_release" doc:"What one-click rollback would re-point to."`
+	Domains     []DomainOut  `json:"domains"`
 	Processes   []ProcessOut `json:"processes"`
-	HookURLHint string      `json:"deploy_hook_hint" doc:"The deploy-hook URL with the token elided; the full URL is shown once, at creation or rotation."`
+	HookURLHint string       `json:"deploy_hook_hint" doc:"The deploy-hook URL with the token elided; the full URL is shown once, at creation or rotation."`
 }
 
 // DeploymentOut is one run of the pipeline.
@@ -251,6 +251,8 @@ func actionErr(err error, fallback string) error {
 			return huma.Error409Conflict(ae.Msg)
 		case http.StatusUnprocessableEntity:
 			return huma.Error422UnprocessableEntity(ae.Msg)
+		case http.StatusForbidden:
+			return huma.Error403Forbidden(ae.Msg)
 		}
 	}
 	var se huma.StatusError
