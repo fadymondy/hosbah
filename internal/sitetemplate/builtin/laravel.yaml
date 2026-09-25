@@ -1,0 +1,38 @@
+name: laravel
+description: The Laravel application skeleton, migrated and cached on release, APP_KEY generated for you.
+driver: laravel
+repo_url: https://github.com/laravel/laravel
+branch: "13.x"
+port: 8080
+health_path: /up
+needs:
+  postgres: true
+env:
+  - name: APP_KEY
+    generate:
+      length: 32
+      charset: alnum
+  - name: APP_ENV
+    value: production
+  - name: APP_DEBUG
+    value: "false"
+  - name: LOG_CHANNEL
+    value: stderr
+  - name: DB_CONNECTION
+    value: pgsql
+  - name: DB_URL
+    from: postgres_url
+    secret: true
+hosbah_toml: |
+  release = "php artisan migrate --force"
+
+  [healthcheck]
+  path = "/up"
+  timeout = 120
+
+  [processes]
+  "worker:queue" = "php artisan queue:work --tries=3 --max-time=3600"
+notes: >-
+  Attach a running Postgres service on the app's server before applying this template — DB_URL is
+  filled from it. Create your own repository from the Laravel skeleton first, then point this
+  template at it.

@@ -62,6 +62,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterServerRoutes(api, a)
 	RegisterServerCostRoutes(api, a)
 	RegisterServerMetricRoutes(api, a)
+	RegisterSiteTemplateRoutes(api, a)
 	RegisterStatusPageRoutes(api, a)
 	RegisterTeamRoutes(api, a)
 	RegisterTeamMemberRoutes(api, a)

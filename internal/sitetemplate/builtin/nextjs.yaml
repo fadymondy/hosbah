@@ -1,0 +1,13 @@
+name: nextjs
+description: A Next.js app, built with npm and started in production mode.
+driver: nextjs
+repo_url: https://github.com/vercel/next-learn
+branch: main
+port: 3000
+health_path: /
+env:
+  - name: NODE_ENV
+    value: production
+notes: >-
+  Point repo_url at your own Next.js repository. NEXTAUTH_SECRET or any other app secret can be
+  added as an env entry with generate instead of value.
