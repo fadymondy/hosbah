@@ -108,6 +108,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"delete_site_template": true,
 		// MH-576 D7: destroying a SaaS product's customer instance.
 		"destroy_instance": true,
+		// MH-580 J1: loading a firewall ruleset can cut a server off from everything not explicitly allowed.
+		"server_firewall_apply": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

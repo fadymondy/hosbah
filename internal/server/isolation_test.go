@@ -217,6 +217,11 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/proxy-hosts", map[string]any{"server": srvA, "hostname": "nas-" + suffix + ".example.test",
 		"upstream": "10.0.0.5:5000", "tls": "off"}, 201, &proxyA)
 
+	// MH-580 J1: a firewall rule of A's on that server.
+	var ruleA struct{ ID string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/servers/"+srvA+"/firewall", map[string]any{"action": "allow", "proto": "tcp",
+		"port_start": 8443, "port_end": 8443, "source_cidr": "any"}, 201, &ruleA)
+
 	// H8: a log drain of A's (syslog, scoped to every app).
 	var drainA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/log-drains", map[string]any{"kind": "syslog", "name": "drain-a-" + suffix,
@@ -279,6 +284,8 @@ func TestIsolationSweep(t *testing.T) {
 		"recipe":      func(string) []string { return []string{"searxng", "no-such-recipe"} },                  // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
 		"job":         func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":       func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
+		"rule":        func(string) []string { return []string{ruleA.ID} },
+		"preset":      func(string) []string { return []string{"web"} },
 		"sftp_user":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
 		"drain":       func(string) []string { return []string{drainA.ID, drainA.Name} },
 		"product":     func(string) []string { return []string{prodA.ID, prodA.Name} },
@@ -450,17 +457,17 @@ func TestIsolationSweep(t *testing.T) {
 		"list_app_monitors":  {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
-		"monitor_uptime": {"app": appA.App.ID, "monitor": monA.ID},
+		"monitor_uptime":              {"app": appA.App.ID, "monitor": monA.ID},
 		"notification_channel_update": {"channel": chanA.ID, "name": "stolen"}, "notification_channel_test": {"channel": chanA.ID},
 		"notification_channel_delete": {"channel": chanA.ID, "confirm": chanA.Name},
-		"status_page_update": {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
+		"status_page_update":          {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
 		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
-		"get_script": {"script": scriptA.ID}, "save_script": {"script": scriptA.ID, "name": "stolen", "body": "echo hi"},
-		"delete_script": {"script": scriptA.ID, "confirm": scriptA.Name},
-		"run_script":    {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
+		"get_script":       {"script": scriptA.ID}, "save_script": {"script": scriptA.ID, "name": "stolen", "body": "echo hi"},
+		"delete_script":     {"script": scriptA.ID, "confirm": scriptA.Name},
+		"run_script":        {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
 		"script_run_status": {"run": scriptRunA},
 		"get_site_template": {"template": templateA.ID}, "save_site_template": {"template": templateA.ID,
 			"source_yaml": "name: " + templateA.Name + "\ndriver: node-api\nrepo_url: https://example.test/a-env/repo.git\n"},
@@ -468,9 +475,17 @@ func TestIsolationSweep(t *testing.T) {
 		"preview_site_template":    {"template": templateA.ID},
 		"create_app_from_template": {"template": templateA.ID, "name": "stolen", "server": srvA},
 		"export_app_template":      {"app": appA.App.ID},
-		"list_services":     {"server": srvA},
-		"service_action":    {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
-		"get_app_queues":   {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
+		"list_services":            {"server": srvA},
+		"service_action":           {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
+		// MH-580 J1/J2: firewall rules and fail2ban of A's server.
+		"list_firewall_rules": {"server": srvA}, "add_firewall_rule": {"server": srvA, "action": "allow", "proto": "tcp", "port_start": 8080, "port_end": 8080},
+		"remove_firewall_rule":     {"rule": ruleA.ID},
+		"server_firewall_apply":    {"server": srvA, "confirm": "drop"},
+		"server_firewall_status":   {"server": srvA},
+		"server_fail2ban_settings": {"server": srvA},
+		"server_fail2ban_banned":   {"server": srvA},
+		"server_fail2ban_unban":    {"server": srvA, "ip": "10.0.0.9"},
+		"get_app_queues":           {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
 		"app_processes": {"app": appA.App.ID}, "app_process_action": {"app": appA.App.ID, "action": "restart", "process": "web"},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
 		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
@@ -492,15 +507,15 @@ func TestIsolationSweep(t *testing.T) {
 		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},
 		"app_apm_settings": {"app": appA.App.ID, "enabled": true}, "app_endpoints": {"app": appA.App.ID},
 		"app_traces": {"app": appA.App.ID, "method": "GET", "route": "/"}, "app_errors": {"app": appA.App.ID},
-		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
+		"app_error_status":   {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
 		"app_cache_settings": {"app": appA.App.ID, "enabled": true}, "app_cache_purge": {"app": appA.App.ID},
 		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
 		// MH-576 D7: SaaS products, instances, upgrades and keys of A's.
 		"product_instances": {"product": prodA.ID}, "provision_instance": {"product": prodA.ID, "server": srvA, "customer_ref": "stolen"},
 		"suspend_instance": {"product": prodA.ID, "instance": instA.ID}, "resume_instance": {"product": prodA.ID, "instance": instA.ID},
-		"upgrade_product":   {"product": prodA.ID},
-		"mint_product_key":  {"product": prodA.ID, "name": "stolen"},
-		"destroy_instance":  {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
+		"upgrade_product":  {"product": prodA.ID},
+		"mint_product_key": {"product": prodA.ID, "name": "stolen"},
+		"destroy_instance": {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

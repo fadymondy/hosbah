@@ -93,6 +93,15 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedEnvVar(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedFail2banSetting(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedFirewallRule(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedFirewallSetting(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedGithubInstallation(ctx, a); err != nil {
 		return err
 	}

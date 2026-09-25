@@ -1517,6 +1517,133 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: Fail2banSetting
+      table: fail2ban_settings
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: bantime
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: findtime
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: maxretry
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: updated_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: FirewallRule
+      table: firewall_rules
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: action
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: proto
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: port_start
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: port_end
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: source_cidr
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: comment
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: position
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: FirewallSetting
+      table: firewall_settings
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: default_policy
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: ssh_port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: updated_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: GithubInstallation
       table: github_installations
       fields:

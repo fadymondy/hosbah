@@ -179,6 +179,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	sv := newServiceHost()
 	e.handlers[agentproto.KindServiceList] = sv.list
 	e.handlers[agentproto.KindServiceAction] = sv.action
+	fw := newFirewallHost()
+	e.handlers[agentproto.KindFirewallApply] = fw.apply
+	e.handlers[agentproto.KindFirewallStatus] = fw.status
+	f2b := newFail2banHost()
+	e.handlers[agentproto.KindFail2banInstall] = f2b.install
+	e.handlers[agentproto.KindFail2banBanned] = f2b.banned
+	e.handlers[agentproto.KindFail2banUnban] = f2b.unban
 	return e
 }
 
