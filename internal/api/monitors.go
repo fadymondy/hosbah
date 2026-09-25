@@ -30,29 +30,35 @@ type MonitorPath struct {
 
 // MonitorCreateIn is a new monitor.
 type MonitorCreateIn struct {
-	Name            string   `json:"name" minLength:"1" maxLength:"80" doc:"Unique in the app."`
-	Kind            string   `json:"kind" enum:"http,cpu,memory,disk"`
-	Target          *string  `json:"target,omitempty" maxLength:"500" doc:"http: an http(s):// URL on one of the app's own hostnames. Not for cpu, memory, disk."`
-	ExpectedStatus  *int     `json:"expected_status,omitempty" doc:"http: the status a check must answer (default 200); 0 = any 2xx or 3xx."`
-	Threshold       *float64 `json:"threshold,omitempty" doc:"http: the slowest acceptable response in ms, 0 to 60000 (default 0 = no limit). cpu, memory, disk: percent, 1 to 100 (required)."`
-	WindowMinutes   *int     `json:"window_minutes,omitempty" doc:"cpu, memory, disk: minutes the average is taken over, 1 to 60 (default 5)."`
-	IntervalSeconds *int     `json:"interval_seconds,omitempty" doc:"How often it is checked, 30 to 3600 (default 60)."`
-	Enabled         *bool    `json:"enabled,omitempty" doc:"Default true."`
-	NotifyEmails    []string `json:"notify_emails,omitempty" maxItems:"10" doc:"Who is emailed when an incident opens or resolves."`
-	NotifyWebhook   *string  `json:"notify_webhook,omitempty" maxLength:"500" doc:"An https:// URL that is POSTed {event, monitor, app, reason, value, at}; \"\" = none."`
+	Name                     string   `json:"name" minLength:"1" maxLength:"80" doc:"Unique in the app."`
+	Kind                     string   `json:"kind" enum:"http,cpu,memory,disk,heartbeat"`
+	Target                   *string  `json:"target,omitempty" maxLength:"500" doc:"http: an http(s):// URL on one of the app's own hostnames. Not for cpu, memory, disk, heartbeat."`
+	ExpectedStatus           *int     `json:"expected_status,omitempty" doc:"http: the status a check must answer (default 200); 0 = any 2xx or 3xx."`
+	Threshold                *float64 `json:"threshold,omitempty" doc:"http: the slowest acceptable response in ms, 0 to 60000 (default 0 = no limit). cpu, memory, disk: percent, 1 to 100 (required)."`
+	WindowMinutes            *int     `json:"window_minutes,omitempty" doc:"cpu, memory, disk: minutes the average is taken over, 1 to 60 (default 5)."`
+	IntervalSeconds          *int     `json:"interval_seconds,omitempty" doc:"How often it is checked, 30 to 3600 (default 60). Unused by heartbeat."`
+	Enabled                  *bool    `json:"enabled,omitempty" doc:"Default true."`
+	NotifyEmails             []string `json:"notify_emails,omitempty" maxItems:"10" doc:"Who is emailed when an incident opens or resolves."`
+	NotifyWebhook            *string  `json:"notify_webhook,omitempty" maxLength:"500" doc:"An https:// URL that is POSTed {event, monitor, app, reason, value, at}; \"\" = none."`
+	NotifyChannelIDs         []string `json:"notify_channel_ids,omitempty" maxItems:"10" doc:"Team notification channels (internal/notifications) this monitor's incidents also reach."`
+	HeartbeatIntervalSeconds *int     `json:"heartbeat_interval_seconds,omitempty" doc:"heartbeat: how often a ping is expected, 30 to 86400 (default 300)."`
+	HeartbeatGraceSeconds    *int     `json:"heartbeat_grace_seconds,omitempty" doc:"heartbeat: how late a ping may be before an incident opens, 0 to 86400 (default 120)."`
 }
 
 // MonitorPatchIn changes a monitor. Omit a field to leave it. The kind never changes.
 type MonitorPatchIn struct {
-	Name            *string  `json:"name,omitempty" minLength:"1" maxLength:"80"`
-	Target          *string  `json:"target,omitempty" maxLength:"500"`
-	ExpectedStatus  *int     `json:"expected_status,omitempty"`
-	Threshold       *float64 `json:"threshold,omitempty"`
-	WindowMinutes   *int     `json:"window_minutes,omitempty"`
-	IntervalSeconds *int     `json:"interval_seconds,omitempty"`
-	Enabled         *bool    `json:"enabled,omitempty" doc:"false also closes the monitor's open incident, quietly."`
-	NotifyEmails    []string `json:"notify_emails,omitempty" maxItems:"10"`
-	NotifyWebhook   *string  `json:"notify_webhook,omitempty" maxLength:"500"`
+	Name                     *string  `json:"name,omitempty" minLength:"1" maxLength:"80"`
+	Target                   *string  `json:"target,omitempty" maxLength:"500"`
+	ExpectedStatus           *int     `json:"expected_status,omitempty"`
+	Threshold                *float64 `json:"threshold,omitempty"`
+	WindowMinutes            *int     `json:"window_minutes,omitempty"`
+	IntervalSeconds          *int     `json:"interval_seconds,omitempty"`
+	Enabled                  *bool    `json:"enabled,omitempty" doc:"false also closes the monitor's open incident, quietly."`
+	NotifyEmails             []string `json:"notify_emails,omitempty" maxItems:"10"`
+	NotifyWebhook            *string  `json:"notify_webhook,omitempty" maxLength:"500"`
+	NotifyChannelIDs         []string `json:"notify_channel_ids,omitempty" maxItems:"10"`
+	HeartbeatIntervalSeconds *int     `json:"heartbeat_interval_seconds,omitempty"`
+	HeartbeatGraceSeconds    *int     `json:"heartbeat_grace_seconds,omitempty"`
 }
 
 func (d *deps) monitors() *monitors.Service {
@@ -107,7 +113,8 @@ func (d *deps) registerMonitors(api huma.API) {
 			b := in.Body
 			out.Body, err = monitors.Create(ctx, q, m.TeamID, webActor(id), a, monitors.Input{Name: &b.Name, Kind: b.Kind, Target: b.Target,
 				ExpectedStatus: b.ExpectedStatus, Threshold: b.Threshold, WindowMinutes: b.WindowMinutes, IntervalSeconds: b.IntervalSeconds,
-				Enabled: b.Enabled, NotifyEmails: emailsIn(b.NotifyEmails), NotifyWebhook: b.NotifyWebhook})
+				Enabled: b.Enabled, NotifyEmails: emailsIn(b.NotifyEmails), NotifyWebhook: b.NotifyWebhook, NotifyChannelIDs: emailsIn(b.NotifyChannelIDs),
+				HeartbeatIntervalSeconds: b.HeartbeatIntervalSeconds, HeartbeatGraceSeconds: b.HeartbeatGraceSeconds})
 			return actionErr(err, "could not create the monitor")
 		})
 		return out, err
@@ -152,7 +159,8 @@ func (d *deps) registerMonitors(api huma.API) {
 			b := in.Body
 			out.Body, err = monitors.Update(ctx, q, m.TeamID, webActor(id), a, mon, monitors.Input{Name: b.Name, Target: b.Target,
 				ExpectedStatus: b.ExpectedStatus, Threshold: b.Threshold, WindowMinutes: b.WindowMinutes, IntervalSeconds: b.IntervalSeconds,
-				Enabled: b.Enabled, NotifyEmails: emailsIn(b.NotifyEmails), NotifyWebhook: b.NotifyWebhook}, d.monitors().Now())
+				Enabled: b.Enabled, NotifyEmails: emailsIn(b.NotifyEmails), NotifyWebhook: b.NotifyWebhook, NotifyChannelIDs: emailsIn(b.NotifyChannelIDs),
+				HeartbeatIntervalSeconds: b.HeartbeatIntervalSeconds, HeartbeatGraceSeconds: b.HeartbeatGraceSeconds}, d.monitors().Now())
 			return actionErr(err, "could not update the monitor")
 		})
 		return out, err

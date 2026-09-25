@@ -922,7 +922,68 @@
     "quotaApps": "Apps",
     "quotaDataServices": "Data services",
     "quotaUnlimited": "Unlimited",
-    "quotaOf": "{used} of {max}"
+    "quotaOf": "{used} of {max}",
+    "alertsTitle": "Alerts & channels",
+    "alertsHint": "Where monitor incidents and other alerts reach the team, beyond email and webhooks set on the monitor itself.",
+    "statusPagesTitle": "Status pages",
+    "statusPagesHint": "A published, read-only page showing a chosen set of monitors, at its own web address."
+  },
+  "alerts": {
+    "add": "Add channel",
+    "search": "Search channels…",
+    "name": "Name",
+    "kind": "Kind",
+    "destination": "Destination",
+    "events": "Events",
+    "test": "Test",
+    "testSent": "Test message sent",
+    "emptyTitle": "No channels yet",
+    "emptyHint": "Add an email, Slack, Discord or generic webhook destination; a monitor's incidents can then reach it too.",
+    "deleteTitle": "Remove {name}?",
+    "deleteBody": "Monitors pointed at this channel keep their other notifications; only this destination goes.",
+    "emails": "Email addresses",
+    "url": "URL",
+    "urlHint": "An https:// URL. Slack and Discord: an incoming webhook URL.",
+    "secret": "Signing secret",
+    "secretHint": "Webhook only: sent as the X-Hosbah-Signature header (HMAC-SHA256). Leave blank to keep it, or clear it below.",
+    "clearSecret": "Clear the secret",
+    "secretSet": "A secret is set",
+    "enabled": "Enabled",
+    "kinds": {
+      "email": "Email",
+      "slack": "Slack",
+      "discord": "Discord",
+      "webhook": "Webhook"
+    },
+    "eventNames": {
+      "deploy.failed": "Deploy failed",
+      "server.offline": "Server offline",
+      "backup.failed": "Backup failed"
+    }
+  },
+  "statusPages": {
+    "add": "Add status page",
+    "search": "Search status pages…",
+    "slug": "Slug",
+    "title": "Title",
+    "published": "Published",
+    "unpublished": "Unpublished",
+    "monitors": "Monitors shown",
+    "monitorsHint": "Only these monitors' name, kind and state are ever shown — never their target or notification settings.",
+    "emptyTitle": "No status pages yet",
+    "emptyHint": "Publish a chosen set of monitors at their own web address, for anyone to check without signing in.",
+    "deleteTitle": "Remove {name}?",
+    "deleteBody": "Its public address stops answering.",
+    "view": "View",
+    "slugHint": "Lowercase letters, digits and hyphens; unique across every team. It cannot change later.",
+    "noMonitors": "This team has no monitors yet."
+  },
+  "publicStatus": {
+    "notFoundTitle": "Page not found",
+    "notFoundHint": "This status page does not exist, or is not published.",
+    "allOk": "All systems operational",
+    "someDown": "Some systems are experiencing issues",
+    "since": "Since {when}"
   },
   "account": {
     "title": "Account",
@@ -2205,17 +2266,31 @@
       "enabled": "Enabled",
       "ruleHttp": "expects {status}, every {every}s",
       "ruleResource": "{kind} above {pct}% over {min} min",
+      "ruleHeartbeat": "expects a ping every {every}s (+{grace}s grace)",
       "kinds": {
         "http": "Uptime (HTTP)",
         "cpu": "CPU",
         "memory": "Memory",
-        "disk": "Disk"
+        "disk": "Disk",
+        "heartbeat": "Heartbeat"
       },
       "state": {
         "unknown": "No data yet",
         "ok": "Passing",
         "failing": "Failing"
-      }
+      },
+      "heartbeatInterval": "Expected every (seconds)",
+      "heartbeatGrace": "Grace (seconds)",
+      "lastPing": "Last ping",
+      "neverPinged": "No ping yet",
+      "pingUrlTitle": "Ping this URL",
+      "pingUrlHint": "Shown once, now — it is not shown again. A GET or POST to it, at least this often, keeps the monitor passing.",
+      "pingUrlCurl": "Example:",
+      "channels": "Also notify these channels",
+      "noChannels": "No notification channels yet — add one in team settings.",
+      "uptime24h": "24h",
+      "uptime7d": "7d",
+      "uptime30d": "30d"
     },
     "schedules": {
       "add": "Add schedule",

@@ -232,7 +232,8 @@ func validate(s spec, hostnames []string) (spec, error) {
 		if s.Threshold < 0 || s.Threshold > 60000 {
 			return s, invalid("threshold is the slowest acceptable response in ms: 0 (no limit) to 60000")
 		}
-		s.Window = 5 // unused by http
+		s.Window = 5                                     // unused by http
+		s.HeartbeatInterval, s.HeartbeatGrace = 300, 120 // unused by http; satisfies the DB's heartbeat range checks
 	case KindCPU, KindMemory, KindDisk:
 		if strings.TrimSpace(s.Target) != "" {
 			return s, invalid("a " + s.Kind + " monitor has no target: it reads the app's server's metrics")
@@ -247,7 +248,8 @@ func validate(s spec, hostnames []string) (spec, error) {
 		if s.Window < 1 || s.Window > 60 {
 			return s, invalid("window_minutes must be between 1 and 60")
 		}
-		s.ExpectedStatus = 200 // unused by resource kinds
+		s.ExpectedStatus = 200                           // unused by resource kinds
+		s.HeartbeatInterval, s.HeartbeatGrace = 300, 120 // unused by cpu/memory/disk; satisfies the DB's heartbeat range checks
 	case KindHeartbeat:
 		if strings.TrimSpace(s.Target) != "" {
 			return s, invalid("a heartbeat monitor has no target: it waits for a ping")

@@ -371,6 +371,10 @@ func TestIsolationSweep(t *testing.T) {
 		"list_app_monitors":  {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
+		"monitor_uptime": {"app": appA.App.ID, "monitor": monA.ID},
+		"notification_channel_update": {"channel": chanA.ID, "name": "stolen"}, "notification_channel_test": {"channel": chanA.ID},
+		"notification_channel_delete": {"channel": chanA.ID, "confirm": chanA.Name},
+		"status_page_update": {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
 		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
@@ -417,6 +421,12 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
 		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "notification_channels_list", nil); strings.Contains(res.Text, chanA.ID) || strings.Contains(res.Text, chanA.Name) {
+		t.Errorf("notification_channels_list as B leaked team A's channel: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "status_pages_list", nil); strings.Contains(res.Text, pageA.ID) || strings.Contains(res.Text, pageA.Slug) {
+		t.Errorf("status_pages_list as B leaked team A's status page: %s", res.Text)
 	}
 	// Imported records of A's, by id and name: not found, and nothing acts on them.
 	for name, args := range map[string]map[string]any{

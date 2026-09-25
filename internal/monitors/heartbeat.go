@@ -92,11 +92,6 @@ func (s *Service) handleHeartbeatPing(w http.ResponseWriter, r *http.Request) {
 				if a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: up.AppID, TeamID: cur.TeamID}); err == nil {
 					base.App.Name = a.Name
 				}
-				body := base.text()
-				if err := q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: cur.TeamID, Kind: "monitor.resolved", Title: base.title(),
-					Body: &body, SubjectType: ptr("app"), SubjectID: &up.AppID}); err != nil {
-					return err
-				}
 				ev = &base
 			}
 		}
@@ -107,7 +102,18 @@ func (s *Service) handleHeartbeatPing(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not record the check-in"})
 		return
 	}
+	// The team's own notification feed: notifications allows only a system INSERT, never a
+	// ping-token-scoped one (see 20260914145012's notifications_system_insert), so this runs as its
+	// own transaction, System AND team — same as Service.apply's — after the ping-token transaction
+	// above that found and updated the monitor by its token.
 	if ev != nil {
+		body := ev.text()
+		if nerr := tenancy.Tx(ctx, s.db, tenancy.Scope{System: true, TeamID: ev.teamID}, func(q *db.Queries, _ *sql.Tx) error {
+			return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: ev.teamID, Kind: "monitor.resolved", Title: ev.title(),
+				Body: &body, SubjectType: ptr("app"), SubjectID: &ev.App.ID})
+		}); nerr != nil {
+			s.log.Warn("heartbeat ping: could not write the team notification", "monitor", ev.Monitor.ID, "err", nerr)
+		}
 		s.announce(ctx, *ev)
 	}
 	writeJSON(w, status, out)

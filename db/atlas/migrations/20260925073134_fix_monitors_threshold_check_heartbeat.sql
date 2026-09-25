@@ -1,0 +1,2 @@
+-- Modify "monitors" table
+ALTER TABLE "public"."monitors" DROP CONSTRAINT "monitors_threshold_check", ADD CONSTRAINT "monitors_threshold_check" CHECK (((kind = ANY (ARRAY['http'::text, 'heartbeat'::text])) AND (threshold >= (0)::double precision) AND (threshold <= (60000)::double precision)) OR ((kind = ANY (ARRAY['cpu'::text, 'memory'::text, 'disk'::text])) AND (threshold >= (1)::double precision) AND (threshold <= (100)::double precision)));

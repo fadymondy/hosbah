@@ -46,8 +46,10 @@ ALTER TABLE monitors ADD CONSTRAINT monitors_name_check CHECK (length(name) BETW
 ALTER TABLE monitors ADD CONSTRAINT monitors_target_check CHECK (
     (kind = 'http' AND target ~ '^https?://' AND length(target) <= 500) OR (kind <> 'http' AND target = ''));
 ALTER TABLE monitors ADD CONSTRAINT monitors_expected_status_check CHECK (expected_status = 0 OR expected_status BETWEEN 100 AND 599);
+-- heartbeat carries no threshold (it is unused, like its target): treated like http's "any value in
+-- range" rather than cpu/memory/disk's "required percent", so 0 (the column's default) is valid.
 ALTER TABLE monitors ADD CONSTRAINT monitors_threshold_check CHECK (
-    (kind = 'http' AND threshold >= 0 AND threshold <= 60000) OR (kind <> 'http' AND threshold >= 1 AND threshold <= 100));
+    (kind IN ('http', 'heartbeat') AND threshold >= 0 AND threshold <= 60000) OR (kind IN ('cpu', 'memory', 'disk') AND threshold >= 1 AND threshold <= 100));
 ALTER TABLE monitors ADD CONSTRAINT monitors_window_check CHECK (window_minutes BETWEEN 1 AND 60);
 ALTER TABLE monitors ADD CONSTRAINT monitors_interval_check CHECK (interval_seconds BETWEEN 30 AND 3600);
 ALTER TABLE monitors ADD CONSTRAINT monitors_emails_check CHECK (coalesce(array_length(notify_emails, 1), 0) <= 10);
