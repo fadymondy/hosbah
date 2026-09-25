@@ -418,9 +418,51 @@
       "tunnels": "Tunnels",
       "github": "GitHub",
       "discovered": "Discovered",
+      "import": "Import",
       "operations": "Operations",
       "settings": "Settings",
       "danger": "Danger zone"
+    },
+    "import": {
+      "title": "Import",
+      "hint": "What the last sync of this server's discovered workloads found, and what became of each — an app, a database, a shared service, or skipped. Choose per item; the next sync always honours it.",
+      "runNow": "Run import now",
+      "queued": "Import queued",
+      "never": "No import has run yet. Run import now, or wait for the next automatic sync.",
+      "lastRun": "Last run",
+      "created": "Created",
+      "updated": "Updated",
+      "status": "Status",
+      "ok": "OK",
+      "errored": "Errored",
+      "emptyTitle": "Nothing discovered yet",
+      "emptyHint": "Once the server reports what it runs, discovered workloads show up here.",
+      "columns": {
+        "name": "Name",
+        "outcome": "Outcome",
+        "detail": "Detail",
+        "decision": "Import as"
+      },
+      "outcomes": {
+        "imported_app": "Imported as app",
+        "imported_data_service": "Imported as database",
+        "imported_shared_service": "Shared service",
+        "linked_guest": "Linked",
+        "updated": "Updated",
+        "missing": "Missing",
+        "removed": "Removed",
+        "skipped": "Skipped",
+        "ignored": "Ignored",
+        "error": "Error"
+      },
+      "decisions": {
+        "auto": "Auto",
+        "app": "App",
+        "database": "Database",
+        "shared_service": "Shared service",
+        "ignore": "Ignore"
+      },
+      "decided": "{name} will be {decision}."
     },
     "appearance": {
       "title": "Appearance",

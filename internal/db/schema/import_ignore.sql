@@ -7,14 +7,17 @@ CREATE TABLE import_ignores (
     origin_key text NOT NULL,
     name text NOT NULL,
     created_by text NOT NULL,
+    decision text NOT NULL DEFAULT 'ignore',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Hosbah: a tombstone for an imported workload the user deleted. Deleting an imported app or data
--- service removes only Hosbah's record; this row stops the next system.info from bringing it back.
--- kind is what the record was (app | data_service); origin_key is the server-stable key (container
--- name, unit name, guest:<vmid>).
+-- Hosbah: a member's sticky decision for one discovered workload (MH-574 A4). Despite the table's
+-- name this now holds every decision, not only "ignore": import as app, import as database, mark
+-- as a shared service, or ignore. A later sync (internal/importer) always honours the row instead
+-- of reclassifying the item. kind is what the item was detected as (app | data_service); origin_key
+-- is the server-stable key (container name, unit name, guest:<vmid>).
 ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_kind_check CHECK (kind IN ('app', 'data_service'));
+ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_decision_check CHECK (decision IN ('ignore', 'app', 'database', 'shared_service'));
 CREATE UNIQUE INDEX import_ignores_server_key ON import_ignores (server_id, origin_key);
 CREATE INDEX import_ignores_team_idx ON import_ignores (team_id);

@@ -21,3 +21,19 @@ ON CONFLICT (server_id, origin_key) DO NOTHING;
 
 -- name: ImportIgnoresOfServer :many
 SELECT origin_key FROM import_ignores WHERE server_id = $1 AND team_id = $2;
+
+-- MH-574 A4: a member's sticky decision for one discovered workload — import as app, import as
+-- database, mark as a shared service, or ignore. Upserted from the import decision endpoint;
+-- consulted by internal/importer.Sync on every later sync.
+
+-- name: SetImportDecision :one
+INSERT INTO import_ignores (team_id, server_id, kind, origin_key, name, created_by, decision)
+VALUES (sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('kind'), sqlc.arg('origin_key'), sqlc.arg('name'), sqlc.arg('created_by'), sqlc.arg('decision'))
+ON CONFLICT (server_id, origin_key) DO UPDATE SET decision = excluded.decision, kind = excluded.kind, name = excluded.name, updated_at = now()
+RETURNING *;
+
+-- name: ImportDecisionsOfServer :many
+SELECT origin_key, decision FROM import_ignores WHERE server_id = $1 AND team_id = $2;
+
+-- name: DeleteImportDecision :execrows
+DELETE FROM import_ignores WHERE server_id = $1 AND team_id = $2 AND origin_key = $3;

@@ -488,6 +488,107 @@ func TestImportedWorkloads(t *testing.T) {
 		}
 	})
 
+	t.Run("MH-574 A4: the Import tab's decisions are honoured by the next sync", func(t *testing.T) {
+		// A first sync with nothing decided yet: one app, one database, one guest that also
+		// imports as an app. This is what the Import tab's table shows before any choice is made.
+		services := []agentproto.Service{
+			{Kind: "container", Name: "keep-web", Image: "nginx", Status: "running"},
+			{Kind: "container", Name: "maybe-db", Image: "postgres:16", Status: "running"},
+			{Kind: "guest", Name: "svc-guest", ID: "301", Type: "lxc", Status: "running", Address: "10.4.4.4"},
+		}
+		srv2 := enrolWithServices(t, owner, ts.URL, team.ID, "decide-"+suffix, services)
+		apps, dss := listImported(t, owner, team.ID, srv2)
+		if _, ok := apps["keep-web"]; !ok {
+			t.Fatalf("keep-web should have imported as an app: %v", keys(apps))
+		}
+		if _, ok := dss["maybe-db"]; !ok {
+			t.Fatalf("maybe-db should have imported as a database: %v", keys(dss))
+		}
+		if _, ok := apps["svc-guest"]; !ok {
+			t.Fatalf("svc-guest should have imported as an app, before any decision: %v", keys(apps))
+		}
+
+		// A run and its items are recorded, readable over REST.
+		var got struct {
+			Run struct {
+				Status     string `json:"status"`
+				Discovered int64  `json:"discovered"`
+				Created    int64  `json:"created"`
+			} `json:"run"`
+			Items []struct {
+				OriginKey string  `json:"origin_key"`
+				Name      string  `json:"name"`
+				Outcome   string  `json:"outcome"`
+				Target    string  `json:"target"`
+				Decision  *string `json:"decision"`
+			} `json:"items"`
+		}
+		owner.mustJSON("GET", "/api/teams/"+team.ID+"/servers/"+srv2+"/import", nil, 200, &got)
+		if got.Run.Status != "ok" || got.Run.Created == 0 || len(got.Items) == 0 {
+			t.Fatalf("import status: %+v", got)
+		}
+		var sawApp, sawDB, sawGuest bool
+		for _, it := range got.Items {
+			switch it.OriginKey {
+			case "keep-web":
+				sawApp = it.Outcome == "imported_app" && it.Decision == nil
+			case "maybe-db":
+				sawDB = it.Outcome == "imported_data_service"
+			case "guest:301":
+				sawGuest = it.Outcome == "imported_app"
+			}
+		}
+		if !sawApp || !sawDB || !sawGuest {
+			t.Fatalf("items missing expected outcomes: %+v", got.Items)
+		}
+
+		// Delete the app the guest became (as a user would, once they decide it should be a shared
+		// service instead), then decide: ignore keep-web, and mark the guest a shared service.
+		owner.mustJSON("DELETE", "/api/teams/"+team.ID+"/apps/"+apps["svc-guest"].ID, map[string]any{"confirm": "svc-guest"}, 204, nil)
+		owner.mustJSON("PUT", "/api/teams/"+team.ID+"/servers/"+srv2+"/import/items/keep-web", map[string]any{"decision": "ignore"}, 200, nil)
+		owner.mustJSON("PUT", "/api/teams/"+team.ID+"/servers/"+srv2+"/import/items/guest:301", map[string]any{"decision": "shared_service"}, 200, nil)
+
+		res, err := importer.Sync(ctx, sqlDB, team.ID, srv2, services)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Ignored != 1 || res.SharedServices != 1 {
+			t.Fatalf("a synced decision should be honoured: %+v", res)
+		}
+		// The guest is a shared service now, not an app, and stays deleted as an app.
+		var svcs struct {
+			Services []struct {
+				Name     string `json:"name"`
+				ServerID string `json:"server_id"`
+			} `json:"services"`
+		}
+		owner.mustJSON("GET", "/api/teams/"+team.ID+"/shared-services", nil, 200, &svcs)
+		found := false
+		for _, s := range svcs.Services {
+			if s.ServerID == srv2 && s.Name == "svc-guest" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("svc-guest should be a shared service now: %+v", svcs.Services)
+		}
+		apps2, _ := listImported(t, owner, team.ID, srv2)
+		if _, ok := apps2["svc-guest"]; ok {
+			t.Fatalf("svc-guest must not come back as an app once it is a shared service: %v", keys(apps2))
+		}
+
+		// A second run keeps honouring both decisions (sticky, not one-shot): svc-guest does not
+		// get re-created as an app, and no new shared service row appears for keep-web.
+		res2, err := importer.Sync(ctx, sqlDB, team.ID, srv2, services)
+		if err != nil || res2.Ignored != 1 || res2.SharedServices != 1 {
+			t.Fatalf("a decision must stay honoured on a later sync: %+v %v", res2, err)
+		}
+		apps3, _ := listImported(t, owner, team.ID, srv2)
+		if _, ok := apps3["svc-guest"]; ok {
+			t.Fatalf("svc-guest must stay out of the apps list on a later sync too: %v", keys(apps3))
+		}
+	})
+
 	t.Run("removing the server forgets its imported records", func(t *testing.T) {
 		owner.mustJSON("DELETE", "/api/teams/"+team.ID+"/servers/"+srv, nil, 204, nil)
 		apps, dss := listImported(t, owner, team.ID, srv)
