@@ -13,6 +13,7 @@
     "discard": "Discard",
     "delete": "Delete",
     "actions": "Actions",
+    "refresh": "Refresh",
     "readOnly": "You can view this, but your role cannot change it.",
     "home": "Go home"
   },
@@ -152,6 +153,7 @@
     "platform": "Platform",
     "overview": "Overview",
     "sharedServices": "Shared services",
+    "scripts": "Scripts",
     "members": "Members",
     "invitations": "Invitations",
     "tokens": "MCP tokens",
@@ -388,7 +390,8 @@
         "agent_update": "Agent update",
         "provider_create": "Create machine",
         "app_detect": "Runtime detection",
-        "app_logs": "Runtime logs"
+        "app_logs": "Runtime logs",
+        "script_run": "Script run"
       },
       "steps": {
         "packages_base": "Base packages",
@@ -446,8 +449,25 @@
       "sftp": "SFTP",
       "terminal": "Terminal",
       "operations": "Operations",
+      "services": "Services",
       "settings": "Settings",
       "danger": "Danger zone"
+    },
+    "services": {
+      "title": "Services",
+      "hint": "The server's systemd .service units. Hosbah's own agent unit is always refused here.",
+      "readOnly": "Your role can view services but not start, stop, restart or reload them.",
+      "empty": "No .service units were found.",
+      "search": "Search by unit, state or description",
+      "unit": "Unit",
+      "state": "State",
+      "enabled": "Boot",
+      "enabledYes": "Enabled",
+      "enabledNo": "Disabled",
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "reload": "Reload"
     },
     "files": {
       "title": "Files",
@@ -1689,6 +1709,61 @@
       "clickhouse": "ClickHouse",
       "mongodb": "MongoDB",
       "other": "Other"
+    }
+  },
+  "scripts": {
+    "title": "Scripts",
+    "hint": "A shared library of shell scripts, run as root on one or many servers. Running or editing one needs owner or admin; any member can see run history.",
+    "search": "Search by name, description…",
+    "add": "New script",
+    "name": "Name",
+    "description": "Description",
+    "body": "Script body",
+    "bodyHint": "Runs with bash as root by default. Params reach it as environment variables, never interpolated into this text.",
+    "runAs": "Run as",
+    "runAsValues": {
+      "root": "root",
+      "app": "app"
+    },
+    "timeout": "Timeout (seconds)",
+    "run": "Run",
+    "started": "Run started.",
+    "dialogHint": "Saved to the team's library and available on every server you run it on.",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "Its run history is kept, but the script itself can no longer be run.",
+    "emptyTitle": "No scripts yet",
+    "emptyHint": "Add a script to the team's library, or run one of the built-ins below.",
+    "builtins": {
+      "title": "Built-in installs",
+      "hint": "Read-only, one-click installs for common host software on Debian and Ubuntu servers (Caddy, PHP, Composer, Node.js, MySQL/MariaDB, Redis, phpMyAdmin, Chromium).",
+      "names": {
+        "caddy": "Caddy",
+        "php": "PHP",
+        "composer": "Composer",
+        "nodejs": "Node.js",
+        "mysql": "MySQL / MariaDB",
+        "redis": "Redis",
+        "phpmyadmin": "phpMyAdmin",
+        "chromium": "Chromium"
+      }
+    },
+    "runs": {
+      "title": "Run history",
+      "hint": "Every run of a script or a built-in install, across every server it targeted.",
+      "of": "Script",
+      "status": "Status",
+      "when": "Started",
+      "empty": "No runs yet.",
+      "view": "View",
+      "viewHint": "One tab per target server, streamed live while it runs.",
+      "noOutput": "No output yet."
+    },
+    "runDialog": {
+      "title": "Run {name}",
+      "hint": "Choose one or more servers. Output streams live once it starts.",
+      "servers": "Servers",
+      "noServers": "No enrolled servers on this team yet.",
+      "pickServer": "Choose at least one server."
     }
   },
   "sites": {

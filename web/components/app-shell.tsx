@@ -26,6 +26,7 @@ import {
   ShieldCheckIcon,
   ShieldIcon,
   SlidersHorizontalIcon,
+  TerminalSquareIcon,
   UsersRoundIcon,
   WorkflowIcon,
   UserIcon,
@@ -249,6 +250,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/shared-services`} icon={<WorkflowIcon />}>
             {t("nav.sharedServices")}
+          </L>
+          <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
+            {t("nav.scripts")}
           </L>
           <L href={`${base}/members`} icon={<UsersIcon />}>
             {t("nav.members")}
