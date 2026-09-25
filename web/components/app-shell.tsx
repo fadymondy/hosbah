@@ -7,6 +7,7 @@ import {
   BellIcon,
   CheckIcon,
   ChevronsUpDownIcon,
+  CircleDollarSignIcon,
   KeyRoundIcon,
   LayoutGridIcon,
   LockKeyholeIcon,
@@ -257,6 +258,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/approvals`} icon={<ShieldCheckIcon />}>
             {t("nav.approvals")}
+          </L>
+          <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
+            {t("nav.costs")}
           </L>
           <L href={`${base}/audit`} icon={<ScrollTextIcon />}>
             {t("nav.audit")}

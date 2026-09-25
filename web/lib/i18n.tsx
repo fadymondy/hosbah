@@ -83,3 +83,26 @@ export function useFormatDate() {
     [locale],
   )
 }
+
+/** Formats a monthly amount in its currency for the current locale (the caller wraps it dir="ltr"). */
+export function useFormatMoney() {
+  const { locale } = useI18n()
+  return useCallback(
+    (amount: number, currency: string) => {
+      let out: string
+      try {
+        out = new Intl.NumberFormat(locale === "ar" ? "ar-EG-u-nu-latn" : "en-US", {
+          style: "currency",
+          currency: currency || "USD",
+          currencyDisplay: "narrowSymbol",
+        }).format(amount)
+      } catch {
+        out = `${amount.toFixed(2)} ${currency}`
+      }
+      // Same reasoning as useFormatDate: an Arabic-locale currency string is still LTR data, and
+      // needs its own reading-order island wherever a bidi (Arabic) context places it.
+      return locale === "ar" ? `⁧${out}⁩` : out
+    },
+    [locale],
+  )
+}

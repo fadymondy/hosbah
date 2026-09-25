@@ -164,7 +164,8 @@
     "databases": "قواعد البيانات",
     "approvals": "الموافقات",
     "proxyHosts": "مضيفو الوكيل",
-    "teamSettings": "إعدادات الفريق"
+    "teamSettings": "إعدادات الفريق",
+    "costs": "التكاليف"
   },
   "feedback": {
     "launcher": "الإبلاغ عن مشكلة",
@@ -945,6 +946,59 @@
       "since": "من",
       "until": "إلى"
     }
+  },
+  "costs": {
+    "description": "تكلفة بنية هذا الفريق التحتية وكيفية استخدامها.",
+    "overviewTitle": "نظرة عامة",
+    "overviewHint": "أسعار الخوادم بالإضافة إلى بنود إضافية، خلال النطاق الزمني المختار.",
+    "kpiTotal": "الإجمالي الشهري",
+    "kpiAllocated": "مخصَّص للتطبيقات",
+    "kpiIdle": "غير مخصَّص",
+    "kpiHints": "ملاءمة السعة",
+    "overProvisionedCount": "{n} بسعة زائدة",
+    "underPressureCount": "{n} تحت ضغط",
+    "serversTitle": "الخوادم",
+    "serversHint": "سعر كل خادم الشهري، واستخدامه خلال النطاق الزمني، وتلميح ملاءمة السعة.",
+    "serversEmptyTitle": "لا توجد خوادم بعد",
+    "serversEmptyHint": "اربط خادمًا لبدء تسعيره وتتبّع استخدامه.",
+    "server": "الخادم",
+    "price": "السعر",
+    "hint": "التلميح",
+    "unpriced": "غير مُسعَّر",
+    "setPrice": "تحديد السعر",
+    "editPrice": "تعديل السعر",
+    "clearPrice": "مسح",
+    "clearPriceTitle": "مسح سعر {name}؟",
+    "clearPriceBody": "يعود الخادم إلى غير مُسعَّر؛ لن تُظهر تطبيقاته تكلفة مخصَّصة حتى يُسعَّر مجددًا.",
+    "priceHint": "مبلغ شهري يُقسَّم على تطبيقات هذا الخادم حسب حدّ الذاكرة المضبوط لكل منها.",
+    "priceSaved": "تم حفظ السعر",
+    "amount": "المبلغ",
+    "currency": "العملة",
+    "idleOf": "{amount} غير مستخدَم",
+    "showDetail": "عرض التفاصيل",
+    "usageChart": "الاستخدام",
+    "byApp": "حسب التطبيق",
+    "noApps": "لا توجد تطبيقات على هذا الخادم.",
+    "app": "التطبيق",
+    "allocated": "المخصَّص",
+    "memoryLimit": "حدّ الذاكرة",
+    "hints": {
+      "over_provisioned": "بسعة زائدة",
+      "under_pressure": "تحت ضغط"
+    },
+    "appHints": {
+      "limit_far_exceeds_usage": "الحدّ يفوق الاستخدام بكثير"
+    },
+    "lineItemsTitle": "بنود إضافية",
+    "lineItemsHint": "تكاليف شهرية أخرى خارج تسعير الخوادم، مثل Cloudflare أو تخزين النسخ الاحتياطية.",
+    "lineItemsEmptyTitle": "لا توجد بنود بعد",
+    "lineItemsEmptyHint": "أضف بندًا لتكاليف ليست خادمًا، كخطة CDN أو تخزين النسخ الاحتياطية.",
+    "addLineItem": "إضافة بند",
+    "lineItemSaved": "تم حفظ البند",
+    "name": "الاسم",
+    "added": "أُضيف",
+    "deleteLineItemTitle": "حذف {name}؟",
+    "deleteLineItemBody": "يُزال هذا البند من الإجمالي الشهري."
   },
   "settings": {
     "description": "بيانات الفريق.",
