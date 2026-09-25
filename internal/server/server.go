@@ -34,6 +34,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/provisioning"
 	"github.com/fadymondy/hosbah/internal/rum"
 	"github.com/fadymondy/hosbah/internal/schedules"
+	"github.com/fadymondy/hosbah/internal/scripts"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -149,7 +150,14 @@ func Boot() *app.App {
 	apmSvc.MountPublic(k.Router)
 	a.Apm = apmSvc
 	deploys.SetApm(apmSvc)
+	// Scripts (MH-576 D4/D5): the team script library, built-in one-click installs, and their runs
+	// (agentproto script.run), plus systemd service list/restart (D3) — the agent side of both is
+	// wired into internal/agent's executor; this is just the run-follower and its sweep.
+	scriptsSvc := scripts.New(a, svc)
+	scriptsSvc.Start()
+	a.Scripts = scriptsSvc
 	a.Stop = func() {
+		scriptsSvc.Close()
 		crons.Close()
 		apmSvc.Stop()
 		realUsers.Stop()

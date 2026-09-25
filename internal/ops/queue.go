@@ -92,6 +92,12 @@ func Timeout(kind string) time.Duration {
 		return 3 * time.Minute
 	case agentproto.KindCaddyCerts:
 		return time.Minute
+	case agentproto.KindScriptRun:
+		return time.Duration(agentproto.MaxScriptTimeoutSeconds)*time.Second + time.Minute // each run sets its own (EnqueueSpec.Timeout)
+	case agentproto.KindServiceList:
+		return 30 * time.Second
+	case agentproto.KindServiceAction:
+		return 2 * time.Minute
 	}
 	return 10 * time.Minute
 }
