@@ -1252,7 +1252,32 @@
     "nextRun": "التشغيل التالي: {time}",
     "saveSchedule": "حفظ الجدولة",
     "deleteTitle": "حذف {name}؟",
-    "deleteHint": "تُزال حاويتها ووحدة تخزينها من الخادم. لا يمكن التراجع."
+    "deleteHint": "تُزال حاويتها ووحدة تخزينها من الخادم. لا يمكن التراجع.",
+    "usersTitle": "المستخدمون",
+    "noUsers": "لا يوجد مستخدمون مستقلون بعد.",
+    "addUser": "إضافة مستخدم",
+    "addUserHint": "ينشئ حساب دخول على إحدى قواعد بيانات هذه الخدمة، بصلاحيات جاهزة.",
+    "targetDatabase": "قاعدة البيانات",
+    "chooseDatabase": "اختر قاعدة بيانات",
+    "createUser": "إنشاء",
+    "userCreatedDone": "{name} — انسخ كلمة مروره الآن.",
+    "passwordShownOnce": "كلمة المرور (تُعرض مرة واحدة)",
+    "passwordOnceHint": "انسخها الآن — يحتفظ Hosbah بالصيغة المختومة فقط ولا يمكنه إظهارها مرة أخرى.",
+    "copyConnectionString": "نص الاتصال",
+    "rotatePassword": "تدوير كلمة المرور",
+    "rotatePasswordTitle": "تدوير كلمة مرور {name}؟",
+    "rotatePasswordHint": "تتوقف كلمة المرور القديمة عن العمل فورًا. أي شيء يستخدمها يحتاج إلى الجديدة.",
+    "deleteUserTitle": "حذف {name}؟",
+    "deleteUserHint": "يُزال حساب الدخول نهائيًا. لا يمكن التراجع.",
+    "revokeUser": "إلغاء الصلاحيات",
+    "revokeTitle": "إلغاء صلاحيات {name}؟",
+    "revokeHint": "يبقى حساب الدخول، لكنه يفقد كل وصول إلى {database} حتى تُمنح الصلاحيات مجددًا.",
+    "grantLabels": {
+      "all": "الكل",
+      "readwrite": "قراءة وكتابة",
+      "readonly": "قراءة فقط",
+      "none": "بلا (مُلغاة)"
+    }
   },
   "approvals": {
     "title": "الموافقات",

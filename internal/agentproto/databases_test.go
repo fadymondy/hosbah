@@ -63,6 +63,58 @@ func TestCreateValidateRefusesRedis(t *testing.T) {
 	}
 }
 
+func TestDBUserValidate(t *testing.T) {
+	base := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Container: "hosbah-db-pg1", Action: "create",
+		Database: "app", User: "app_ro", Grants: "readonly", RootSecret: "r", UserSecret: "u"}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("valid db.user create rejected: %v", err)
+	}
+	noUserSecret := base
+	noUserSecret.UserSecret = ""
+	if noUserSecret.Validate() == nil {
+		t.Fatal("create needs a user secret")
+	}
+	badGrants := base
+	badGrants.Grants = "superuser"
+	if badGrants.Validate() == nil {
+		t.Fatal("create must reject unknown grants")
+	}
+	rotate := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Container: "hosbah-db-pg1", Action: "rotate", User: "app_ro", RootSecret: "r", UserSecret: "u2"}
+	if err := rotate.Validate(); err != nil {
+		t.Fatalf("valid rotate rejected: %v", err)
+	}
+	rotate.UserSecret = ""
+	if rotate.Validate() == nil {
+		t.Fatal("rotate needs a new user secret")
+	}
+	del := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Container: "hosbah-db-pg1", Action: "delete", User: "app_ro", RootSecret: "r"}
+	if err := del.Validate(); err != nil {
+		t.Fatalf("valid delete rejected: %v", err)
+	}
+	grant := DBUserParams{ServiceID: testSvcID, Kind: "mysql", Container: "hosbah-db-my1", Action: "grant", User: "app_rw", Database: "app", Grants: "readwrite", RootSecret: "r"}
+	if err := grant.Validate(); err != nil {
+		t.Fatalf("valid grant rejected: %v", err)
+	}
+	grant.Database = ""
+	if grant.Validate() == nil {
+		t.Fatal("grant needs a database")
+	}
+	revoke := DBUserParams{ServiceID: testSvcID, Kind: "mysql", Container: "hosbah-db-my1", Action: "revoke", User: "app_rw", Database: "app", RootSecret: "r"}
+	if err := revoke.Validate(); err != nil {
+		t.Fatalf("valid revoke rejected: %v", err)
+	}
+	redis := base
+	redis.Kind = "redis"
+	if redis.Validate() == nil {
+		t.Fatal("db.user must be refused for redis")
+	}
+	badAction := base
+	badAction.Action = "drop_everything"
+	if badAction.Validate() == nil {
+		t.Fatal("db.user must reject an unknown action")
+	}
+}
+
 func TestRepoValidate(t *testing.T) {
 	if (RepoSpec{Target: "local", Repo: "/var/lib/hosbah/restic/x"}).Validate() != nil {
 		t.Fatal("valid local repo rejected")

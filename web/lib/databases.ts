@@ -27,9 +27,10 @@ export interface DatabaseRow {
 export interface DatabaseUser {
   id: string
   name: string
-  grants: "all" | "readwrite" | "readonly"
+  grants: "all" | "readwrite" | "readonly" | "none"
   status: string
   error: string | null
+  database_id: string | null
 }
 
 export interface Backup {

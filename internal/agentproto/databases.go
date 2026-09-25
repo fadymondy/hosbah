@@ -18,6 +18,7 @@ const (
 	KindDBRestore   = "db.restore"   // restore a snapshot into a throwaway container and verify it (restore-test)
 	KindDBRemove    = "db.remove"    // stop and remove a service's container and its volume (the service was deleted)
 	KindDBDrop      = "db.drop"      // drop one database (bucket) and its users inside a running service
+	KindDBUser      = "db.user"      // create, rotate, delete, grant or revoke a user's password/grants (MH-574 F1)
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -301,6 +302,94 @@ func (p DBRemoveParams) Validate() error {
 		return errors.New("bad remove params")
 	}
 	return nil
+}
+
+// ValidDBUserAction: the actions db.user supports.
+func ValidDBUserAction(s string) bool {
+	switch s {
+	case "create", "rotate", "delete", "grant", "revoke":
+		return true
+	}
+	return false
+}
+
+// DBUserParams: db.user — a standalone user lifecycle action on a running Postgres/MySQL/MinIO
+// service, independent of CreateDatabaseAndUser's combined database+user flow (MH-574 F1):
+//
+//   - create: adds a login/role/access-key (Database is the one it is granted on; Grants is the preset).
+//   - rotate: changes the password/secret key of an existing user; UserSecret carries the new one.
+//   - delete: drops the login/role/access-key. Never the service's own root credential (that has no
+//     database_users row — the control plane refuses before this op is even built).
+//   - grant / revoke: sets or removes the user's privileges on Database (revoke needs no Grants; it
+//     always removes everything the preset levels would have given).
+//
+// RootSecret is always required (the agent acts as the service administrator). UserSecret is the
+// user's own new secret, required for create and rotate. Database is required for create/grant/revoke
+// (a user's privileges are always scoped to one database/bucket); rotate and delete act on the user
+// only and leave it empty.
+type DBUserParams struct {
+	ServiceID  string `json:"service_id"`
+	Kind       string `json:"kind"`
+	Container  string `json:"container"`
+	Action     string `json:"action"`
+	Database   string `json:"database,omitempty"`
+	User       string `json:"user"`
+	Grants     string `json:"grants,omitempty"`
+	RootSecret string `json:"root_secret"`
+	UserSecret string `json:"user_secret,omitempty"`
+}
+
+func (p DBUserParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
+		return errors.New("users apply to postgres, mysql and minio")
+	case !ValidDBUserAction(p.Action):
+		return fmt.Errorf("bad action %q", p.Action)
+	case !ValidDBName(p.User):
+		return fmt.Errorf("bad user name %q", p.User)
+	case p.Container == "":
+		return errors.New("bad container")
+	case p.RootSecret == "":
+		return errors.New("db.user needs the root secret")
+	}
+	switch p.Action {
+	case "create":
+		if !ValidDBName(p.Database) {
+			return fmt.Errorf("bad database name %q", p.Database)
+		}
+		if !ValidGrants(p.Grants) {
+			return fmt.Errorf("bad grants %q", p.Grants)
+		}
+		if p.UserSecret == "" {
+			return errors.New("db.user create needs the user secret")
+		}
+	case "rotate":
+		if p.UserSecret == "" {
+			return errors.New("db.user rotate needs the user secret")
+		}
+	case "grant":
+		if !ValidDBName(p.Database) {
+			return fmt.Errorf("bad database name %q", p.Database)
+		}
+		if !ValidGrants(p.Grants) {
+			return fmt.Errorf("bad grants %q", p.Grants)
+		}
+	case "revoke":
+		if !ValidDBName(p.Database) {
+			return fmt.Errorf("bad database name %q", p.Database)
+		}
+	case "delete":
+		// no extra fields
+	}
+	return nil
+}
+
+// DBUserResult: db.user's answer — nothing sensitive.
+type DBUserResult struct {
+	User   string `json:"user"`
+	Action string `json:"action"`
 }
 
 // DBDropParams: db.drop — drop one database (a MinIO bucket) and the users created for it. Idempotent:

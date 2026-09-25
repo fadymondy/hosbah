@@ -48,11 +48,12 @@ type DatabaseOut struct {
 	Error  *string `json:"error"`
 }
 type DatabaseUserOut struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Grants string  `json:"grants" enum:"all,readwrite,readonly"`
-	Status string  `json:"status"`
-	Error  *string `json:"error"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Grants     string  `json:"grants" enum:"all,readwrite,readonly,none"`
+	Status     string  `json:"status"`
+	Error      *string `json:"error"`
+	DatabaseID *string `json:"database_id"`
 }
 type BackupOut struct {
 	ID              string     `json:"id"`
@@ -93,6 +94,9 @@ func toDataServiceOut(s db.DataService) DataServiceOut {
 		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt, Container: s.Container,
 		Source: s.Source, OriginKind: s.OriginKind, Origin: originOf(s.Origin), ImportedState: s.ImportedState, LastSeenAt: s.LastSeenAt,
 		HasCredentials: dbsvc.HasCredentials(s)}
+}
+func toDatabaseUserOut(u db.DatabaseUser) DatabaseUserOut {
+	return DatabaseUserOut{ID: u.ID, Name: u.Name, Grants: u.Grants, Status: u.Status, Error: u.Error, DatabaseID: u.DatabaseID}
 }
 func toBackupOut(b db.Backup) BackupOut {
 	return BackupOut{ID: b.ID, Kind: b.Kind, Status: b.Status, Target: b.Target, SizeBytes: b.SizeBytes,
@@ -286,7 +290,140 @@ func (d *deps) registerDatabases(api huma.API) {
 				return dbErr(err, "could not create the database")
 			}
 			out.Body.Database = DatabaseOut{ID: dbRow.ID, Name: dbRow.Name, Status: dbRow.Status, Error: dbRow.Error}
-			out.Body.User = DatabaseUserOut{ID: userRow.ID, Name: userRow.Name, Grants: userRow.Grants, Status: userRow.Status, Error: userRow.Error}
+			out.Body.User = toDatabaseUserOut(userRow)
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- standalone database users (MH-574 F1): list is on the service detail; create, rotate,
+	// delete, grant and revoke are each a synchronous agent call, so the response either carries the
+	// plaintext password (once, create/rotate) or the settled row (grant/revoke) — never a queued state.
+	type dsUserCreatedOut struct {
+		Body struct {
+			User     DatabaseUserOut `json:"user"`
+			Password string          `json:"password" doc:"Shown once — Hosbah stores only the sealed form."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "create-database-user", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/users",
+		DefaultStatus: http.StatusCreated, Tags: tags,
+		Summary: "Add a user to an existing database/bucket, with a grant preset (owner or admin; the password is returned once)",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			Database string `json:"database" minLength:"1" maxLength:"64" doc:"Database or bucket name or id."`
+			User     string `json:"user" minLength:"1" maxLength:"63" doc:"Lower snake_case."`
+			Grants   string `json:"grants,omitempty" enum:"all,readwrite,readonly"`
+		}
+	}) (*dsUserCreatedOut, error) {
+		out := &dsUserCreatedOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			row, pw, err := d.dbs().CreateUser(ctx, q, m.TeamID, webActor(id), svc, in.Body.Database, in.Body.User, in.Body.Grants)
+			if err != nil {
+				return dbErr(err, "could not create the user")
+			}
+			out.Body.User, out.Body.Password = toDatabaseUserOut(row), pw
+			return nil
+		})
+		return out, err
+	})
+
+	type UserPath struct {
+		ServicePath
+		User string `path:"user" maxLength:"64"`
+	}
+	type dsUserRotatedOut struct {
+		Body struct {
+			User     DatabaseUserOut `json:"user"`
+			Password string          `json:"password" doc:"Shown once — Hosbah stores only the sealed form."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "rotate-database-user-password", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/users/{user}/rotate",
+		Tags: tags, Summary: "Rotate a database user's password (owner or admin; the new password is returned once)",
+	}, func(ctx context.Context, in *UserPath) (*dsUserRotatedOut, error) {
+		out := &dsUserRotatedOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			row, pw, err := d.dbs().RotateUserPassword(ctx, q, m.TeamID, webActor(id), svc, in.User)
+			if err != nil {
+				return dbErr(err, "could not rotate the user's password")
+			}
+			out.Body.User, out.Body.Password = toDatabaseUserOut(row), pw
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "delete-database-user", Method: http.MethodDelete, Path: "/api/teams/{team}/data-services/{service}/users/{user}",
+		DefaultStatus: http.StatusNoContent, Tags: tags,
+		Summary: "Delete a database user (owner or admin; confirm must be its name). Never the service's own root credential — that is not a user row.",
+	}, func(ctx context.Context, in *struct {
+		UserPath
+		Body struct {
+			Confirm string `json:"confirm" minLength:"1" maxLength:"63"`
+		}
+	}) (*struct{}, error) {
+		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			return dbErr(d.dbs().DeleteUser(ctx, q, m.TeamID, webActor(id), svc, in.User, in.Body.Confirm), "could not delete the user")
+		})
+	})
+
+	type dsUserOut struct{ Body DatabaseUserOut }
+	huma.Register(api, huma.Operation{OperationID: "grant-database-user", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/users/{user}/grant",
+		Tags: tags, Summary: "Grant a preset (all/readwrite/readonly) to a database user on one database (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		UserPath
+		Body struct {
+			Database string `json:"database,omitempty" maxLength:"64" doc:"Defaults to the database the user was created against."`
+			Grants   string `json:"grants" enum:"all,readwrite,readonly"`
+		}
+	}) (*dsUserOut, error) {
+		out := &dsUserOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			row, err := d.dbs().GrantUser(ctx, q, m.TeamID, webActor(id), svc, in.User, in.Body.Database, in.Body.Grants)
+			if err != nil {
+				return dbErr(err, "could not apply the grants")
+			}
+			out.Body = toDatabaseUserOut(row)
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "revoke-database-user", Method: http.MethodPost, Path: "/api/teams/{team}/data-services/{service}/users/{user}/revoke",
+		Tags: tags, Summary: "Revoke a database user's privileges on one database, leaving the login in place (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		UserPath
+		Body struct {
+			Database string `json:"database,omitempty" maxLength:"64" doc:"Defaults to the database the user was created against."`
+		}
+	}) (*dsUserOut, error) {
+		out := &dsUserOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			row, err := d.dbs().RevokeUser(ctx, q, m.TeamID, webActor(id), svc, in.User, in.Body.Database)
+			if err != nil {
+				return dbErr(err, "could not revoke the grants")
+			}
+			out.Body = toDatabaseUserOut(row)
 			return nil
 		})
 		return out, err
@@ -467,7 +604,7 @@ func (d *deps) dataServiceDetail(ctx context.Context, q *db.Queries, m *tenancy.
 	}
 	if urows, err := q.ListDatabaseUsersOfService(ctx, db.ListDatabaseUsersOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID}); err == nil {
 		for _, r := range urows {
-			out.Users = append(out.Users, DatabaseUserOut{ID: r.ID, Name: r.Name, Grants: r.Grants, Status: r.Status, Error: r.Error})
+			out.Users = append(out.Users, toDatabaseUserOut(r))
 		}
 	}
 	if brows, err := q.ListBackupsOfService(ctx, db.ListBackupsOfServiceParams{DataServiceID: svc.ID, TeamID: m.TeamID, Limit: 50}); err == nil {

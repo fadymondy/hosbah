@@ -160,6 +160,144 @@ func DatabaseTools() []Tool {
 			},
 		},
 
+		// ---- read: standalone database users (MH-574 F1) ----
+		{
+			Name: "db_users_list", Scope: scopes.Read,
+			Description: "A data service's standalone users: which database each was created against, its grant preset and status. The service's own root/superuser credential is never a row here.",
+			InputSchema: schema([]string{"database"}, map[string]any{"database": dbArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				us, err := env.Q.ListDatabaseUsersOfService(ctx, db.ListDatabaseUsersOfServiceParams{DataServiceID: svc.ID, TeamID: env.Caller.TeamID})
+				if err != nil {
+					return "", errors.New("could not list database users")
+				}
+				if len(us) == 0 {
+					return "No standalone users yet. db_user_create adds one.", nil
+				}
+				dbs, _ := env.Q.ListDatabasesOfService(ctx, db.ListDatabasesOfServiceParams{DataServiceID: svc.ID, TeamID: env.Caller.TeamID})
+				names := map[string]string{}
+				for _, d := range dbs {
+					names[d.ID] = d.Name
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%d user(s) on %s:\n", len(us), svc.Name)
+				for _, u := range us {
+					dbName := "—"
+					if u.DatabaseID != nil {
+						if n, ok := names[*u.DatabaseID]; ok {
+							dbName = n
+						}
+					}
+					fmt.Fprintf(&b, "  %-20s db %-16s grants %-10s status %-9s (id %s)\n", u.Name, dbName, u.Grants, u.Status, u.ID)
+				}
+				return b.String(), nil
+			},
+		},
+
+		// ---- write: standalone database users (MH-574 F1) ----
+		{
+			Name: "db_user_grant", Scope: scopes.Write,
+			Description: "Grant a preset (all, readwrite or readonly) to a database user on one database. Re-applies from scratch, so it also changes an existing user's level.",
+			InputSchema: schema([]string{"database", "user", "grants"}, map[string]any{"database": dbArg, "user": str("Database user name or id"),
+				"target_database": str("The database/bucket to grant on (optional; defaults to the one the user was created against)"),
+				"grants":          map[string]any{"type": "string", "enum": []string{"all", "readwrite", "readonly"}}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				u, err := s.GrantUser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, args.Str("user"), args.Str("target_database"), args.Str("grants"))
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("%s now has %s on this service.", u.Name, u.Grants), nil
+			},
+		},
+		{
+			Name: "db_user_revoke", Scope: scopes.Write,
+			Description: "Revoke a database user's privileges on one database, leaving the login/role itself in place. db_user_delete removes the login entirely.",
+			InputSchema: schema([]string{"database", "user"}, map[string]any{"database": dbArg, "user": str("Database user name or id"),
+				"target_database": str("The database/bucket to revoke on (optional; defaults to the one the user was created against)")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				u, err := s.RevokeUser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, args.Str("user"), args.Str("target_database"))
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("%s's privileges on this service were revoked (its login still exists).", u.Name), nil
+			},
+		},
+
+		// ---- secrets:read: standalone database users (their password travels through this scope, like reveal_db_url) ----
+		{
+			Name: "db_user_create", Scope: scopes.SecretsRead,
+			Description: "Add a user to an existing database/bucket, with a grant preset. Returns its password once — Hosbah stores only the sealed form.",
+			InputSchema: schema([]string{"database", "target_database", "user"}, map[string]any{"database": dbArg,
+				"target_database": str("Database or bucket name or id"), "user": str("Lower snake_case"),
+				"grants": map[string]any{"type": "string", "enum": []string{"all", "readwrite", "readonly"}, "description": "Default readwrite"}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				u, pw, err := s.CreateUser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, args.Str("target_database"), args.Str("user"), args.Str("grants"))
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Created %s (%s) on %s (id %s). Password (shown once): %s", u.Name, u.Grants, svc.Name, u.ID, pw), nil
+			},
+		},
+		{
+			Name: "db_user_rotate_password", Scope: scopes.SecretsRead,
+			Description: "Rotate a database user's password. Returns the new password once — Hosbah stores only the sealed form.",
+			InputSchema: schema([]string{"database", "user"}, map[string]any{"database": dbArg, "user": str("Database user name or id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				u, pw, err := s.RotateUserPassword(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, args.Str("user"))
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Rotated %s's password (shown once): %s", u.Name, pw), nil
+			},
+		},
+
 		// ---- secrets:read ----
 		{
 			Name: "reveal_db_url", Scope: scopes.SecretsRead,
@@ -215,6 +353,28 @@ func DatabaseTools() []Tool {
 					return "", err
 				}
 				return fmt.Sprintf("Restore-test of backup %s of %s started (a throwaway container; the live service is untouched). Poll list_backups for pass/fail.", bk.ID, svc.Name), nil
+			},
+		},
+		{
+			Name: "db_user_delete", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
+			Description: "Delete a database user (its login/role/access-key). confirm must equal the user's name. Never the service's own root credential — that is not a user row.",
+			InputSchema: schema([]string{"database", "user", "confirm"}, map[string]any{"database": dbArg, "user": str("Database user name or id"), "confirm": str("The user's name, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				if err := s.DeleteUser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, args.Str("user"), args.Str("confirm")); err != nil {
+					return "", err
+				}
+				return "Deleted database user " + args.Str("confirm") + " on " + svc.Name + ".", nil
 			},
 		},
 	}

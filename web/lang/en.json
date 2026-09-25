@@ -1252,7 +1252,32 @@
     "nextRun": "Next run: {time}",
     "saveSchedule": "Save schedule",
     "deleteTitle": "Delete {name}?",
-    "deleteHint": "Its container and volume are removed from the server. This cannot be undone."
+    "deleteHint": "Its container and volume are removed from the server. This cannot be undone.",
+    "usersTitle": "Users",
+    "noUsers": "No standalone users yet.",
+    "addUser": "Add user",
+    "addUserHint": "Creates a login on one of this service's databases, with a grant preset.",
+    "targetDatabase": "Database",
+    "chooseDatabase": "Choose a database",
+    "createUser": "Create",
+    "userCreatedDone": "{name} — copy its password now.",
+    "passwordShownOnce": "Password (shown once)",
+    "passwordOnceHint": "Copy it now — Hosbah stores only the sealed form and cannot show it again.",
+    "copyConnectionString": "Connection string",
+    "rotatePassword": "Rotate password",
+    "rotatePasswordTitle": "Rotate {name}'s password?",
+    "rotatePasswordHint": "The old password stops working immediately. Anything using it needs the new one.",
+    "deleteUserTitle": "Delete {name}?",
+    "deleteUserHint": "Removes the login entirely. This cannot be undone.",
+    "revokeUser": "Revoke",
+    "revokeTitle": "Revoke {name}'s privileges?",
+    "revokeHint": "The login stays, but it loses all access to {database} until granted again.",
+    "grantLabels": {
+      "all": "All",
+      "readwrite": "Read-write",
+      "readonly": "Read-only",
+      "none": "None (revoked)"
+    }
   },
   "approvals": {
     "title": "Approvals",

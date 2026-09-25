@@ -19,7 +19,8 @@ CREATE TABLE database_users (
 -- from it is what an attach injects into an app as a sealed DATABASE_URL / REDIS_URL. name goes into
 -- the agent's fixed argv (CREATE USER / GRANT), so it is constrained like a database name.
 ALTER TABLE database_users ADD CONSTRAINT database_users_status_check CHECK (status IN ('new', 'creating', 'ready', 'failed', 'dropping'));
-ALTER TABLE database_users ADD CONSTRAINT database_users_grants_check CHECK (grants IN ('all', 'readwrite', 'readonly'));
+-- 'none' (MH-574 F1): a user whose grants were revoked but the login/role itself still exists.
+ALTER TABLE database_users ADD CONSTRAINT database_users_grants_check CHECK (grants IN ('all', 'readwrite', 'readonly', 'none'));
 ALTER TABLE database_users ADD CONSTRAINT database_users_name_check CHECK (name ~ '^[a-z_][a-z0-9_]{0,62}$');
 ALTER TABLE database_users ADD CONSTRAINT database_users_sealed_check CHECK (password_sealed LIKE 'csv1:%');
 CREATE UNIQUE INDEX database_users_service_name_key ON database_users (data_service_id, name);

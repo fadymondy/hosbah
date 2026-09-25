@@ -348,6 +348,236 @@ func dbCreateMySQL(oc *OpContext, p agentproto.DBCreateParams, root map[string]s
 	return agentproto.DBCreateResult{Database: p.Database, User: p.User}, 0, nil
 }
 
+// ---- db.user (MH-574 F1: standalone user create/rotate/delete/grant/revoke) -----------------------
+
+func dbUser(oc *OpContext) (any, int, error) {
+	p, err := decode[agentproto.DBUserParams](oc)
+	if err != nil {
+		return nil, 2, err
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
+	if err != nil {
+		return nil, 1, err
+	}
+	var userpw string
+	if p.UserSecret != "" {
+		user, err := oc.openSecret(p.ServiceID, "user:"+p.User, p.UserSecret)
+		if err != nil {
+			return nil, 1, err
+		}
+		userpw = user["password"]
+	}
+	if !containerRunning(oc, p.Container) {
+		return nil, 1, errors.New("the data service is not running")
+	}
+	oc.Info("db.user %s %q on %s", p.Action, p.User, p.Container)
+	var runErr error
+	switch p.Kind {
+	case "postgres":
+		runErr = dbUserPostgres(oc, p, root, userpw)
+	case "mysql":
+		runErr = dbUserMySQL(oc, p, root, userpw)
+	case "minio":
+		runErr = dbUserMinIO(oc, p, root["password"], userpw)
+	default:
+		return nil, 2, errors.New("unsupported kind")
+	}
+	if runErr != nil {
+		return nil, 1, runErr
+	}
+	return agentproto.DBUserResult{User: p.User, Action: p.Action}, 0, nil
+}
+
+// pgGrantSQL is the object-privilege half of a Postgres grant preset — the same mapping db.create
+// uses for the primary user, minus the ownership transfer (a secondary user is never made the
+// database's owner: that would silently take it from whoever holds it).
+func pgGrantSQL(database, user, grants string) string {
+	switch grants {
+	case "all":
+		return fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE "%[1]s" TO "%[2]s";
+GRANT USAGE, CREATE ON SCHEMA public TO "%[2]s";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "%[2]s";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO "%[2]s";`, database, user)
+	case "readwrite":
+		return fmt.Sprintf(`GRANT CONNECT ON DATABASE "%[1]s" TO "%[2]s";
+GRANT USAGE, CREATE ON SCHEMA public TO "%[2]s";
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "%[2]s";
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE ON SEQUENCES TO "%[2]s";`, database, user)
+	case "readonly":
+		return fmt.Sprintf(`GRANT CONNECT ON DATABASE "%[1]s" TO "%[2]s";
+GRANT USAGE ON SCHEMA public TO "%[2]s";
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "%[2]s";`, database, user)
+	}
+	return ""
+}
+
+// pgRevokeSQL undoes every privilege pgGrantSQL could have granted on database to user.
+func pgRevokeSQL(database, user string) string {
+	return fmt.Sprintf(`REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "%[2]s";
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM "%[2]s";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON SEQUENCES FROM "%[2]s";
+REVOKE ALL PRIVILEGES ON SCHEMA public FROM "%[2]s";
+REVOKE ALL PRIVILEGES ON DATABASE "%[1]s" FROM "%[2]s";`, database, user)
+}
+
+func dbUserPostgres(oc *OpContext, p agentproto.DBUserParams, root map[string]string, userpw string) error {
+	login := append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)
+	loginDB := func(database string) []string { return append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, database)...) }
+	env := []string{"PGPASSWORD=" + root["password"]}
+	switch p.Action {
+	case "create":
+		sql := fmt.Sprintf(`\set ON_ERROR_STOP on
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '%[1]s') THEN
+    CREATE ROLE "%[1]s" LOGIN PASSWORD %[2]s;
+  ELSE
+    ALTER ROLE "%[1]s" LOGIN PASSWORD %[2]s;
+  END IF;
+END $$;
+GRANT CONNECT ON DATABASE "%[3]s" TO "%[1]s";
+`, p.User, pgQuoteLiteral(userpw), p.Database) + pgGrantSQL(p.Database, p.User, p.Grants)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not create the user")
+		}
+	case "rotate":
+		sql := fmt.Sprintf(`\set ON_ERROR_STOP on
+ALTER ROLE "%[1]s" LOGIN PASSWORD %[2]s;
+`, p.User, pgQuoteLiteral(userpw))
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not rotate the user's password")
+		}
+	case "delete":
+		sql := fmt.Sprintf("\\set ON_ERROR_STOP on\nDROP ROLE IF EXISTS \"%s\";\n", p.User)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not delete the user — it may still own objects; revoke its grants first")
+		}
+	case "grant":
+		sql := "\\set ON_ERROR_STOP on\n" + pgGrantSQL(p.Database, p.User, p.Grants)
+		if out, err := execIn(oc, env, sql, p.Container, loginDB(p.Database)...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not apply the grants")
+		}
+	case "revoke":
+		sql := "\\set ON_ERROR_STOP on\n" + pgRevokeSQL(p.Database, p.User)
+		if out, err := execIn(oc, env, sql, p.Container, loginDB(p.Database)...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not revoke the grants")
+		}
+	}
+	return nil
+}
+
+// mysqlPrivOf maps a grants preset to the MySQL privilege list db.create already uses.
+func mysqlPrivOf(grants string) string {
+	switch grants {
+	case "readwrite":
+		return "SELECT, INSERT, UPDATE, DELETE"
+	case "readonly":
+		return "SELECT"
+	default:
+		return "ALL PRIVILEGES"
+	}
+}
+
+func dbUserMySQL(oc *OpContext, p agentproto.DBUserParams, root map[string]string, userpw string) error {
+	env := []string{"MYSQL_PWD=" + root["password"]}
+	login := append([]string{"mysql"}, mysqlLogin(root)...)
+	switch p.Action {
+	case "create":
+		sql := fmt.Sprintf("CREATE USER IF NOT EXISTS '%[1]s'@'%%' IDENTIFIED BY %[2]s;\n"+
+			"ALTER USER '%[1]s'@'%%' IDENTIFIED BY %[2]s;\n"+
+			"GRANT %[3]s ON `%[4]s`.* TO '%[1]s'@'%%';\nFLUSH PRIVILEGES;\n",
+			p.User, pgQuoteLiteral(userpw), mysqlPrivOf(p.Grants), p.Database)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not create the user")
+		}
+	case "rotate":
+		sql := fmt.Sprintf("ALTER USER '%[1]s'@'%%' IDENTIFIED BY %[2]s;\nFLUSH PRIVILEGES;\n", p.User, pgQuoteLiteral(userpw))
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not rotate the user's password")
+		}
+	case "delete":
+		sql := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';\nFLUSH PRIVILEGES;\n", p.User)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not delete the user")
+		}
+	case "grant":
+		sql := fmt.Sprintf("GRANT %[1]s ON `%[2]s`.* TO '%[3]s'@'%%';\nFLUSH PRIVILEGES;\n", mysqlPrivOf(p.Grants), p.Database, p.User)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not apply the grants")
+		}
+	case "revoke":
+		sql := fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%[1]s`.* FROM '%[2]s'@'%%';\nFLUSH PRIVILEGES;\n", p.Database, p.User)
+		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not revoke the grants")
+		}
+	}
+	return nil
+}
+
+// dbUserMinIO maps a user's lifecycle to an access key: create/rotate both go through `mc admin user
+// add` (it sets the secret key), delete through `mc admin user remove`, and grant/revoke (re)attach or
+// detach one of MinIO's built-in policies (readwrite/readonly) — there is no ownership preset for a
+// secondary key; "all" maps to readwrite, the closest MinIO has.
+func dbUserMinIO(oc *OpContext, p agentproto.DBUserParams, rootpw, userpw string) error {
+	env := []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000", "U=" + p.User}
+	switch p.Action {
+	case "create", "rotate":
+		env = append(env, "S="+userpw)
+		if out, err := execIn(oc, env, "", p.Container, "sh", "-c", `mc admin user add local "$U" "$S"`); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not create or rotate the access key")
+		}
+		if p.Action == "create" {
+			policy := "readwrite"
+			if p.Grants == "readonly" {
+				policy = "readonly"
+			}
+			if out, err := execIn(oc, env, "", p.Container, "sh", "-c", `mc admin policy attach local `+policy+` --user "$U" || true`); err != nil {
+				oc.Info("%s", strings.TrimSpace(out))
+				return errors.New("could not attach the access key's policy")
+			}
+		}
+	case "delete":
+		if out, err := execIn(oc, env, "", p.Container, "sh", "-c", `mc admin user remove local "$U" || true`); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not delete the access key")
+		}
+	case "grant":
+		policy := "readwrite"
+		if p.Grants == "readonly" {
+			policy = "readonly"
+		}
+		if out, err := execIn(oc, env, "", p.Container, "sh", "-c", `mc admin policy attach local `+policy+` --user "$U"`); err != nil {
+			oc.Info("%s", strings.TrimSpace(out))
+			return errors.New("could not attach the policy")
+		}
+	case "revoke":
+		for _, policy := range []string{"readwrite", "readonly"} {
+			_, _ = execIn(oc, env, "", p.Container, "sh", "-c", `mc admin policy detach local `+policy+` --user "$U" || true`)
+		}
+	}
+	return nil
+}
+
 // ---- restic --------------------------------------------------------------------------------------
 
 // resticEnv builds the environment restic needs: the repository, its password and (for s3) the AWS

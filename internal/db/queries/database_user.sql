@@ -30,3 +30,12 @@ UPDATE database_users SET status = $3, error = $4, updated_at = now() WHERE id =
 
 -- name: DeleteDatabaseUserInTeam :execrows
 DELETE FROM database_users WHERE id = $1 AND team_id = $2;
+
+-- name: DatabaseUserByNameOfService :one
+SELECT * FROM database_users WHERE data_service_id = $1 AND team_id = $2 AND name = $3;
+
+-- name: SetDatabaseUserGrants :exec
+UPDATE database_users SET grants = $3, status = $4, error = $5, updated_at = now() WHERE id = $1 AND team_id = $2;
+
+-- name: SetDatabaseUserPasswordSealed :exec
+UPDATE database_users SET password_sealed = $3, status = $4, error = $5, updated_at = now() WHERE id = $1 AND team_id = $2;

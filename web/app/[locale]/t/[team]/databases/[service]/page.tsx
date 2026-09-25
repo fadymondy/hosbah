@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { DatabaseIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { DatabaseIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
-import { humanBytes, type DataServiceDetail } from "@/lib/databases"
+import { humanBytes, type DataService, type DataServiceDetail, type DatabaseUser } from "@/lib/databases"
 import { isImported } from "@/lib/apps"
 import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imported-view"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -150,28 +150,17 @@ export default function DataServicePage() {
                 </Table>
               </TableBand>
             )}
-            {detail.users.length > 0 ? (
-              <TableBand>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("databases.user")}</TableHead>
-                      <TableHead>{t("databases.grants")}</TableHead>
-                      <TableHead>{t("databases.status")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detail.users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell dir="ltr">{u.name}</TableCell>
-                        <TableCell>{u.grants}</TableCell>
-                        <TableCell>{u.status}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableBand>
-            ) : null}
+          </Section>
+        ) : null}
+
+        {!isRedis ? (
+          <Section
+            title={t("databases.usersTitle")}
+            action={
+              manage ? <AddUserDialog teamSlug={team.slug} serviceRef={s.id} service={s} databases={detail.databases} onDone={load} /> : null
+            }
+          >
+            <UsersTable teamSlug={team.slug} serviceRef={s.id} service={s} detail={detail} manage={manage} onDone={load} />
           </Section>
         ) : null}
 
@@ -364,6 +353,393 @@ function CreateDbDialog({ teamSlug, serviceRef, onDone }: { teamSlug: string; se
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// connectionStringFor builds a client-side connection string from a service, a database name, a
+// user and a plaintext password just returned by create/rotate — the same shape RevealURL builds
+// server-side, but without a second (audited) round-trip while the password is already in hand.
+function connectionStringFor(service: DataService, databaseName: string, user: string, password: string): string | null {
+  if (!service.host || !service.port) return null
+  const cred = `${encodeURIComponent(user)}:${encodeURIComponent(password)}`
+  if (service.kind === "postgres") return `postgres://${cred}@${service.host}:${service.port}/${databaseName}`
+  if (service.kind === "mysql") return `mysql://${cred}@${service.host}:${service.port}/${databaseName}`
+  return null
+}
+
+const GRANT_PRESETS = ["all", "readwrite", "readonly"] as const
+
+function grantVariant(grants: string): "default" | "secondary" | "outline" {
+  if (grants === "none") return "outline"
+  if (grants === "readonly") return "secondary"
+  return "default"
+}
+
+function UsersTable({
+  teamSlug,
+  serviceRef,
+  service,
+  detail,
+  manage,
+  onDone,
+}: {
+  teamSlug: string
+  serviceRef: string
+  service: DataService
+  detail: DataServiceDetail
+  manage: boolean
+  onDone: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [rowError, setRowError] = useState<string | null>(null)
+  const dbName = (u: DatabaseUser) => detail.databases.find((d) => d.id === u.database_id)?.name ?? "—"
+
+  if (detail.users.length === 0) {
+    return <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noUsers")}</p>
+  }
+
+  return (
+    <>
+      {rowError ? (
+        <div className="border-b border-line px-6 py-2">
+          <FormError message={rowError} />
+        </div>
+      ) : null}
+      <TableBand>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("databases.user")}</TableHead>
+              <TableHead>{t("databases.dbName")}</TableHead>
+              <TableHead>{t("databases.grants")}</TableHead>
+              <TableHead>{t("databases.status")}</TableHead>
+              {manage ? <TableHead /> : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {detail.users.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell dir="ltr">{u.name}</TableCell>
+                <TableCell dir="ltr">{dbName(u)}</TableCell>
+                <TableCell>
+                  {manage ? (
+                    <Select
+                      value={u.grants === "none" ? undefined : u.grants}
+                      onValueChange={async (v) => {
+                        if (!v) return
+                        setRowError(null)
+                        try {
+                          await apiFetch(`/api/teams/${teamSlug}/data-services/${serviceRef}/users/${u.id}/grant`, {
+                            method: "POST",
+                            body: { database: u.database_id ?? undefined, grants: v },
+                          })
+                          await onDone()
+                        } catch (err) {
+                          setRowError(errorText(err))
+                        }
+                      }}
+                    >
+                      <SelectTrigger size="sm" className="w-36">
+                        <SelectValue placeholder={t("databases.grantLabels.none")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GRANT_PRESETS.map((g) => (
+                          <SelectItem key={g} value={g}>
+                            {t(`databases.grantLabels.${g}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant={grantVariant(u.grants)}>{t(`databases.grantLabels.${u.grants}`)}</Badge>
+                  )}
+                </TableCell>
+                <TableCell>{u.status}</TableCell>
+                {manage ? (
+                  <TableCell className="text-end">
+                    <div className="flex justify-end gap-2">
+                      <RotateUserDialog teamSlug={teamSlug} serviceRef={serviceRef} service={service} user={u} databaseName={dbName(u)} onDone={onDone} />
+                      {u.grants !== "none" ? (
+                        <ConfirmButton
+                          size="sm"
+                          label={t("databases.revokeUser")}
+                          title={t("databases.revokeTitle", { name: u.name })}
+                          description={t("databases.revokeHint", { database: dbName(u) })}
+                          confirmLabel={t("databases.revokeUser")}
+                          onConfirm={async () => {
+                            await apiFetch(`/api/teams/${teamSlug}/data-services/${serviceRef}/users/${u.id}/revoke`, {
+                              method: "POST",
+                              body: { database: u.database_id ?? undefined },
+                            })
+                            await onDone()
+                          }}
+                        />
+                      ) : null}
+                      <ConfirmButton
+                        size="sm"
+                        label={t("common.delete")}
+                        title={t("databases.deleteUserTitle", { name: u.name })}
+                        description={t("databases.deleteUserHint")}
+                        confirmLabel={t("common.delete")}
+                        icon={<Trash2Icon />}
+                        onConfirm={async () => {
+                          await apiFetch(`/api/teams/${teamSlug}/data-services/${serviceRef}/users/${u.id}`, {
+                            method: "DELETE",
+                            body: { confirm: u.name },
+                          })
+                          await onDone()
+                        }}
+                      />
+                    </div>
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableBand>
+    </>
+  )
+}
+
+function PasswordResult({ service, databaseName, user, password }: { service: DataService; databaseName: string; user: string; password: string }) {
+  const { t } = useI18n()
+  const connString = connectionStringFor(service, databaseName, user, password)
+  return (
+    <div className="flex flex-col gap-3">
+      <Alert>
+        <AlertDescription>{t("databases.passwordOnceHint")}</AlertDescription>
+      </Alert>
+      <div className="flex flex-col gap-1">
+        <FieldLabel>{t("databases.passwordShownOnce")}</FieldLabel>
+        <CopyField value={password} />
+      </div>
+      {connString ? (
+        <div className="flex flex-col gap-1">
+          <FieldLabel>{t("databases.copyConnectionString")}</FieldLabel>
+          <CopyField value={connString} block />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function AddUserDialog({
+  teamSlug,
+  serviceRef,
+  service,
+  databases,
+  onDone,
+}: {
+  teamSlug: string
+  serviceRef: string
+  service: DataService
+  databases: DataServiceDetail["databases"]
+  onDone: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [targetDatabase, setTargetDatabase] = useState("")
+  const [user, setUser] = useState("")
+  const [grants, setGrants] = useState("readwrite")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ user: string; password: string; database: string } | null>(null)
+
+  const reset = () => {
+    setTargetDatabase("")
+    setUser("")
+    setGrants("readwrite")
+    setError(null)
+    setResult(null)
+  }
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!targetDatabase || !user) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await apiFetch<{ user: DatabaseUser; password: string }>(`/api/teams/${teamSlug}/data-services/${serviceRef}/users`, {
+        method: "POST",
+        body: { database: targetDatabase, user, grants },
+      })
+      setResult({ user: res.user.name, password: res.password, database: targetDatabase })
+      await onDone()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) reset()
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <PlusIcon />
+        {t("databases.addUser")}
+      </DialogTrigger>
+      <DialogContent>
+        {result ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t("databases.addUser")}</DialogTitle>
+              <DialogDescription>{t("databases.userCreatedDone", { name: result.user })}</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <PasswordResult service={service} databaseName={result.database} user={result.user} password={result.password} />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <form onSubmit={submit}>
+            <DialogHeader>
+              <DialogTitle>{t("databases.addUser")}</DialogTitle>
+              <DialogDescription>{t("databases.addUserHint")}</DialogDescription>
+            </DialogHeader>
+            <FieldGroup className="py-4">
+              <Field>
+                <FieldLabel>{t("databases.targetDatabase")}</FieldLabel>
+                <Select value={targetDatabase} onValueChange={(v) => v && setTargetDatabase(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("databases.chooseDatabase")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {databases.map((d) => (
+                      <SelectItem key={d.id} value={d.name}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="new-standalone-user">{t("databases.user")}</FieldLabel>
+                <Input id="new-standalone-user" value={user} onChange={(e) => setUser(e.target.value)} placeholder="app_readonly" dir="ltr" autoFocus />
+              </Field>
+              <Field>
+                <FieldLabel>{t("databases.grants")}</FieldLabel>
+                <Select value={grants} onValueChange={(v) => v && setGrants(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRANT_PRESETS.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {t(`databases.grantLabels.${g}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <FormError message={error} />
+            </FieldGroup>
+            <DialogFooter>
+              <Button type="submit" disabled={busy || !targetDatabase || !user}>
+                {busy ? t("common.working") : t("databases.createUser")}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function RotateUserDialog({
+  teamSlug,
+  serviceRef,
+  service,
+  user,
+  databaseName,
+  onDone,
+}: {
+  teamSlug: string
+  serviceRef: string
+  service: DataService
+  user: DatabaseUser
+  databaseName: string
+  onDone: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [password, setPassword] = useState<string | null>(null)
+
+  const rotate = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await apiFetch<{ password: string }>(`/api/teams/${teamSlug}/data-services/${serviceRef}/users/${user.id}/rotate`, { method: "POST" })
+      setPassword(res.password)
+      await onDone()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) {
+          setPassword(null)
+          setError(null)
+        }
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <RefreshCwIcon />
+        {t("databases.rotatePassword")}
+      </DialogTrigger>
+      <DialogContent>
+        {password ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t("databases.rotatePassword")}</DialogTitle>
+              <DialogDescription>{t("databases.userCreatedDone", { name: user.name })}</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <PasswordResult service={service} databaseName={databaseName} user={user.name} password={password} />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t("databases.rotatePasswordTitle", { name: user.name })}</DialogTitle>
+              <DialogDescription>{t("databases.rotatePasswordHint")}</DialogDescription>
+            </DialogHeader>
+            <FormError message={error} />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button onClick={rotate} disabled={busy}>
+                {busy ? t("common.working") : t("databases.rotatePassword")}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )
