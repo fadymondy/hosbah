@@ -2413,6 +2413,7 @@
       "monitors": "Alerts & monitors",
       "proxy": "Proxy manager",
       "cache": "Edge cache",
+      "rules": "Rules",
       "dns": "DNS & SSL",
       "backups": "Backups",
       "settings": "Settings & actions"
@@ -2772,6 +2773,59 @@
       "purged": "Cache purged.",
       "saved": "Edge cache settings saved.",
       "disabledHint": "Turn the cache on to set a TTL and bypass rules."
+    },
+    "rules": {
+      "remove": "Remove",
+      "saved": "Rules saved.",
+      "statuses": {
+        "ok": "Applied",
+        "pending": "Applying…",
+        "error": "Error"
+      },
+      "redirects": {
+        "title": "Redirects",
+        "hint": "Send requests for a path or pattern somewhere else, applied before anything else.",
+        "list": "Redirects",
+        "empty": "No redirects yet.",
+        "fromPlaceholder": "/old",
+        "toPlaceholder": "https://example.com/new or /new"
+      },
+      "headers": {
+        "title": "Response headers",
+        "hint": "Set, add or remove headers on every response from this site.",
+        "list": "Header rules",
+        "empty": "No header rules yet.",
+        "namePlaceholder": "Header name",
+        "valuePlaceholder": "Value",
+        "actions": {
+          "set": "Set",
+          "add": "Add",
+          "remove": "Remove"
+        },
+        "presets": {
+          "hsts": "HSTS",
+          "nosniff": "No sniff",
+          "frame": "Deny framing",
+          "cors": "Allow any origin"
+        }
+      },
+      "access": {
+        "title": "Access",
+        "hint": "Basic auth, IP allow/deny lists and bad-bot blocking.",
+        "basicAuth": "HTTP basic auth",
+        "basicAuthHint": "Applies to the app's server at once. Leave the path prefix empty to require it for the whole site.",
+        "usernamePlaceholder": "Username",
+        "passwordPlaceholder": "Password",
+        "pathPrefixPlaceholder": "Path prefix (optional)",
+        "ipAllow": "IP allow list",
+        "ipAllowHint": "If set, only these CIDRs may reach the site.",
+        "ipDeny": "IP deny list",
+        "ipDenyHint": "Block these CIDRs.",
+        "cidrPlaceholder": "10.0.0.0/8 or a single IP",
+        "blockBadBots": "Block known bad bots",
+        "blockBadBotsHint": "Blocks a curated list of scraper and AI-crawler user agents.",
+        "rateLimitNote": "Rate limiting is not available: the agent's Caddy build has no rate-limit module, and this project does not rebuild Caddy to add one."
+      }
     },
     "monitors": {
       "add": "Add monitor",

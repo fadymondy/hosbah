@@ -494,6 +494,8 @@ func TestIsolationSweep(t *testing.T) {
 		"app_traces": {"app": appA.App.ID, "method": "GET", "route": "/"}, "app_errors": {"app": appA.App.ID},
 		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
 		"app_cache_settings": {"app": appA.App.ID, "enabled": true}, "app_cache_purge": {"app": appA.App.ID},
+		"app_http_rules_get": {"app": appA.App.ID}, "app_http_rules_set": {"app": appA.App.ID, "headers": []map[string]any{{"action": "set", "name": "X-Stolen", "value": "1"}}},
+		"proxy_host_http_rules_get": {"proxy": proxyA.ID}, "proxy_host_http_rules_set": {"proxy": proxyA.ID, "headers": []map[string]any{{"action": "set", "name": "X-Stolen", "value": "1"}}},
 		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
 		// MH-576 D7: SaaS products, instances, upgrades and keys of A's.
 		"product_instances": {"product": prodA.ID}, "provision_instance": {"product": prodA.ID, "server": srvA, "customer_ref": "stolen"},

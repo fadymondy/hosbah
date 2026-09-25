@@ -116,6 +116,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindDBLimits:        dbLimits,
 		agentproto.KindCacheSet:        cacheSet,
 		agentproto.KindCachePurge:      cachePurge,
+		agentproto.KindHTTPRulesSet:    httpRulesSet,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -390,6 +391,16 @@ func laneOf(op agentproto.SignedOp) string {
 			return "db:" + p.ServiceID
 		}
 		return "db:?"
+	case agentproto.KindHTTPRulesSet:
+		// One lane per target (an app or a proxy host): two rules.set for the same target must never
+		// interleave, but must never wait behind a build or a provisioning step either.
+		var p struct {
+			TargetID string `json:"target_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.TargetID != "" {
+			return "rules:" + p.TargetID
+		}
+		return "rules:?"
 	}
 	return "host"
 }

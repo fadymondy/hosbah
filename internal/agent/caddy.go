@@ -111,6 +111,10 @@ type routeEntry struct {
 	// container (cacheVarnishAddr) instead of Upstream directly. Preserved across route.set by
 	// setRoute, which only ever changes Hosts/Upstream/Realtime.
 	Cache *cacheConfig `json:"cache,omitempty"`
+	// Rules (MH-578 E4-E6): redirects, response headers, basic auth and IP/bot access rules,
+	// rendered into this app's own route (renderTargetRoutes). Preserved across route.set the same
+	// way Cache is; only rules.set ever changes it.
+	Rules *agentproto.HTTPRules `json:"rules,omitempty"`
 }
 
 // realtimeStreamCloseDelay keeps upgraded (websocket) connections of a realtime route open across
@@ -202,6 +206,8 @@ type proxyEntry struct {
 	Dial       string           `json:"dial"`
 	TLS        bool             `json:"tls,omitempty"`
 	SkipVerify bool             `json:"skip_verify,omitempty"`
+	// Rules (MH-578 E4-E6): same as routeEntry.Rules, for a proxy host.
+	Rules *agentproto.HTTPRules `json:"rules,omitempty"`
 }
 
 // renderCaddy turns the route table into Caddy's JSON config. accessLog wires the access-log
@@ -271,17 +277,18 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		if cacheOn {
 			dial = cacheVarnishAddr
 		}
+		mainHandler := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": dial}}, "flush_interval": -1}
 		if len(plain) > 0 {
 			if rt != nil {
 				httpRoutes = append(httpRoutes, realtimeCaddyRoute(id, "-http", plain, *rt))
 			}
-			httpRoutes = append(httpRoutes, route(id, "-http", plain, dial))
+			httpRoutes = append(httpRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-http", plain, mainHandler, e.Rules)...)
 		}
 		if len(secure) > 0 {
 			if rt != nil {
 				httpsRoutes = append(httpsRoutes, realtimeCaddyRoute(id, "-https", secure, *rt))
 			}
-			httpsRoutes = append(httpsRoutes, route(id, "-https", secure, dial))
+			httpsRoutes = append(httpsRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-https", secure, mainHandler, e.Rules)...)
 		}
 	}
 	pids := make([]string, 0, len(t.Proxies))
@@ -299,16 +306,15 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			}
 			proxy["transport"] = tr
 		}
-		r := map[string]any{"@id": agentproto.ProxyRouteID(id), "match": []any{map[string]any{"host": []string{p.Host.Hostname}}},
-			"terminal": true, "handle": []any{proxy}}
+		rs := renderTargetRoutes(agentproto.ProxyRouteID(id), []string{p.Host.Hostname}, proxy, p.Rules)
 		switch p.Host.TLS {
 		case "off":
-			httpRoutes = append(httpRoutes, r)
+			httpRoutes = append(httpRoutes, rs...)
 		case "internal":
-			httpsRoutes = append(httpsRoutes, r)
+			httpsRoutes = append(httpsRoutes, rs...)
 			internalHosts = append(internalHosts, p.Host.Hostname)
 		default:
-			httpsRoutes = append(httpsRoutes, r)
+			httpsRoutes = append(httpsRoutes, rs...)
 			autoHosts = append(autoHosts, p.Host.Hostname)
 		}
 	}

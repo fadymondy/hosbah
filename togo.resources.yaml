@@ -565,6 +565,55 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppHTTPRule
+      table: app_httprules
+      fields:
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: redirects
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: headers
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: basic_auth
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: access
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: AppInstall
       table: app_installs
       fields:
@@ -2449,6 +2498,55 @@ resources:
           gql: Boolean!
           pg: boolean
           "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ProxyHostHTTPRule
+      table: proxy_host_httprules
+      fields:
+        - name: proxy_host_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: redirects
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: headers
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: basic_auth
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: access
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
         - name: created_by
           go: string
           gql: String!

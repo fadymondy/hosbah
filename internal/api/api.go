@@ -77,6 +77,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerRum(api)
 	d.registerApm(api)
 	d.registerEdgeCache(api)
+	d.registerHTTPRules(api)
 	d.registerCosts(api)
 	d.registerSchedules(api)
 	d.registerScripts(api)

@@ -39,6 +39,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAppEdgeCache(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppHTTPRule(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedAppInstall(ctx, a); err != nil {
 		return err
 	}
@@ -142,6 +145,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 		return err
 	}
 	if err := SeedProxyHost(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedProxyHostHTTPRule(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedRelease(ctx, a); err != nil {
