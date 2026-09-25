@@ -4,10 +4,12 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import {
+  BadgeCheckIcon,
   BellIcon,
   CheckIcon,
   ChevronsUpDownIcon,
   CircleDollarSignIcon,
+  FingerprintIcon,
   KeyRoundIcon,
   LayoutGridIcon,
   LayoutTemplateIcon,
@@ -280,6 +282,12 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           <GroupLabel>{t("nav.settings")}</GroupLabel>
           <L href={`${base}/tokens`} icon={<KeyRoundIcon />}>
             {t("nav.tokens")}
+          </L>
+          <L href={`${base}/ssh-keys`} icon={<FingerprintIcon />}>
+            {t("nav.sshKeys")}
+          </L>
+          <L href={`${base}/certificates`} icon={<BadgeCheckIcon />}>
+            {t("nav.certificates")}
           </L>
           {/* Credentials are owner/admin only (the API answers 403 to anyone else). */}
           {teamCtx?.manage ? (
