@@ -23,6 +23,6 @@ func EnvSealContext(appID string) string { return "apm-key:" + appID }
 // four vars automatically whenever they are not already set).
 func Snippet(publicURL, key, serviceName string) string {
 	return fmt.Sprintf(
-		"OTEL_EXPORTER_OTLP_ENDPOINT=%s/api/otlp\nOTEL_EXPORTER_OTLP_PROTOCOL=http/json\nOTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer %s\nOTEL_SERVICE_NAME=%s\n",
+		"OTEL_EXPORTER_OTLP_ENDPOINT=%s/api/otlp\nOTEL_EXPORTER_OTLP_PROTOCOL=http/json\nOTEL_EXPORTER_OTLP_HEADERS=x-hosbah-key=%s\nOTEL_SERVICE_NAME=%s\n",
 		publicURL, key, serviceName)
 }

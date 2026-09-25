@@ -553,7 +553,9 @@ func (r *runner) injectApmEnv(ctx context.Context, env map[string]string) {
 	defaults := map[string]string{
 		"OTEL_EXPORTER_OTLP_ENDPOINT": base + "/api/otlp",
 		"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
-		"OTEL_EXPORTER_OTLP_HEADERS":  "Authorization=Bearer " + string(plain),
+		// x-hosbah-key, not "Authorization=Bearer …": the spec percent-decodes header values and a raw
+		// space trips some SDKs.
+		"OTEL_EXPORTER_OTLP_HEADERS":  "x-hosbah-key=" + string(plain),
 		"OTEL_SERVICE_NAME":           r.app.Name,
 	}
 	for k, v := range defaults {
