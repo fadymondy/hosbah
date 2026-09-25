@@ -71,6 +71,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerCosts(api)
 	d.registerSchedules(api)
 	d.registerScripts(api)
+	d.registerSiteTemplates(api)
 	d.registerServices(api)
 	d.registerStorage(api)
 	d.registerBrowsers(api)

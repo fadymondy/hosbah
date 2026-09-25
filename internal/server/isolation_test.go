@@ -150,6 +150,10 @@ func TestIsolationSweep(t *testing.T) {
 	var scriptA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/scripts", map[string]any{"name": "deploy-key-a", "body": "echo a-env-script"}, 201, &scriptA)
 	scriptRunA := seedScriptRun(t, teamA.ID, srvA, "ok", "a-env-script-output")
+	// B11: a site template of A's, saved from a minimal valid YAML document.
+	var templateA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/site-templates", map[string]any{"source_yaml": "name: a-env-template-" + suffix +
+		"\ndriver: node-api\nrepo_url: https://example.test/a-env/repo.git\n"}, 201, &templateA)
 	// Storage of app A: a volume.
 	var volA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/storage/volumes", map[string]any{"name": "a-env-data", "mount_path": "/data"}, 201, &volA)
@@ -250,6 +254,7 @@ func TestIsolationSweep(t *testing.T) {
 		"schedule":    func(string) []string { return []string{schedA.ID, schedA.Name} },
 		"run":         func(string) []string { return []string{runA, scriptRunA} },
 		"script":      func(string) []string { return []string{scriptA.ID, scriptA.Name} },
+		"template":    func(string) []string { return []string{templateA.ID, templateA.Name} },
 		"volume":      func(string) []string { return []string{volA.ID, volA.Name} },
 		"bucket":      func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
 		"browser":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
@@ -396,6 +401,12 @@ func TestIsolationSweep(t *testing.T) {
 		"delete_script": {"script": scriptA.ID, "confirm": scriptA.Name},
 		"run_script":    {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
 		"script_run_status": {"run": scriptRunA},
+		"get_site_template": {"template": templateA.ID}, "save_site_template": {"template": templateA.ID,
+			"source_yaml": "name: " + templateA.Name + "\ndriver: node-api\nrepo_url: https://example.test/a-env/repo.git\n"},
+		"delete_site_template":     {"template": templateA.ID, "confirm": templateA.Name},
+		"preview_site_template":    {"template": templateA.ID},
+		"create_app_from_template": {"template": templateA.ID, "name": "stolen", "server": srvA},
+		"export_app_template":      {"app": appA.App.ID},
 		"list_services":     {"server": srvA},
 		"service_action":    {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
 		"get_app_queues":   {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
@@ -446,6 +457,9 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_scripts", nil); strings.Contains(res.Text, scriptA.Name) {
 		t.Errorf("list_scripts as B leaked team A's script: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_site_templates", nil); strings.Contains(res.Text, templateA.Name) {
+		t.Errorf("list_site_templates as B leaked team A's template: %s", res.Text)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
 		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)

@@ -1,0 +1,21 @@
+name: wordpress-docker
+description: A WordPress checkout built from its own Dockerfile, with a generated auth salt and a MySQL database URL.
+driver: wordpress-docker
+repo_url: https://github.com/docker-library/wordpress
+branch: master
+port: 80
+health_path: /
+needs:
+  mysql: true
+env:
+  - name: WORDPRESS_DB_URL
+    from: mysql_url
+    secret: true
+  - name: WORDPRESS_AUTH_KEY
+    generate:
+      length: 64
+      charset: hex
+    secret: true
+notes: >-
+  Point repo_url at your own WordPress checkout, with a Dockerfile that reads WORDPRESS_DB_URL.
+  Attach a running MySQL service on the app's server before applying this template.

@@ -15,7 +15,8 @@
     "actions": "Actions",
     "refresh": "Refresh",
     "readOnly": "You can view this, but your role cannot change it.",
-    "home": "Go home"
+    "home": "Go home",
+    "close": "Close"
   },
   "prefs": {
     "switchLanguage": "Switch language",
@@ -154,6 +155,7 @@
     "overview": "Overview",
     "sharedServices": "Shared services",
     "scripts": "Scripts",
+    "templates": "Templates",
     "members": "Members",
     "invitations": "Invitations",
     "tokens": "MCP tokens",
@@ -810,7 +812,10 @@
       "deleteTitle": "Delete this app",
       "deleteHint": "Removes its route, containers and images from the server, and its history from Hosbah.",
       "delete": "Delete app",
-      "deleteConfirm": "Type {name} to confirm."
+      "deleteConfirm": "Type {name} to confirm.",
+      "exportTemplate": "Export as template",
+      "exportTemplateHint": "Save this app's repository, branch, port, health path and driver as a YAML site template. Env values are never included.",
+      "exportTemplateAction": "Export"
     },
     "domainsLabel": "Domains"
   },
@@ -1765,6 +1770,41 @@
       "noServers": "No enrolled servers on this team yet.",
       "pickServer": "Choose at least one server."
     }
+  },
+  "siteTemplates": {
+    "title": "Templates",
+    "hint": "Declarative YAML that scaffolds a ready-to-deploy app in one step: driver, build, env defaults and any data services it needs. Built-in templates plus whatever the team has saved.",
+    "search": "Search by name, description, driver…",
+    "add": "New template",
+    "builtin": "Built-in",
+    "driver": "Driver",
+    "preview": "Preview",
+    "createApp": "Create app",
+    "emptyTitle": "No templates yet",
+    "emptyHint": "Save a YAML template, or preview and use one of Hosbah's built-ins.",
+    "yaml": "Template YAML",
+    "yamlHint": "Unknown keys are rejected. Env values may reference generated secrets ({{random:32}}) or a provisioned service's URL ({{db.url}}).",
+    "dialogHint": "Saved to the team's library. Built-in template names can't be reused.",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "Apps already created from this template are not affected.",
+    "previewTitle": "Preview {name}",
+    "previewHint": "What this template will create. Secret values stay hidden until an app is actually created.",
+    "env": "Environment",
+    "secret": "secret",
+    "notes": "Notes",
+    "services": {
+      "postgres": "PostgreSQL service",
+      "mysql": "MySQL service",
+      "redis": "Redis service",
+      "none": "None"
+    },
+    "createFromTitle": "Create app from {name}",
+    "createFromHint": "Creates the app on the chosen server and sets its environment from this template.",
+    "noServers": "No enrolled servers on this team yet.",
+    "deployNow": "Deploy immediately",
+    "created": "App created",
+    "createdHint": "{name} was created from this template.",
+    "viewApp": "View app"
   },
   "sites": {
     "title": "Sites",

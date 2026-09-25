@@ -10,6 +10,7 @@ import {
   CircleDollarSignIcon,
   KeyRoundIcon,
   LayoutGridIcon,
+  LayoutTemplateIcon,
   LockKeyholeIcon,
   MegaphoneIcon,
   TriangleAlertIcon,
@@ -253,6 +254,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
             {t("nav.scripts")}
+          </L>
+          <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
+            {t("nav.templates")}
           </L>
           <L href={`${base}/members`} icon={<UsersIcon />}>
             {t("nav.members")}

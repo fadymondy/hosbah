@@ -1,0 +1,25 @@
+name: django
+description: A Django project with a generated SECRET_KEY and a Postgres database URL.
+driver: django
+repo_url: https://github.com/django/django
+branch: main
+port: 8000
+health_path: /
+needs:
+  postgres: true
+env:
+  - name: DJANGO_SETTINGS_MODULE
+    value: config.settings.production
+  - name: SECRET_KEY
+    generate:
+      length: 50
+      charset: alnum
+    secret: true
+  - name: DEBUG
+    value: "False"
+  - name: DATABASE_URL
+    from: postgres_url
+    secret: true
+notes: >-
+  Attach a running Postgres service on the app's server before applying this template —
+  DATABASE_URL is filled from it. Point repo_url at your own Django project.

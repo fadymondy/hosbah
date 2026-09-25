@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api"
 import type { App, AppDetail, Integrations } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
+import type { SiteTemplate } from "@/lib/site-templates"
 
 export function SettingsPanel({
   team,
@@ -191,8 +193,72 @@ export function SettingsPanel({
         ) : null}
       </section>
 
+      {manage ? <ExportTemplate path={path} /> : null}
+
       {manage ? <DeleteApp path={path} name={app.name} team={team} /> : null}
     </div>
+  )
+}
+
+/** MH-576 B11: export this app's current repo, branch, port, health path and guessed driver as a
+ * site-template YAML — a starting point for reusing the same setup elsewhere. Env values are
+ * deliberately never included (a template must never hold plaintext secrets). */
+function ExportTemplate({ path }: { path: string }) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [yaml, setYaml] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setOpen(true)
+    setBusy(true)
+    setError(null)
+    setYaml(null)
+    try {
+      const r = await apiFetch<SiteTemplate>(`${path}/export-template`)
+      setYaml(r.source_yaml)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section data-testid="export-template">
+      <SectionTitle title={t("apps.settings.exportTemplate")} hint={t("apps.settings.exportTemplateHint")} />
+      <SettingsRow label={t("apps.settings.exportTemplate")}>
+        <div>
+          <Button type="button" variant="outline" onClick={run}>
+            {t("apps.settings.exportTemplateAction")}
+          </Button>
+        </div>
+      </SettingsRow>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("apps.settings.exportTemplate")}</DialogTitle>
+            <DialogDescription>{t("apps.settings.exportTemplateHint")}</DialogDescription>
+          </DialogHeader>
+          {busy ? (
+            <p className="text-sm text-grid-muted">{t("common.working")}</p>
+          ) : yaml ? (
+            <>
+              <Textarea dir="ltr" readOnly rows={18} value={yaml} className="min-h-80 font-mono text-xs" />
+              <CopyField value={yaml} />
+            </>
+          ) : null}
+          <ErrorBand message={error} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              {t("common.close")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
   )
 }
 

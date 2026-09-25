@@ -1,0 +1,16 @@
+name: node-api
+description: A plain Node.js HTTP API, installed with npm and started with npm start.
+driver: node-api
+repo_url: https://github.com/expressjs/express
+branch: master
+port: 8080
+health_path: /health
+env:
+  - name: NODE_ENV
+    value: production
+  - name: SESSION_SECRET
+    generate:
+      length: 32
+      charset: hex
+    secret: true
+notes: Point repo_url at your own API repository; it must answer 2xx on /health (or change health_path).

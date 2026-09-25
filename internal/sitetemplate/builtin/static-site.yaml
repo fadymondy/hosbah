@@ -1,0 +1,8 @@
+name: static-site
+description: Pre-built static files (HTML/CSS/JS), served as-is with no build step at runtime.
+driver: static-site
+repo_url: https://github.com/github/personal-website
+branch: main
+port: 80
+health_path: /
+notes: Point repo_url at a repository whose files are already ready to serve, or one with a build step you configure in the deploy pipeline.

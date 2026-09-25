@@ -162,6 +162,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedServerMetric(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedSiteTemplate(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedStatusPage(ctx, a); err != nil {
 		return err
 	}

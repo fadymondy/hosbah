@@ -2924,6 +2924,40 @@ resources:
           pg: jsonb
           "null": false
       controller: true
+    - name: SiteTemplate
+      table: site_templates
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: description
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: driver
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: source_yaml
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: StatusPage
       table: status_pages
       fields:
