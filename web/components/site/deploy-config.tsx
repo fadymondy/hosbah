@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ArrowDownIcon, ArrowUpIcon, HistoryIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, HistoryIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
@@ -10,6 +10,7 @@ import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/state
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -31,6 +32,9 @@ export type DeployConfig = {
   mode: DeployMode
   preset: string
   steps: DeployStep[]
+  builder_image: string
+  outputs: string[]
+  detected_preset?: string
   version: number
   updated_by?: string | null
   updated_at: string | null
@@ -44,10 +48,16 @@ export type DeployConfigVersion = {
   updated_by?: string | null
   created_at: string
 }
-export type DeployPreset = { preset: string; steps: DeployStep[] }
+export type DeployPreset = { preset: string; steps: DeployStep[]; builder_image: string; outputs: string[] }
 
-type Draft = { mode: DeployMode; preset: string; steps: DeployStep[] }
-const draftOf = (c: DeployConfig): Draft => ({ mode: c.mode, preset: c.preset, steps: c.steps.map((s) => ({ ...s })) })
+type Draft = { mode: DeployMode; preset: string; steps: DeployStep[]; builder_image: string; outputs: string[] }
+const draftOf = (c: DeployConfig): Draft => ({
+  mode: c.mode,
+  preset: c.preset,
+  steps: c.steps.map((s) => ({ ...s })),
+  builder_image: c.builder_image ?? "",
+  outputs: [...(c.outputs ?? [])],
+})
 const same = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b)
 
 /** The per-app deploy script configuration: mode, preset, pipeline steps, and its version history. */
@@ -69,6 +79,9 @@ export function SiteDeployConfig() {
   const [restoreTarget, setRestoreTarget] = useState<DeployConfigVersion | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [addKey, setAddKey] = useState("")
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [newOutput, setNewOutput] = useState("")
+  const [detecting, setDetecting] = useState(false)
 
   useEffect(() => {
     setConfig(null)
@@ -133,6 +146,31 @@ export function SiteDeployConfig() {
 
   function discard() {
     if (config) setDraft(draftOf(config))
+  }
+
+  function addOutput() {
+    const path = newOutput.trim()
+    if (!path) return
+    setDraft((d) => (d ? { ...d, outputs: [...d.outputs, path] } : d))
+    setNewOutput("")
+  }
+
+  function removeOutput(i: number) {
+    setDraft((d) => (d ? { ...d, outputs: d.outputs.filter((_, oi) => oi !== i) } : d))
+  }
+
+  async function detectPreset() {
+    setDetecting(true)
+    setError(null)
+    try {
+      const r = await apiFetch<DeployPreset>(`${configPath}/detect`)
+      setDraft((d) => (d ? { ...d, preset: r.preset, steps: r.steps.map((s) => ({ ...s })), builder_image: r.builder_image, outputs: [...r.outputs] } : d))
+      toast.success(t("site.deployScript.detected", { preset: r.preset }))
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setDetecting(false)
+    }
   }
 
   async function save() {
@@ -222,18 +260,27 @@ export function SiteDeployConfig() {
             <div className="border-b border-line px-6 py-5">
               <p className="mb-2 text-sm font-medium text-grid-fg">{t("site.deployScript.preset")}</p>
               <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.deployScript.presetHint")}</p>
-              <Select value={draft.preset} onValueChange={(v) => v && applyPreset(v, false)} disabled={!canSave || busy || !presets}>
-                <SelectTrigger className="w-full sm:w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(presets ?? []).map((p) => (
-                    <SelectItem key={p.preset} value={p.preset}>
-                      {p.preset}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={draft.preset} onValueChange={(v) => v && applyPreset(v, false)} disabled={!canSave || busy || !presets}>
+                  <SelectTrigger className="w-full sm:w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(presets ?? []).map((p) => (
+                      <SelectItem key={p.preset} value={p.preset}>
+                        {p.preset}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" size="sm" disabled={!canSave || busy || detecting} onClick={() => void detectPreset()}>
+                  <SearchIcon />
+                  {detecting ? t("common.working") : t("site.deployScript.detect")}
+                </Button>
+                {config?.detected_preset ? (
+                  <span className="text-xs text-grid-muted">{t("site.deployScript.detectedAs", { preset: config.detected_preset })}</span>
+                ) : null}
+              </div>
             </div>
 
             <div className="flex flex-col gap-3 border-b border-line px-6 py-5">
@@ -317,6 +364,63 @@ export function SiteDeployConfig() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="border-b border-line px-6 py-5">
+              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <CollapsibleTrigger render={<button type="button" className="flex w-full items-center justify-between text-start group/deploy-adv" />}>
+                  <span className="text-sm font-medium text-grid-fg">{t("site.deployScript.advanced")}</span>
+                  <ChevronDownIcon className="size-4 text-grid-muted transition-transform group-aria-expanded/deploy-adv:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.deployScript.advancedHint")}</p>
+                  <div className="mb-4">
+                    <label className="mb-1 block text-xs font-medium text-grid-fg">{t("site.deployScript.builderImage")}</label>
+                    <Input
+                      dir="ltr"
+                      maxLength={200}
+                      placeholder="golang:1.26"
+                      value={draft.builder_image}
+                      onChange={(e) => setDraft((d) => (d ? { ...d, builder_image: e.target.value } : d))}
+                      className="w-full sm:w-64"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-grid-fg">{t("site.deployScript.outputs")}</label>
+                    <p className="mb-2 text-xs text-grid-muted">{t("site.deployScript.outputsHint")}</p>
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {draft.outputs.map((o, i) => (
+                        <Badge key={`${o}-${i}`} variant="outline" dir="ltr" className="gap-1">
+                          {o}
+                          <button type="button" onClick={() => removeOutput(i)} aria-label={t("site.deployScript.removeOutput")}>
+                            <Trash2Icon className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        dir="ltr"
+                        maxLength={200}
+                        placeholder=".next"
+                        value={newOutput}
+                        onChange={(e) => setNewOutput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            addOutput()
+                          }
+                        }}
+                        className="w-full sm:w-64"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={addOutput}>
+                        <PlusIcon />
+                        {t("site.deployScript.addOutput")}
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </fieldset>
         </>

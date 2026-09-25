@@ -4,8 +4,58 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
+
+// TestFastBuildMode (MH-573 A7b): the fast track's mode picks dockerfile for a Dockerfile app,
+// builder for an app with a configured builder image, and falls back to runtime otherwise.
+func TestFastBuildMode(t *testing.T) {
+	cases := []struct {
+		name, preset, builderImage, want string
+	}{
+		{"dockerfile preset wins regardless of builder image", PresetDockerfile, "golang:1.26", agentproto.FastModeDockerfile},
+		{"a builder image with no Dockerfile", PresetGo, "golang:1.26", agentproto.FastModeBuilder},
+		{"no Dockerfile, no builder image falls back to runtime", PresetStatic, "", agentproto.FastModeRuntime},
+		{"unknown preset with no builder image falls back to runtime", "", "", agentproto.FastModeRuntime},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := FastBuildMode(c.preset, c.builderImage); got != c.want {
+				t.Fatalf("FastBuildMode(%q, %q) = %q, want %q", c.preset, c.builderImage, got, c.want)
+			}
+		})
+	}
+}
+
+// TestDetectPresetDockerfile (MH-573 A7b): a Dockerfile at the repository root always wins, ahead
+// of any other marker file, so the fast track defaults to a cached `docker build`.
+func TestDetectPresetDockerfile(t *testing.T) {
+	if got := DetectPreset([]string{"Dockerfile", "package.json", "go.mod"}); got != PresetDockerfile {
+		t.Fatalf("want dockerfile, got %q", got)
+	}
+	if got := DetectPreset([]string{"package.json", "next.config.js"}); got != PresetNext {
+		t.Fatalf("without a Dockerfile the more specific marker still wins: got %q", got)
+	}
+}
+
+// TestPresetBuilderImageAndOutputs (MH-573 A7b): every non-static, non-dockerfile preset gets a
+// default builder image and at least one output path; dockerfile and static need neither.
+func TestPresetBuilderImageAndOutputs(t *testing.T) {
+	for _, p := range []string{PresetGo, PresetNode, PresetNext, PresetLaravel, PresetPHP, PresetPython} {
+		if PresetBuilderImage(p) == "" {
+			t.Errorf("preset %s: want a default builder image", p)
+		}
+		if len(PresetOutputs(p)) == 0 {
+			t.Errorf("preset %s: want at least one default output", p)
+		}
+	}
+	for _, p := range []string{PresetDockerfile, PresetStatic} {
+		if PresetBuilderImage(p) != "" {
+			t.Errorf("preset %s: want no builder image", p)
+		}
+	}
+}
 
 // TestFastBuildBlockedByRelease is the dispatcher's first fast-vs-full gate (MH-573 A7): the fast
 // track needs a previous successful release to build from.

@@ -65,3 +65,19 @@ func TestRunFastStepsNoStepsIsOK(t *testing.T) {
 		t.Fatalf("no steps must be a no-op success, got %v/%d", err, code)
 	}
 }
+
+// TestFastCopyArgs (MH-573 A7b): the builder mode's generated `FROM <base>\nCOPY …` Dockerfile —
+// "." copies the whole checkout, anything else keeps its relative path under /app.
+func TestFastCopyArgs(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{".", ". /app/"},
+		{".next", ".next /app/.next"},
+		{"public", "public /app/public"},
+		{"/etc/passwd", "etc/passwd /app/etc/passwd"}, // a leading slash is stripped, never escapes /app
+	}
+	for _, c := range cases {
+		if got := fastCopyArgs(c.in); got != c.want {
+			t.Errorf("fastCopyArgs(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

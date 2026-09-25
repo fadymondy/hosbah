@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -40,13 +41,21 @@ type DeployStepIn struct {
 
 // DeployConfigOut is GET …/deploy-config.
 type DeployConfigOut struct {
-	Mode      string         `json:"mode"`
-	Preset    string         `json:"preset"`
-	Steps     []DeployStepIn `json:"steps"`
-	Version   int            `json:"version"`
-	UpdatedBy *string        `json:"updated_by,omitempty"`
-	UpdatedAt *time.Time     `json:"updated_at" doc:"null: never saved — this is the preset's default."`
-	CanSave   bool           `json:"can_save" doc:"Whether the caller may save a configuration (deploy)."`
+	Mode   string         `json:"mode"`
+	Preset string         `json:"preset"`
+	Steps  []DeployStepIn `json:"steps"`
+	// BuilderImage and Outputs (MH-573 A7b, Advanced) apply to the fast track's builder mode: an
+	// app with no Dockerfile but a configured builder image runs its steps there, then copies
+	// Outputs onto the current runtime image. Both empty (the default for dockerfile/static) means
+	// the fast track either builds the Dockerfile directly or falls back to the original in-place
+	// (runtime) mode.
+	BuilderImage   string     `json:"builder_image"`
+	Outputs        []string   `json:"outputs"`
+	DetectedPreset string     `json:"detected_preset,omitempty" doc:"What DetectPreset last saw from the repository's own files, if a build ever ran."`
+	Version        int        `json:"version"`
+	UpdatedBy      *string    `json:"updated_by,omitempty"`
+	UpdatedAt      *time.Time `json:"updated_at" doc:"null: never saved — this is the preset's default."`
+	CanSave        bool       `json:"can_save" doc:"Whether the caller may save a configuration (deploy)."`
 }
 
 // DeployConfigVersionOut is one entry of GET …/deploy-config/versions.
@@ -61,8 +70,19 @@ type DeployConfigVersionOut struct {
 
 // DeployPresetOut is one entry of GET /api/teams/{team}/deploy-presets.
 type DeployPresetOut struct {
-	Preset string         `json:"preset"`
-	Steps  []DeployStepIn `json:"steps"`
+	Preset       string         `json:"preset"`
+	Steps        []DeployStepIn `json:"steps"`
+	BuilderImage string         `json:"builder_image"`
+	Outputs      []string       `json:"outputs"`
+}
+
+func outputsOrEmpty(raw string) []string {
+	var out []string
+	_ = json.Unmarshal([]byte(raw), &out)
+	if out == nil {
+		out = []string{}
+	}
+	return out
 }
 
 func toDeployStepsOut(steps []deploy.DeployStep) []DeployStepIn {
@@ -96,6 +116,16 @@ func checkDeploySteps(steps []DeployStepIn) error {
 			return huma.Error422UnprocessableEntity("duplicate step key " + s.Key)
 		}
 		seen[s.Key] = true
+	}
+	return nil
+}
+
+// checkDeployOutputs validates the builder mode's output paths: relative, no traversal.
+func checkDeployOutputs(outputs []string) error {
+	for _, o := range outputs {
+		if o == "" || strings.Contains(o, "..") || strings.HasPrefix(o, "/") {
+			return huma.Error422UnprocessableEntity("bad output path " + o)
+		}
 	}
 	return nil
 }
@@ -135,6 +165,9 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				out.Body.Mode = row.Mode
 				out.Body.Preset = row.Preset
 				out.Body.Steps = toDeployStepsOut(steps)
+				out.Body.BuilderImage = row.BuilderImage
+				out.Body.Outputs = outputsOrEmpty(row.Outputs)
+				out.Body.DetectedPreset = row.DetectedPreset
 				out.Body.Version = int(row.Version)
 				out.Body.UpdatedBy = row.UpdatedBy
 				out.Body.UpdatedAt = &row.UpdatedAt
@@ -143,6 +176,11 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				out.Body.Mode = "auto"
 				out.Body.Preset = preset
 				out.Body.Steps = toDeployStepsOut(deploy.PresetSteps(preset))
+				out.Body.BuilderImage = deploy.PresetBuilderImage(preset)
+				out.Body.Outputs = deploy.PresetOutputs(preset)
+				if out.Body.Outputs == nil {
+					out.Body.Outputs = []string{}
+				}
 				out.Body.Version = 0
 			default:
 				return huma.Error500InternalServerError("could not read the deploy configuration")
@@ -159,9 +197,11 @@ func (d *deps) registerDeployConfig(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
-			Mode   string         `json:"mode" enum:"auto,fast,full"`
-			Preset string         `json:"preset" maxLength:"32"`
-			Steps  []DeployStepIn `json:"steps"`
+			Mode         string         `json:"mode" enum:"auto,fast,full"`
+			Preset       string         `json:"preset" maxLength:"32"`
+			Steps        []DeployStepIn `json:"steps"`
+			BuilderImage string         `json:"builder_image,omitempty" maxLength:"200"`
+			Outputs      []string       `json:"outputs,omitempty" maxItems:"32"`
 		}
 	}) (*putOut, error) {
 		out := &putOut{}
@@ -179,10 +219,21 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			if err := checkDeploySteps(in.Body.Steps); err != nil {
 				return err
 			}
+			if err := checkDeployOutputs(in.Body.Outputs); err != nil {
+				return err
+			}
 			steps := fromDeployStepsIn(in.Body.Steps)
 			raw, err := json.Marshal(steps)
 			if err != nil {
 				return huma.Error422UnprocessableEntity("the steps could not be encoded")
+			}
+			outputs := in.Body.Outputs
+			if outputs == nil {
+				outputs = []string{}
+			}
+			outputsRaw, err := json.Marshal(outputs)
+			if err != nil {
+				return huma.Error422UnprocessableEntity("the outputs could not be encoded")
 			}
 
 			existing, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
@@ -199,6 +250,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			userID := id.ID
 			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 				AppID: a.ID, TeamID: m.TeamID, Mode: in.Body.Mode, Preset: in.Body.Preset, Steps: string(raw),
+				BuilderImage: in.Body.BuilderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -214,6 +266,9 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			out.Body.Mode = row.Mode
 			out.Body.Preset = row.Preset
 			out.Body.Steps = toDeployStepsOut(steps)
+			out.Body.BuilderImage = row.BuilderImage
+			out.Body.Outputs = outputsOrEmpty(row.Outputs)
+			out.Body.DetectedPreset = row.DetectedPreset
 			out.Body.Version = int(row.Version)
 			out.Body.UpdatedBy = row.UpdatedBy
 			out.Body.UpdatedAt = &row.UpdatedAt
@@ -289,13 +344,16 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			nextVersion := int32(1)
 			if err == nil {
 				nextVersion = existing.Version + 1
-			} else if !errors.Is(err, sql.ErrNoRows) {
+			} else if errors.Is(err, sql.ErrNoRows) {
+				existing.Outputs = "[]"
+			} else {
 				return huma.Error500InternalServerError("could not read the deploy configuration")
 			}
 
 			userID := id.ID
 			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 				AppID: a.ID, TeamID: m.TeamID, Mode: target.Mode, Preset: target.Preset, Steps: target.Steps,
+				BuilderImage: existing.BuilderImage, Outputs: existing.Outputs, DetectedPreset: existing.DetectedPreset,
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -313,6 +371,9 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			out.Body.Mode = row.Mode
 			out.Body.Preset = row.Preset
 			out.Body.Steps = toDeployStepsOut(steps)
+			out.Body.BuilderImage = row.BuilderImage
+			out.Body.Outputs = outputsOrEmpty(row.Outputs)
+			out.Body.DetectedPreset = row.DetectedPreset
 			out.Body.Version = int(row.Version)
 			out.Body.UpdatedBy = row.UpdatedBy
 			out.Body.UpdatedAt = &row.UpdatedAt
@@ -333,8 +394,41 @@ func (d *deps) registerDeployConfig(api huma.API) {
 		out := &presetsOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(_ *db.Queries, _ *sql.Tx, _ *auth.Identity, _ *tenancy.Membership) error {
 			for _, p := range deploy.Presets {
-				out.Body.Presets = append(out.Body.Presets, DeployPresetOut{Preset: p, Steps: toDeployStepsOut(deploy.PresetSteps(p))})
+				outputs := deploy.PresetOutputs(p)
+				if outputs == nil {
+					outputs = []string{}
+				}
+				out.Body.Presets = append(out.Body.Presets, DeployPresetOut{
+					Preset: p, Steps: toDeployStepsOut(deploy.PresetSteps(p)),
+					BuilderImage: deploy.PresetBuilderImage(p), Outputs: outputs,
+				})
 			}
+			return nil
+		})
+		return out, err
+	})
+
+	type detectOut struct{ Body DeployPresetOut }
+	huma.Register(api, huma.Operation{OperationID: "detect-app-deploy-preset", Method: http.MethodGet, Path: basePath + "/detect", Tags: tags,
+		Summary: "The preset last detected from the app's own repository files (MH-573 A7b: a Dockerfile at the root, or the deploy " +
+			"pipeline's marker files, seen the last time a build ran there) with its default steps, builder image and outputs — a " +
+			"suggestion to apply, not a saved configuration. Any member.",
+	}, func(ctx context.Context, in *AppPath) (*detectOut, error) {
+		out := &detectOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			preset := deploy.DetectPreset(nil)
+			if row, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID}); err == nil && row.DetectedPreset != "" {
+				preset = row.DetectedPreset
+			}
+			outputs := deploy.PresetOutputs(preset)
+			if outputs == nil {
+				outputs = []string{}
+			}
+			out.Body = DeployPresetOut{Preset: preset, Steps: toDeployStepsOut(deploy.PresetSteps(preset)), BuilderImage: deploy.PresetBuilderImage(preset), Outputs: outputs}
 			return nil
 		})
 		return out, err

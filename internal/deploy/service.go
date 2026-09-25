@@ -527,10 +527,26 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 		cfg, err = q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
 		return err
 	})
-	fbSteps, reason, ok := fastBuildSteps(cfg.Steps, cfgErr)
-	if !ok {
-		r.downgradeTrack(ctx, reason)
-		return false, nil
+	mode := FastBuildMode(cfg.Preset, cfg.BuilderImage)
+	var fbSteps []agentproto.FastBuildStep
+	if mode != agentproto.FastModeDockerfile {
+		// The dockerfile mode needs no install/build/migrate steps at all — it builds the
+		// checkout's own Dockerfile — so a missing/unreadable deploy script config only blocks
+		// the builder and runtime modes.
+		var reason string
+		var ok bool
+		fbSteps, reason, ok = fastBuildSteps(cfg.Steps, cfgErr)
+		if !ok {
+			r.downgradeTrack(ctx, reason)
+			return false, nil
+		}
+	}
+	var outputs []string
+	if mode == agentproto.FastModeBuilder {
+		if err := json.Unmarshal([]byte(cfg.Outputs), &outputs); err != nil || len(outputs) == 0 {
+			r.downgradeTrack(ctx, "no outputs configured for the builder image")
+			return false, nil
+		}
 	}
 	box, err := r.envBox(ctx, "fast_build")
 	if err != nil {
@@ -539,7 +555,8 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 	var res agentproto.FastBuildResult
 	if err := r.op(ctx, "build", agentproto.KindAppFastBuild, agentproto.FastBuildParams{
 		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, GitSource: src,
-		Image: image, BaseImage: r.live.Image, Steps: fbSteps, Env: box,
+		Image: image, BaseImage: r.live.Image, Mode: mode, Steps: fbSteps,
+		BuilderImage: cfg.BuilderImage, Outputs: outputs, Env: box,
 	}, &res); err != nil {
 		return false, fmt.Errorf("fast build: %w", err)
 	}
@@ -552,11 +569,26 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 		r.downgradeTrack(ctx, reason)
 		return false, nil
 	}
+	r.notePreset(ctx, res.DetectedFiles)
 	*built = agentproto.BuildResult{
 		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast"},
 		Image:        res.Image, ImageID: res.ImageID,
 	}
 	return true, nil
+}
+
+// notePreset (MH-573 A7b) persists the preset DetectPreset sees in the checkout's own files, best
+// effort — a fast build's outcome should never fail because the detected preset could not be saved.
+func (r *runner) notePreset(ctx context.Context, files []string) {
+	if len(files) == 0 {
+		return
+	}
+	preset := DetectPreset(files)
+	_ = r.tx(ctx, func(q *db.Queries) error {
+		return q.SetAppDeployConfigDetectedPreset(ctx, db.SetAppDeployConfigDetectedPresetParams{
+			AppID: r.app.ID, TeamID: r.dep.TeamID, DetectedPreset: preset,
+		})
+	})
 }
 
 // fastBuildBlockedByRelease reports whether the fast track cannot apply because there is no
@@ -662,6 +694,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
 		}
+		r.notePreset(ctx, built.Files)
 	}
 	runtime := built.Runtime
 	if built.Provider != "" {

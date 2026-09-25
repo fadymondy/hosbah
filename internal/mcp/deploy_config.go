@@ -82,8 +82,34 @@ func DeployConfigTools() []Tool {
 		return out, nil
 	}
 
-	saveConfig := func(ctx context.Context, env *Env, a db.App, mode, preset string, steps []deploy.DeployStep) (db.AppDeployConfig, error) {
+	parseOutputs := func(raw any) ([]string, error) {
+		if raw == nil {
+			return nil, nil
+		}
+		list, ok := raw.([]any)
+		if !ok {
+			return nil, errors.New("outputs must be a list of paths")
+		}
+		out := make([]string, 0, len(list))
+		for _, item := range list {
+			s, ok := item.(string)
+			if !ok || s == "" || strings.Contains(s, "..") || strings.HasPrefix(s, "/") {
+				return nil, fmt.Errorf("bad output path %v", item)
+			}
+			out = append(out, s)
+		}
+		return out, nil
+	}
+
+	saveConfig := func(ctx context.Context, env *Env, a db.App, mode, preset string, steps []deploy.DeployStep, builderImage string, outputs []string) (db.AppDeployConfig, error) {
 		raw, err := json.Marshal(steps)
+		if err != nil {
+			return db.AppDeployConfig{}, err
+		}
+		if outputs == nil {
+			outputs = []string{}
+		}
+		outputsRaw, err := json.Marshal(outputs)
 		if err != nil {
 			return db.AppDeployConfig{}, err
 		}
@@ -99,6 +125,7 @@ func DeployConfigTools() []Tool {
 		userID := env.Caller.UserID
 		row, err := env.Q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 			AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: string(raw),
+			BuilderImage: builderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
 			Version: nextVersion, UpdatedBy: &userID,
 		})
 		if err != nil {
@@ -145,9 +172,15 @@ func DeployConfigTools() []Tool {
 			Description: "Save an app's deploy script configuration (replaces the whole pipeline) and append it to the version history. " +
 				"Deployer, admin or owner.",
 			InputSchema: schema([]string{"app", "mode", "steps"}, map[string]any{"app": appArg,
-				"mode":   map[string]any{"type": "string", "enum": []string{"auto", "fast", "full"}},
-				"preset": str("A stack name (go, node, next, laravel, php, python, static); freeform"),
-				"steps":  stepSchema}),
+				"mode":          map[string]any{"type": "string", "enum": []string{"auto", "fast", "full"}},
+				"preset":        str("A stack name (go, node, next, laravel, php, python, static, dockerfile); freeform"),
+				"steps":         stepSchema,
+				"builder_image": str("Advanced, fast track: the image install/build/migrate steps run in when the app has no Dockerfile (e.g. golang:1.26, node:24). Empty = the fast track falls back to running in place."),
+				"outputs": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string"},
+					"description": "Advanced, fast track: paths (relative to the checkout) copied onto the runtime image once the builder image's steps ran. Required with builder_image.",
+				}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
 					return "", err
@@ -164,7 +197,11 @@ func DeployConfigTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				row, err := saveConfig(ctx, env, a, mode, args.Str("preset"), steps)
+				outputs, err := parseOutputs(args["outputs"])
+				if err != nil {
+					return "", err
+				}
+				row, err := saveConfig(ctx, env, a, mode, args.Str("preset"), steps, args.Str("builder_image"), outputs)
 				if err != nil {
 					return "", err
 				}
@@ -220,7 +257,13 @@ func DeployConfigTools() []Tool {
 				if err := json.Unmarshal([]byte(target.Steps), &steps); err != nil {
 					return "", err
 				}
-				row, err := saveConfig(ctx, env, a, target.Mode, target.Preset, steps)
+				var builderImage string
+				var outputs []string
+				if existing, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID}); err == nil {
+					builderImage = existing.BuilderImage
+					_ = json.Unmarshal([]byte(existing.Outputs), &outputs)
+				}
+				row, err := saveConfig(ctx, env, a, target.Mode, target.Preset, steps, builderImage, outputs)
 				if err != nil {
 					return "", err
 				}

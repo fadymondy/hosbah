@@ -11,26 +11,30 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 )
 
-// ---- app.fast_build (MH-573 A7) -------------------------------------------------------------
+// ---- app.fast_build (MH-573 A7, redesigned MH-573 A7b) -----------------------------------------
 //
-// The fast track skips a Dockerfile/Railpack rebuild entirely. It keeps a persistent checkout per
-// app under the agent's work dir, fetches the requested ref into it (git, same credentials as
-// app.build/app.detect), and diffs the new commit against the one it last built there. If a
-// build-affecting path changed (agentproto.FullTrackMatch — the same rule deploy.ChooseTrack
-// applies before dispatch), it aborts: the result says so, and the control plane falls back to a
-// full app.build.
+// The fast track skips a from-scratch rebuild, but what "fast" means depends on the app
+// (agentproto.FastBuildParams.Mode, deploy.FastBuildMode):
 //
-// Otherwise it runs the app's own configured install/build/migrate steps as shell, inside a
-// container started from the app's CURRENT live image (BaseImage) — never on the host, so the
-// server needs no language toolchains. The checkout is docker-cp'd into the container (not bind-
-// mounted): a bind mount lives outside the container's own layer, so files a step writes into it
-// would be invisible to `docker commit`. A persistent named volume, mounted at /cache and pointed
-// to by HOME/XDG_CACHE_HOME/GOCACHE/GOMODCACHE/npm_config_cache/COMPOSER_HOME, gives every deploy
-// of the app warm package and build caches without bloating the committed image (a volume is never
-// part of a commit). Once the steps succeed, the container is stopped and `docker commit`ted to
-// the new tag — the simplest way to turn "the base image plus whatever the steps changed on disk"
-// into a new image, without re-deriving a Dockerfile for an app that might not even have one
-// (Railpack apps, imported apps with an inspected image and no build definition at all).
+//   - dockerfile: the app has its own Dockerfile — fastBuildDockerfile runs the exact same build
+//     as app.build, just with BuildKit's local cache kept between deploys instead of thrown away.
+//     Multi-stage Dockerfiles (a golang builder, a node builder, a slim runtime with no toolchain)
+//     work exactly as a full build would, because it IS that build, only warmer.
+//   - builder: no Dockerfile, but a configured builder image (a preset's golang/node/composer/
+//     python image, or a hand-picked one) — fastBuildWithBuilder runs the steps in a throwaway
+//     `docker run` of that image with the checkout bind-mounted, then copies the configured output
+//     paths onto the app's current runtime image with a generated `FROM <base>\nCOPY …` build. The
+//     runtime image itself never needs a toolchain, so this also fixes multi-stage Dockerfile apps
+//     once they get a matching builder_image/outputs configuration instead of a Dockerfile.
+//   - runtime: the original MH-573 A7 behaviour, kept as the fallback for an app with neither a
+//     Dockerfile nor a builder image configured (nothing to build, e.g. static) —
+//     fastBuildInRuntime runs the steps directly inside BaseImage and `docker commit`s the result.
+//
+// Every mode keeps a persistent checkout per app under the agent's work dir (fetches the requested
+// ref, same credentials as app.build/app.detect) and diffs the new commit against the one last
+// built there. If a build-affecting path changed (agentproto.FullTrackMatch — the same rule
+// deploy.ChooseTrack applies before dispatch), it aborts before running any mode: the result says
+// so, and the control plane falls back to a full app.build.
 
 // fastCheckoutDir is where a persistent, per-app checkout lives (kept between deploys, unlike
 // app.build's and app.detect's one-shot dirs under builds/ and detect/).
@@ -45,6 +49,9 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, 2, err
 	}
+	if p.Mode == "" {
+		p.Mode = agentproto.FastModeRuntime // an old control plane that predates the mode field
+	}
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
@@ -58,6 +65,7 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, code, err
 	}
+	files := topLevelFiles(dir)
 
 	var changed []string
 	if prevCommit != "" && prevCommit != commit {
@@ -74,13 +82,125 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	if path, ok := agentproto.FullTrackMatch(changed); ok {
 		oc.Info("%s changed — a full rebuild is required", path)
 		return agentproto.FastBuildResult{Commit: commit, PrevCommit: prevCommit, Message: msg, Changed: changed,
-			Aborted: true, AbortPath: path, AbortReason: path + " changed"}, 0, nil
+			Aborted: true, AbortPath: path, AbortReason: path + " changed", DetectedFiles: files}, 0, nil
 	}
 	oc.Progress(2, 5)
 
+	var image, imageID string
+	switch p.Mode {
+	case agentproto.FastModeDockerfile:
+		image, imageID, code, err = fastBuildDockerfile(oc, p, dir)
+	case agentproto.FastModeBuilder:
+		image, imageID, code, err = fastBuildWithBuilder(oc, p, dir)
+	default: // FastModeRuntime
+		image, imageID, code, err = fastBuildInRuntime(oc, p, dir)
+	}
+	if err != nil {
+		return nil, code, err
+	}
+	oc.Progress(5, 5)
+
+	return agentproto.FastBuildResult{Commit: commit, PrevCommit: prevCommit, Message: msg, Changed: changed,
+		Image: image, ImageID: imageID, DetectedFiles: files}, 0, nil
+}
+
+// fastBuildDockerfile (MH-573 A7b) is the fast track for an app with a Dockerfile: the exact image
+// a full build would produce, just with BuildKit's own cache reused from a persistent local
+// directory instead of thrown away, so an unchanged base layer never rebuilds. Kept as a normal
+// `docker build`/buildx invocation, not app.build's — app.build always ran without --cache-to/from,
+// and keeps doing so, so `full` stays a from-scratch, cache-free rebuild by design.
+func fastBuildDockerfile(oc *OpContext, p agentproto.FastBuildParams, dir string) (image, imageID string, code int, err error) {
+	if exec.CommandContext(oc.Ctx, "docker", "buildx", "version").Run() != nil { //#nosec G204 -- fixed argv
+		return "", "", 1, errors.New("docker buildx is missing — run the build.tools provisioning step")
+	}
+	cacheDir := filepath.Join(workRoot, "apps", p.App, "buildcache")
+	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+		return "", "", 1, err
+	}
+	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
+	args := append([]string{"buildx", "build", "--progress=plain", "--load", "-t", p.Image},
+		"--cache-from", "type=local,src="+cacheDir, "--cache-to", "type=local,dest="+cacheDir+",mode=max")
+	args = append(args, labels...)
+	args = append(args, "-f", filepath.Join(dir, "Dockerfile"), dir)
+	oc.Progress(3, 5)
+	if code, err := oc.RunEnv([]string{"DOCKER_BUILDKIT=1"}, "docker", args...); err != nil {
+		return "", "", code, errors.New("the cached build failed — see the log above; the live release is untouched")
+	}
+	oc.Progress(4, 5)
+	id, _ := execOutput(oc, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image)
+	return p.Image, strings.TrimSpace(id), 0, nil
+}
+
+// fastBuildWithBuilder (MH-573 A7b) is the fast track for an app with no Dockerfile but a
+// configured builder image: the steps run in a `docker run` of BuilderImage with the checkout
+// bind-mounted (so their output lands back on disk, unlike app.fast_build's original docker-cp —
+// there is no live container to commit here), then Outputs are layered onto BaseImage with a
+// generated `FROM <base>\nCOPY …` build. The runtime image never needs the builder's toolchain.
+func fastBuildWithBuilder(oc *OpContext, p agentproto.FastBuildParams, dir string) (image, imageID string, code int, err error) {
+	cache := fastCacheVolume(p.App)
 	env, err := oc.OpenEnv(agentproto.EnvContext(p.AppID, p.DeploymentID, "fast_build"), p.Env)
 	if err != nil {
-		return nil, 2, err
+		return "", "", 2, err
+	}
+	runArgs := []string{"run", "--rm", "-v", dir + ":/app", "-w", "/app", "-v", cache + ":/cache",
+		"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
+		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer"}
+	for k, v := range env {
+		runArgs = append(runArgs, "-e", k+"="+v)
+	}
+	oc.Progress(3, 5)
+	stepErr, stepCode := runFastSteps(p.Steps, func(args ...string) (int, error) {
+		full := append(append([]string{}, runArgs...), p.BuilderImage)
+		full = append(full, args...) // args is always ["sh", "-c", run]
+		return oc.Run("docker", full...)
+	}, oc.Info)
+	if stepErr != nil {
+		return "", "", stepCode, stepErr
+	}
+	oc.Progress(4, 5)
+
+	genDir, err := os.MkdirTemp("", "hosbah-fastbuild-*")
+	if err != nil {
+		return "", "", 1, err
+	}
+	defer os.RemoveAll(genDir)
+	dockerfile := "FROM " + p.BaseImage + "\n"
+	for _, o := range p.Outputs {
+		dockerfile += "COPY " + fastCopyArgs(o) + "\n"
+	}
+	dockerfilePath := filepath.Join(genDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(dockerfile), 0o600); err != nil {
+		return "", "", 1, err
+	}
+	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
+	args := append([]string{"build", "--progress=plain", "-t", p.Image, "-f", dockerfilePath}, labels...)
+	args = append(args, dir)
+	if code, err := oc.RunEnv([]string{"DOCKER_BUILDKIT=1"}, "docker", args...); err != nil {
+		return "", "", code, errors.New("could not layer the build output onto the runtime image")
+	}
+	id, _ := execOutput(oc, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image)
+	return p.Image, strings.TrimSpace(id), 0, nil
+}
+
+// fastCopyArgs turns one output path into a `COPY <src> <dest>` pair (relative to the checkout,
+// which is also the generated Dockerfile's build context): the same relative path in the image,
+// under /app — the working directory app.build's own Dockerfile-mode images already use by
+// convention. "." copies the whole checkout.
+func fastCopyArgs(out string) string {
+	if out == "." {
+		return ". /app/"
+	}
+	clean := strings.TrimPrefix(out, "/")
+	return clean + " /app/" + clean
+}
+
+// fastBuildInRuntime is the original MH-573 A7 fast track: the steps run inside a container started
+// from BaseImage with the checkout docker-cp'd in, then the container is committed — the fallback
+// for an app with no Dockerfile and no configured builder image.
+func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string) (image, imageID string, code int, err error) {
+	env, err := oc.OpenEnv(agentproto.EnvContext(p.AppID, p.DeploymentID, "fast_build"), p.Env)
+	if err != nil {
+		return "", "", 2, err
 	}
 	ctr := agentproto.NamePrefix + "fastbuild-" + p.App
 	cache := fastCacheVolume(p.App)
@@ -94,17 +214,17 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	}
 	createArgs = append(createArgs, p.BaseImage, "tail", "-f", "/dev/null")
 	if code, err := dockerStep(oc, createArgs...); err != nil {
-		return nil, code, fmt.Errorf("could not create the build container from %s", p.BaseImage)
+		return "", "", code, fmt.Errorf("could not create the build container from %s", p.BaseImage)
 	}
 	defer func() { _, _ = dockerStep(oc, "rm", "-f", ctr) }()
 	if code, err := dockerStep(oc, "start", ctr); err != nil {
-		return nil, code, errors.New("could not start the build container")
+		return "", "", code, errors.New("could not start the build container")
 	}
 	if code, err := dockerStep(oc, "exec", ctr, "mkdir", "-p", "/app"); err != nil {
-		return nil, code, err
+		return "", "", code, err
 	}
 	if code, err := oc.Run("docker", "cp", dir+"/.", ctr+":/app"); err != nil {
-		return nil, code, errors.New("could not copy the checkout into the build container")
+		return "", "", code, errors.New("could not copy the checkout into the build container")
 	}
 	oc.Progress(3, 5)
 
@@ -112,21 +232,18 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 		return oc.Run("docker", append([]string{"exec", "-w", "/app", ctr}, args...)...)
 	}, oc.Info)
 	if stepErr != nil {
-		return nil, code, stepErr
+		return "", "", code, stepErr
 	}
 	oc.Progress(4, 5)
 
 	if code, err := dockerStep(oc, "stop", ctr); err != nil {
-		return nil, code, errors.New("could not stop the build container")
+		return "", "", code, errors.New("could not stop the build container")
 	}
 	if code, err := dockerStep(oc, "commit", ctr, p.Image); err != nil {
-		return nil, code, errors.New("could not commit the new image")
+		return "", "", code, errors.New("could not commit the new image")
 	}
 	id, _ := execOutput(oc, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image)
-	oc.Progress(5, 5)
-
-	return agentproto.FastBuildResult{Commit: commit, PrevCommit: prevCommit, Message: msg, Changed: changed,
-		Image: p.Image, ImageID: strings.TrimSpace(id)}, 0, nil
+	return p.Image, strings.TrimSpace(id), 0, nil
 }
 
 // runFastSteps runs an app's enabled install/build/migrate steps in order (each `sh -c <run>`,

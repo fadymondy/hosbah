@@ -70,6 +70,58 @@ func TestFastBuildParamsValidate(t *testing.T) {
 	}
 }
 
+// TestFastBuildParamsValidateModes (MH-573 A7b): each mode has its own required fields.
+func TestFastBuildParamsValidateModes(t *testing.T) {
+	base := FastBuildParams{
+		AppID: "0195c2ee-7b1a-7000-8000-000000000001", App: "demo", DeploymentID: "0195c2ee-7b1a-7000-8000-000000000002",
+		Image: ImageRepo("demo") + ":0195c2ee-7b1a-7000-8000-000000000002",
+	}
+	dockerfile := base
+	dockerfile.Mode = FastModeDockerfile
+	if err := dockerfile.Validate(); err != nil {
+		t.Fatalf("dockerfile mode needs no base image: %v", err)
+	}
+
+	builder := base
+	builder.Mode = FastModeBuilder
+	builder.BaseImage = ImageRepo("demo") + ":old"
+	if err := builder.Validate(); err == nil {
+		t.Fatal("builder mode without a builder image must not validate")
+	}
+	builder.BuilderImage = "golang:1.26"
+	if err := builder.Validate(); err == nil {
+		t.Fatal("builder mode without outputs must not validate")
+	}
+	builder.Outputs = []string{"app"}
+	if err := builder.Validate(); err != nil {
+		t.Fatalf("a well-formed builder mode must validate: %v", err)
+	}
+	builder.Outputs = []string{"../escape"}
+	if err := builder.Validate(); err == nil {
+		t.Fatal("an output path with .. must not validate")
+	}
+	builder.Outputs = []string{"/abs"}
+	if err := builder.Validate(); err == nil {
+		t.Fatal("an absolute output path must not validate")
+	}
+
+	runtime := base
+	runtime.Mode = FastModeRuntime
+	if err := runtime.Validate(); err == nil {
+		t.Fatal("runtime mode without a base image must not validate")
+	}
+	runtime.BaseImage = ImageRepo("demo") + ":old"
+	if err := runtime.Validate(); err != nil {
+		t.Fatalf("a well-formed runtime mode must validate: %v", err)
+	}
+
+	bad := base
+	bad.Mode = "sideways"
+	if err := bad.Validate(); err == nil {
+		t.Fatal("an unknown mode must not validate")
+	}
+}
+
 func TestFullTrackMatch(t *testing.T) {
 	if _, ok := FullTrackMatch(nil); ok {
 		t.Fatal("no changed paths must not match")

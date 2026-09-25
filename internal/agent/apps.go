@@ -172,6 +172,7 @@ func gitOut(oc *OpContext, dir string, args ...string) (string, error) {
 // pre-rename cloudy.toml — is returned raw for the control plane to parse.
 func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
+	r.Files = topLevelFiles(src)
 	for _, name := range []string{"hosbah.toml", "cloudy.toml"} {
 		b, err := os.ReadFile(filepath.Join(src, name)) //#nosec G304 -- inside our checkout
 		if err != nil {
@@ -213,6 +214,20 @@ func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, e
 		oc.Info("build: Railpack, detected %s", r.Provider)
 	}
 	return r, 0, nil
+}
+
+// topLevelFiles lists a checkout's root entries (files and directories), for deploy.DetectPreset —
+// best-effort: an unreadable directory just yields no files, never a build failure.
+func topLevelFiles(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, e.Name())
+	}
+	return out
 }
 
 // readRailpackInfo pulls the detected provider and start command out of Railpack's outputs. It

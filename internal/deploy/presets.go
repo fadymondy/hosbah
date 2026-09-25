@@ -14,17 +14,55 @@ without a build ever having to run.
 
 // PresetGo, PresetNode, ... name the presets a deploy configuration may pick.
 const (
-	PresetGo      = "go"
-	PresetNode    = "node"
-	PresetNext    = "next"
-	PresetLaravel = "laravel"
-	PresetPHP     = "php"
-	PresetPython  = "python"
-	PresetStatic  = "static"
+	PresetDockerfile = "dockerfile"
+	PresetGo         = "go"
+	PresetNode       = "node"
+	PresetNext       = "next"
+	PresetLaravel    = "laravel"
+	PresetPHP        = "php"
+	PresetPython     = "python"
+	PresetStatic     = "static"
 )
 
 // Presets is every preset name, in the order DetectPreset tries them.
-var Presets = []string{PresetNext, PresetLaravel, PresetPHP, PresetNode, PresetGo, PresetPython, PresetStatic}
+var Presets = []string{PresetDockerfile, PresetNext, PresetLaravel, PresetPHP, PresetNode, PresetGo, PresetPython, PresetStatic}
+
+// PresetBuilderImage is a preset's default fast-track builder image (MH-573 A7b): the image the
+// install/build/migrate steps run in when the app has no Dockerfile. dockerfile and static presets
+// need none — dockerfile's fast track is a cached `docker build`, static has nothing to build.
+func PresetBuilderImage(preset string) string {
+	switch preset {
+	case PresetGo:
+		return "golang:1.26"
+	case PresetNode, PresetNext:
+		return "node:24"
+	case PresetLaravel, PresetPHP:
+		return "composer:2"
+	case PresetPython:
+		return "python:3.13"
+	default:
+		return ""
+	}
+}
+
+// PresetOutputs is a preset's default fast-track outputs (MH-573 A7b): paths, relative to the
+// checkout, copied from the builder image onto the app's current runtime image once the steps ran.
+func PresetOutputs(preset string) []string {
+	switch preset {
+	case PresetGo:
+		return []string{"app"}
+	case PresetNode:
+		return []string{"."} // no separate build output — the whole checkout plus node_modules
+	case PresetNext:
+		return []string{".next", "public", "node_modules", "package.json"}
+	case PresetLaravel, PresetPHP:
+		return []string{"."} // vendor/ plus the app itself
+	case PresetPython:
+		return []string{"."}
+	default:
+		return nil
+	}
+}
 
 // DeployStep is one step of a deploy configuration's pipeline.
 type DeployStep struct {
@@ -139,6 +177,8 @@ func DetectPreset(files []string) string {
 	}
 
 	switch {
+	case has("Dockerfile"):
+		return PresetDockerfile
 	case hasPrefix("next.config"):
 		return PresetNext
 	case has("artisan"):

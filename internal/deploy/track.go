@@ -23,6 +23,22 @@ const (
 // rule to the changed paths it computes from its cached checkout.
 func fullTrackMatch(changed []string) (string, bool) { return agentproto.FullTrackMatch(changed) }
 
+// FastBuildMode picks the fast track's sub-mode (MH-573 A7b) from the app's deploy configuration:
+// dockerfile builds the checkout's own Dockerfile with a cached `docker build`; builder runs the
+// steps in a separate builder image and copies the outputs onto the current runtime image; runtime
+// is the original MH-573 A7 fallback (steps run directly inside the current runtime image), for an
+// app with no Dockerfile and no configured builder image. Pure, so it is unit-testable without a
+// database or an agent.
+func FastBuildMode(preset, builderImage string) string {
+	if preset == PresetDockerfile {
+		return agentproto.FastModeDockerfile
+	}
+	if builderImage != "" {
+		return agentproto.FastModeBuilder
+	}
+	return agentproto.FastModeRuntime
+}
+
 // ChooseTrack decides a deployment's track. mode is the app's deploy configuration mode
 // (auto | fast | full); changed is the set of paths that differ from the last successful
 // release's commit, or nil when that diff could not be computed; lastOK reports whether the app

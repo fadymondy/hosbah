@@ -92,6 +92,9 @@ type DetectResult struct {
 	LegacyToml string `json:"cloudy_toml,omitempty"`
 	// TomlFile is the file it came from: "hosbah.toml" or "cloudy.toml".
 	TomlFile string `json:"toml_file,omitempty"`
+	// Files is the checkout's top-level file and directory names (MH-573 A7b), for the control
+	// plane to run deploy.DetectPreset against without a second round trip.
+	Files []string `json:"files,omitempty"`
 }
 
 // BuildParams / BuildResult: app.build.
@@ -165,17 +168,34 @@ type FastBuildStep struct {
 	Run  string `json:"run"`
 }
 
-// FastBuildParams / FastBuildResult: app.fast_build. Steps run, in order, inside a container
-// started from BaseImage (the app's current live image) with the fresh checkout copied in; the
-// container is then committed as Image — no BuildKit, no host toolchains.
+// Fast build modes (MH-573 A7b): FastModeDockerfile does a cached `docker build` of the app's own
+// Dockerfile — the exact image a full build would produce, just with a warm layer cache.
+// FastModeBuilder runs the steps in a separate BuilderImage (bind-mounted checkout, no toolchain
+// needed in the runtime image), then copies Outputs onto BaseImage with a generated Dockerfile.
+// FastModeRuntime is the original MH-573 A7 behaviour: the steps run directly inside BaseImage and
+// the container is committed — the fallback for an app with neither a Dockerfile nor a configured
+// builder image (e.g. a static app, or one with nothing to build).
+const (
+	FastModeDockerfile = "dockerfile"
+	FastModeBuilder    = "builder"
+	FastModeRuntime    = "runtime"
+)
+
+// FastBuildParams / FastBuildResult: app.fast_build.
 type FastBuildParams struct {
 	AppID        string `json:"app_id"`
 	App          string `json:"app"`
 	DeploymentID string `json:"deployment_id"`
 	GitSource
-	Image     string          `json:"image"`      // hosbah/<app>:<deployment_id>, the new tag
-	BaseImage string          `json:"base_image"`  // the app's current live image
+	Image     string          `json:"image"`     // hosbah/<app>:<deployment_id>, the new tag
+	BaseImage string          `json:"base_image"` // the app's current live image (builder and runtime modes)
+	Mode      string          `json:"mode"`       // dockerfile | builder | runtime
 	Steps     []FastBuildStep `json:"steps,omitempty"`
+	// BuilderImage and Outputs apply to FastModeBuilder only: the steps run in a container of
+	// BuilderImage with the checkout bind-mounted at /app, then Outputs (paths relative to /app)
+	// are copied onto BaseImage.
+	BuilderImage string   `json:"builder_image,omitempty"`
+	Outputs      []string `json:"outputs,omitempty"`
 	// Env is an EnvBox sealed to this agent, context EnvContext(app, deployment, "fast_build"),
 	// exported to every step (install, build, migrate) — not the release env, which app.release
 	// still seals and opens on its own.
@@ -195,6 +215,9 @@ type FastBuildResult struct {
 	Aborted     bool     `json:"aborted,omitempty"`
 	AbortPath   string   `json:"abort_path,omitempty"`
 	AbortReason string   `json:"abort_reason,omitempty"`
+	// DetectedFiles is the checkout's top-level file names, for the control plane to run
+	// deploy.DetectPreset against and persist as app_deploy_configs.detected_preset.
+	DetectedFiles []string `json:"detected_files,omitempty"`
 }
 
 // Validate checks the fields common to every app op (see StartParams.Validate) plus fast_build's own.
@@ -205,12 +228,34 @@ func (p FastBuildParams) Validate() error {
 	if !IsAppImage(p.App, p.Image) {
 		return fmt.Errorf("image %q is not one of this app's", p.Image)
 	}
-	if p.BaseImage == "" {
-		return errors.New("no base image to build from")
+	switch p.Mode {
+	case FastModeDockerfile:
+		// builds the checkout's own Dockerfile; no base image or steps needed.
+	case FastModeBuilder:
+		if p.BaseImage == "" {
+			return errors.New("no base image to build from")
+		}
+		if p.BuilderImage == "" {
+			return errors.New("no builder image")
+		}
+		if len(p.Outputs) == 0 {
+			return errors.New("no outputs to copy")
+		}
+	case FastModeRuntime, "":
+		if p.BaseImage == "" {
+			return errors.New("no base image to build from")
+		}
+	default:
+		return fmt.Errorf("bad fast build mode %q", p.Mode)
 	}
 	for _, st := range p.Steps {
 		if st.Key != "" && !stepKeyRE.MatchString(st.Key) {
 			return fmt.Errorf("bad step key %q", st.Key)
+		}
+	}
+	for _, o := range p.Outputs {
+		if strings.TrimSpace(o) == "" || strings.Contains(o, "..") || strings.HasPrefix(o, "/") {
+			return fmt.Errorf("bad output path %q", o)
 		}
 	}
 	return nil

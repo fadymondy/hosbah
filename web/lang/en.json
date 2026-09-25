@@ -1640,7 +1640,17 @@
       "restore": "Restore",
       "restoreConfirmTitle": "Restore this version?",
       "restoreConfirmBody": "Restoring version {version} makes it the current deploy script, and adds a new version to the history.",
-      "restoreConfirmAction": "Restore"
+      "restoreConfirmAction": "Restore",
+      "detect": "Detect",
+      "detectedAs": "Last detected as {preset}",
+      "detected": "Detected {preset} — review and save",
+      "advanced": "Advanced (fast track)",
+      "advancedHint": "For an app with no Dockerfile: run the pipeline steps in a separate builder image, then copy the outputs onto the current runtime image. Leave the builder image empty to run the steps in place instead.",
+      "builderImage": "Builder image",
+      "outputs": "Outputs",
+      "outputsHint": "Paths, relative to the checkout, copied onto the runtime image once the builder image's steps ran.",
+      "addOutput": "Add output",
+      "removeOutput": "Remove output"
     },
     "nav": {
       "label": "Site sections",
