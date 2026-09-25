@@ -26,6 +26,7 @@ export const SERVER_TABS = [
   "terminal",
   "operations",
   "services",
+  "security",
   "settings",
 ] as const
 export type ServerTab = (typeof SERVER_TABS)[number]

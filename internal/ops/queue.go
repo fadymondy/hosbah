@@ -98,6 +98,12 @@ func Timeout(kind string) time.Duration {
 		return 30 * time.Second
 	case agentproto.KindServiceAction:
 		return 2 * time.Minute
+	case agentproto.KindFirewallApply, agentproto.KindFirewallStatus:
+		return 2 * time.Minute
+	case agentproto.KindFail2banInstall:
+		return 5 * time.Minute // a first install pulls a package
+	case agentproto.KindFail2banBanned, agentproto.KindFail2banUnban:
+		return 30 * time.Second
 	}
 	return 10 * time.Minute
 }

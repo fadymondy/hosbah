@@ -63,6 +63,8 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerDatabases(api)
 	d.registerResources(api)
 	d.registerProxyHosts(api)
+	d.registerFirewall(api)
+	d.registerFail2ban(api)
 	d.registerTunnels(api)
 	d.registerGitHub(api)
 	d.registerGitHubApp(api)
