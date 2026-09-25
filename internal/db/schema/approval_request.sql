@@ -39,9 +39,11 @@ ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check
 -- 'site_template' (added MH-576 B11): deleting a team site template.
 -- 'product', 'product_instance' (added MH-576 D7): deleting a SaaS product and destroying one of
 -- its instances.
+-- 'ssh_key' (added MH-578 C10): removing a team SSH key from the library, or installing/uninstalling
+-- one on a server's authorized_keys.
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_resource_type_check
   CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member', 'team', 'log_drain',
-    'script', 'script_run', 'service', 'site_template', 'product', 'product_instance'));
+    'script', 'script_run', 'service', 'site_template', 'product', 'product_instance', 'ssh_key'));
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_decided_check
   CHECK ((status IN ('pending', 'expired')) = (decided_by IS NULL));
 CREATE UNIQUE INDEX approval_requests_id_team_key ON approval_requests (id, team_id);

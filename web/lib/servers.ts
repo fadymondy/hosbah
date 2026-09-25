@@ -352,3 +352,60 @@ export type Fail2banInstallResult = { installed: boolean; active: boolean }
 
 /** GET .../servers/{server}/fail2ban/banned: the sshd jail's currently banned IPs, read live. */
 export type Fail2banBannedResult = { jail: string; active: boolean; banned: string[] }
+/** One hostname's last TLS reading (GET /api/teams/{team}/certificates), MH-580 J6. */
+export type SSLCertificate = {
+  id: string
+  hostname: string
+  source: "app" | "proxy"
+  ok: boolean
+  issuer?: string
+  not_before?: string
+  not_after?: string
+  days_left?: number
+  san_match: boolean
+  error?: string
+  last_checked_at?: string
+}
+
+/** One upgradable package (part of UpdateStatus.packages). */
+export type PkgInfo = {
+  name: string
+  current?: string
+  candidate?: string
+}
+
+/** A server's last known package/update state (GET .../servers/{server}/updates), MH-578 C8. */
+export type UpdateStatus = {
+  server_id: string
+  os_family: string
+  package_manager: string
+  upgradable_count: number
+  packages: PkgInfo[]
+  reboot_required: boolean
+  auto_security_updates: boolean
+  auto_supported: boolean
+  last_checked_at?: string
+  last_upgraded_at?: string
+  last_error?: string
+}
+
+/** A team SSH key (GET /api/teams/{team}/ssh-keys), MH-578 C10. Never a private key. */
+export type SSHKey = {
+  id: string
+  name: string
+  key_type: string
+  public_key: string
+  fingerprint: string
+  created_by: string
+  created_at: string
+}
+
+/** One (server, unix user) install record of a team SSH key. */
+export type SSHKeyInstall = {
+  server_id: string
+  unix_user: string
+  status: "installed" | "removed" | "failed"
+  last_error?: string
+  installed_at?: string
+  removed_at?: string
+}

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 
 import { ServerAppearance } from "@/components/server-tabs/appearance"
+import { ServerUpdates } from "@/components/server-tabs/updates"
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedServer } from "@/components/server-tabs/context"
@@ -22,6 +23,7 @@ export default function ServerSettingsTab() {
   return (
     <>
       <ServerAppearance key={server.id} manage={manage} />
+      <ServerUpdates key={server.id} manage={manage} />
       <SectionTitle title={t("servers.tabs.danger")} />
       {manage ? (
         <div className="flex justify-end border-b border-line px-6 py-5">

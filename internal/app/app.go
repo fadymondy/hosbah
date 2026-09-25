@@ -66,6 +66,9 @@ type App struct {
 	// Scripts is the *scripts.Service (typed any for the same reason): MH-576 D4/D5 the team script
 	// library, the built-in one-click installs, and running either on one or many servers.
 	Scripts any
+	// CertCheck is the *certcheck.Service (typed any for the same reason): MH-580 J6 the TLS
+	// certificate expiry sweep over every team's app domains and proxy hosts.
+	CertCheck any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

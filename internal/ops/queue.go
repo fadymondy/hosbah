@@ -108,6 +108,14 @@ func Timeout(kind string) time.Duration {
 		return 5 * time.Minute // a first install pulls a package
 	case agentproto.KindFail2banBanned, agentproto.KindFail2banUnban:
 		return 30 * time.Second
+	case agentproto.KindPkgList:
+		return 3 * time.Minute // apt-get update + list/check-update
+	case agentproto.KindPkgUpgrade:
+		return 30 * time.Minute
+	case agentproto.KindPkgAutoupdateSet:
+		return 3 * time.Minute
+	case agentproto.KindSSHKeyInstall, agentproto.KindSSHKeyUninstall:
+		return time.Minute
 	}
 	return 10 * time.Minute
 }
