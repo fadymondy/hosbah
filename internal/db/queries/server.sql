@@ -130,3 +130,15 @@ WHERE team_id = sqlc.arg('team_id')::text AND id != sqlc.arg('exclude_id')::text
 -- name: ServersWithParent :many
 -- Team scope: every server whose parent_server_id points at the given node (its enrolled guests).
 SELECT * FROM servers WHERE team_id = sqlc.arg('team_id')::text AND parent_server_id = sqlc.arg('parent_server_id')::text;
+
+-- name: ServersDueFactsRefresh :many
+-- System scope: enrolled servers seen recently with no system.info queued or run within the interval,
+-- so the facts refresh loop keeps discovered services and Proxmox guests current.
+SELECT s.id, s.team_id FROM servers s
+WHERE s.status = 'enrolled' AND s.last_seen_at > now() - interval '5 minutes'
+  AND NOT EXISTS (
+    SELECT 1 FROM operations o
+    WHERE o.server_id = s.id AND o.kind = 'system.info'
+      AND o.created_at > now() - make_interval(secs => sqlc.arg('every_seconds')::int)
+  )
+ORDER BY s.id;
