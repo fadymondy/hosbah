@@ -19,6 +19,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterAppApmSettingRoutes(api, a)
 	RegisterAppBrowserRoutes(api, a)
 	RegisterAppBucketRoutes(api, a)
+	RegisterAppEdgeCacheRoutes(api, a)
 	RegisterAppInstallRoutes(api, a)
 	RegisterAppRealtimeRoutes(api, a)
 	RegisterAppRumSettingRoutes(api, a)

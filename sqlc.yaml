@@ -17,6 +17,8 @@ sql:
           repo_url: RepoURL
           # sqlc singularises table names for its models; "canvas" is not a plural.
           app_canva: AppCanvas
+          # sqlc strips the trailing "es" of "caches", giving "cach" instead of "cache".
+          app_edge_cach: AppEdgeCache
         # togo 0.2.31 writes emit_pointers_for_null_types, which sqlc honours only with
         # sql_package pgx/v5. With the postgresql engine on database/sql, nullable
         # columns came out as sql.NullString/NullTime and the generated resources/*.go

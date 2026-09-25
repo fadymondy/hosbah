@@ -420,6 +420,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app_apm_settings": {"app": appA.App.ID, "enabled": true}, "app_endpoints": {"app": appA.App.ID},
 		"app_traces": {"app": appA.App.ID, "method": "GET", "route": "/"}, "app_errors": {"app": appA.App.ID},
 		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
+		"app_cache_settings": {"app": appA.App.ID, "enabled": true}, "app_cache_purge": {"app": appA.App.ID},
 		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)

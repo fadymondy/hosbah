@@ -47,6 +47,9 @@ const routesPath = agentproto.WorkDir + "/routes.json"
 const (
 	caddyHTTP  = "hosbah_http"
 	caddyHTTPS = "hosbah_https"
+	// caddyOrigin (MH-576 D8) is the loopback-only server Varnish always dials; see cacheOriginAddr
+	// in cache.go and the comment above where originRoutes is built in renderCaddy.
+	caddyOrigin = "hosbah_origin"
 )
 
 // accessLogDir is where Caddy writes its JSON access log. It is deliberately NOT under WorkDir
@@ -104,6 +107,10 @@ type routeEntry struct {
 	// Realtime: the app's websocket server (a worker with a published port). Requests of the app's
 	// hostnames whose path starts with Realtime.Path go there instead of Upstream.
 	Realtime *agentproto.RealtimeRoute `json:"realtime,omitempty"`
+	// Cache (MH-576 D8): when set and Enabled, the app's public route dials the shared Varnish
+	// container (cacheVarnishAddr) instead of Upstream directly. Preserved across route.set by
+	// setRoute, which only ever changes Hosts/Upstream/Realtime.
+	Cache *cacheConfig `json:"cache,omitempty"`
 }
 
 // realtimeStreamCloseDelay keeps upgraded (websocket) connections of a realtime route open across
@@ -208,7 +215,7 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	}
 	sort.Strings(ids)
 
-	var httpRoutes, httpsRoutes []any
+	var httpRoutes, httpsRoutes, originRoutes []any
 	var internalHosts, autoHosts []string
 	route := func(id, suffix string, hosts []string, upstream string) map[string]any {
 		return map[string]any{
@@ -245,17 +252,31 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		if rt != nil && rt.Validate() != nil {
 			rt = nil
 		}
+		// The origin server (127.0.0.1:8180, loopback only) always mirrors the app's real upstream,
+		// by the same hostnames, regardless of the cache toggle: it is what Varnish itself dials, so
+		// its backend never needs reconfiguring when a deploy rotates Upstream's ephemeral port —
+		// only this mirror route (re-rendered on every route.set, like the rest of the table) does.
+		if len(e.Hosts) > 0 {
+			originHosts := append(append([]string{}, plain...), secure...)
+			originRoutes = append(originRoutes, route(id, "-origin", originHosts, e.Upstream))
+		}
+		// The public route dials Varnish instead of the app directly once its edge cache is on
+		// (MH-576 D8); Varnish's own backend is always the origin mirror above.
+		dial := e.Upstream
+		if e.Cache != nil && e.Cache.Enabled {
+			dial = cacheVarnishAddr
+		}
 		if len(plain) > 0 {
 			if rt != nil {
 				httpRoutes = append(httpRoutes, realtimeCaddyRoute(id, "-http", plain, *rt))
 			}
-			httpRoutes = append(httpRoutes, route(id, "-http", plain, e.Upstream))
+			httpRoutes = append(httpRoutes, route(id, "-http", plain, dial))
 		}
 		if len(secure) > 0 {
 			if rt != nil {
 				httpsRoutes = append(httpsRoutes, realtimeCaddyRoute(id, "-https", secure, *rt))
 			}
-			httpsRoutes = append(httpsRoutes, route(id, "-https", secure, e.Upstream))
+			httpsRoutes = append(httpsRoutes, route(id, "-https", secure, dial))
 		}
 	}
 	pids := make([]string, 0, len(t.Proxies))
@@ -305,6 +326,10 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			httpsServer["logs"] = map[string]any{"default_logger_name": accessLoggerName}
 		}
 		servers[caddyHTTPS] = httpsServer
+	}
+	if len(originRoutes) > 0 {
+		// No access-log block: the origin mirror is never a request's public entry point.
+		servers[caddyOrigin] = map[string]any{"listen": []string{cacheOriginAddr}, "routes": originRoutes}
 	}
 	apps := map[string]any{"http": map[string]any{"servers": servers}}
 

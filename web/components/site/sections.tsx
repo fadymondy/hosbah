@@ -21,6 +21,7 @@ import {
   RocketIcon,
   ScrollTextIcon,
   WaypointsIcon,
+  ZapIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -55,6 +56,7 @@ export const SITE_SECTIONS: SiteSection[] = [
   { key: "apm", icon: WaypointsIcon, group: "observe", for: "both", ready: true },
   { key: "monitors", icon: BellRingIcon, group: "observe", for: "both", ready: true },
   { key: "proxy", icon: NetworkIcon, group: "network", for: "both", ready: true },
+  { key: "cache", icon: ZapIcon, group: "network", for: "both", ready: true },
   { key: "dns", icon: CloudIcon, group: "network", for: "both", ready: true },
   { key: "backups", icon: ArchiveIcon, group: "manage", for: "both", ready: true },
   { key: "settings", icon: ActivityIcon, group: "manage", for: "both", ready: true },

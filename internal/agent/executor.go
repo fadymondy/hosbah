@@ -114,6 +114,8 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppProcesses:    appProcesses,
 		agentproto.KindAppLimits:       appLimits,
 		agentproto.KindDBLimits:        dbLimits,
+		agentproto.KindCacheSet:        cacheSet,
+		agentproto.KindCachePurge:      cachePurge,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -365,7 +367,8 @@ func laneOf(op agentproto.SignedOp) string {
 		return "host"
 	case agentproto.KindAppBuild, agentproto.KindAppFastBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
 		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove,
-		agentproto.KindRealtimeRoute, agentproto.KindAppProcesses, agentproto.KindAppLimits:
+		agentproto.KindRealtimeRoute, agentproto.KindAppProcesses, agentproto.KindAppLimits,
+		agentproto.KindCacheSet, agentproto.KindCachePurge:
 		var p struct {
 			AppID string `json:"app_id"`
 		}

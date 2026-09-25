@@ -689,7 +689,9 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 			delete(t.Apps, p.AppID)
 			return
 		}
-		t.Apps[p.AppID] = routeEntry{Hosts: p.Hosts, Upstream: p.Upstream, Realtime: p.Realtime}
+		// The cache toggle (MH-576 D8) is set separately (cache.set); route.set must never clear it.
+		prev := t.Apps[p.AppID]
+		t.Apps[p.AppID] = routeEntry{Hosts: p.Hosts, Upstream: p.Upstream, Realtime: p.Realtime, Cache: prev.Cache}
 	})
 	if err != nil {
 		return 1, err
