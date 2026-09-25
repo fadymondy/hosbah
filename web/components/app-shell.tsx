@@ -258,6 +258,7 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
             {t("nav.templates")}
+          </L>
           <L href={`${base}/products`} icon={<PackageIcon />}>
             {t("nav.products")}
           </L>

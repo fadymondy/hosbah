@@ -528,6 +528,7 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_site_templates", nil); strings.Contains(res.Text, templateA.Name) {
 		t.Errorf("list_site_templates as B leaked team A's template: %s", res.Text)
+	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_products", nil); strings.Contains(res.Text, prodA.Name) || strings.Contains(res.Text, prodA.ID) {
 		t.Errorf("list_products as B leaked team A's product: %s", res.Text)
 	}
