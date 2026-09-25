@@ -7,6 +7,7 @@ import { PauseCircleIcon, PlayCircleIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Facts, ListEmpty, ListError, LoadingRows, SectionTitle, ServerStatus } from "@/components/admin/admin-list"
+import { QuotaEditor } from "@/components/admin/quota-editor"
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { Badge } from "@/components/ui/badge"
@@ -105,6 +106,8 @@ export default function AdminTeamPage() {
           ]}
         />
       </div>
+
+      <QuotaEditor teamId={team.id} />
 
       <SectionTitle>{t("admin.teams.members")}</SectionTitle>
       {members.length === 0 ? (

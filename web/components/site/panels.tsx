@@ -36,6 +36,7 @@ import {
   useWorkloadActions,
   WorkloadLogs,
 } from "@/components/imported-controls"
+import { ResourcesCard } from "@/components/resources-panel"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
@@ -588,7 +589,10 @@ export function SiteSettings() {
     <>
       <SiteAppearance key={app.id} manage={manage} />
       {!imported ? (
-        <SettingsPanel team={team.slug} path={path} detail={detail} manage={manage} onSaved={(a) => setDetail((d) => (d ? { ...d, app: a } : d))} />
+        <>
+          <SettingsPanel team={team.slug} path={path} detail={detail} manage={manage} onSaved={(a) => setDetail((d) => (d ? { ...d, app: a } : d))} />
+          <ResourcesCard path={`${path}/resources`} manage={manage} processes={detail.processes.map((p) => p.name)} />
+        </>
       ) : (
         <>
           <ErrorBand message={error} />

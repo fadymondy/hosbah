@@ -891,7 +891,14 @@
     "general": "General",
     "renameHint": "The name everyone in the team sees.",
     "viewerNote": "Only owners and admins can rename the team.",
-    "saved": "Team updated"
+    "saved": "Team updated",
+    "quotasTitle": "Usage & quotas",
+    "quotasHint": "Counts include only apps and data services Hosbah manages — not imported guests.",
+    "quotaServers": "Servers",
+    "quotaApps": "Apps",
+    "quotaDataServices": "Data services",
+    "quotaUnlimited": "Unlimited",
+    "quotaOf": "{used} of {max}"
   },
   "account": {
     "title": "Account",
@@ -1084,7 +1091,14 @@
       "reinstate": "Reinstate team",
       "reinstated": "Team reinstated.",
       "noMembers": "No members.",
-      "noApps": "No apps."
+      "noApps": "No apps.",
+      "quotaTitle": "Quota",
+      "quotaHint": "A platform admin's own guardrail on top of the platform-wide limits. Empty means unlimited.",
+      "quotaServers": "Max servers",
+      "quotaApps": "Max apps",
+      "quotaDataServices": "Max data services",
+      "quotaUnlimited": "Unlimited",
+      "quotaSaved": "Quota saved."
     },
     "servers": {
       "hint": "Every server across every team, with its agent and when it last checked in.",
@@ -2340,5 +2354,20 @@
       },
       "fromStack": "Prefilled from the {name} stack."
     }
+  },
+  "resources": {
+    "title": "Resources",
+    "hint": "Memory and CPU caps. Saving here applies live to the running container(s) — no redeploy needed.",
+    "memory": "Memory",
+    "cpu": "CPU",
+    "unlimited": "Unlimited",
+    "custom": "Custom",
+    "base": "Base limit",
+    "baseHint": "Applies to every process unless overridden below.",
+    "processes": "Per-process overrides",
+    "processesHint": "Give a process its own limit instead of the base one.",
+    "usesBase": "Uses the base limit",
+    "saved": "Resource limits saved",
+    "importedHint": "This service was imported; Hosbah does not manage its resources."
   }
 }
