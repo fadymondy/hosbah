@@ -688,3 +688,270 @@ func TestAppInstalls(t *testing.T) {
 		}
 	})
 }
+
+/*
+MH-576 D6: the app catalogue's recipes that need a managed database (WordPress needs MySQL, Odoo
+needs Postgres) — the connection travels apart (host, user, password, …) in the same sealed box as a
+generated secret, never as a site variable and never in plaintext in operations.params, and a service
+of another team cannot be named.
+*/
+func TestAppInstallsWithDataServices(t *testing.T) {
+	ts, stop := bootTestServer(t)
+	defer stop()
+	sqlDB := testDB(t)
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	short := suffix[len(suffix)-6:]
+	ctx := context.Background()
+
+	owner := newClient(t, ts.URL)
+	owner.register("in-ds-owner-" + suffix + "@example.test")
+	var team struct{ ID string }
+	owner.mustJSON("POST", "/api/teams", map[string]any{"name": "Installs DS " + suffix}, 201, &team)
+
+	other := newClient(t, ts.URL)
+	other.register("in-ds-other-" + suffix + "@example.test")
+	var otherTeam struct{ ID string }
+	other.mustJSON("POST", "/api/teams", map[string]any{"name": "Elsewhere DS " + suffix}, 201, &otherTeam)
+
+	cat, err := catalog.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wordpress, _ := cat.Get("wordpress")
+	odoo, _ := cat.Get("odoo")
+
+	srv, priv := enrolWithServicesKey(t, owner, ts.URL, team.ID, "inds-"+short, "203.0.113.61", nil)
+	var app struct {
+		App struct{ ID, Name string } `json:"app"`
+	}
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/apps", map[string]any{"name": "inds-" + short, "server": srv, "repo_url": "https://github.com/octocat/api.git"}, 201, &app)
+	appBase := func(id string) string { return "/api/teams/" + team.ID + "/apps/" + id }
+	base := appBase(app.App.ID)
+
+	agent := startFakeAgent(t, ts.URL, srv, priv, func(op agentproto.SignedOp) (any, string) {
+		switch op.Kind {
+		case agentproto.KindDBProvision:
+			var p agentproto.DBProvisionParams
+			_ = json.Unmarshal(op.Params, &p)
+			return agentproto.DBProvisionResult{Container: p.Container, Volume: p.Volume, Host: "172.17.0.1", Port: p.Port}, ""
+		case agentproto.KindDBCreate:
+			var p agentproto.DBCreateParams
+			_ = json.Unmarshal(op.Params, &p)
+			return agentproto.DBCreateResult{Database: p.Database, User: p.User}, ""
+		case agentproto.KindRecipeInstall:
+			var p agentproto.RecipeInstallParams
+			_ = json.Unmarshal(op.Params, &p)
+			if err := p.Validate(); err != nil {
+				return nil, err.Error()
+			}
+			return agentproto.RecipeInstallResult{Container: agentproto.InstallContainerName(p.InstallID), HostPort: 49700}, ""
+		case agentproto.KindRecipeStatus:
+			var p agentproto.RecipeStatusParams
+			_ = json.Unmarshal(op.Params, &p)
+			res := agentproto.RecipeStatusResult{}
+			for _, id := range p.InstallIDs {
+				res.Installs = append(res.Installs, agentproto.InstallState{InstallID: id, Running: true, HostPort: 49700})
+			}
+			return res, ""
+		case agentproto.KindAppRemove:
+			return map[string]any{"containers": []string{}}, ""
+		case agentproto.KindProxySet, agentproto.KindProvisionStep:
+			return map[string]any{}, ""
+		}
+		return nil, "this fake agent does not run " + op.Kind
+	})
+
+	// Two managed services on the app's own server: MySQL for WordPress, Postgres for Odoo.
+	var mysqlSvc, pgSvc struct{ ID, Name string }
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/data-services", map[string]any{"name": "wpdb-" + short, "server": srv, "kind": "mysql"}, 201, &mysqlSvc)
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/data-services", map[string]any{"name": "odoodb-" + short, "server": srv, "kind": "postgres"}, 201, &pgSvc)
+	waitRunning := func(id string) {
+		t.Helper()
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			var d struct {
+				Service struct{ Status string } `json:"service"`
+			}
+			owner.mustJSON("GET", "/api/teams/"+team.ID+"/data-services/"+id, nil, 200, &d)
+			if d.Service.Status == "running" {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("data service %s never ran: %+v", id, d)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	waitRunning(mysqlSvc.ID)
+	waitRunning(pgSvc.ID)
+
+	// A database and user on each — CreateInstall reads the first user's connection apart.
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/data-services/"+mysqlSvc.ID+"/databases", map[string]any{"name": "wp_content", "user": "wp_user"}, 201, nil)
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/data-services/"+pgSvc.ID+"/databases", map[string]any{"name": "odoo_db", "user": "odoo_user"}, 201, nil)
+
+	wait := func(ref, want string) installJSON {
+		t.Helper()
+		var s installsJSON
+		deadline := time.Now().Add(30 * time.Second)
+		for {
+			owner.mustJSON("GET", base+"/installs", nil, 200, &s)
+			for _, b := range s.Installs {
+				if (b.ID == ref || b.Name == ref) && b.Status == want {
+					return b
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("install %s never became %s: %+v", ref, want, s.Installs)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	installOp := func(installID string) agentproto.SignedOp {
+		t.Helper()
+		for _, op := range agentOps(agent, agentproto.KindRecipeInstall) {
+			var p agentproto.RecipeInstallParams
+			_ = json.Unmarshal(op.Params, &p)
+			if p.InstallID == installID {
+				return op
+			}
+		}
+		t.Fatalf("no recipe.install for %s", installID)
+		return agentproto.SignedOp{}
+	}
+	installParams := func(installID string) agentproto.RecipeInstallParams {
+		t.Helper()
+		var p agentproto.RecipeInstallParams
+		_ = json.Unmarshal(installOp(installID).Params, &p)
+		return p
+	}
+	operationText := func(opID string) string {
+		t.Helper()
+		var params string
+		var result sql.NullString
+		if err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{System: true}, func(_ *db.Queries, tx *sql.Tx) error {
+			return tx.QueryRow(`SELECT params::text, result::text FROM operations WHERE id = $1`, opID).Scan(&params, &result)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return params + " " + result.String
+	}
+
+	t.Run("wordpress: a managed MySQL service is needed, another team's cannot be named", func(t *testing.T) {
+		other.mustJSON("POST", base+"/installs", map[string]any{"recipe": "wordpress", "name": "wp"}, 404, nil) // not even a member
+		owner.mustJSON("POST", base+"/installs", map[string]any{"recipe": "wordpress", "name": "wp"}, 422, nil) // no mysql given
+
+		host := "wp-" + short + ".example.test"
+		status, text := owner.do("POST", base+"/installs", map[string]any{"recipe": "wordpress", "name": "wp", "mysql": mysqlSvc.Name, "hostname": host})
+		if status != 201 {
+			t.Fatalf("create: %d %s", status, text)
+		}
+		var created installJSON
+		_ = json.Unmarshal([]byte(text), &created)
+		if created.Recipe != "wordpress" || created.Image != wordpress.Image || fmt.Sprint(created.EnvInjected) != "[WORDPRESS_URL]" {
+			t.Fatalf("created: %+v", created)
+		}
+		wait(created.ID, "ready")
+
+		p := installParams(created.ID)
+		var wire map[string]any
+		_ = json.Unmarshal(installOp(created.ID).Params, &wire)
+		for k := range wire {
+			switch k {
+			case "install_id", "app_id", "recipe_id", "recipe_version", "image", "secrets":
+			default:
+				t.Errorf("recipe.install carries %q — the agent takes everything else from its own catalog", k)
+			}
+		}
+		pt, err := agentproto.OpenBox(priv, agentproto.InstallSecretsContext(created.ID), p.Secrets)
+		if err != nil {
+			t.Fatalf("the agent's box does not open: %v", err)
+		}
+		var sec agentproto.InstallSecrets
+		_ = json.Unmarshal(pt, &sec)
+		host2, user, pass := sec.Env["WORDPRESS_DB_HOST"], sec.Env["WORDPRESS_DB_USER"], sec.Env["WORDPRESS_DB_PASSWORD"]
+		if !strings.HasPrefix(host2, "172.17.0.1:") {
+			t.Errorf("WORDPRESS_DB_HOST is host:port, the agent's DBProvision answer: %q", host2)
+		}
+		if sec.Env["WORDPRESS_DB_NAME"] != "wp_content" {
+			t.Errorf("WORDPRESS_DB_NAME: %q", sec.Env["WORDPRESS_DB_NAME"])
+		}
+		if user != "wp_user" {
+			t.Errorf("WORDPRESS_DB_USER: %q", user)
+		}
+		if !regexp.MustCompile(`^[A-Za-z0-9]{24}$`).MatchString(pass) {
+			t.Fatalf("WORDPRESS_DB_PASSWORD: the database user's own generated password, 24 alnum: %q", pass)
+		}
+		if sec.Env["WORDPRESS_TABLE_PREFIX"] == "" || sec.Env["WORDPRESS_AUTH_KEY"] == "" {
+			t.Errorf("the recipe's own generated secrets travel too: %+v", sec.Env)
+		}
+		// operations.params/result never carry the plaintext password, host, user or generated secrets —
+		// only the sealed box (already asserted above to be the sole non-id field).
+		text2 := operationText(created.Operation)
+		for _, secret := range []string{pass, sec.Env["WORDPRESS_TABLE_PREFIX"], sec.Env["WORDPRESS_AUTH_KEY"]} {
+			if strings.Contains(text2, secret) {
+				t.Errorf("operations.params/result carries a plaintext secret: %q", secret)
+			}
+		}
+		// Nothing db-shaped ever became a site variable: env_injected was already checked above.
+		var env struct {
+			Variables []struct{ Name string } `json:"variables"`
+		}
+		owner.mustJSON("GET", base+"/env", nil, 200, &env)
+		for _, v := range env.Variables {
+			if strings.HasPrefix(v.Name, "WORDPRESS_DB_") {
+				t.Errorf("a database credential reached the site's variables: %s", v.Name)
+			}
+		}
+
+		// An unknown service name is not found (still within the owning team).
+		owner.mustJSON("POST", base+"/installs", map[string]any{"recipe": "wordpress", "name": "wp2", "mysql": "does-not-exist-" + short}, 404, nil)
+	})
+
+	t.Run("odoo: a managed Postgres service, split into host/port/user/password (no database part)", func(t *testing.T) {
+		host := "odoo-" + short + ".example.test"
+		status, text := owner.do("POST", base+"/installs", map[string]any{"recipe": "odoo", "name": "odoo", "postgres": pgSvc.Name, "hostname": host})
+		if status != 201 {
+			t.Fatalf("create: %d %s", status, text)
+		}
+		var created installJSON
+		_ = json.Unmarshal([]byte(text), &created)
+		if created.Recipe != "odoo" || created.Image != odoo.Image {
+			t.Fatalf("created: %+v", created)
+		}
+		wait(created.ID, "ready")
+		p := installParams(created.ID)
+		pt, err := agentproto.OpenBox(priv, agentproto.InstallSecretsContext(created.ID), p.Secrets)
+		if err != nil {
+			t.Fatalf("the agent's box does not open: %v", err)
+		}
+		var sec agentproto.InstallSecrets
+		_ = json.Unmarshal(pt, &sec)
+		if sec.Env["HOST"] != "172.17.0.1" || sec.Env["PORT"] == "" {
+			t.Errorf("HOST/PORT: %+v", sec.Env)
+		}
+		if sec.Env["USER"] != "odoo_user" {
+			t.Errorf("USER: %q", sec.Env["USER"])
+		}
+		if !regexp.MustCompile(`^[A-Za-z0-9]{24}$`).MatchString(sec.Env["PASSWORD"]) {
+			t.Fatalf("PASSWORD: %q", sec.Env["PASSWORD"])
+		}
+		text2 := operationText(created.Operation)
+		if strings.Contains(text2, sec.Env["PASSWORD"]) {
+			t.Error("operations.params/result carries the plaintext database password")
+		}
+
+		// Cross-team isolation: the other team's own app cannot use this team's Postgres service —
+		// not found even by exact id, and it cannot see it in its own catalog install form either.
+		var otherSrv struct{ ID string }
+		otherSrv.ID, _ = enrolWithServicesKey(t, other, ts.URL, otherTeam.ID, "od-"+short, "203.0.113.62", nil)
+		var otherApp struct {
+			App struct{ ID string } `json:"app"`
+		}
+		other.mustJSON("POST", "/api/teams/"+otherTeam.ID+"/apps", map[string]any{"name": "od-" + short, "server": otherSrv.ID, "repo_url": "https://github.com/octocat/api.git"}, 201, &otherApp)
+		other.mustJSON("POST", "/api/teams/"+otherTeam.ID+"/apps/"+otherApp.App.ID+"/installs",
+			map[string]any{"recipe": "odoo", "name": "odoo", "postgres": pgSvc.ID}, 404, nil)
+		other.mustJSON("POST", "/api/teams/"+otherTeam.ID+"/apps/"+otherApp.App.ID+"/installs",
+			map[string]any{"recipe": "odoo", "name": "odoo", "postgres": pgSvc.Name}, 404, nil)
+		other.mustJSON("GET", "/api/teams/"+otherTeam.ID+"/data-services/"+pgSvc.ID, nil, 404, nil)
+	})
+}
