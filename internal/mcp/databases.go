@@ -503,6 +503,100 @@ func DatabaseTools() []Tool {
 			},
 		},
 
+		// ---- DB metrics and slow queries (MH-575 F6): postgres/mysql only, owner/admin only
+		// (AbilityRevealSecrets — the same tier the table browser and SQL console use). Every
+		// statement db.insights runs is fixed and agent-owned; nothing here reaches user SQL.
+		{
+			Name: "db_insights", Scope: scopes.Read,
+			Description: "DB metrics for a Postgres/MySQL data service: connections vs max, cache hit ratio, transactions/status counters, database sizes, long-running queries and locks waiting.",
+			InputSchema: schema([]string{"database"}, map[string]any{"database": dbArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Insights(ctx, env.Q, env.Caller.TeamID, svc)
+				if err != nil {
+					return "", err
+				}
+				return renderInsights(res), nil
+			},
+		},
+		{
+			Name: "db_slow_queries", Scope: scopes.Read,
+			Description: "Top statements by total time (pg_stat_statements / performance_schema), plus a hint how to enable it when it is not available.",
+			InputSchema: schema([]string{"database"}, map[string]any{"database": dbArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.Insights(ctx, env.Q, env.Caller.TeamID, svc)
+				if err != nil {
+					return "", err
+				}
+				if !res.StatStatementsAvailable {
+					return res.StatStatementsHint, nil
+				}
+				if len(res.TopStatements) == 0 {
+					return "No statements recorded yet.", nil
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%d top statement(s) by total time:\n", len(res.TopStatements))
+				for _, t := range res.TopStatements {
+					fmt.Fprintf(&b, "  calls %-8d total %-10.1fms mean %-8.2fms rows %-8d %s\n", t.Calls, t.TotalTimeMS, t.MeanTimeMS, t.Rows, clipStr(t.Query, 200))
+				}
+				return b.String(), nil
+			},
+		},
+
+		// ---- destructive ----
+		{
+			Name: "db_cancel_query", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
+			Description: "Cancel a running backend/query (pg_cancel_backend / KILL QUERY), using the pid/id from db_insights' long-running list. confirm must equal the data service's name. Audited.",
+			InputSchema: schema([]string{"database", "id", "confirm"}, map[string]any{"database": dbArg,
+				"id":      map[string]any{"type": "integer", "description": "The Postgres pid or MySQL processlist Id"},
+				"confirm": str("The data service's name, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityRevealSecrets); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, svc.Name); err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.CancelQuery(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, int64(args.Int("id", 0, 1, 1<<62)))
+				if err != nil {
+					return "", err
+				}
+				if !res.OK {
+					return "Not cancelled: " + res.Detail, nil
+				}
+				return "Cancelled.", nil
+			},
+		},
+
 		// ---- destructive: the one tool that can write ----
 		{
 			Name: "db_execute", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
@@ -560,6 +654,42 @@ func renderQueryResult(res agentproto.DBQueryResult) string {
 	}
 	fmt.Fprintf(&b, "(%d row(s), %dms%s)\n", res.RowCount, res.DurationMS, map[bool]string{true: ", truncated", false: ""}[res.Truncated])
 	return b.String()
+}
+
+// renderInsights formats db.insights' answer as text.
+func renderInsights(res agentproto.DBInsightsResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s: %d/%d connections, cache hit %.1f%%, %d lock(s) waiting\n",
+		res.Kind, res.Connections, res.MaxConnections, res.CacheHitRatio, res.LocksWaiting)
+	if res.Kind == "postgres" {
+		fmt.Fprintf(&b, "transactions: %d committed, %d rolled back; %d deadlock(s); %d temp byte(s)\n",
+			res.XactCommit, res.XactRollback, res.Deadlocks, res.TempBytes)
+	} else {
+		fmt.Fprintf(&b, "threads: %d connected, %d running; %d question(s), %d slow quer(y/ies); up %ds; slow_query_log=%s\n",
+			res.ThreadsConnected, res.ThreadsRunning, res.Questions, res.SlowQueries, res.UptimeSeconds, res.SlowQueryLog)
+	}
+	for _, d := range res.Databases {
+		fmt.Fprintf(&b, "  database %-24s %d bytes\n", d.Name, d.SizeBytes)
+	}
+	if len(res.LongRunning) == 0 {
+		b.WriteString("no long-running queries\n")
+	} else {
+		fmt.Fprintf(&b, "%d long-running quer(y/ies):\n", len(res.LongRunning))
+		for _, q := range res.LongRunning {
+			fmt.Fprintf(&b, "  pid %-8s %6.1fs  %-10s %s\n", q.PID, q.DurationSeconds, q.State, clipStr(q.Query, 200))
+		}
+	}
+	if !res.StatStatementsAvailable {
+		b.WriteString(res.StatStatementsHint + "\n")
+	}
+	return b.String()
+}
+
+func clipStr(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 // ---- helpers -----------------------------------------------------------------------------------

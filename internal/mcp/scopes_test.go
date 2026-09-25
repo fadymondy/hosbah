@@ -97,6 +97,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		// Imported workloads: destroying the real guest or container, and deleting a guest snapshot.
 		"permanently_destroy_app": true, "permanently_destroy_data_service": true, "delete_snapshot": true,
 		"sftp_user_delete": true,
+		// DB metrics and slow queries (MH-575 F6): cancelling a running query/backend.
+		"db_cancel_query": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

@@ -451,6 +451,8 @@ func TestIsolationSweep(t *testing.T) {
 		"db_table_rows": {"database": "svc-x", "target_database": "x", "table": "t"}, "db_query": {"database": "svc-x", "target_database": "x", "sql": "select 1"},
 		"db_execute":                 {"database": "svc-x", "target_database": "x", "sql": "select 1", "confirm": "svc-x"},
 		"data_service_resources_get": {"database": "svc-x"}, "data_service_resources_set": {"database": "svc-x", "memory_mb": 512, "cpus": 1},
+		"db_insights": {"database": "svc-x"}, "db_slow_queries": {"database": "svc-x"},
+		"db_cancel_query": {"database": "svc-x", "id": 1, "confirm": "svc-x"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {

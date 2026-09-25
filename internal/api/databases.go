@@ -752,6 +752,136 @@ func (d *deps) registerDatabases(api huma.API) {
 		})
 		return out, err
 	})
+
+	registerDataServiceInsights(d, api, tags)
+}
+
+// ---- DB metrics and slow queries (MH-575 F6) --------------------------------------------------
+
+// DBSizeInfoOut / DBLongQueryOut / DBTopStatementOut / DBInsightsOut mirror agentproto's shapes.
+type DBSizeInfoOut struct {
+	Name      string `json:"name"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+type DBLongQueryOut struct {
+	PID             string  `json:"pid"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	State           string  `json:"state,omitempty"`
+	Query           string  `json:"query,omitempty"`
+	Database        string  `json:"database,omitempty"`
+	User            string  `json:"user,omitempty"`
+}
+type DBTopStatementOut struct {
+	Query       string  `json:"query"`
+	Calls       int64   `json:"calls"`
+	TotalTimeMS float64 `json:"total_time_ms"`
+	MeanTimeMS  float64 `json:"mean_time_ms"`
+	Rows        int64   `json:"rows"`
+}
+type DBInsightsOut struct {
+	Kind                    string              `json:"kind"`
+	Connections             int                 `json:"connections"`
+	MaxConnections          int                 `json:"max_connections"`
+	ConnectionsByState      map[string]int      `json:"connections_by_state,omitempty"`
+	XactCommit              int64               `json:"xact_commit,omitempty"`
+	XactRollback            int64               `json:"xact_rollback,omitempty"`
+	CacheHitRatio           float64             `json:"cache_hit_ratio"`
+	Deadlocks               int64               `json:"deadlocks,omitempty"`
+	TempBytes               int64               `json:"temp_bytes,omitempty"`
+	Databases               []DBSizeInfoOut     `json:"databases,omitempty"`
+	LongRunning             []DBLongQueryOut    `json:"long_running,omitempty"`
+	LocksWaiting            int                 `json:"locks_waiting"`
+	StatStatementsAvailable bool                `json:"stat_statements_available"`
+	StatStatementsHint      string              `json:"stat_statements_hint,omitempty"`
+	TopStatements           []DBTopStatementOut `json:"top_statements,omitempty"`
+	ThreadsConnected        int64               `json:"threads_connected,omitempty"`
+	ThreadsRunning          int64               `json:"threads_running,omitempty"`
+	Questions               int64               `json:"questions,omitempty"`
+	SlowQueries             int64               `json:"slow_queries,omitempty"`
+	UptimeSeconds           int64               `json:"uptime_seconds,omitempty"`
+	SlowQueryLog            string              `json:"slow_query_log,omitempty"`
+}
+
+func toDBInsightsOut(r agentproto.DBInsightsResult) DBInsightsOut {
+	out := DBInsightsOut{
+		Kind: r.Kind, Connections: r.Connections, MaxConnections: r.MaxConnections, ConnectionsByState: r.ConnectionsByState,
+		XactCommit: r.XactCommit, XactRollback: r.XactRollback, CacheHitRatio: r.CacheHitRatio, Deadlocks: r.Deadlocks,
+		TempBytes: r.TempBytes, LocksWaiting: r.LocksWaiting, StatStatementsAvailable: r.StatStatementsAvailable,
+		StatStatementsHint: r.StatStatementsHint, ThreadsConnected: r.ThreadsConnected, ThreadsRunning: r.ThreadsRunning,
+		Questions: r.Questions, SlowQueries: r.SlowQueries, UptimeSeconds: r.UptimeSeconds, SlowQueryLog: r.SlowQueryLog,
+	}
+	for _, d := range r.Databases {
+		out.Databases = append(out.Databases, DBSizeInfoOut{Name: d.Name, SizeBytes: d.SizeBytes})
+	}
+	for _, lr := range r.LongRunning {
+		out.LongRunning = append(out.LongRunning, DBLongQueryOut{
+			PID: lr.PID, DurationSeconds: lr.DurationSeconds, State: lr.State, Query: lr.Query, Database: lr.Database, User: lr.User,
+		})
+	}
+	for _, t := range r.TopStatements {
+		out.TopStatements = append(out.TopStatements, DBTopStatementOut{
+			Query: t.Query, Calls: t.Calls, TotalTimeMS: t.TotalTimeMS, MeanTimeMS: t.MeanTimeMS, Rows: t.Rows,
+		})
+	}
+	return out
+}
+
+func registerDataServiceInsights(d *deps, api huma.API, tags []string) {
+	type dsInsightsOut struct{ Body DBInsightsOut }
+	huma.Register(api, huma.Operation{OperationID: "get-data-service-insights", Method: http.MethodGet,
+		Path: "/api/teams/{team}/data-services/{service}/insights", Tags: tags,
+		Summary: "DB metrics and slow queries: connections, cache hit ratio, long-running queries, locks and top statements (owner or admin). Postgres and MySQL only.",
+	}, func(ctx context.Context, in *ServicePath) (*dsInsightsOut, error) {
+		out := &dsInsightsOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			res, err := d.dbs().Insights(ctx, q, m.TeamID, svc)
+			if err != nil {
+				return dbErr(err, "could not gather insights")
+			}
+			out.Body = toDBInsightsOut(res)
+			return nil
+		})
+		return out, err
+	})
+
+	type dsCancelOut struct {
+		Body struct {
+			OK     bool   `json:"ok"`
+			Detail string `json:"detail,omitempty"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "cancel-data-service-query", Method: http.MethodPost,
+		Path: "/api/teams/{team}/data-services/{service}/insights/cancel", Tags: tags,
+		Summary: "Cancel a running backend/query (pg_cancel_backend / KILL QUERY). Owner or admin; confirm must equal the service's name. Audited.",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			ID      int64  `json:"id" minimum:"1" doc:"The Postgres pid or the MySQL processlist Id, from insights' long_running list."`
+			Confirm string `json:"confirm" minLength:"1" maxLength:"64" doc:"The service's name, exactly."`
+		}
+	}) (*dsCancelOut, error) {
+		out := &dsCancelOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			if in.Body.Confirm != svc.Name {
+				return huma.Error422UnprocessableEntity("confirm must equal the service's name — nothing was cancelled")
+			}
+			res, err := d.dbs().CancelQuery(ctx, q, m.TeamID, webActor(id), svc, in.Body.ID)
+			if err != nil {
+				return dbErr(err, "could not cancel the query")
+			}
+			out.Body.OK, out.Body.Detail = res.OK, res.Detail
+			return nil
+		})
+		return out, err
+	})
 }
 
 func toScheduleOut(s db.BackupSchedule) ScheduleOut {

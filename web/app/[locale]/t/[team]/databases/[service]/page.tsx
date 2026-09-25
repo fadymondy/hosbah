@@ -33,6 +33,7 @@ import { humanBytes, type DataService, type DataServiceDetail, type DatabaseUser
 import { isImported } from "@/lib/apps"
 import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imported-view"
 import { DataConsole } from "@/components/databases/data-console"
+import { InsightsPanel } from "@/components/databases/insights-panel"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -166,6 +167,12 @@ export default function DataServicePage() {
             }
           >
             <UsersTable teamSlug={team.slug} serviceRef={s.id} service={s} detail={detail} manage={manage} onDone={load} />
+          </Section>
+        ) : null}
+
+        {canQueryData ? (
+          <Section title={t("databases.insights.title")}>
+            <InsightsPanel teamSlug={team.slug} serviceRef={s.id} serviceName={s.name} />
           </Section>
         ) : null}
 

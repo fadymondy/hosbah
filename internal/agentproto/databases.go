@@ -12,14 +12,16 @@ import (
 // turns them into fixed argv lists (docker run / docker exec / restic), and the only strings a user
 // influences (a database or user name) are validated to a strict identifier before they are used.
 const (
-	KindDBProvision = "db.provision" // run a Postgres/MySQL/Redis container with a named volume, bound to a private address
-	KindDBCreate    = "db.create"    // create a database + user + grants inside a running service
-	KindDBBackup    = "db.backup"    // pg_dump -Fc / mysqldump / Redis RDB, pushed into a restic repository
-	KindDBRestore   = "db.restore"   // restore a snapshot into a throwaway container and verify it (restore-test)
-	KindDBRemove    = "db.remove"    // stop and remove a service's container and its volume (the service was deleted)
-	KindDBDrop      = "db.drop"      // drop one database (bucket) and its users inside a running service
-	KindDBUser      = "db.user"      // create, rotate, delete, grant or revoke a user's password/grants (MH-574 F1)
-	KindDBQuery     = "db.query"     // table browser and SQL console: tables/columns/rows/sql (MH-574 F2)
+	KindDBProvision   = "db.provision"    // run a Postgres/MySQL/Redis container with a named volume, bound to a private address
+	KindDBCreate      = "db.create"       // create a database + user + grants inside a running service
+	KindDBBackup      = "db.backup"       // pg_dump -Fc / mysqldump / Redis RDB, pushed into a restic repository
+	KindDBRestore     = "db.restore"      // restore a snapshot into a throwaway container and verify it (restore-test)
+	KindDBRemove      = "db.remove"       // stop and remove a service's container and its volume (the service was deleted)
+	KindDBDrop        = "db.drop"         // drop one database (bucket) and its users inside a running service
+	KindDBUser        = "db.user"         // create, rotate, delete, grant or revoke a user's password/grants (MH-574 F1)
+	KindDBQuery       = "db.query"        // table browser and SQL console: tables/columns/rows/sql (MH-574 F2)
+	KindDBInsights    = "db.insights"     // metrics and slow queries for postgres/mysql (MH-575 F6)
+	KindDBCancelQuery = "db.cancel_query" // pg_cancel_backend / KILL QUERY (MH-575 F6)
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -558,4 +560,136 @@ type DBQueryResult struct {
 	Truncated  bool            `json:"truncated"`
 	DurationMS int64           `json:"duration_ms"`
 	Tables     []DBTableInfo   `json:"tables,omitempty"`
+}
+
+// ---- db.insights / db.cancel_query (MH-575 F6: DB metrics and slow queries) ----------------------
+//
+// Unlike db.query, every statement here is fixed and agent-owned — nothing a member typed ever
+// reaches the engine. Postgres and MySQL only (the same engines db.query supports); Redis and MinIO
+// have no such notion and are refused before this op is even built, same as db.query.
+
+// DBInsightsMaxTimeout bounds the single statement db.insights runs.
+const DBInsightsMaxTimeout = 30
+
+// DBInsightsParams: db.insights. Database is the database to connect as (optional for both engines:
+// Postgres defaults to "postgres", MySQL needs none — the figures gathered are cluster/server-wide).
+type DBInsightsParams struct {
+	ServiceID      string `json:"service_id"`
+	Kind           string `json:"kind"`
+	Container      string `json:"container"`
+	Database       string `json:"database,omitempty"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+	RootSecret     string `json:"root_secret"`
+}
+
+func (p DBInsightsParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case p.Kind != "postgres" && p.Kind != "mysql":
+		return errors.New("insights apply to postgres and mysql")
+	case p.Database != "" && !ValidDBName(p.Database):
+		return fmt.Errorf("bad database name %q", p.Database)
+	case p.Container == "":
+		return errors.New("bad container")
+	case p.RootSecret == "":
+		return errors.New("db.insights needs the root secret")
+	case p.TimeoutSeconds < 1 || p.TimeoutSeconds > DBInsightsMaxTimeout:
+		return fmt.Errorf("timeout_seconds must be between 1 and %d", DBInsightsMaxTimeout)
+	}
+	return nil
+}
+
+// DBSizeInfo: one database's on-disk size.
+type DBSizeInfo struct {
+	Name      string `json:"name"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+// DBLongQuery: one long-running or active session/query.
+type DBLongQuery struct {
+	PID             string  `json:"pid"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	State           string  `json:"state,omitempty"`
+	Query           string  `json:"query,omitempty" doc:"Truncated to 500 characters."`
+	Database        string  `json:"database,omitempty"`
+	User            string  `json:"user,omitempty"`
+}
+
+// DBTopStatement: one row of pg_stat_statements / performance_schema.events_statements_summary_by_digest.
+type DBTopStatement struct {
+	Query       string  `json:"query" doc:"Truncated to 500 characters."`
+	Calls       int64   `json:"calls"`
+	TotalTimeMS float64 `json:"total_time_ms"`
+	MeanTimeMS  float64 `json:"mean_time_ms"`
+	Rows        int64   `json:"rows"`
+}
+
+// DBInsightsResult: db.insights' answer. Fields not gathered for the engine are left zero/empty.
+type DBInsightsResult struct {
+	Kind string `json:"kind"`
+
+	Connections        int            `json:"connections"`
+	MaxConnections     int            `json:"max_connections"`
+	ConnectionsByState map[string]int `json:"connections_by_state,omitempty"`
+
+	// Postgres: cumulative since the cluster started (pg_stat_database). MySQL: cumulative since
+	// Uptime (SHOW GLOBAL STATUS) — Questions/SlowQueries below.
+	XactCommit    int64   `json:"xact_commit,omitempty"`
+	XactRollback  int64   `json:"xact_rollback,omitempty"`
+	CacheHitRatio float64 `json:"cache_hit_ratio" doc:"Percent, buffer cache hits over hits+reads."`
+	Deadlocks     int64   `json:"deadlocks,omitempty"`
+	TempBytes     int64   `json:"temp_bytes,omitempty"`
+
+	Databases []DBSizeInfo `json:"databases,omitempty"`
+
+	LongRunning  []DBLongQuery `json:"long_running,omitempty"`
+	LocksWaiting int           `json:"locks_waiting"`
+
+	StatStatementsAvailable bool             `json:"stat_statements_available"`
+	StatStatementsHint      string           `json:"stat_statements_hint,omitempty" doc:"Set when not available: how to enable it."`
+	TopStatements           []DBTopStatement `json:"top_statements,omitempty"`
+
+	// MySQL only.
+	ThreadsConnected int64  `json:"threads_connected,omitempty"`
+	ThreadsRunning   int64  `json:"threads_running,omitempty"`
+	Questions        int64  `json:"questions,omitempty"`
+	SlowQueries      int64  `json:"slow_queries,omitempty"`
+	UptimeSeconds    int64  `json:"uptime_seconds,omitempty"`
+	SlowQueryLog     string `json:"slow_query_log,omitempty"`
+}
+
+// DBCancelQueryParams: db.cancel_query. ID is the Postgres pid (pg_stat_activity.pid) or the MySQL
+// processlist Id. Refused for the agent's own connection (never cancels itself).
+type DBCancelQueryParams struct {
+	ServiceID  string `json:"service_id"`
+	Kind       string `json:"kind"`
+	Container  string `json:"container"`
+	Database   string `json:"database,omitempty"`
+	ID         int64  `json:"id"`
+	RootSecret string `json:"root_secret"`
+}
+
+func (p DBCancelQueryParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case p.Kind != "postgres" && p.Kind != "mysql":
+		return errors.New("cancel query applies to postgres and mysql")
+	case p.Database != "" && !ValidDBName(p.Database):
+		return fmt.Errorf("bad database name %q", p.Database)
+	case p.Container == "":
+		return errors.New("bad container")
+	case p.RootSecret == "":
+		return errors.New("db.cancel_query needs the root secret")
+	case p.ID <= 0:
+		return errors.New("a positive process/pid id is required")
+	}
+	return nil
+}
+
+// DBCancelQueryResult: whether the backend/query was found and cancelled.
+type DBCancelQueryResult struct {
+	OK     bool   `json:"ok"`
+	Detail string `json:"detail,omitempty"`
 }
