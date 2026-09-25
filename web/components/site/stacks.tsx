@@ -33,8 +33,10 @@ export type Recipe = {
   homepage: string
   version: string
   verified: boolean
-  needs: { postgres?: boolean; redis?: boolean }
+  needs: { postgres?: boolean; mysql?: boolean; redis?: boolean }
   has_web_ui: boolean
+  /** Set when the recipe also publishes a second port (e.g. an admin console); its label. */
+  extra_port_name?: string
 }
 export type Install = {
   id: string
@@ -50,11 +52,18 @@ export type Install = {
   error: string | null
   running: boolean | null
   restarts: number | null
+  /** The recipe's extra_port on the server's 127.0.0.1 (e.g. MinIO's console); null when it has none or isn't known yet. */
+  extra_host_port: number | null
 }
 
 /** The data services an installed app may use: running, Hosbah-managed ones on the site's server. */
 export function installServices(all: DataService[], serverId: string) {
   return all.filter((s) => s.server_id === serverId && !isImported(s) && s.status === "running")
+}
+
+/** The install's recipe's extra_port_name (e.g. "console"), or a generic fallback once the recipe itself isn't loaded yet. */
+function extraPortName(recipes: Recipe[] | null, recipeId: string) {
+  return recipes?.find((r) => r.id === recipeId)?.extra_port_name || "port"
 }
 
 /**
@@ -165,6 +174,11 @@ export function SiteStacks() {
                       ) : (
                         "—"
                       )}
+                      {i.extra_host_port ? (
+                        <div className="mt-1 text-grid-muted">
+                          {t("site.stacks.extraPort", { name: extraPortName(recipes, i.recipe), port: String(i.extra_host_port) })}
+                        </div>
+                      ) : null}
                     </TableCell>
                     <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
                       {i.env_injected.join(" ")}
@@ -208,6 +222,21 @@ export function SiteStacks() {
                           </span>
                           <Badge variant="outline">{t(`site.stacks.kinds.${r.kind}`)}</Badge>
                           {!r.verified ? <Badge variant="secondary">{t("site.stacks.unverified")}</Badge> : null}
+                          {r.needs.postgres ? (
+                            <Badge variant="outline" dir="ltr">
+                              {t("site.stacks.needs", { service: "Postgres" })}
+                            </Badge>
+                          ) : null}
+                          {r.needs.mysql ? (
+                            <Badge variant="outline" dir="ltr">
+                              {t("site.stacks.needs", { service: "MySQL" })}
+                            </Badge>
+                          ) : null}
+                          {r.needs.redis ? (
+                            <Badge variant="outline" dir="ltr">
+                              {t("site.stacks.needs", { service: "Redis" })}
+                            </Badge>
+                          ) : null}
                         </span>
                         <span dir="auto" className="block text-xs text-grid-muted">
                           {r.summary}
@@ -217,8 +246,6 @@ export function SiteStacks() {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-4 py-2 text-xs text-grid-muted">
                       <span dir="ltr">{r.licence}</span>
                       <span dir="ltr">v{r.version}</span>
-                      {r.needs.postgres ? <span>Postgres</span> : null}
-                      {r.needs.redis ? <span>Redis</span> : null}
                       <a href={r.homepage} target="_blank" rel="noreferrer" className="ms-auto inline-flex items-center gap-1 hover:underline">
                         {t("site.stacks.homepage")}
                         <ExternalLinkIcon className="size-3" />
@@ -257,17 +284,22 @@ export function InstallDialog({
   onSaved,
   ...controlled
 }: { path: string; recipe: Recipe; services: DataService[]; onSaved: () => Promise<void> | void } & Controlled) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const { team } = useTeam()
+  const { app } = useLoadedSite()
   const errorText = useErrorText()
   const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
   const [name, setName] = useState(recipe.id)
   const [hostname, setHostname] = useState("")
   const [postgres, setPostgres] = useState("")
+  const [mysql, setMysql] = useState("")
   const [redis, setRedis] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pg = services.filter((s) => s.kind === "postgres")
+  const my = services.filter((s) => s.kind === "mysql")
   const rd = services.filter((s) => s.kind === "redis")
+  const databasesHref = `/${locale}/t/${team.slug}/servers/${app.server_id}/databases`
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -280,6 +312,7 @@ export function InstallDialog({
           recipe: recipe.id,
           name: name.trim(),
           ...(recipe.needs.postgres ? { postgres } : {}),
+          ...(recipe.needs.mysql ? { mysql } : {}),
           ...(recipe.needs.redis ? { redis } : {}),
           ...(hostname.trim() ? { hostname: hostname.trim() } : {}),
         },
@@ -294,7 +327,7 @@ export function InstallDialog({
     }
   }
 
-  const missing = (recipe.needs.postgres && pg.length === 0) || (recipe.needs.redis && rd.length === 0)
+  const missing = (recipe.needs.postgres && pg.length === 0) || (recipe.needs.mysql && my.length === 0) || (recipe.needs.redis && rd.length === 0)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -318,6 +351,18 @@ export function InstallDialog({
             {recipe.needs.postgres ? (
               <ServicePick label="Postgres" items={pg} value={postgres} onChange={setPostgres} />
             ) : null}
+            {recipe.needs.mysql ? (
+              my.length === 0 ? (
+                <p className="text-sm text-grid-danger">
+                  {t("site.stacks.needsMySQL")}{" "}
+                  <Link href={databasesHref} className="underline underline-offset-4 hover:no-underline">
+                    {t("nav.databases")}
+                  </Link>
+                </p>
+              ) : (
+                <ServicePick label="MySQL/MariaDB" items={my} value={mysql} onChange={setMysql} />
+              )
+            ) : null}
             {recipe.needs.redis ? <ServicePick label="Redis" items={rd} value={redis} onChange={setRedis} /> : null}
             {recipe.has_web_ui ? (
               <Field>
@@ -326,14 +371,19 @@ export function InstallDialog({
                 <FieldDescription>{t("site.stacks.hostnameHint")}</FieldDescription>
               </Field>
             ) : null}
-            {missing ? <FormError message={t("site.stacks.needsService")} /> : null}
+            {(recipe.needs.postgres && pg.length === 0) || (recipe.needs.redis && rd.length === 0) ? (
+              <FormError message={t("site.stacks.needsService")} />
+            ) : null}
           </FieldGroup>
           <FormError message={error} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || missing || (recipe.needs.postgres && !postgres) || (recipe.needs.redis && !redis)}>
+            <Button
+              type="submit"
+              disabled={busy || missing || (recipe.needs.postgres && !postgres) || (recipe.needs.mysql && !mysql) || (recipe.needs.redis && !redis)}
+            >
               {busy ? t("common.working") : t("site.stacks.install")}
             </Button>
           </DialogFooter>
