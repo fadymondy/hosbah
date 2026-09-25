@@ -6,12 +6,12 @@ import (
 )
 
 func TestValidPHPVersion(t *testing.T) {
-	for _, v := range []string{"auto", "8.1", "8.2", "8.3", "8.4"} {
+	for _, v := range []string{"auto", "8.2", "8.3", "8.4"} {
 		if !ValidPHPVersion(v) {
 			t.Errorf("ValidPHPVersion(%q) = false, want true", v)
 		}
 	}
-	for _, v := range []string{"", "8.0", "8.5", "php8.3", "8.3 "} {
+	for _, v := range []string{"", "8.0", "8.1", "8.5", "php8.3", "8.3 "} {
 		if ValidPHPVersion(v) {
 			t.Errorf("ValidPHPVersion(%q) = true, want false", v)
 		}
@@ -67,19 +67,6 @@ func TestPHPIniEnvValue(t *testing.T) {
 	}
 	if PHPIniEnvValue(nil) != "" {
 		t.Errorf("PHPIniEnvValue(nil) should be empty")
-	}
-}
-
-func TestRailpackPHPEnv(t *testing.T) {
-	if env := RailpackPHPEnv(""); env != nil {
-		t.Errorf("RailpackPHPEnv(\"\") = %v, want nil", env)
-	}
-	if env := RailpackPHPEnv("auto"); env != nil {
-		t.Errorf("RailpackPHPEnv(auto) = %v, want nil", env)
-	}
-	env := RailpackPHPEnv("8.3")
-	if len(env) != 1 || env[0] != "RAILPACK_PHP_VERSION=8.3" {
-		t.Errorf("RailpackPHPEnv(8.3) = %v", env)
 	}
 }
 

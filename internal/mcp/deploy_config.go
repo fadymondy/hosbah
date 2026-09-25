@@ -313,7 +313,7 @@ func DeployConfigTools() []Tool {
 		},
 		{
 			Name: "app_php_config_set", Scope: scopes.Deploy,
-			Description: "Save an app's PHP version pin (auto, 8.1-8.4) and php.ini overrides (memory_limit, upload_max_filesize, " +
+			Description: "Save an app's PHP version pin (auto, 8.2-8.4) and php.ini overrides (memory_limit, upload_max_filesize, " +
 				"post_max_size, max_execution_time, max_input_time, max_input_vars, display_errors, date.timezone, opcache.*). Not " +
 				"versioned. Deployer, admin or owner.",
 			InputSchema: schema([]string{"app", "php_version"}, map[string]any{"app": appArg,

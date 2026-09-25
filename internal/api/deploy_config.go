@@ -480,7 +480,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
-			Version string            `json:"php_version" enum:"auto,8.1,8.2,8.3,8.4"`
+			Version string            `json:"php_version" enum:"auto,8.2,8.3,8.4"`
 			Ini     map[string]string `json:"php_ini,omitempty" maxProperties:"32"`
 		}
 	}) (*phpOut, error) {

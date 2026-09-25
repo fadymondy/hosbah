@@ -56,7 +56,7 @@ func TestAppPHPConfig(t *testing.T) {
 		if c.Version != "auto" || len(c.Ini) != 0 || !c.CanSave {
 			t.Fatalf("a new app's php config: %+v", c)
 		}
-		if len(c.AvailableVersions) < 5 || len(c.AvailableIniKeys) == 0 {
+		if len(c.AvailableVersions) < 4 || len(c.AvailableIniKeys) == 0 {
 			t.Fatalf("choices not returned: %+v", c)
 		}
 		viewer.mustJSON("GET", byName, nil, 200, &c)

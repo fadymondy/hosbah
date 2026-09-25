@@ -1,2 +1,0 @@
--- Modify "app_deploy_configs" table
-ALTER TABLE "public"."app_deploy_configs" ADD CONSTRAINT "app_deploy_configs_php_ini_check" CHECK ((jsonb_typeof(php_ini) = 'object'::text) AND (octet_length((php_ini)::text) <= 4096)), ADD CONSTRAINT "app_deploy_configs_php_version_check" CHECK (php_version = ANY (ARRAY['auto'::text, '8.1'::text, '8.2'::text, '8.3'::text, '8.4'::text])), ADD COLUMN "php_version" text NOT NULL DEFAULT 'auto', ADD COLUMN "php_ini" jsonb NOT NULL DEFAULT '{}';

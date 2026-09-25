@@ -431,14 +431,14 @@ func TestDetectReadsHosbahTomlThenCloudyToml(t *testing.T) {
 		t.Fatal(err)
 	}
 	oc, _ := opCtx(t, agentproto.DetectParams{})
-	r, _, err := detect(oc, src, t.TempDir(), nil)
+	r, _, err := detect(oc, src, t.TempDir())
 	if err != nil || r.TomlFile != "cloudy.toml" || r.Toml() != "port = 3000\n" || r.LegacyToml != r.HosbahToml {
 		t.Fatalf("cloudy.toml alone: %+v %v", r, err)
 	}
 	if err := os.WriteFile(filepath.Join(src, "hosbah.toml"), []byte("port = 4000\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	r, _, err = detect(oc, src, t.TempDir(), nil)
+	r, _, err = detect(oc, src, t.TempDir())
 	if err != nil || r.TomlFile != "hosbah.toml" || r.Toml() != "port = 4000\n" {
 		t.Fatalf("hosbah.toml wins: %+v %v", r, err)
 	}

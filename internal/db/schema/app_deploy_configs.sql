@@ -17,9 +17,11 @@
 --
 -- php_version and php_ini (MH-576 D2) are a PHP/Laravel app's advanced settings, like
 -- builder_image/outputs: not part of the versioned step history. php_version is one of
--- internal/deploy.PHPVersions ("auto" or 8.1-8.4), applied by app.build as RAILPACK_PHP_VERSION.
--- php_ini is a jsonb object of internal/deploy.PHPIniKeys -> value, validated by
--- internal/deploy.ValidatePHPIni before it is ever saved.
+-- internal/deploy.PHPVersions ("auto" or 8.2-8.4 — Railpack's PHP provider supports no earlier
+-- version), applied by app.build rewriting composer.json's "require"."php" (Railpack reads the PHP
+-- version only from there, not from an env var). php_ini is a jsonb object of
+-- internal/deploy.PHPIniKeys -> value, validated by internal/deploy.ValidatePHPIni before it is
+-- ever saved.
 CREATE TABLE app_deploy_configs (
     app_id text PRIMARY KEY,
     team_id text NOT NULL,
@@ -38,7 +40,7 @@ CREATE TABLE app_deploy_configs (
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_mode_check CHECK (mode IN ('auto', 'fast', 'full'));
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_steps_check CHECK (jsonb_typeof(steps) = 'array' AND octet_length(steps::text) <= 65536);
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_outputs_check CHECK (jsonb_typeof(outputs) = 'array' AND octet_length(outputs::text) <= 4096);
-ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_php_version_check CHECK (php_version IN ('auto', '8.1', '8.2', '8.3', '8.4'));
+ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_php_version_check CHECK (php_version IN ('auto', '8.2', '8.3', '8.4'));
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_php_ini_check CHECK (jsonb_typeof(php_ini) = 'object' AND octet_length(php_ini::text) <= 4096);
 CREATE INDEX app_deploy_configs_team_idx ON app_deploy_configs (team_id);
 

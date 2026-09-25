@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -185,10 +186,8 @@ func readConfigToml(src string) (toml, name string, err error) {
 
 // detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
 // the build plan and says what it found). hosbah.toml — or, when a repository has none, the
-// pre-rename cloudy.toml — is returned raw for the control plane to parse. railpackEnv is extra
-// process environment for `railpack prepare` (MH-576 D2: RAILPACK_PHP_VERSION), empty outside a
-// deploy that pinned one.
-func detect(oc *OpContext, src, workdir string, railpackEnv []string) (agentproto.DetectResult, int, error) {
+// pre-rename cloudy.toml — is returned raw for the control plane to parse.
+func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
 	r.Files = topLevelFiles(src)
 	toml, name, err := readConfigToml(src)
@@ -212,7 +211,7 @@ func detect(oc *OpContext, src, workdir string, railpackEnv []string) (agentprot
 	plan, info := filepath.Join(workdir, "railpack-plan.json"), filepath.Join(workdir, "railpack-info.json")
 	var code int
 	for attempt := 1; attempt <= 3; attempt++ {
-		code, err = oc.RunEnv(railpackEnv, railpackBin, "prepare", src, "--plan-out", plan, "--info-out", info)
+		code, err = oc.Run(railpackBin, "prepare", src, "--plan-out", plan, "--info-out", info)
 		if code != 75 { // 75 = transient (a download), worth retrying; anything else is final
 			break
 		}
@@ -229,16 +228,75 @@ func detect(oc *OpContext, src, workdir string, railpackEnv []string) (agentprot
 	return r, 0, nil
 }
 
-// railpackPHPEnv is the process environment `railpack prepare` gets to pin the PHP version
-// (MH-576 D2), overriding composer.json's "require.php" constraint — Railpack's own convention
-// for a language version override (RAILPACK_PHP_VERSION, alongside RAILPACK_NODE_VERSION etc).
-// "" or "auto" adds nothing: Railpack detects it itself. Mirrors deploy.RailpackPHPEnv, duplicated
-// here (not imported) because the agent binary never depends on the control-plane deploy package.
-func railpackPHPEnv(version string) []string {
+// composerRequireRE finds a top-level "require": { ... } object in a composer.json (composer.json
+// never nests another object inside "require" — every value is a version constraint string — so a
+// non-greedy match to the first "}" is safe).
+var composerRequireRE = regexp.MustCompile(`(?s)("require"\s*:\s*\{)(.*?)(\})`)
+
+// composerPHPLineRE matches an existing "php": "..." entry inside a require object.
+var composerPHPLineRE = regexp.MustCompile(`"php"\s*:\s*"[^"]*"`)
+
+// composerIndentRE pulls the indentation composer.json already uses for its require entries, so an
+// inserted "php" line matches the file's own style instead of guessing one.
+var composerIndentRE = regexp.MustCompile(`\n([ \t]*)"`)
+
+// pinComposerPHPVersion (MH-576 D2) rewrites "require"."php" in the checkout's composer.json to an
+// exact version, because Railpack's PHP provider (railwayapp/railpack core/providers/php) reads the
+// version only from that constraint — it does not honor a RAILPACK_PHP_VERSION env var. A no-op for
+// "" or "auto" (Railpack detects it itself). When the repository has no composer.json at all, this
+// leaves it alone and logs a clear note instead of creating one: a PHP pin only makes sense for a
+// Composer-managed app.
+func pinComposerPHPVersion(oc *OpContext, src, version string) error {
 	if version == "" || version == "auto" {
 		return nil
 	}
-	return []string{"RAILPACK_PHP_VERSION=" + version}
+	path := filepath.Join(src, "composer.json")
+	b, err := os.ReadFile(path) //#nosec G304 -- our own checkout
+	if err != nil {
+		if os.IsNotExist(err) {
+			oc.Info("PHP version pin %s: no composer.json in this repository — Railpack reads the PHP version from composer.json's \"require\".\"php\"; add one to apply the pin", version)
+			return nil
+		}
+		return fmt.Errorf("reading composer.json: %w", err)
+	}
+	out, changed := setComposerPHPVersion(string(b), version)
+	if !changed {
+		oc.Info("PHP version pin %s: composer.json has no \"require\" object to add a \"php\" constraint to — add one to apply the pin", version)
+		return nil
+	}
+	if !json.Valid([]byte(out)) {
+		oc.Info("PHP version pin %s: rewriting composer.json's \"require\".\"php\" would produce invalid JSON — leaving composer.json untouched", version)
+		return nil
+	}
+	oc.Info("pinned composer.json's \"require\".\"php\" to %s", version)
+	return os.WriteFile(path, []byte(out), 0o644) //#nosec G306 -- world-readable manifest, not a secret
+}
+
+// setComposerPHPVersion edits composer.json's first top-level "require" object to require exactly
+// version, preserving the rest of the file (including key order and formatting) untouched. It
+// replaces an existing "php" entry in place, or inserts one as the first entry in "require" when
+// there isn't one yet. Reports false, unchanged, when there is no "require" object at all.
+func setComposerPHPVersion(src, version string) (string, bool) {
+	loc := composerRequireRE.FindStringSubmatchIndex(src)
+	if loc == nil {
+		return src, false
+	}
+	body := src[loc[4]:loc[5]]
+	var newBody string
+	if composerPHPLineRE.MatchString(body) {
+		newBody = composerPHPLineRE.ReplaceAllString(body, `"php": "`+version+`"`)
+	} else {
+		indent := "    "
+		if m := composerIndentRE.FindStringSubmatch(body); m != nil {
+			indent = m[1]
+		}
+		if strings.TrimSpace(body) == "" {
+			newBody = "\n" + indent + `"php": "` + version + `"` + "\n"
+		} else {
+			newBody = "\n" + indent + `"php": "` + version + `",` + body
+		}
+	}
+	return src[:loc[4]] + newBody + src[loc[5]:], true
 }
 
 // writePHPIniOverrides (MH-576 D2) writes settings as a php.ini at the checkout root, for
@@ -323,7 +381,7 @@ func appDetect(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, code, err
 	}
-	r, code, err := detect(oc, src, work, nil)
+	r, code, err := detect(oc, src, work)
 	r.Commit, r.Message = commit, msg
 	if err != nil {
 		return r, code, err
@@ -355,14 +413,17 @@ func appBuild(oc *OpContext) (any, int, error) {
 		return nil, code, err
 	}
 	oc.Progress(2, 4)
-	// MH-576 D2: a pinned PHP version becomes RAILPACK_PHP_VERSION on `railpack prepare`; ini
-	// overrides are written to a php.ini at the checkout root first, unless the app ships its own
-	// (never overwritten — it owns that file). Both are no-ops for a Dockerfile app, and detect()
-	// itself only uses railpackEnv on the Railpack path.
+	// MH-576 D2: a pinned PHP version is written into composer.json's "require"."php" before
+	// `railpack prepare` runs (Railpack reads the version from there, nowhere else); ini overrides
+	// are written to a php.ini at the checkout root, unless the app ships its own (never
+	// overwritten — it owns that file). Both are no-ops for a Dockerfile app.
+	if err := pinComposerPHPVersion(oc, src, p.PHPVersion); err != nil {
+		oc.Info("PHP version pin: %v — continuing without it", err)
+	}
 	if err := writePHPIniOverrides(src, p.PHPIni); err != nil {
 		oc.Info("php.ini overrides: %v — continuing without them", err)
 	}
-	d, code, err := detect(oc, src, work, railpackPHPEnv(p.PHPVersion))
+	d, code, err := detect(oc, src, work)
 	if err != nil {
 		return nil, code, err
 	}

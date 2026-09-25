@@ -12,20 +12,23 @@ Per-app PHP version and php.ini overrides (MH-576 D2). Stored on app_deploy_conf
 (php_version, php_ini — not versioned, like builder_image/outputs: they are advanced settings a
 team tunes in place, not part of the pipeline's step history).
 
-Mechanism: a deploy of a Railpack-built PHP/Laravel app passes PHPVersion to the agent, which sets
-it as RAILPACK_PHP_VERSION on the `railpack prepare` invocation — Railpack's own convention for
-overriding a language's auto-detected version (RAILPACK_NODE_VERSION, RAILPACK_PYTHON_VERSION, …
-apply the same way), taking precedence over composer.json's "require.php" constraint. php.ini
-overrides are written to a php.ini file at the checkout root before `railpack prepare` runs
-(Railpack's PHP provider merges a repository's own php.ini into the image it builds), unless the
-app already ships one — Hosbah never overwrites an app's own file. Both are also exposed to the
-running container as HOSBAH_PHP_VERSION and HOSBAH_PHP_INI env vars (deploy.injectPHPEnv), which a
-Dockerfile app's own image is free to read since it owns its build and Hosbah cannot inject files
-into it.
+Mechanism: Railpack's PHP provider (railwayapp/railpack core/providers/php) reads the version only
+from composer.json's "require"."php" constraint (a leading "^" stripped), defaulting to 8.4 when
+absent — it does not honor a RAILPACK_PHP_VERSION env var. So a deploy of a Railpack-built PHP app
+that pins a version has the agent rewrite "require"."php" in the checkout's composer.json to that
+exact version before `railpack prepare` runs (internal/agent's pinComposerPHPVersion); a repository
+with no composer.json is left alone and the build log gets a clear note that the pin needs one.
+Railpack only supports PHP 8.2+, so PHPVersions below stops at 8.2. php.ini overrides are written to
+a php.ini file at the checkout root before `railpack prepare` runs (Railpack's PHP provider merges a
+repository's own php.ini into the image it builds), unless the app already ships one — Hosbah never
+overwrites an app's own file. Both are also exposed to the running container as HOSBAH_PHP_VERSION
+and HOSBAH_PHP_INI env vars (deploy.injectPHPEnv), which a Dockerfile app's own image is free to
+read since it owns its build and Hosbah cannot rewrite composer.json for a build it does not run.
 */
 
-// PHPVersions is every version a team may pin, "auto" meaning "let Railpack detect it".
-var PHPVersions = []string{"auto", "8.1", "8.2", "8.3", "8.4"}
+// PHPVersions is every version a team may pin, "auto" meaning "let Railpack detect it from
+// composer.json". Railpack's PHP provider only supports 8.2 and up.
+var PHPVersions = []string{"auto", "8.2", "8.3", "8.4"}
 
 // ValidPHPVersion reports whether v is one of PHPVersions.
 func ValidPHPVersion(v string) bool {
@@ -124,14 +127,4 @@ func PHPIniEnvValue(settings map[string]string) string {
 		parts = append(parts, k+"="+settings[k])
 	}
 	return strings.Join(parts, ";")
-}
-
-// RailpackPHPEnv is the process environment app.build adds to `railpack prepare` to pin the PHP
-// version Railpack's provider selects, overriding composer.json's "require.php" constraint. Empty
-// or "auto" adds nothing — Railpack detects it itself.
-func RailpackPHPEnv(version string) []string {
-	if version == "" || version == "auto" {
-		return nil
-	}
-	return []string{"RAILPACK_PHP_VERSION=" + version}
 }
