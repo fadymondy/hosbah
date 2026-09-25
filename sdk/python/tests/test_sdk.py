@@ -42,5 +42,28 @@ class SDKTest(unittest.TestCase):
             Hosbah("https://c.test", "")
 
 
+class ContinueOpener:
+    def __init__(self):
+        self.calls = 0
+
+    def open(self, req, timeout=None):
+        self.calls += 1
+        name = json.loads(req.data)["params"]["name"]
+        nxt = 'continue: wait_deployment {"app":"shop","deployment":"4","until":"2026-09-25T12:00:00Z"}\n'
+        if name == "deploy_app":
+            return FakeResp(200, {"result": {"content": [{"type": "text", "text": "Deploy #4 of shop queued.\n" + nxt}]}})
+        if self.calls == 2:
+            return FakeResp(200, {"result": {"content": [{"type": "text", "text": "#4 is running.\n" + nxt}]}})
+        return FakeResp(200, {"result": {"content": [{"type": "text", "text": "✓ #4 succeeded in 1m2s.\n"}]}})
+
+
+class ContinueTest(unittest.TestCase):
+    def test_follows_continue(self):
+        o = ContinueOpener()
+        out = Hosbah("https://c.test", "hbu_ok", opener=o).deploy("shop", wait=True)
+        self.assertEqual(out, "Deploy #4 of shop queued.\n✓ #4 succeeded in 1m2s.\n")
+        self.assertEqual(o.calls, 3)
+
+
 if __name__ == "__main__":
     unittest.main()

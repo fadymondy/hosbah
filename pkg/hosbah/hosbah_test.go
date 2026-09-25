@@ -70,3 +70,35 @@ func TestBadTokenAndNoToken(t *testing.T) {
 		t.Fatal("expected an error without a token")
 	}
 }
+
+// A wait longer than one request comes back as a chain: each reply but the last ends with a
+// continue: line, which Call follows until the deployment has finished.
+func TestCallFollowsContinue(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Params struct {
+				Name      string         `json:"name"`
+				Arguments map[string]any `json:"arguments"`
+			} `json:"params"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		calls++
+		text := ""
+		switch {
+		case req.Params.Name == "deploy_app":
+			text = "Deploy #4 of shop queued.\n#4 is running (step build).\ncontinue: wait_deployment {\"app\":\"shop\",\"deployment\":\"4\",\"until\":\"2026-09-25T12:00:00Z\"}\n"
+		case req.Params.Name == "wait_deployment" && req.Params.Arguments["deployment"] == "4" && calls == 2:
+			text = "#4 is running (step release).\ncontinue: wait_deployment {\"app\":\"shop\",\"deployment\":\"4\",\"until\":\"2026-09-25T12:00:00Z\"}\n"
+		case req.Params.Name == "wait_deployment" && req.Params.Arguments["until"] == "2026-09-25T12:00:00Z":
+			text = "✓ #4 succeeded in 1m2s.\n"
+		}
+		b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}})
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+	out, err := New(srv.URL, "hbu_ok").Deploy(context.Background(), "shop", Wait())
+	if err != nil || out != "Deploy #4 of shop queued.\n#4 is running (step build).\n✓ #4 succeeded in 1m2s.\n" || calls != 3 {
+		t.Fatalf("deploy = %q err = %v calls = %d", out, err, calls)
+	}
+}

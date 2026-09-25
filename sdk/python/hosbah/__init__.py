@@ -14,10 +14,30 @@ import itertools
 import json
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = ["Hosbah", "HosbahToolError", "HosbahApiError"]
 __version__ = "0.1.0"
+
+
+CONTINUE_PREFIX = "continue: "
+"""The last line of a reply that is not finished yet: the tool and the JSON arguments to call next."""
+
+
+def _split_continue(text: str) -> Optional[Tuple[str, str, Dict[str, Any]]]:
+    trimmed = text.rstrip("\n")
+    i = trimmed.rfind("\n")
+    last = trimmed[i + 1 :]
+    if not last.startswith(CONTINUE_PREFIX):
+        return None
+    tool, _, raw = last[len(CONTINUE_PREFIX) :].partition(" ")
+    try:
+        args = json.loads(raw)
+    except ValueError:
+        return None
+    if not tool or not isinstance(args, dict):
+        return None
+    return trimmed[: i + 1], tool, args
 
 
 class HosbahToolError(Exception):
@@ -76,7 +96,27 @@ class Hosbah:
         return self._rpc("tools/list", {}).get("tools", [])
 
     def call(self, tool: str, **args: Any) -> str:
-        """Run any tool; returns its text output, raises HosbahToolError on a refusal."""
+        """Run any tool; returns its text output, raises HosbahToolError on a refusal.
+
+        A long wait is served as a chain of short requests (so no proxy drops it): call follows
+        each ``continue:`` line and returns the first reply's text followed by the last one's.
+        """
+        text = self._call_once(tool, args)
+        cont = _split_continue(text)
+        if cont is None:
+            return text
+        head = cont[0]
+        for _ in range(200):
+            try:
+                more = self._call_once(cont[1], cont[2])
+            except HosbahToolError as e:
+                raise HosbahToolError(tool, head + e.message) from None
+            cont = _split_continue(more)
+            if cont is None:
+                return head + more
+        raise RuntimeError(f"hosbah: {tool} kept asking to continue")
+
+    def _call_once(self, tool: str, args: Dict[str, Any]) -> str:
         r = self._rpc("tools/call", {"name": tool, "arguments": args})
         text = "".join(c.get("text", "") for c in r.get("content", []))
         if r.get("isError"):

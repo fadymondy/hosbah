@@ -344,7 +344,7 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	// P2 MCP tools with team A's app: every one must say not found and change nothing.
 	for name, args := range map[string]map[string]any{
-		"get_app": {"app": appA.App.ID}, "list_deployments": {"app": appA.App.Name}, "get_deployment": {"app": appA.App.ID, "deployment": "1"},
+		"get_app": {"app": appA.App.ID}, "list_deployments": {"app": appA.App.Name}, "get_deployment": {"app": appA.App.ID, "deployment": "1"}, "wait_deployment": {"app": appA.App.ID, "deployment": "1", "wait_seconds": 10},
 		"deploy_logs": {"app": appA.App.ID, "deployment": appA.Deployment.ID}, "list_env": {"app": appA.App.ID},
 		"list_domains": {"app": appA.App.ID}, "app_analytics": {"app": appA.App.ID}, "deploy_app": {"app": appA.App.ID}, "cancel_deployment": {"app": appA.App.ID, "deployment": "1"},
 		"rollback_app": {"app": appA.App.ID}, "restart_app": {"app": appA.App.ID}, "pause_autodeploy": {"app": appA.App.ID},

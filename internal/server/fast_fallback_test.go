@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/mcp"
+	"github.com/fadymondy/hosbah/pkg/hosbah"
 )
 
 /*
@@ -103,5 +106,56 @@ func TestFastTrackAbortRunsFullBuild(t *testing.T) {
 	_ = json.Unmarshal(builds[1].Params, &p)
 	if !strings.HasPrefix(p.Image, agentproto.ImageRepo(app.App.Name)+":") {
 		t.Fatalf("fallback build image %q", p.Image)
+	}
+}
+
+// deploy_app with wait answers within one short hold, so no proxy in front of the API drops it (the
+// web app's rewrite proxy gives up after 30s with a bare HTTP 500), and the SDK follows the
+// continue: line through wait_deployment until the deployment has finished.
+func TestDeployAppWaitOverMCP(t *testing.T) {
+	ts, stop := bootTestServer(t)
+	defer stop()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	short := suffix[len(suffix)-6:]
+
+	owner := newClient(t, ts.URL)
+	owner.register("wait-owner-" + suffix + "@example.test")
+	var team struct{ ID string }
+	owner.mustJSON("POST", "/api/teams", map[string]any{"name": "Wait " + suffix}, 201, &team)
+	var tok struct{ ID, Token string }
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/mcp-tokens", map[string]any{
+		"name": "wait", "scopes": []string{"read", "deploy"}, "expires_in_days": 1}, 201, &tok)
+	srv, priv := enrolWithServicesKey(t, owner, ts.URL, team.ID, "wt-"+short, "203.0.113.53", nil)
+	var app struct {
+		App struct{ ID, Name string } `json:"app"`
+	}
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/apps", map[string]any{"name": "wt-" + short, "server": srv,
+		"repo_url": "https://github.com/octocat/api.git"}, 201, &app)
+
+	startFakeAgent(t, ts.URL, srv, priv, func(op agentproto.SignedOp) (any, string) {
+		switch op.Kind {
+		case agentproto.KindProvisionStep, agentproto.KindAppDrain:
+			return map[string]any{"ok": true}, ""
+		case agentproto.KindAppBuild:
+			time.Sleep(2500 * time.Millisecond) // outlasts the hold, so the wait needs a continue
+			var p agentproto.BuildParams
+			_ = json.Unmarshal(op.Params, &p)
+			return agentproto.BuildResult{Image: p.Image, DetectResult: agentproto.DetectResult{Commit: strings.Repeat("a", 40), Runtime: "dockerfile"}}, ""
+		case agentproto.KindAppStart:
+			var p agentproto.StartParams
+			_ = json.Unmarshal(op.Params, &p)
+			return agentproto.StartResult{Container: agentproto.ContainerName(p.App, p.Process, p.DeploymentID), HostPort: 41012}, ""
+		case agentproto.KindRouteSet:
+			return map[string]any{"hosts": 0}, ""
+		}
+		return nil, "this fake agent does not run " + op.Kind
+	})
+
+	before := mcp.WaitHold
+	mcp.WaitHold = time.Second
+	defer func() { mcp.WaitHold = before }()
+	out, err := hosbah.New(ts.URL, tok.Token).Deploy(context.Background(), app.App.Name, hosbah.Wait(), hosbah.With("wait_seconds", 60))
+	if err != nil || !strings.Contains(out, "queued") || !strings.Contains(out, "succeeded") || strings.Contains(out, mcp.ContinuePrefix) {
+		t.Fatalf("deploy_app wait: %q %v", out, err)
 	}
 }

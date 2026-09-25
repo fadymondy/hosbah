@@ -25,3 +25,17 @@ test("call, helpers and errors", async () => {
   await assert.rejects(bad.apps(), (e) => e instanceof HosbahApiError && e.status === 401)
   assert.throws(() => new Hosbah({ url: "https://c.test", token: "" }))
 })
+
+test("call follows continue: lines until the wait is over", async () => {
+  let calls = 0
+  const fetch = fakeFetch((url, headers, req) => {
+    calls++
+    const next = 'continue: wait_deployment {"app":"shop","deployment":"4","until":"2026-09-25T12:00:00Z"}\n'
+    if (req.params.name === "deploy_app") return { body: { result: { content: [{ type: "text", text: "Deploy #4 of shop queued.\n" + next }] } } }
+    if (calls === 2) return { body: { result: { content: [{ type: "text", text: "#4 is running (step release).\n" + next }] } } }
+    return { body: { result: { content: [{ type: "text", text: "✗ #4 failed: health check\n" }], isError: true } } }
+  })
+  const c = new Hosbah({ url: "https://c.test", token: "hbu_ok", fetch })
+  await assert.rejects(c.deploy("shop", { wait: true }), (e) => e instanceof HosbahToolError && e.tool === "deploy_app" && e.detail === "Deploy #4 of shop queued.\n✗ #4 failed: health check\n")
+  assert.equal(calls, 3)
+})

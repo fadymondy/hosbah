@@ -359,6 +359,40 @@ func AppTools() []Tool {
 			},
 		},
 		{
+			Name: "wait_deployment", Scope: scopes.Read,
+			Description: "Follow a deployment until it finishes, fails or `until` passes, holding at most ~25 seconds per call. " +
+				"While it still runs, the reply's last line is `continue: wait_deployment {…}`: call it again with those arguments.",
+			InputSchema: schema([]string{"app", "deployment"}, map[string]any{"app": appArg, "deployment": str("Deployment number or id"),
+				"until":        str("RFC 3339 time to stop following (from a continue: line); default wait_seconds from now"),
+				"wait_seconds": map[string]any{"type": "integer", "default": 600, "maximum": 1800}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, d, err := findDeployment(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				until := time.Now().Add(time.Duration(args.Int("wait_seconds", 600, 10, 1800)) * time.Second)
+				if v := args.Str("until"); v != "" {
+					t, err := time.Parse(time.RFC3339, v)
+					if err != nil {
+						return "", errors.New("until must be an RFC 3339 time, e.g. 2026-09-25T12:00:00Z")
+					}
+					// A caller resumes a wait; it cannot stretch one past the longest a wait may run.
+					if limit := time.Now().Add(1800 * time.Second); t.After(limit) {
+						t = limit
+					}
+					until = t
+				}
+				env.Then = func(ctx context.Context) (string, error) {
+					return waitDeployment(ctx, env, s, a, d, until)
+				}
+				return "", nil
+			},
+		},
+		{
 			Name: "cancel_deployment", Scope: scopes.Deploy,
 			Description: "Cancel a waiting deployment, or stop a running one before it switches traffic.",
 			InputSchema: schema([]string{"app", "deployment"}, map[string]any{"app": appArg, "deployment": str("Deployment number or id")}),
@@ -787,17 +821,27 @@ func queueAndMaybeWait(ctx context.Context, env *Env, args Args, fn func(*deploy
 	if !args.Bool("wait") {
 		return out + "Follow it with get_deployment / deploy_logs.", nil
 	}
-	limit := time.Duration(args.Int("wait_seconds", 600, 10, 1800)) * time.Second
+	until := time.Now().Add(time.Duration(args.Int("wait_seconds", 600, 10, 1800)) * time.Second)
 	env.Then = func(ctx context.Context) (string, error) {
-		return waitDeployment(ctx, env, s, d, limit)
+		return waitDeployment(ctx, env, s, a, d, until)
 	}
 	return out, nil
 }
 
-func waitDeployment(ctx context.Context, env *Env, s *deploy.Service, d db.Deployment, limit time.Duration) (string, error) {
+// WaitHold is the longest one MCP request follows a deployment. Every hop in front of the API
+// (the web app's proxy at 30s, NPM at 60s, Cloudflare at 100s) drops a request that stays silent
+// longer, and the caller then sees a bare HTTP 500 while the deployment runs on. Past the hold the
+// reply names the wait_deployment call that picks up where it stopped.
+var WaitHold = 25 * time.Second
+
+// ContinuePrefix starts the last line of a reply that is not finished yet: the tool and the JSON
+// arguments to call next. The SDKs and the CLI follow it on their own; a model reads it.
+const ContinuePrefix = "continue: "
+
+func waitDeployment(ctx context.Context, env *Env, s *deploy.Service, a db.App, d db.Deployment, until time.Time) (string, error) {
 	wake, unsub := s.Ops().Broker().Subscribe(ops.DeployTopic(d.ID))
 	defer unsub()
-	deadline := time.Now().Add(limit)
+	hold := time.Now().Add(WaitHold)
 	started := time.Now()
 	for {
 		var cur db.Deployment
@@ -828,8 +872,13 @@ func waitDeployment(ctx context.Context, env *Env, s *deploy.Service, d db.Deplo
 			}
 			return "", errors.New(b.String())
 		}
-		if time.Now().After(deadline) {
-			return fmt.Sprintf("Still %s (step %s) after %s — follow it with get_deployment.\n", cur.Status, orDash(cur.Step), limit), nil
+		now := time.Now()
+		if now.After(until) {
+			return fmt.Sprintf("Still %s (step %s) and the wait ran out: follow it with get_deployment.\n", cur.Status, orDash(cur.Step)), nil
+		}
+		if now.After(hold) {
+			next, _ := json.Marshal(map[string]any{"app": a.Name, "deployment": fmt.Sprint(cur.Number), "until": until.UTC().Format(time.RFC3339)})
+			return fmt.Sprintf("#%d is %s (step %s).\n%swait_deployment %s\n", cur.Number, cur.Status, orDash(cur.Step), ContinuePrefix, next), nil
 		}
 		select {
 		case <-ctx.Done():

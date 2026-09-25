@@ -15,6 +15,9 @@ namespace Hosbah;
  */
 final class Hosbah
 {
+    /** The last line of a reply that is not finished yet: the tool and the JSON arguments to call next. */
+    public const CONTINUE_PREFIX = 'continue: ';
+
     private string $url;
     private string $token;
     private int $id = 0;
@@ -47,12 +50,54 @@ final class Hosbah
      */
     public function call(string $tool, array $args = []): string
     {
+        // A long wait is served as a chain of short requests (so no proxy drops it): follow each
+        // "continue:" line and return the first reply's text followed by the last one's.
+        $text = $this->callOnce($tool, $args);
+        $cont = self::splitContinue($text);
+        if ($cont === null) {
+            return $text;
+        }
+        $head = $cont[0];
+        for ($i = 0; $i < 200; $i++) {
+            try {
+                $more = $this->callOnce($cont[1], $cont[2]);
+            } catch (ToolError $e) {
+                throw new ToolError($tool, $head . $e->detail);
+            }
+            $cont = self::splitContinue($more);
+            if ($cont === null) {
+                return $head . $more;
+            }
+        }
+        throw new \RuntimeException("hosbah: {$tool} kept asking to continue");
+    }
+
+    /** @param array<string, mixed> $args */
+    private function callOnce(string $tool, array $args): string
+    {
         $r = $this->rpc('tools/call', ['name' => $tool, 'arguments' => (object) $args]);
         $text = implode('', array_map(fn ($c) => $c['text'] ?? '', $r['content'] ?? []));
         if (!empty($r['isError'])) {
             throw new ToolError($tool, $text);
         }
         return $text;
+    }
+
+    /** @return array{0:string, 1:string, 2:array<string, mixed>}|null */
+    private static function splitContinue(string $text): ?array
+    {
+        $trimmed = rtrim($text, "\n");
+        $i = strrpos($trimmed, "\n");
+        $last = $i === false ? $trimmed : substr($trimmed, $i + 1);
+        if (!str_starts_with($last, self::CONTINUE_PREFIX)) {
+            return null;
+        }
+        $parts = explode(' ', substr($last, strlen(self::CONTINUE_PREFIX)), 2);
+        $args = json_decode($parts[1] ?? '', true);
+        if ($parts[0] === '' || !is_array($args)) {
+            return null;
+        }
+        return [$i === false ? '' : substr($trimmed, 0, $i + 1), $parts[0], $args];
     }
 
     public function whoami(): string { return $this->call('whoami'); }
@@ -133,9 +178,10 @@ final class Hosbah
 /** A tool refused (not found, missing scope, validation…). */
 final class ToolError extends \RuntimeException
 {
-    public function __construct(public readonly string $tool, string $message)
+    /** @param string $detail the tool's own text, without the "hosbah: tool:" prefix */
+    public function __construct(public readonly string $tool, public readonly string $detail)
     {
-        parent::__construct("hosbah: {$tool}: {$message}");
+        parent::__construct("hosbah: {$tool}: {$detail}");
     }
 }
 

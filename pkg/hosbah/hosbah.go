@@ -120,8 +120,59 @@ func (c *Client) Tools(ctx context.Context) ([]Tool, error) {
 	return r.Tools, err
 }
 
-// Call runs any tool with its arguments and returns its text output.
+// ContinuePrefix starts the last line of a reply that is not finished yet (a deploy with wait
+// that outlasted one request): the tool and the JSON arguments to call next.
+const ContinuePrefix = "continue: "
+
+// maxContinues bounds how many times Call follows a continue: line (the server stops offering
+// one after at most 30 minutes; this only guards against a misbehaving server).
+const maxContinues = 200
+
+// Call runs any tool with its arguments and returns its text output. A long wait is served as a
+// chain of short requests, so no proxy in front of the API drops it: Call follows each continue:
+// line and returns the first reply's text followed by the last one's.
 func (c *Client) Call(ctx context.Context, tool string, args map[string]any) (string, error) {
+	text, err := c.call(ctx, tool, args)
+	if err != nil {
+		return "", err
+	}
+	head, next, nextArgs, ok := splitContinue(text)
+	if !ok {
+		return text, nil
+	}
+	for i := 0; i < maxContinues; i++ {
+		more, err := c.call(ctx, next, nextArgs)
+		if err != nil {
+			var te *ToolError
+			if errors.As(err, &te) {
+				return "", &ToolError{Tool: tool, Message: head + te.Message}
+			}
+			return "", err
+		}
+		if _, next, nextArgs, ok = splitContinue(more); !ok {
+			return head + more, nil
+		}
+	}
+	return "", fmt.Errorf("hosbah: %s kept asking to continue", tool)
+}
+
+// splitContinue splits a reply ending in a continue: line into the text before it and the call it
+// names.
+func splitContinue(text string) (head, tool string, args map[string]any, ok bool) {
+	trimmed := strings.TrimRight(text, "\n")
+	i := strings.LastIndex(trimmed, "\n")
+	last := trimmed[i+1:]
+	if !strings.HasPrefix(last, ContinuePrefix) {
+		return text, "", nil, false
+	}
+	tool, raw, found := strings.Cut(strings.TrimPrefix(last, ContinuePrefix), " ")
+	if !found || tool == "" || json.Unmarshal([]byte(raw), &args) != nil {
+		return text, "", nil, false
+	}
+	return trimmed[:i+1], tool, args, true
+}
+
+func (c *Client) call(ctx context.Context, tool string, args map[string]any) (string, error) {
 	if args == nil {
 		args = map[string]any{}
 	}
