@@ -105,21 +105,17 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 }
 
 // fastBuildDockerfile (MH-573 A7b) is the fast track for an app with a Dockerfile: the exact image
-// a full build would produce, just with BuildKit's own cache reused from a persistent local
-// directory instead of thrown away, so an unchanged base layer never rebuilds. Kept as a normal
+// a full build would produce, reusing the Docker daemon's own layer cache, so unchanged layers
+// (dependencies, base images) never rebuild. The default docker driver cannot export a
+// type=local cache, so the daemon cache is the one every Docker install has. Kept as a normal
 // `docker build`/buildx invocation, not app.build's — app.build always ran without --cache-to/from,
 // and keeps doing so, so `full` stays a from-scratch, cache-free rebuild by design.
 func fastBuildDockerfile(oc *OpContext, p agentproto.FastBuildParams, dir string) (image, imageID string, code int, err error) {
 	if exec.CommandContext(oc.Ctx, "docker", "buildx", "version").Run() != nil { //#nosec G204 -- fixed argv
 		return "", "", 1, errors.New("docker buildx is missing — run the build.tools provisioning step")
 	}
-	cacheDir := filepath.Join(workRoot, "apps", p.App, "buildcache")
-	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
-		return "", "", 1, err
-	}
 	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
-	args := append([]string{"buildx", "build", "--progress=plain", "--load", "-t", p.Image},
-		"--cache-from", "type=local,src="+cacheDir, "--cache-to", "type=local,dest="+cacheDir+",mode=max")
+	args := []string{"buildx", "build", "--progress=plain", "--load", "-t", p.Image}
 	args = append(args, labels...)
 	args = append(args, "-f", filepath.Join(dir, "Dockerfile"), dir)
 	oc.Progress(3, 5)

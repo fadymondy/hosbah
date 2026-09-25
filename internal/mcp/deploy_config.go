@@ -76,9 +76,7 @@ func DeployConfigTools() []Tool {
 			enabled, _ := m["enabled"].(bool)
 			out = append(out, deploy.DeployStep{Key: key, Name: name, Run: run, Enabled: enabled})
 		}
-		if len(out) == 0 {
-			return nil, errors.New("steps must have at least one entry")
-		}
+		// No steps is valid: the dockerfile preset builds from the Dockerfile alone.
 		return out, nil
 	}
 
