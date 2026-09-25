@@ -1384,6 +1384,31 @@ resources:
           gql: Int!
           pg: bigint
           "null": false
+        - name: notify_channel_ids
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: heartbeat_interval_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: heartbeat_grace_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: ping_token_hash
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: last_ping_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
       controller: true
     - name: MonitorIncident
       table: monitor_incidents
@@ -1472,6 +1497,55 @@ resources:
           gql: String
           pg: timestamptz
           "null": true
+      controller: true
+    - name: NotificationChannel
+      table: notification_channels
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: emails
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: url_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: secret_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: events
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
       controller: true
     - name: Operation
       table: operations
@@ -2300,6 +2374,35 @@ resources:
           go: string
           gql: String!
           pg: jsonb
+          "null": false
+      controller: true
+    - name: StatusPage
+      table: status_pages
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: slug
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: title
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: monitor_ids
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: published
+          go: bool
+          gql: Boolean!
+          pg: boolean
           "null": false
       controller: true
     - name: Team

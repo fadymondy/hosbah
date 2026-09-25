@@ -52,6 +52,9 @@ type App struct {
 	Monitors any
 	// Schedules is the *schedules.Service (typed any for the same reason): a site's cron jobs.
 	Schedules any
+	// Notifications is the *notifications.Service (typed any for the same reason): a team's alert
+	// channels (email, Slack, Discord, webhook) and status pages.
+	Notifications any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

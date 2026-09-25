@@ -18,6 +18,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/pgtext"
 	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 /*
@@ -28,10 +29,11 @@ member's role, names team_id in every statement and writes the audit entry on th
 
 // Kinds and states.
 const (
-	KindHTTP   = "http"
-	KindCPU    = "cpu"
-	KindMemory = "memory"
-	KindDisk   = "disk"
+	KindHTTP      = "http"
+	KindCPU       = "cpu"
+	KindMemory    = "memory"
+	KindDisk      = "disk"
+	KindHeartbeat = "heartbeat"
 
 	StateUnknown = "unknown"
 	StateOK      = "ok"
@@ -41,6 +43,12 @@ const (
 	MaxPerApp = 20
 	// MaxEmails bounds notify_emails.
 	MaxEmails = 10
+	// MaxChannels bounds notify_channel_ids.
+	MaxChannels = 10
+	// MinHeartbeatInterval / MaxHeartbeatInterval bound heartbeat_interval_seconds.
+	MinHeartbeatInterval, MaxHeartbeatInterval = 30, 86400
+	// MinHeartbeatGrace / MaxHeartbeatGrace bound heartbeat_grace_seconds.
+	MinHeartbeatGrace, MaxHeartbeatGrace = 0, 86400
 )
 
 func invalid(msg string) error  { return &deploy.ActionError{Status: 422, Msg: msg} }
@@ -56,33 +64,41 @@ type OpenIncident struct {
 
 // Monitor is a monitor as the API shows it.
 type Monitor struct {
-	ID                  string        `json:"id"`
-	AppID               string        `json:"app_id"`
-	Name                string        `json:"name"`
-	Kind                string        `json:"kind" enum:"http,cpu,memory,disk"`
-	Target              string        `json:"target" doc:"http: the URL that is fetched; its host is one of the app's own hostnames. Empty for cpu, memory and disk."`
-	ExpectedStatus      int           `json:"expected_status" doc:"http: the status a check must answer; 0 = any 2xx or 3xx."`
-	Threshold           float64       `json:"threshold" doc:"http: the slowest acceptable response in ms (0 = no limit). cpu, memory, disk: percent."`
-	WindowMinutes       int           `json:"window_minutes" doc:"cpu, memory, disk: the threshold is held against the average over this many minutes."`
-	IntervalSeconds     int           `json:"interval_seconds"`
-	Enabled             bool          `json:"enabled"`
-	NotifyEmails        []string      `json:"notify_emails"`
-	NotifyWebhook       string        `json:"notify_webhook"`
-	State               string        `json:"state" enum:"unknown,ok,failing"`
-	LastCheckedAt       *time.Time    `json:"last_checked_at"`
-	LastError           string        `json:"last_error"`
-	ConsecutiveFailures int           `json:"consecutive_failures"`
-	OpenIncident        *OpenIncident `json:"open_incident"`
-	CreatedAt           time.Time     `json:"created_at"`
-	UpdatedAt           time.Time     `json:"updated_at"`
+	ID                       string        `json:"id"`
+	AppID                    string        `json:"app_id"`
+	Name                     string        `json:"name"`
+	Kind                     string        `json:"kind" enum:"http,cpu,memory,disk,heartbeat"`
+	Target                   string        `json:"target" doc:"http: the URL that is fetched; its host is one of the app's own hostnames. Empty otherwise."`
+	ExpectedStatus           int           `json:"expected_status" doc:"http: the status a check must answer; 0 = any 2xx or 3xx."`
+	Threshold                float64       `json:"threshold" doc:"http: the slowest acceptable response in ms (0 = no limit). cpu, memory, disk: percent."`
+	WindowMinutes            int           `json:"window_minutes" doc:"cpu, memory, disk: the threshold is held against the average over this many minutes."`
+	IntervalSeconds          int           `json:"interval_seconds"`
+	Enabled                  bool          `json:"enabled"`
+	NotifyEmails             []string      `json:"notify_emails"`
+	NotifyWebhook            string        `json:"notify_webhook"`
+	NotifyChannelIDs         []string      `json:"notify_channel_ids" doc:"Team notification channels (internal/notifications) this monitor's incidents also reach."`
+	HeartbeatIntervalSeconds int           `json:"heartbeat_interval_seconds" doc:"kind heartbeat: how often a ping is expected."`
+	HeartbeatGraceSeconds    int           `json:"heartbeat_grace_seconds" doc:"kind heartbeat: how late a ping may be before an incident opens."`
+	PingURLPath              string        `json:"ping_url_path,omitempty" doc:"kind heartbeat only, and only right after it is created: POST (or GET) this path on the API origin to check in. Never shown again."`
+	State                    string        `json:"state" enum:"unknown,ok,failing"`
+	LastCheckedAt            *time.Time    `json:"last_checked_at"`
+	LastPingAt               *time.Time    `json:"last_ping_at,omitempty" doc:"kind heartbeat: when the last check-in arrived."`
+	LastError                string        `json:"last_error"`
+	ConsecutiveFailures      int           `json:"consecutive_failures"`
+	OpenIncident             *OpenIncident `json:"open_incident"`
+	CreatedAt                time.Time     `json:"created_at"`
+	UpdatedAt                time.Time     `json:"updated_at"`
 }
 
 func view(m db.Monitor, open *db.MonitorIncident) Monitor {
 	out := Monitor{ID: m.ID, AppID: m.AppID, Name: m.Name, Kind: m.Kind, Target: m.Target, ExpectedStatus: int(m.ExpectedStatus),
 		Threshold: m.Threshold, WindowMinutes: int(m.WindowMinutes), IntervalSeconds: int(m.IntervalSeconds), Enabled: m.Enabled,
-		NotifyEmails: []string{}, NotifyWebhook: m.NotifyWebhook, State: m.State, LastCheckedAt: m.LastCheckedAt, LastError: m.LastError,
+		NotifyEmails: []string{}, NotifyWebhook: m.NotifyWebhook, NotifyChannelIDs: []string{},
+		HeartbeatIntervalSeconds: int(m.HeartbeatIntervalSeconds), HeartbeatGraceSeconds: int(m.HeartbeatGraceSeconds),
+		State: m.State, LastCheckedAt: m.LastCheckedAt, LastPingAt: m.LastPingAt, LastError: m.LastError,
 		ConsecutiveFailures: int(m.ConsecutiveFailures), CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 	out.NotifyEmails = append(out.NotifyEmails, m.NotifyEmails...)
+	out.NotifyChannelIDs = append(out.NotifyChannelIDs, m.NotifyChannelIds...)
 	if open != nil {
 		out.OpenIncident = &OpenIncident{ID: open.ID, OpenedAt: open.OpenedAt, Reason: open.Reason}
 	}
@@ -92,25 +108,29 @@ func view(m db.Monitor, open *db.MonitorIncident) Monitor {
 // Input is a monitor's settings as a caller gives them. nil = not given (create: the default;
 // update: unchanged). Kind is only read on create.
 type Input struct {
-	Name            *string
-	Kind            string
-	Target          *string
-	ExpectedStatus  *int
-	Threshold       *float64
-	WindowMinutes   *int
-	IntervalSeconds *int
-	Enabled         *bool
-	NotifyEmails    *[]string
-	NotifyWebhook   *string
+	Name                     *string
+	Kind                     string
+	Target                   *string
+	ExpectedStatus           *int
+	Threshold                *float64
+	WindowMinutes            *int
+	IntervalSeconds          *int
+	Enabled                  *bool
+	NotifyEmails             *[]string
+	NotifyWebhook            *string
+	NotifyChannelIDs         *[]string
+	HeartbeatIntervalSeconds *int
+	HeartbeatGraceSeconds    *int
 }
 
 // spec is a complete, validated set of settings.
 type spec struct {
-	Name, Kind, Target, Webhook      string
-	ExpectedStatus, Window, Interval int
-	Threshold                        float64
-	Enabled                          bool
-	Emails                           []string
+	Name, Kind, Target, Webhook       string
+	ExpectedStatus, Window, Interval  int
+	Threshold                         float64
+	Enabled                           bool
+	Emails, Channels                  []string
+	HeartbeatInterval, HeartbeatGrace int
 }
 
 func (in Input) over(s spec) spec {
@@ -140,6 +160,15 @@ func (in Input) over(s spec) spec {
 	}
 	if in.NotifyWebhook != nil {
 		s.Webhook = *in.NotifyWebhook
+	}
+	if in.NotifyChannelIDs != nil {
+		s.Channels = *in.NotifyChannelIDs
+	}
+	if in.HeartbeatIntervalSeconds != nil {
+		s.HeartbeatInterval = *in.HeartbeatIntervalSeconds
+	}
+	if in.HeartbeatGraceSeconds != nil {
+		s.HeartbeatGrace = *in.HeartbeatGraceSeconds
 	}
 	return s
 }
@@ -203,7 +232,8 @@ func validate(s spec, hostnames []string) (spec, error) {
 		if s.Threshold < 0 || s.Threshold > 60000 {
 			return s, invalid("threshold is the slowest acceptable response in ms: 0 (no limit) to 60000")
 		}
-		s.Window = 5 // unused by http
+		s.Window = 5                                     // unused by http
+		s.HeartbeatInterval, s.HeartbeatGrace = 300, 120 // unused by http; satisfies the DB's heartbeat range checks
 	case KindCPU, KindMemory, KindDisk:
 		if strings.TrimSpace(s.Target) != "" {
 			return s, invalid("a " + s.Kind + " monitor has no target: it reads the app's server's metrics")
@@ -218,13 +248,51 @@ func validate(s spec, hostnames []string) (spec, error) {
 		if s.Window < 1 || s.Window > 60 {
 			return s, invalid("window_minutes must be between 1 and 60")
 		}
-		s.ExpectedStatus = 200 // unused by resource kinds
+		s.ExpectedStatus = 200                           // unused by resource kinds
+		s.HeartbeatInterval, s.HeartbeatGrace = 300, 120 // unused by cpu/memory/disk; satisfies the DB's heartbeat range checks
+	case KindHeartbeat:
+		if strings.TrimSpace(s.Target) != "" {
+			return s, invalid("a heartbeat monitor has no target: it waits for a ping")
+		}
+		s.Target = ""
+		s.ExpectedStatus, s.Threshold, s.Window = 200, 0, 5 // unused by heartbeat
+		if s.HeartbeatInterval == 0 {
+			s.HeartbeatInterval = 300
+		}
+		if s.HeartbeatInterval < MinHeartbeatInterval || s.HeartbeatInterval > MaxHeartbeatInterval {
+			return s, invalid(fmt.Sprintf("heartbeat_interval_seconds must be between %d and %d", MinHeartbeatInterval, MaxHeartbeatInterval))
+		}
+		if s.HeartbeatGrace == 0 {
+			s.HeartbeatGrace = 120
+		}
+		if s.HeartbeatGrace < MinHeartbeatGrace || s.HeartbeatGrace > MaxHeartbeatGrace {
+			return s, invalid(fmt.Sprintf("heartbeat_grace_seconds must be between %d and %d", MinHeartbeatGrace, MaxHeartbeatGrace))
+		}
+		s.Interval = 60 // unused by heartbeat (it is never claimed by ClaimDueMonitors)
 	default:
-		return s, invalid("kind must be one of http, cpu, memory, disk")
+		return s, invalid("kind must be one of http, cpu, memory, disk, heartbeat")
 	}
 
 	if len(s.Emails) > MaxEmails {
 		return s, invalid(fmt.Sprintf("notify_emails holds at most %d addresses", MaxEmails))
+	}
+	if len(s.Channels) > MaxChannels {
+		return s, invalid(fmt.Sprintf("notify_channel_ids holds at most %d channels", MaxChannels))
+	}
+	{
+		seen := map[string]bool{}
+		ids := []string{}
+		for _, id := range s.Channels {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				continue
+			}
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+		s.Channels = ids
 	}
 	seen := map[string]bool{}
 	emails := []string{}
@@ -318,7 +386,8 @@ func View(ctx context.Context, q *db.Queries, m db.Monitor) (Monitor, error) {
 	return view(m, &open), nil
 }
 
-// Create adds a monitor to the app. Audited.
+// Create adds a monitor to the app. kind heartbeat mints a ping token; the plaintext (PingURLPath)
+// is returned once, in this call's result only — nothing but its hash is ever stored. Audited.
 func Create(ctx context.Context, q *db.Queries, teamID string, actor deploy.Actor, a db.App, in Input) (Monitor, error) {
 	hosts, err := hostnamesOf(ctx, q, teamID, a)
 	if err != nil {
@@ -326,6 +395,9 @@ func Create(ctx context.Context, q *db.Queries, teamID string, actor deploy.Acto
 	}
 	s, err := validate(in.over(spec{Kind: strings.TrimSpace(in.Kind), ExpectedStatus: 200, Enabled: true}), hosts)
 	if err != nil {
+		return Monitor{}, err
+	}
+	if err := channelsExist(ctx, q, teamID, s.Channels); err != nil {
 		return Monitor{}, err
 	}
 	if n, err := q.CountMonitorsOfApp(ctx, db.CountMonitorsOfAppParams{AppID: a.ID, TeamID: teamID}); err != nil {
@@ -337,17 +409,49 @@ func Create(ctx context.Context, q *db.Queries, teamID string, actor deploy.Acto
 	if _, err := q.MonitorOfApp(ctx, db.MonitorOfAppParams{AppID: a.ID, TeamID: teamID, Ref: s.Name}); err == nil {
 		return Monitor{}, conflict("the app already has a monitor with that name")
 	}
+	plainToken := ""
+	var tokenHash *string
+	if s.Kind == KindHeartbeat {
+		var hash string
+		plainToken, hash = tokens.New(tokens.PrefixPing)
+		tokenHash = &hash
+	}
 	m, err := q.InsertMonitor(ctx, db.InsertMonitorParams{TeamID: teamID, AppID: a.ID, Name: s.Name, Kind: s.Kind, Target: s.Target,
 		ExpectedStatus: int64(s.ExpectedStatus), Threshold: s.Threshold, WindowMinutes: int64(s.Window), IntervalSeconds: int64(s.Interval),
-		Enabled: s.Enabled, NotifyEmails: pgtext.Array(s.Emails), NotifyWebhook: s.Webhook})
+		Enabled: s.Enabled, NotifyEmails: pgtext.Array(s.Emails), NotifyWebhook: s.Webhook, NotifyChannelIds: pgtext.Array(s.Channels),
+		HeartbeatIntervalSeconds: int64(s.HeartbeatInterval), HeartbeatGraceSeconds: int64(s.HeartbeatGrace), PingTokenHash: tokenHash})
 	if isUnique(err) {
 		return Monitor{}, conflict("the app already has a monitor with that name")
 	}
 	if err != nil {
 		return Monitor{}, err
 	}
-	return view(m, nil), tenancy.Record(ctx, q, teamID, actor.UserID, "monitor.created", "app", a.ID,
+	out := view(m, nil)
+	if plainToken != "" {
+		out.PingURLPath = PingPath(plainToken)
+	}
+	return out, tenancy.Record(ctx, q, teamID, actor.UserID, "monitor.created", "app", a.ID,
 		auditOf(actor, map[string]any{"monitor": m.ID, "name": m.Name, "kind": m.Kind, "target": m.Target}))
+}
+
+// PingPath is the path (on the API origin, outside /api — see internal/monitors.MountPublic) a
+// heartbeat's plaintext ping token checks in at.
+func PingPath(plainToken string) string { return "/hooks/heartbeat/" + plainToken }
+
+// channelsExist checks that every id in ids names one of the team's notification channels — a 422,
+// not a silent drop, so a typo is caught at create/update time.
+func channelsExist(ctx context.Context, q *db.Queries, teamID string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := q.NotificationChannelsByIDsInTeam(ctx, db.NotificationChannelsByIDsInTeamParams{TeamID: teamID, Ids: strings.Join(ids, ",")})
+	if err != nil {
+		return err
+	}
+	if len(rows) != len(ids) {
+		return invalid("notify_channel_ids: one or more of those channels do not exist")
+	}
+	return nil
 }
 
 // Update changes a monitor's settings (never its kind). Changing the rule, or switching the
@@ -358,9 +462,13 @@ func Update(ctx context.Context, q *db.Queries, teamID string, actor deploy.Acto
 		return Monitor{}, err
 	}
 	old := spec{Name: m.Name, Kind: m.Kind, Target: m.Target, Webhook: m.NotifyWebhook, ExpectedStatus: int(m.ExpectedStatus),
-		Window: int(m.WindowMinutes), Interval: int(m.IntervalSeconds), Threshold: m.Threshold, Enabled: m.Enabled, Emails: m.NotifyEmails}
+		Window: int(m.WindowMinutes), Interval: int(m.IntervalSeconds), Threshold: m.Threshold, Enabled: m.Enabled, Emails: m.NotifyEmails,
+		Channels: m.NotifyChannelIds, HeartbeatInterval: int(m.HeartbeatIntervalSeconds), HeartbeatGrace: int(m.HeartbeatGraceSeconds)}
 	s, err := validate(in.over(old), hosts)
 	if err != nil {
+		return Monitor{}, err
+	}
+	if err := channelsExist(ctx, q, teamID, s.Channels); err != nil {
 		return Monitor{}, err
 	}
 	if s.Name != m.Name {
@@ -372,7 +480,8 @@ func Update(ctx context.Context, q *db.Queries, teamID string, actor deploy.Acto
 		(old.Enabled && !s.Enabled)
 	up, err := q.UpdateMonitorInTeam(ctx, db.UpdateMonitorInTeamParams{ID: m.ID, TeamID: teamID, Name: s.Name, Target: s.Target,
 		ExpectedStatus: int64(s.ExpectedStatus), Threshold: s.Threshold, WindowMinutes: int64(s.Window), IntervalSeconds: int64(s.Interval),
-		Enabled: s.Enabled, NotifyEmails: pgtext.Array(s.Emails), NotifyWebhook: s.Webhook, Reset: reset})
+		Enabled: s.Enabled, NotifyEmails: pgtext.Array(s.Emails), NotifyWebhook: s.Webhook, NotifyChannelIds: pgtext.Array(s.Channels),
+		HeartbeatIntervalSeconds: int64(s.HeartbeatInterval), HeartbeatGraceSeconds: int64(s.HeartbeatGrace), Reset: reset})
 	if isUnique(err) {
 		return Monitor{}, conflict("the app already has a monitor with that name")
 	}

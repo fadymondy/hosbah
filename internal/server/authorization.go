@@ -122,6 +122,11 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/providers":  // which "Continue with Google / GitHub" buttons to show
 		return true
 	}
+	// The public status page (internal/api/public.go): a published page by its slug, filtered so
+	// deeply (PublicStatusPageBySlug, PublicMonitorsByIDs) that anonymous access is the point.
+	if strings.HasPrefix(p, "/api/public/status/") {
+		return true
+	}
 	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
 	// a single-use state bound to this browser) and the callback (accepts only that state). The
 	// start with ?link=1 attaches the provider to the signed-in account: member tier.

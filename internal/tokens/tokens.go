@@ -7,6 +7,7 @@
 //	hba_  platform-admin MCP token      (admin_mcp_tokens)    was cla_
 //	hbe_  agent enrolment token         (agent_enrollments)   was cle_  (internal/ops)
 //	hbh_  app deploy-hook token         (apps)                was cdh_  (internal/deploy)
+//	hbp_  heartbeat ping token          (monitors)             new in MH-575 H3
 //	(none) invitation link token        (invitations)
 //
 // New tokens get the hb*_ prefix. Tokens minted before the rename keep working: the prefix is
@@ -26,6 +27,7 @@ const (
 	PrefixAdminMCP = "hba_"
 	PrefixEnrol    = "hbe_"
 	PrefixHook     = "hbh_"
+	PrefixPing     = "hbp_"
 
 	// Before the rename from Cloudy. Accepted, never minted.
 	LegacyPrefixUserMCP  = "cld_"
@@ -40,6 +42,7 @@ var (
 	AdminMCP = []string{PrefixAdminMCP, LegacyPrefixAdminMCP}
 	Enrol    = []string{PrefixEnrol, LegacyPrefixEnrol}
 	Hook     = []string{PrefixHook, LegacyPrefixHook}
+	Ping     = []string{PrefixPing}
 )
 
 // HasPrefix reports whether token starts with one of the family's prefixes.

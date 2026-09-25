@@ -132,6 +132,15 @@ func TestIsolationSweep(t *testing.T) {
 	var monA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/monitors", map[string]any{"name": "up-a", "kind": "http",
 		"target": "https://a-" + suffix + ".example.test/health", "enabled": false}, 201, &monA)
+	// A notification channel of A's (alerts & channels — MH-575 H2), and a status page of A's that
+	// shows the monitor above (MH-575 H3), so the swept {channel} and {status_page} routes have
+	// something to leak.
+	var chanA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/notification-channels", map[string]any{"kind": "email", "name": "alerts-a",
+		"emails": []string{"ops-a-" + suffix + "@example.test"}}, 201, &chanA)
+	var pageA struct{ ID, Slug string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/status-pages", map[string]any{"slug": "alpha-" + suffix, "title": "Alpha status",
+		"monitor_ids": []string{monA.ID}}, 201, &pageA)
 	// A schedule of app A (cron jobs), switched off, and one run of it with sealed output.
 	var schedA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/schedules", map[string]any{"name": "nightly-a", "cron": "0 3 * * *",
@@ -212,33 +221,35 @@ func TestIsolationSweep(t *testing.T) {
 	// ---- REST sweep -------------------------------------------------------------------------
 	oapi := openAPIDoc()
 	fillers := map[string]func(path string) []string{
-		"team":       func(string) []string { return []string{teamA.ID, teamA.Slug} },
-		"member":     func(string) []string { return []string{memberA} },
-		"server":     func(string) []string { return []string{srvA, "alpha-" + suffix} }, // an id, and a name (must not resolve either)
-		"item":       func(string) []string { return []string{"imp-site", "imp-pg"} },    // an import item's origin key of A's server
-		"op":         func(string) []string { return []string{opA} },
-		"credential": func(string) []string { return []string{credA.ID} },
-		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
-		"app":        func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
-		"snapshot":   func(string) []string { return []string{"pre-up"} },
-		"deployment": func(string) []string { return []string{appA.Deployment.ID, "1"} },
-		"version":    func(string) []string { return []string{"1"} },
-		"name":       func(string) []string { return []string{"SECRET_A"} },
-		"domain":     func(string) []string { return []string{domA.ID, domA.Hostname} },
-		"hostname":   func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
-		"monitor":    func(string) []string { return []string{monA.ID, monA.Name} },
-		"schedule":   func(string) []string { return []string{schedA.ID, schedA.Name} },
-		"run":        func(string) []string { return []string{runA} },
-		"volume":     func(string) []string { return []string{volA.ID, volA.Name} },
-		"bucket":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
-		"browser":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
-		"install":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c3", "a-env-install"} },
-		"recipe":     func(string) []string { return []string{"searxng", "no-such-recipe"} },                  // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
-		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
-		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
-		"sftp_user":  func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
-		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
-		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
+		"team":        func(string) []string { return []string{teamA.ID, teamA.Slug} },
+		"member":      func(string) []string { return []string{memberA} },
+		"server":      func(string) []string { return []string{srvA, "alpha-" + suffix} }, // an id, and a name (must not resolve either)
+		"item":        func(string) []string { return []string{"imp-site", "imp-pg"} },    // an import item's origin key of A's server
+		"op":          func(string) []string { return []string{opA} },
+		"credential":  func(string) []string { return []string{credA.ID} },
+		"token":       func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
+		"app":         func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
+		"snapshot":    func(string) []string { return []string{"pre-up"} },
+		"deployment":  func(string) []string { return []string{appA.Deployment.ID, "1"} },
+		"version":     func(string) []string { return []string{"1"} },
+		"name":        func(string) []string { return []string{"SECRET_A"} },
+		"domain":      func(string) []string { return []string{domA.ID, domA.Hostname} },
+		"hostname":    func(string) []string { return []string{domA.Hostname} }, // …/dns/{hostname}: one of app A's own
+		"monitor":     func(string) []string { return []string{monA.ID, monA.Name} },
+		"channel":     func(string) []string { return []string{chanA.ID} },
+		"status_page": func(string) []string { return []string{pageA.ID, pageA.Slug} },
+		"schedule":    func(string) []string { return []string{schedA.ID, schedA.Name} },
+		"run":         func(string) []string { return []string{runA} },
+		"volume":      func(string) []string { return []string{volA.ID, volA.Name} },
+		"bucket":      func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
+		"browser":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
+		"install":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c3", "a-env-install"} },
+		"recipe":      func(string) []string { return []string{"searxng", "no-such-recipe"} },                  // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
+		"job":         func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
+		"proxy":       func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
+		"sftp_user":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
+		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
+		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -360,6 +371,10 @@ func TestIsolationSweep(t *testing.T) {
 		"list_app_monitors":  {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
+		"monitor_uptime": {"app": appA.App.ID, "monitor": monA.ID},
+		"notification_channel_update": {"channel": chanA.ID, "name": "stolen"}, "notification_channel_test": {"channel": chanA.ID},
+		"notification_channel_delete": {"channel": chanA.ID, "confirm": chanA.Name},
+		"status_page_update": {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
 		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
@@ -406,6 +421,12 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
 		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "notification_channels_list", nil); strings.Contains(res.Text, chanA.ID) || strings.Contains(res.Text, chanA.Name) {
+		t.Errorf("notification_channels_list as B leaked team A's channel: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "status_pages_list", nil); strings.Contains(res.Text, pageA.ID) || strings.Contains(res.Text, pageA.Slug) {
+		t.Errorf("status_pages_list as B leaked team A's status page: %s", res.Text)
 	}
 	// Imported records of A's, by id and name: not found, and nothing acts on them.
 	for name, args := range map[string]map[string]any{

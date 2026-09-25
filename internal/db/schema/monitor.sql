@@ -17,6 +17,11 @@ CREATE TABLE monitors (
     last_checked_at timestamptz,
     last_error text NOT NULL DEFAULT '',
     consecutive_failures bigint NOT NULL DEFAULT 0,
+    notify_channel_ids text[] NOT NULL DEFAULT '{}',
+    heartbeat_interval_seconds bigint NOT NULL DEFAULT 300,
+    heartbeat_grace_seconds bigint NOT NULL DEFAULT 120,
+    ping_token_hash text,
+    last_ping_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -25,22 +30,36 @@ CREATE TABLE monitors (
 -- own hostnames (checked by the API on every write: the control plane fetches it, so an arbitrary
 -- URL would be an SSRF hole) — expecting expected_status (0 = any 2xx/3xx) within threshold ms
 -- (0 = no limit), every interval_seconds. kind cpu | memory | disk: the average of the app's
--- server's server_metrics over window_minutes against threshold percent. The evaluator
--- (internal/monitors) claims due rows by moving last_checked_at, keeps state, last_error and
--- consecutive_failures, and opens / resolves monitor_incidents. Rows go with their app.
-ALTER TABLE monitors ADD CONSTRAINT monitors_kind_check CHECK (kind IN ('http', 'cpu', 'memory', 'disk'));
+-- server's server_metrics over window_minutes against threshold percent. kind heartbeat (MH-575
+-- H3): nothing is fetched — the monitor instead expects a GET/POST to its ping_token_hash's public
+-- URL at least every heartbeat_interval_seconds, plus heartbeat_grace_seconds of slack; the sweep
+-- (internal/monitors) opens an incident on a missed window and a later ping resolves it.
+-- ping_token_hash is the SHA-256 of a one-time-shown hbp_ token (internal/tokens), unique so the
+-- public ping handler finds exactly one monitor by it (tenancy.Scope{TokenHash: ...}, see the
+-- monitors_ping_token_* policies). notify_channel_ids names team notification_channels this
+-- monitor also routes to, on top of the older notify_emails / notify_webhook. The evaluator claims
+-- due rows by moving last_checked_at, keeps state, last_error and consecutive_failures, and opens /
+-- resolves monitor_incidents. Rows go with their app.
+ALTER TABLE monitors ADD CONSTRAINT monitors_kind_check CHECK (kind IN ('http', 'cpu', 'memory', 'disk', 'heartbeat'));
 ALTER TABLE monitors ADD CONSTRAINT monitors_state_check CHECK (state IN ('unknown', 'ok', 'failing'));
 ALTER TABLE monitors ADD CONSTRAINT monitors_name_check CHECK (length(name) BETWEEN 1 AND 80);
 ALTER TABLE monitors ADD CONSTRAINT monitors_target_check CHECK (
     (kind = 'http' AND target ~ '^https?://' AND length(target) <= 500) OR (kind <> 'http' AND target = ''));
 ALTER TABLE monitors ADD CONSTRAINT monitors_expected_status_check CHECK (expected_status = 0 OR expected_status BETWEEN 100 AND 599);
+-- heartbeat carries no threshold (it is unused, like its target): treated like http's "any value in
+-- range" rather than cpu/memory/disk's "required percent", so 0 (the column's default) is valid.
 ALTER TABLE monitors ADD CONSTRAINT monitors_threshold_check CHECK (
-    (kind = 'http' AND threshold >= 0 AND threshold <= 60000) OR (kind <> 'http' AND threshold >= 1 AND threshold <= 100));
+    (kind IN ('http', 'heartbeat') AND threshold >= 0 AND threshold <= 60000) OR (kind IN ('cpu', 'memory', 'disk') AND threshold >= 1 AND threshold <= 100));
 ALTER TABLE monitors ADD CONSTRAINT monitors_window_check CHECK (window_minutes BETWEEN 1 AND 60);
 ALTER TABLE monitors ADD CONSTRAINT monitors_interval_check CHECK (interval_seconds BETWEEN 30 AND 3600);
 ALTER TABLE monitors ADD CONSTRAINT monitors_emails_check CHECK (coalesce(array_length(notify_emails, 1), 0) <= 10);
 ALTER TABLE monitors ADD CONSTRAINT monitors_webhook_check CHECK (notify_webhook = '' OR (notify_webhook ~ '^https://' AND length(notify_webhook) <= 500));
+ALTER TABLE monitors ADD CONSTRAINT monitors_heartbeat_interval_check CHECK (heartbeat_interval_seconds BETWEEN 30 AND 86400);
+ALTER TABLE monitors ADD CONSTRAINT monitors_heartbeat_grace_check CHECK (heartbeat_grace_seconds BETWEEN 0 AND 86400);
+ALTER TABLE monitors ADD CONSTRAINT monitors_ping_token_check CHECK ((kind = 'heartbeat') = (ping_token_hash IS NOT NULL));
 CREATE UNIQUE INDEX monitors_app_name_key ON monitors (app_id, name);
 CREATE UNIQUE INDEX monitors_id_team_key ON monitors (id, team_id);
+CREATE UNIQUE INDEX monitors_ping_token_key ON monitors (ping_token_hash) WHERE ping_token_hash IS NOT NULL;
 CREATE INDEX monitors_team_idx ON monitors (team_id);
 CREATE INDEX monitors_due_idx ON monitors (last_checked_at) WHERE enabled;
+CREATE INDEX monitors_heartbeat_due_idx ON monitors (last_ping_at) WHERE enabled AND kind = 'heartbeat';

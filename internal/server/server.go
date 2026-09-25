@@ -27,6 +27,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/mcp"
 	"github.com/fadymondy/hosbah/internal/monitors"
+	"github.com/fadymondy/hosbah/internal/notifications"
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
@@ -114,7 +115,14 @@ func Boot() *app.App {
 	}
 	// Alerts and monitors: the evaluator loop (internal/monitors). It mails through the same sender.
 	watch := monitors.New(a, mailSender)
+	// Team notification channels (email, Slack, Discord, webhook — MH-575 H2). The same SSRF-safe
+	// dialer the monitor checks themselves use (internal/monitors/safehttp.go), so a channel's
+	// slack/discord/webhook URL is resolved and dialed exactly as carefully as a monitor's target.
+	notify := notifications.New(a, svc, monitors.SafeTransport(nil))
+	a.Notifications = notify
+	watch.SetNotifier(notify)
 	watch.Start()
+	watch.MountPublic(k.Router) // /hooks/heartbeat/{token} — outside /api, ping-token authenticated
 	a.Monitors = watch
 	// Schedules: the cron loop (internal/schedules). Its runs are app.exec operations of the app's server.
 	crons := schedules.New(a, svc)
@@ -127,6 +135,8 @@ func Boot() *app.App {
 	// A websocket upgrade is not a JSON request/response, so the web terminal is a raw route,
 	// mounted next to the Huma ones under the same /api/teams prefix (member tier).
 	api.MountTerminal(k.Router, a, svc)
+	// The public status page (MH-575 H3): GET /api/public/status/{slug}, no session.
+	api.MountPublic(k.Router, a, svc)
 
 	k.Router.Post("/api/mcp", mcp.UserServer().Handler(a))
 	k.Router.Get("/api/mcp", mcp.UserServer().Handler(a)) // 405: no server-initiated stream

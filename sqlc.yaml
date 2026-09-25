@@ -48,3 +48,11 @@ sql:
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
           - column: "app_installs.env_injected"
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "monitors.notify_channel_ids"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "notification_channels.emails"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "notification_channels.events"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "status_pages.monitor_ids"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }

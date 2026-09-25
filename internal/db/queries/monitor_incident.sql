@@ -60,3 +60,10 @@ WHERE monitor_id = sqlc.arg('monitor_id') AND team_id = sqlc.arg('team_id') AND 
 -- name: MarkMonitorIncidentNotified :exec
 UPDATE monitor_incidents SET notified = true, updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: PublicOpenIncidentsByMonitorIDs :many
+-- System scope, public endpoint: the open incident, if any, of each monitor a status page shows —
+-- opened_at only (a reason can name internal hosts or IPs), matching PublicMonitorsByIDs's own no-team-data-leak shape
+-- (internal/api/public.go).
+SELECT id, monitor_id, opened_at FROM monitor_incidents
+WHERE team_id = sqlc.arg('team_id') AND monitor_id = ANY(string_to_array(sqlc.arg('ids')::text, ',')) AND resolved_at IS NULL;

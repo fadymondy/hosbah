@@ -922,7 +922,68 @@
     "quotaApps": "التطبيقات",
     "quotaDataServices": "خدمات البيانات",
     "quotaUnlimited": "بلا حدود",
-    "quotaOf": "{used} من {max}"
+    "quotaOf": "{used} من {max}",
+    "alertsTitle": "التنبيهات والقنوات",
+    "alertsHint": "أين تصل حوادث المراقبة وغيرها من التنبيهات إلى الفريق، إلى جانب البريد والـ webhook المضبوطين على المراقب نفسه.",
+    "statusPagesTitle": "صفحات الحالة",
+    "statusPagesHint": "صفحة منشورة للقراءة فقط تعرض مجموعة مختارة من المراقبين، على عنوان ويب خاص بها."
+  },
+  "alerts": {
+    "add": "إضافة قناة",
+    "search": "ابحث في القنوات…",
+    "name": "الاسم",
+    "kind": "النوع",
+    "destination": "الوجهة",
+    "events": "الأحداث",
+    "test": "اختبار",
+    "testSent": "أُرسلت رسالة الاختبار",
+    "emptyTitle": "لا توجد قنوات بعد",
+    "emptyHint": "أضف وجهة بريد إلكتروني أو Slack أو Discord أو webhook عام؛ يمكن حينها لحوادث أي مراقب الوصول إليها أيضًا.",
+    "deleteTitle": "إزالة {name}؟",
+    "deleteBody": "تحتفظ المراقبات المشيرة إلى هذه القناة بإشعاراتها الأخرى؛ هذه الوجهة فقط تزول.",
+    "emails": "عناوين البريد الإلكتروني",
+    "url": "الرابط",
+    "urlHint": "رابط https://‎. لـ Slack وDiscord: رابط webhook وارد.",
+    "secret": "سر التوقيع",
+    "secretHint": "لـ webhook فقط: يُرسل في ترويسة X-Hosbah-Signature (HMAC-SHA256). اتركه فارغًا للإبقاء عليه، أو امسحه أدناه.",
+    "clearSecret": "امسح السر",
+    "secretSet": "تم ضبط سر",
+    "enabled": "مفعّلة",
+    "kinds": {
+      "email": "بريد إلكتروني",
+      "slack": "Slack",
+      "discord": "Discord",
+      "webhook": "Webhook"
+    },
+    "eventNames": {
+      "deploy.failed": "فشل النشر",
+      "server.offline": "الخادم غير متصل",
+      "backup.failed": "فشلت النسخة الاحتياطية"
+    }
+  },
+  "statusPages": {
+    "add": "إضافة صفحة حالة",
+    "search": "ابحث في صفحات الحالة…",
+    "slug": "المعرّف النصي",
+    "title": "العنوان",
+    "published": "منشورة",
+    "unpublished": "غير منشورة",
+    "monitors": "المراقبون المعروضون",
+    "monitorsHint": "لا يُعرض من هؤلاء المراقبين إلا الاسم والنوع والحالة — أبدًا الهدف أو إعدادات الإشعار.",
+    "emptyTitle": "لا توجد صفحات حالة بعد",
+    "emptyHint": "انشر مجموعة مختارة من المراقبين على عنوان ويب خاص بها، ليطّلع عليها أي شخص دون تسجيل الدخول.",
+    "deleteTitle": "إزالة {name}؟",
+    "deleteBody": "يتوقف عنوانها العام عن الاستجابة.",
+    "view": "عرض",
+    "slugHint": "أحرف إنجليزية صغيرة وأرقام وشرطات؛ فريد عبر كل الفرق. لا يمكن تغييره لاحقًا.",
+    "noMonitors": "لا يوجد لهذا الفريق مراقبون بعد."
+  },
+  "publicStatus": {
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundHint": "صفحة الحالة هذه غير موجودة، أو غير منشورة.",
+    "allOk": "كل الأنظمة تعمل بشكل طبيعي",
+    "someDown": "بعض الأنظمة تواجه مشكلات",
+    "since": "منذ {when}"
   },
   "account": {
     "title": "الحساب",
@@ -2246,17 +2307,31 @@
       "enabled": "مفعّل",
       "ruleHttp": "يتوقع {status}، كل {every} ث",
       "ruleResource": "{kind} فوق {pct}% خلال {min} د",
+      "ruleHeartbeat": "يتوقع نبضة كل {every} ث (+{grace} ث مهلة)",
       "kinds": {
         "http": "التوفر (HTTP)",
         "cpu": "المعالج",
         "memory": "الذاكرة",
-        "disk": "القرص"
+        "disk": "القرص",
+        "heartbeat": "نبضة"
       },
       "state": {
         "unknown": "لا بيانات بعد",
         "ok": "ناجح",
         "failing": "فاشل"
-      }
+      },
+      "heartbeatInterval": "متوقعة كل (ثوانٍ)",
+      "heartbeatGrace": "مهلة (ثوانٍ)",
+      "lastPing": "آخر نبضة",
+      "neverPinged": "لا نبضة بعد",
+      "pingUrlTitle": "أرسل النبضة إلى هذا الرابط",
+      "pingUrlHint": "يُعرض مرة واحدة، الآن — لن يُعرض مجددًا. طلب GET أو POST إليه، على الأقل بهذا التكرار، يُبقي المراقب ناجحًا.",
+      "pingUrlCurl": "مثال:",
+      "channels": "أخطر أيضًا هذه القنوات",
+      "noChannels": "لا توجد قنوات إشعار بعد — أضف واحدة من إعدادات الفريق.",
+      "uptime24h": "24 س",
+      "uptime7d": "7 أيام",
+      "uptime30d": "30 يومًا"
     },
     "schedules": {
       "add": "إضافة جدول",

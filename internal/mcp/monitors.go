@@ -29,6 +29,12 @@ func MonitorTools() []Tool {
 			"notify_emails": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "maxItems": monitors.MaxEmails,
 				"description": "Who is emailed when an incident opens or resolves"},
 			"notify_webhook": str("An https:// URL that is POSTed {event, monitor, app, reason, value, at}; \"\" = none"),
+			"notify_channel_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "maxItems": monitors.MaxChannels,
+				"description": "Team notification channel ids (notification_channels_list) this monitor's incidents also reach"},
+			"heartbeat_interval_seconds": num(fmt.Sprintf("kind heartbeat: how often a ping is expected, %d to %d seconds (default 300)",
+				monitors.MinHeartbeatInterval, monitors.MaxHeartbeatInterval)),
+			"heartbeat_grace_seconds": num(fmt.Sprintf("kind heartbeat: how late a ping may be before an incident opens, %d to %d seconds (default 120)",
+				monitors.MinHeartbeatGrace, monitors.MaxHeartbeatGrace)),
 		}
 		for k, v := range extra {
 			props[k] = v
@@ -45,7 +51,8 @@ func MonitorTools() []Tool {
 				*dst = ptrTo(v)
 			}
 		}
-		for k, dst := range map[string]**int{"expected_status": &in.ExpectedStatus, "window_minutes": &in.WindowMinutes, "interval_seconds": &in.IntervalSeconds} {
+		for k, dst := range map[string]**int{"expected_status": &in.ExpectedStatus, "window_minutes": &in.WindowMinutes, "interval_seconds": &in.IntervalSeconds,
+			"heartbeat_interval_seconds": &in.HeartbeatIntervalSeconds, "heartbeat_grace_seconds": &in.HeartbeatGraceSeconds} {
 			if v, ok := args[k].(float64); ok {
 				if v != float64(int(v)) {
 					return in, fmt.Errorf("%s must be a whole number", k)
@@ -73,6 +80,21 @@ func MonitorTools() []Tool {
 				emails = append(emails, s)
 			}
 			in.NotifyEmails = &emails
+		}
+		if raw, ok := args["notify_channel_ids"]; ok {
+			list, isList := raw.([]any)
+			if !isList {
+				return in, errors.New("notify_channel_ids must be a list of channel ids")
+			}
+			ids := []string{}
+			for _, e := range list {
+				s, isStr := e.(string)
+				if !isStr {
+					return in, errors.New("notify_channel_ids must be a list of channel ids")
+				}
+				ids = append(ids, s)
+			}
+			in.NotifyChannelIDs = &ids
 		}
 		return in, nil
 	}
@@ -149,11 +171,13 @@ func MonitorTools() []Tool {
 			Name: "create_app_monitor", Scope: scopes.Write,
 			Description: "Add a monitor to an app. kind http: GET target (a URL on one of the app's OWN hostnames) every interval_seconds, " +
 				"expecting expected_status within threshold ms; an incident opens on the second failure in a row. kind cpu | memory | disk: " +
-				"the app's server's average over window_minutes against threshold percent. Incidents are announced to the team, to " +
-				"notify_emails and to notify_webhook. Owner or admin.",
+				"the app's server's average over window_minutes against threshold percent. kind heartbeat: mints a unique, unguessable ping " +
+				"URL (shown once, in this response, and never again) that something else must call at least every heartbeat_interval_seconds " +
+				"(+ heartbeat_grace_seconds of grace) or an incident opens; a ping resolves it. Incidents are announced to the team, to " +
+				"notify_emails, to notify_webhook and to notify_channel_ids. Owner or admin.",
 			InputSchema: schema([]string{"app", "name", "kind"}, settings(map[string]any{
 				"name": str("Unique in the app, up to 80 characters"),
-				"kind": map[string]any{"type": "string", "enum": []string{"http", "cpu", "memory", "disk"}}})),
+				"kind": map[string]any{"type": "string", "enum": []string{"http", "cpu", "memory", "disk", "heartbeat"}}})),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -173,7 +197,11 @@ func MonitorTools() []Tool {
 				if err != nil {
 					return "", err
 				}
-				return "Created.\n" + monitorLine(m), nil
+				out := "Created.\n" + monitorLine(m)
+				if m.PingURLPath != "" {
+					out += fmt.Sprintf("\nPing URL (shown once, never again), on the API origin: %s\ncurl example: curl -fsS <api origin>%s\n", m.PingURLPath, m.PingURLPath)
+				}
+				return out, nil
 			},
 		},
 		{
@@ -227,6 +255,26 @@ func MonitorTools() []Tool {
 				return "Deleted " + cur.Name + ".", nil
 			},
 		},
+		{
+			Name: "monitor_uptime", Scope: scopes.Read,
+			Description: "A monitor's uptime over the last 24h, 7d and 30d, as a percentage. Any member.",
+			InputSchema: schema([]string{"app", "monitor"}, map[string]any{"app": appArg, "monitor": str("Monitor name or id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				cur, err := monitors.Find(ctx, env.Q, env.Caller.TeamID, a, args.Str("monitor"))
+				if err != nil {
+					return "", err
+				}
+				u, err := monitors.MonitorUptime(ctx, env.Q, env.Caller.TeamID, cur.ID, clock(env))
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("%s uptime — 24h: %g%%  7d: %g%%  30d: %g%%\n", cur.Name, u.Last24h, u.Last7d, u.Last30d), nil
+			},
+		},
 	}
 }
 
@@ -245,6 +293,8 @@ func monitorLine(m monitors.Monitor) string {
 		if m.Threshold > 0 {
 			rule += fmt.Sprintf(" within %g ms", m.Threshold)
 		}
+	} else if m.Kind == monitors.KindHeartbeat {
+		rule = fmt.Sprintf("expects a ping every %d s (%d s grace)", m.HeartbeatIntervalSeconds, m.HeartbeatGraceSeconds)
 	} else {
 		rule = fmt.Sprintf("above %g%% over %d min", m.Threshold, m.WindowMinutes)
 	}
@@ -252,7 +302,10 @@ func monitorLine(m monitors.Monitor) string {
 	if !m.Enabled {
 		state = "disabled"
 	}
-	fmt.Fprintf(&b, "  %s  %-24s %-6s %-8s %s  every %d s", m.ID, m.Name, m.Kind, state, rule, m.IntervalSeconds)
+	fmt.Fprintf(&b, "  %s  %-24s %-10s %-8s %s  every %d s", m.ID, m.Name, m.Kind, state, rule, m.IntervalSeconds)
+	if m.Kind == monitors.KindHeartbeat && m.LastPingAt != nil {
+		fmt.Fprintf(&b, "  last ping %s", m.LastPingAt.UTC().Format(time.RFC3339))
+	}
 	if m.LastError != "" {
 		fmt.Fprintf(&b, "  last error: %s", m.LastError)
 	}

@@ -1,13 +1,27 @@
 "use client"
 
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
-import { ActivityIcon, BellRingIcon, CpuIcon, GlobeIcon, HardDriveIcon, MemoryStickIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import {
+  ActivityIcon,
+  BellRingIcon,
+  CpuIcon,
+  GlobeIcon,
+  HardDriveIcon,
+  HeartPulseIcon,
+  MemoryStickIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
+import type { NotificationChannel } from "@/components/notification-channels"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
@@ -24,7 +38,7 @@ import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
-type Kind = "http" | "cpu" | "memory" | "disk"
+type Kind = "http" | "cpu" | "memory" | "disk" | "heartbeat"
 export type Monitor = {
   id: string
   name: string
@@ -37,6 +51,11 @@ export type Monitor = {
   enabled: boolean
   notify_emails: string[]
   notify_webhook: string
+  notify_channel_ids: string[]
+  heartbeat_interval_seconds: number
+  heartbeat_grace_seconds: number
+  ping_url_path?: string
+  last_ping_at: string | null
   state: "unknown" | "ok" | "failing"
   last_checked_at: string | null
   last_error: string
@@ -50,9 +69,16 @@ type Incident = {
   reason: string
   last_value: string
 }
+type Uptime = { last_24h: number; last_7d: number; last_30d: number }
 
-const KINDS: Kind[] = ["http", "cpu", "memory", "disk"]
-const KIND_ICON: Record<Kind, ReactNode> = { http: <GlobeIcon />, cpu: <CpuIcon />, memory: <MemoryStickIcon />, disk: <HardDriveIcon /> }
+const KINDS: Kind[] = ["http", "cpu", "memory", "disk", "heartbeat"]
+const KIND_ICON: Record<Kind, ReactNode> = {
+  http: <GlobeIcon />,
+  cpu: <CpuIcon />,
+  memory: <MemoryStickIcon />,
+  disk: <HardDriveIcon />,
+  heartbeat: <HeartPulseIcon />,
+}
 
 /**
  * Alerts & monitors: uptime checks on the site's own hostnames and rules on its server's CPU,
@@ -72,6 +98,7 @@ export function SiteMonitors() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [q, setQ] = useState("")
+  const [pingURL, setPingURL] = useState<{ name: string; url: string } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -123,13 +150,35 @@ export function SiteMonitors() {
 
   const hosts = detail.domains.map((d) => `${d.tls === "off" ? "http" : "https"}://${d.hostname}`)
   const shown = (monitors ?? []).filter((m) => matches(q, m.name, m.kind, m.target, m.state))
-  const add = manage ? <MonitorDialog path={path} hosts={hosts} onSaved={load} /> : null
+
+  async function saved(created?: Monitor) {
+    if (created?.ping_url_path && typeof window !== "undefined") {
+      setPingURL({ name: created.name, url: window.location.origin + created.ping_url_path })
+    }
+    await load()
+  }
+
+  const add = manage ? <MonitorDialog path={path} hosts={hosts} onSaved={saved} /> : null
 
   return (
     <>
       <section aria-labelledby="mon-h">
         <SectionTitle id="mon-h" title={t("site.nav.monitors")} hint={t("site.planned.monitors.hint")} action={add} />
         <ErrorBand message={error} />
+        {pingURL ? (
+          <div className="border-b border-line px-6 py-4">
+            <p dir="auto" className="mb-2 text-sm font-medium">
+              {t("site.monitors.pingUrlTitle")} — {pingURL.name}
+            </p>
+            <p className="mb-2 text-xs text-grid-muted">{t("site.monitors.pingUrlHint")}</p>
+            <CopyField value={pingURL.url} />
+            <p className="mt-2 text-xs text-grid-muted">{t("site.monitors.pingUrlCurl")}</p>
+            <CopyField block value={`curl ${pingURL.url}`} className="mt-1" />
+            <Button size="sm" variant="ghost" className="mt-2" onClick={() => setPingURL(null)}>
+              {t("common.done")}
+            </Button>
+          </div>
+        ) : null}
         {monitors === null ? (
           <LoadingRows rows={3} />
         ) : monitors.length === 0 ? (
@@ -154,6 +203,7 @@ export function SiteMonitors() {
                     <TableHead>{t("lists.status")}</TableHead>
                     <TableHead>{t("site.monitors.rule")}</TableHead>
                     <TableHead>{t("site.monitors.checked")}</TableHead>
+                    <TableHead>{t("site.monitors.uptime24h")}</TableHead>
                     {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
                   </TableRow>
                 </TableHeader>
@@ -193,17 +243,32 @@ export function SiteMonitors() {
                         {m.kind === "http"
                           ? t("site.monitors.ruleHttp", { status: m.expected_status || "2xx/3xx", every: m.interval_seconds }) +
                             (m.threshold ? ` · ≤ ${m.threshold} ms` : "")
-                          : t("site.monitors.ruleResource", { kind: t(`site.monitors.kinds.${m.kind}`), pct: m.threshold, min: m.window_minutes })}
+                          : m.kind === "heartbeat"
+                            ? t("site.monitors.ruleHeartbeat", { every: m.heartbeat_interval_seconds, grace: m.heartbeat_grace_seconds })
+                            : t("site.monitors.ruleResource", { kind: t(`site.monitors.kinds.${m.kind}`), pct: m.threshold, min: m.window_minutes })}
                       </TableCell>
-                      <TableCell className="text-xs text-grid-muted">{m.last_checked_at ? ago(m.last_checked_at) : "—"}</TableCell>
+                      <TableCell className="text-xs text-grid-muted">
+                        {m.kind === "heartbeat"
+                          ? m.last_ping_at
+                            ? ago(m.last_ping_at)
+                            : t("site.monitors.neverPinged")
+                          : m.last_checked_at
+                            ? ago(m.last_checked_at)
+                            : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <UptimeBadge path={path} monitor={m} />
+                      </TableCell>
                       {manage ? (
                         <TableCell>
                           <div className="flex flex-wrap justify-end gap-2">
-                            <Button size="sm" variant="outline" disabled={busy === m.id || !m.enabled} onClick={() => void check(m)}>
-                              <PlayIcon />
-                              {t("site.monitors.checkNow")}
-                            </Button>
-                            <MonitorDialog path={path} hosts={hosts} monitor={m} onSaved={load} />
+                            {m.kind === "heartbeat" ? null : (
+                              <Button size="sm" variant="outline" disabled={busy === m.id || !m.enabled} onClick={() => void check(m)}>
+                                <PlayIcon />
+                                {t("site.monitors.checkNow")}
+                              </Button>
+                            )}
+                            <MonitorDialog path={path} hosts={hosts} monitor={m} onSaved={saved} />
                             <DeleteMonitor path={path} monitor={m} onDeleted={load} />
                           </div>
                         </TableCell>
@@ -280,6 +345,35 @@ export function DeleteMonitor({ path, monitor: m, onDeleted, ...controlled }: { 
   )
 }
 
+/** A monitor's uptime over 24h/7d/30d, fetched once and shown as a compact badge with a tooltip. */
+function UptimeBadge({ path, monitor: m }: { path: string; monitor: Monitor }) {
+  const { t } = useI18n()
+  const [uptime, setUptime] = useState<Uptime | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<Uptime>(`${path}/monitors/${m.id}/uptime`)
+      .then((u) => {
+        if (!cancelled) setUptime(u)
+      })
+      .catch(() => {
+        if (!cancelled) setUptime(null)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, m.id])
+
+  if (!uptime) return <span className="text-grid-muted">—</span>
+  const title = `${t("site.monitors.uptime7d")}: ${uptime.last_7d}% · ${t("site.monitors.uptime30d")}: ${uptime.last_30d}%`
+  return (
+    <Badge variant={uptime.last_24h >= 99.9 ? "default" : uptime.last_24h >= 95 ? "secondary" : "destructive"} title={title} dir="ltr">
+      {uptime.last_24h}%
+    </Badge>
+  )
+}
+
 /**
  * Create or edit one monitor. hosts: the site's own URLs, offered as targets (the first is the
  * default). Also opened from the overview canvas.
@@ -290,7 +384,7 @@ export function MonitorDialog({
   monitor,
   onSaved,
   ...controlled
-}: { path: string; hosts: string[]; monitor?: Monitor; onSaved: () => Promise<void> | void } & Controlled) {
+}: { path: string; hosts: string[]; monitor?: Monitor; onSaved: (created?: Monitor) => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
   const [name, setName] = useState("")
@@ -302,10 +396,22 @@ export function MonitorDialog({
   const [interval, setIntervalS] = useState("60")
   const [emails, setEmails] = useState("")
   const [webhook, setWebhook] = useState("")
+  const [channelIds, setChannelIds] = useState<string[]>([])
+  const [channels, setChannels] = useState<NotificationChannel[]>([])
+  const [hbInterval, setHbInterval] = useState("300")
+  const [hbGrace, setHbGrace] = useState("120")
   const [enabled, setEnabled] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { team } = useTeam()
   const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, reset)
+
+  useEffect(() => {
+    if (!open) return
+    apiFetch<{ channels: NotificationChannel[] }>(`/api/teams/${team.slug}/notification-channels`)
+      .then((r) => setChannels(r.channels ?? []))
+      .catch(() => setChannels([]))
+  }, [open, team.slug])
 
   function reset() {
     setError(null)
@@ -318,6 +424,9 @@ export function MonitorDialog({
     setIntervalS(String(monitor?.interval_seconds || 60))
     setEmails((monitor?.notify_emails ?? []).join(", "))
     setWebhook(monitor?.notify_webhook ?? "")
+    setChannelIds(monitor?.notify_channel_ids ?? [])
+    setHbInterval(String(monitor?.heartbeat_interval_seconds || 300))
+    setHbGrace(String(monitor?.heartbeat_grace_seconds ?? 120))
     setEnabled(monitor?.enabled ?? true)
   }
 
@@ -326,21 +435,36 @@ export function MonitorDialog({
     setBusy(true)
     setError(null)
     const http = kind === "http"
+    const heartbeat = kind === "heartbeat"
     // Only what applies to the kind is sent; the kind itself is fixed once created.
-    const body = {
+    const body: Record<string, unknown> = {
       name: name.trim(),
       ...(monitor ? {} : { kind }),
-      ...(http ? { target: target.trim(), expected_status: Number(status) || 0 } : { window_minutes: Number(windowMin) || 5 }),
-      threshold: Number(threshold) || 0,
-      interval_seconds: Number(interval) || 60,
       enabled,
       notify_emails: emails.split(/[,\s]+/).filter(Boolean),
       notify_webhook: webhook.trim(),
+      notify_channel_ids: channelIds,
+    }
+    if (http) {
+      body.target = target.trim()
+      body.expected_status = Number(status) || 0
+      body.threshold = Number(threshold) || 0
+      body.interval_seconds = Number(interval) || 60
+    } else if (heartbeat) {
+      body.heartbeat_interval_seconds = Number(hbInterval) || 300
+      body.heartbeat_grace_seconds = Number(hbGrace) || 0
+    } else {
+      body.window_minutes = Number(windowMin) || 5
+      body.threshold = Number(threshold) || 0
+      body.interval_seconds = Number(interval) || 60
     }
     try {
-      await apiFetch(monitor ? `${path}/monitors/${monitor.id}` : `${path}/monitors`, { method: monitor ? "PATCH" : "POST", body })
+      const saved = await apiFetch<Monitor>(monitor ? `${path}/monitors/${monitor.id}` : `${path}/monitors`, {
+        method: monitor ? "PATCH" : "POST",
+        body,
+      })
       setOpen(false)
-      await onSaved()
+      await onSaved(saved)
     } catch (err) {
       setError(errorText(err))
     } finally {
@@ -349,6 +473,7 @@ export function MonitorDialog({
   }
 
   const http = kind === "http"
+  const heartbeat = kind === "heartbeat"
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
@@ -407,6 +532,17 @@ export function MonitorDialog({
                   </Field>
                 </div>
               </>
+            ) : heartbeat ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="mon-hb-int">{t("site.monitors.heartbeatInterval")}</FieldLabel>
+                  <Input id="mon-hb-int" dir="ltr" type="number" min={30} max={86400} required value={hbInterval} onChange={(e) => setHbInterval(e.target.value)} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="mon-hb-grace">{t("site.monitors.heartbeatGrace")}</FieldLabel>
+                  <Input id="mon-hb-grace" dir="ltr" type="number" min={0} max={86400} required value={hbGrace} onChange={(e) => setHbGrace(e.target.value)} />
+                </Field>
+              </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
@@ -419,10 +555,12 @@ export function MonitorDialog({
                 </Field>
               </div>
             )}
-            <Field>
-              <FieldLabel htmlFor="mon-int">{t("site.monitors.interval")}</FieldLabel>
-              <Input id="mon-int" dir="ltr" type="number" min={30} max={3600} required value={interval} onChange={(e) => setIntervalS(e.target.value)} />
-            </Field>
+            {heartbeat ? null : (
+              <Field>
+                <FieldLabel htmlFor="mon-int">{t("site.monitors.interval")}</FieldLabel>
+                <Input id="mon-int" dir="ltr" type="number" min={30} max={3600} required value={interval} onChange={(e) => setIntervalS(e.target.value)} />
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="mon-emails">{t("site.monitors.emails")}</FieldLabel>
               <Input id="mon-emails" dir="ltr" placeholder="ops@example.com, me@example.com" value={emails} onChange={(e) => setEmails(e.target.value)} />
@@ -432,6 +570,26 @@ export function MonitorDialog({
               <Input id="mon-hook" dir="ltr" type="url" placeholder="https://…" value={webhook} onChange={(e) => setWebhook(e.target.value)} />
               <FieldDescription>{t("site.monitors.webhookHint")}</FieldDescription>
             </Field>
+            {channels.length ? (
+              <Field>
+                <FieldLabel>{t("site.monitors.channels")}</FieldLabel>
+                <div className="flex flex-col gap-2">
+                  {channels.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={channelIds.includes(c.id)}
+                        onCheckedChange={(v) => setChannelIds((cur) => (v === true ? [...cur, c.id] : cur.filter((x) => x !== c.id)))}
+                      />
+                      <span dir="auto">
+                        {c.name} ({t(`alerts.kinds.${c.kind}`)})
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            ) : (
+              <FieldDescription>{t("site.monitors.noChannels")}</FieldDescription>
+            )}
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
               {t("site.monitors.enabled")}
