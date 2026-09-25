@@ -2106,6 +2106,32 @@
         "unknown": "Unknown"
       }
     },
+    "workers": {
+      "needsDeployer": "Worker status, restart, stop and start need the deployer role: a process's environment and command can be as sensitive as its logs.",
+      "notLive": "Nothing is live yet. Deploy the site to see its processes here.",
+      "started": "started {time}",
+      "restarts": "{count} restart(s)",
+      "cpu": "CPU",
+      "mem": "Mem",
+      "viewLogs": "View logs",
+      "restart": "Restart",
+      "restartDone": "Restarted",
+      "stop": "Stop",
+      "stopTitle": "Stop {name}?",
+      "stopBody": "The container stops but is not removed, so Start reuses it. This does not affect other processes.",
+      "stopDone": "Stopped",
+      "start": "Start",
+      "startDone": "Started",
+      "states": {
+        "running": "Running",
+        "exited": "Stopped",
+        "restarting": "Restarting",
+        "created": "Created",
+        "paused": "Paused",
+        "dead": "Dead",
+        "missing": "Not found"
+      }
+    },
     "storage": {
       "volumes": "Volumes",
       "volumesHint": "Folders that survive deploys, mounted into every release and worker.",

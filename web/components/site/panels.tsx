@@ -2,14 +2,30 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, type FormEvent } from "react"
-import { ArchiveIcon, CogIcon, DatabaseIcon, LinkIcon, PlusIcon, SearchIcon, Trash2Icon, UploadIcon } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import {
+  ArchiveIcon,
+  CogIcon,
+  DatabaseIcon,
+  LinkIcon,
+  PlayIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  RotateCwIcon,
+  ScrollTextIcon,
+  SearchIcon,
+  SquareIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { DomainsPanel } from "@/components/apps/domains"
 import { RuntimeLogsPanel } from "@/components/apps/runtime-logs"
 import { SettingsPanel } from "@/components/apps/settings"
+import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
+import { useTimeAgo } from "@/components/home/sparkline"
 import {
   DangerZone,
   GuestBackup,
@@ -29,9 +45,9 @@ import { Button } from "@/components/ui/button"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { apiFetch } from "@/lib/api"
+import { apiFetch, ApiError } from "@/lib/api"
 import { isImported, type App, type EnvVar } from "@/lib/apps"
-import type { DataService } from "@/lib/databases"
+import { humanBytes, type DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
@@ -267,14 +283,100 @@ function ConnectedServices() {
   )
 }
 
-/** Workers: the processes the app runs besides web, as its hosbah.toml declares them. */
+type ProcessStatus = {
+  process: string
+  container: string
+  state: string
+  status?: string
+  started_at?: string
+  restart_count: number
+  cpu_percent?: number
+  mem_bytes?: number
+  mem_limit_bytes?: number
+  image?: string
+  deployment?: string
+}
+type ProcessesOut = { processes: ProcessStatus[]; operation: string }
+
+const PROCESS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
+  running: "default",
+  restarting: "secondary",
+  created: "secondary",
+  paused: "secondary",
+}
+
+/**
+ * Workers: web and every worker process of the app's live release, with live container state,
+ * uptime, restarts and resource use. Restart works on any process; stop and start are refused for
+ * web (stopping it takes the site down) so they only show on workers.
+ */
 export function SiteWorkers() {
-  const { t } = useI18n()
-  const { detail } = useLoadedSite()
-  return (
-    <section aria-labelledby="wk-h">
-      <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
-      {detail.processes.length === 0 ? (
+  const { t, locale } = useI18n()
+  const { team } = useTeam()
+  const operate = canOperate(team.role)
+  const ago = useTimeAgo(locale)
+  const errorText = useErrorText()
+  const { detail, app, path } = useLoadedSite()
+  const logsBase = `/${locale}/t/${team.slug}/apps/${encodeURIComponent(app.name)}/logs`
+  const [items, setItems] = useState<ProcessStatus[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const commands = new Map(detail.processes.map((p) => [p.name, p.command]))
+
+  const load = useCallback(
+    async (quiet?: boolean) => {
+      if (!operate || detail.processes.length === 0) return
+      if (!quiet) setLoading(true)
+      setNote(null)
+      try {
+        const r = await apiFetch<ProcessesOut>(`${path}/processes`)
+        setItems(r.processes ?? [])
+        setError(null)
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) setNote(errorText(err))
+        else setError(errorText(err))
+        setItems((x) => x ?? [])
+      } finally {
+        setLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [path, operate, detail.processes.length],
+  )
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void load(true)
+    }, 10_000)
+    return () => clearInterval(id)
+  }, [load])
+
+  async function act(process: string, action: "restart" | "stop" | "start") {
+    setBusy(`${process}:${action}`)
+    setError(null)
+    try {
+      const r = await apiFetch<ProcessesOut>(`${path}/processes/action`, { method: "POST", body: { process, action } })
+      setItems(r.processes ?? [])
+      toast.success(t(`site.workers.${action}Done`))
+    } catch (err) {
+      setError(errorText(err))
+      throw new Error(errorText(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (detail.processes.length === 0)
+    return (
+      <section aria-labelledby="wk-h">
+        <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
         <Empty className="border-b">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -284,29 +386,109 @@ export function SiteWorkers() {
             <EmptyDescription>{t("site.workersEmptyHint")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
+        <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.workersNote")}</p>
+      </section>
+    )
+
+  if (!operate)
+    return (
+      <section aria-labelledby="wk-h">
+        <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
+        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.workers.needsDeployer")}</p>
+      </section>
+    )
+
+  return (
+    <section aria-labelledby="wk-h">
+      <SectionTitle
+        id="wk-h"
+        title={t("site.nav.workers")}
+        hint={t("site.workersHint")}
+        action={
+          <Button variant="ghost" size="icon-sm" aria-label={t("github.refresh")} disabled={loading} onClick={() => void load()}>
+            <RefreshCwIcon className={loading ? "animate-spin" : ""} />
+          </Button>
+        }
+      />
+      <ErrorBand message={error} />
+      {note ? <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{note}</p> : null}
+      {items === null ? (
+        note || error ? null : (
+          <LoadingRows rows={detail.processes.length} />
+        )
+      ) : items.length === 0 ? (
+        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.workers.notLive")}</p>
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("site.process")}</TableHead>
-                <TableHead>{t("site.command")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.processes.map((p) => (
-                <TableRow key={p.name}>
-                  <TableCell dir="ltr" className="text-start font-medium">
-                    {p.name}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start font-mono text-xs text-grid-muted">
-                    {p.command ?? "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <ul className="flex flex-col divide-y divide-line border-b border-line">
+          {items.map((p) => {
+            const isWeb = p.process === "web"
+            const badge = PROCESS_BADGE[p.state] ?? "outline"
+            const restarting = busy === `${p.process}:restart`
+            const stopping = busy === `${p.process}:stop`
+            const starting = busy === `${p.process}:start`
+            const command = commands.get(p.process)
+            return (
+              <li key={p.process} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4">
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span dir="ltr" className="text-sm font-medium text-grid-fg">
+                      {p.process}
+                    </span>
+                    <Badge variant={badge}>{t(`site.workers.states.${p.state}`, undefined, p.state)}</Badge>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
+                    {p.started_at ? <span dir="ltr">{t("site.workers.started", { time: ago(p.started_at) })}</span> : null}
+                    <span>{t("site.workers.restarts", { count: p.restart_count })}</span>
+                    {p.state === "running" ? (
+                      <span dir="ltr">
+                        {t("site.workers.cpu")} {(p.cpu_percent ?? 0).toFixed(1)}%
+                      </span>
+                    ) : null}
+                    {p.state === "running" && p.mem_bytes ? (
+                      <span dir="ltr">
+                        {t("site.workers.mem")} {humanBytes(p.mem_bytes)}
+                        {p.mem_limit_bytes ? ` / ${humanBytes(p.mem_limit_bytes)}` : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                  {command ? (
+                    <span dir="ltr" className="truncate font-mono text-xs text-grid-muted" title={command}>
+                      {command}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="flex flex-wrap items-center gap-2">
+                  <Link href={`${logsBase}?process=${encodeURIComponent(p.process)}`}>
+                    <Button size="sm" variant="ghost">
+                      <ScrollTextIcon />
+                      {t("site.workers.viewLogs")}
+                    </Button>
+                  </Link>
+                  <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void act(p.process, "restart").catch(() => {})}>
+                    <RotateCwIcon className={restarting ? "animate-spin" : ""} />
+                    {t("site.workers.restart")}
+                  </Button>
+                  {!isWeb && p.state === "running" ? (
+                    <ConfirmButton
+                      icon={<SquareIcon className={stopping ? "animate-pulse" : ""} />}
+                      label={t("site.workers.stop")}
+                      title={t("site.workers.stopTitle", { name: p.process })}
+                      description={t("site.workers.stopBody")}
+                      confirmLabel={t("site.workers.stop")}
+                      onConfirm={() => act(p.process, "stop")}
+                    />
+                  ) : null}
+                  {!isWeb && p.state !== "running" ? (
+                    <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void act(p.process, "start").catch(() => {})}>
+                      <PlayIcon className={starting ? "animate-pulse" : ""} />
+                      {t("site.workers.start")}
+                    </Button>
+                  ) : null}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       )}
       <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.workersNote")}</p>
     </section>

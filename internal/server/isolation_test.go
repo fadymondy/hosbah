@@ -353,6 +353,7 @@ func TestIsolationSweep(t *testing.T) {
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
 		"get_app_queues": {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
+		"app_processes": {"app": appA.App.ID}, "app_process_action": {"app": appA.App.ID, "action": "restart", "process": "web"},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
 		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
 		"get_app_storage": {"app": appA.App.ID}, "create_app_volume": {"app": appA.App.ID, "name": "stolen", "mount_path": "/stolen"},

@@ -51,6 +51,8 @@ func Timeout(kind string) time.Duration {
 		return 61 * time.Minute // the longest schedule timeout and a minute; each run sets its own (EnqueueSpec.Timeout)
 	case agentproto.KindAppLogs:
 		return 6 * time.Minute
+	case agentproto.KindAppProcesses:
+		return 90 * time.Second // docker inspect/stats/restart/stop/start of a handful of containers
 	case agentproto.KindDBProvision, agentproto.KindDBRestore:
 		return 20 * time.Minute // pull an image, start the engine, wait for readiness, restore
 	case agentproto.KindDBBackup:

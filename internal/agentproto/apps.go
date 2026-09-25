@@ -27,6 +27,11 @@ const (
 	// install/build/migrate steps inside its CURRENT live image (no host toolchains, no BuildKit
 	// rebuild), and commits the result to a new tag. See FastBuildParams / FastBuildResult.
 	KindAppFastBuild = "app.fast_build"
+	// KindAppProcesses (MH-574 G1): status, restart, stop or start of one or every process of an
+	// app's live release — the "Workers" page's manage actions. Fixed docker argv only: inspect and
+	// stats to report, restart/stop/start by container name found through the app's labels (the
+	// same way app.drain and app.logs find them).
+	KindAppProcesses = "app.processes"
 )
 
 // Provision steps added in P2 (params.step of provision.step). Idempotent like P1's.
@@ -103,10 +108,10 @@ type BuildParams struct {
 	App          string `json:"app"`
 	DeploymentID string `json:"deployment_id"`
 	GitSource
-	Image            string   `json:"image"`             // hosbah/<app>:<deployment_id>
-	Keep             int      `json:"keep"`              // newest images of hosbah/<app> (and cloudy/<app>) to keep (5)
-	Protect          []string `json:"protect,omitempty"` // images never pruned (the live release)
-	RailpackFrontend string   `json:"railpack_frontend"` // BuildKit frontend image, same version as the CLI
+	Image            string   `json:"image"`              // hosbah/<app>:<deployment_id>
+	Keep             int      `json:"keep"`               // newest images of hosbah/<app> (and cloudy/<app>) to keep (5)
+	Protect          []string `json:"protect,omitempty"`  // images never pruned (the live release)
+	RailpackFrontend string   `json:"railpack_frontend"`  // BuildKit frontend image, same version as the CLI
 	NoCache          bool     `json:"no_cache,omitempty"` // a requested full rebuild: ignore the layer cache
 }
 
@@ -188,7 +193,7 @@ type FastBuildParams struct {
 	App          string `json:"app"`
 	DeploymentID string `json:"deployment_id"`
 	GitSource
-	Image     string          `json:"image"`     // hosbah/<app>:<deployment_id>, the new tag
+	Image     string          `json:"image"`      // hosbah/<app>:<deployment_id>, the new tag
 	BaseImage string          `json:"base_image"` // the app's current live image (builder and runtime modes)
 	Mode      string          `json:"mode"`       // dockerfile | builder | runtime
 	Steps     []FastBuildStep `json:"steps,omitempty"`
@@ -370,6 +375,67 @@ type RemoveParams struct {
 // CancelParams: op.cancel.
 type CancelParams struct {
 	OpID string `json:"op_id"`
+}
+
+// Process actions of app.processes.
+const (
+	ProcessActionStatus  = "status"  // report only, no change
+	ProcessActionRestart = "restart" // docker restart, one process (or every process when Process is "")
+	ProcessActionStop    = "stop"    // docker stop (containers stay, so a later start reuses them); workers only
+	ProcessActionStart   = "start"   // docker start of previously stopped containers; workers only
+)
+
+// ProcessesParams: app.processes. Process empty means "every process of the app" — allowed for
+// status and restart, refused for stop/start (those must name one worker: stopping the web
+// process would take the site down, and "start every process" makes no sense when web is always
+// meant to be running).
+type ProcessesParams struct {
+	AppID   string `json:"app_id"`
+	Action  string `json:"action"`
+	Process string `json:"process,omitempty"`
+}
+
+// Validate checks the params on both sides of the wire: the control plane before it signs and
+// enqueues, the agent before it runs.
+func (p ProcessesParams) Validate() error {
+	if !ValidID(p.AppID) {
+		return errors.New("bad app id")
+	}
+	if p.Process != "" && !ValidProcess(p.Process) {
+		return fmt.Errorf("bad process %q", p.Process)
+	}
+	switch p.Action {
+	case ProcessActionStatus, ProcessActionRestart:
+		return nil
+	case ProcessActionStop, ProcessActionStart:
+		if p.Process == "" || p.Process == "web" {
+			return errors.New("web cannot be stopped or started here — stopping it takes the site down; only a worker process can be")
+		}
+		return nil
+	default:
+		return fmt.Errorf("bad action %q", p.Action)
+	}
+}
+
+// ProcessStatus is one container of the app: its process, its live state, and — while running — its
+// resource use. Every field the agent could not read stays at its zero value rather than a guess.
+type ProcessStatus struct {
+	Process       string  `json:"process"`
+	Container     string  `json:"container"`
+	State         string  `json:"state" doc:"docker's container state: running, exited, restarting, created…"`
+	Status        string  `json:"status,omitempty" doc:"docker's human status line, e.g. \"Up 3 hours\" or \"Exited (0) 2 minutes ago\"."`
+	StartedAt     string  `json:"started_at,omitempty"`
+	RestartCount  int     `json:"restart_count"`
+	CPUPercent    float64 `json:"cpu_percent,omitempty" doc:"Only while running (docker stats)."`
+	MemBytes      int64   `json:"mem_bytes,omitempty" doc:"Only while running."`
+	MemLimitBytes int64   `json:"mem_limit_bytes,omitempty" doc:"Only while running."`
+	Image         string  `json:"image,omitempty"`
+	Deployment    string  `json:"deployment,omitempty" doc:"The deployment id the container's label names, when it has one."`
+}
+
+// ProcessesResult: app.processes — the app's processes after any requested action.
+type ProcessesResult struct {
+	Processes []ProcessStatus `json:"processes"`
 }
 
 // Limits the agent enforces whatever the params say.

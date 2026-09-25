@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { PlayIcon, ScrollTextIcon } from "lucide-react"
 
@@ -34,8 +35,10 @@ export function RuntimeLogsPanel({
 }) {
   const { t } = useI18n()
   const errorText = useErrorText()
+  const searchParams = useSearchParams()
   const names = processes.length ? processes.map((p) => p.name) : ["web"]
-  const [process, setProcess] = useState(names[0])
+  const wanted = searchParams.get("process")
+  const [process, setProcess] = useState(wanted && names.includes(wanted) ? wanted : names[0])
   const [tail, setTail] = useState("200")
   const [follow, setFollow] = useState("60")
   const [op, setOp] = useState<Operation | null>(null)
