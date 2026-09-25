@@ -66,8 +66,13 @@ func Timeout(kind string) time.Duration {
 	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop, agentproto.KindBucketCreate, agentproto.KindBucketRemove, agentproto.KindVolumeRemove,
 		agentproto.KindBrowserRemove, agentproto.KindRecipeRemove:
 		return 5 * time.Minute
-	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus:
+	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
+		agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest:
 		return 2 * time.Minute
+	case agentproto.KindAppLogsSearch:
+		return 90 * time.Second
+	case agentproto.KindLogDrainSet:
+		return time.Minute
 	case agentproto.KindWorkloadLogs:
 		return 6 * time.Minute
 	case agentproto.KindWorkloadPower, agentproto.KindGuestResize, agentproto.KindWorkloadDestroy:

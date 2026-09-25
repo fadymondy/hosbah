@@ -69,7 +69,7 @@ to find out, so it is a build-time failure instead.
 */
 func TestDestructiveToolsNameAKnownResourceType(t *testing.T) {
 	// Mirrors approval_requests_resource_type_check in internal/db/schema/approval_request.sql.
-	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user", "team"}
+	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user", "team", "log_drain"}
 	for _, srv := range []*Server{UserServer(), AdminServer()} {
 		for _, tool := range srv.Tools {
 			if !tool.Destructive {
@@ -100,6 +100,7 @@ func TestDestructiveToolInventory(t *testing.T) {
 		// DB metrics and slow queries (MH-575 F6): cancelling a running query/backend.
 		"db_cancel_query": true,
 		"notification_channel_delete": true, "status_page_delete": true,
+		"log_drain_delete": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

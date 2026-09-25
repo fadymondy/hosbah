@@ -192,6 +192,11 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/proxy-hosts", map[string]any{"server": srvA, "hostname": "nas-" + suffix + ".example.test",
 		"upstream": "10.0.0.5:5000", "tls": "off"}, 201, &proxyA)
 
+	// H8: a log drain of A's (syslog, scoped to every app).
+	var drainA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/log-drains", map[string]any{"kind": "syslog", "name": "drain-a-" + suffix,
+		"syslog": map[string]any{"transport": "udp", "host": "sweep.example.test", "port": 514}}, 201, &drainA)
+
 	// P4: a pending approval request of A's, made the only way one can be made — by turning the
 	// team setting on and letting a destructive MCP call be held. Sweeping it matters because an
 	// approval is a capability to destroy something: B must not be able to read it or decide it.
@@ -248,6 +253,7 @@ func TestIsolationSweep(t *testing.T) {
 		"job":         func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":       func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"sftp_user":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
+		"drain":       func(string) []string { return []string{drainA.ID, drainA.Name} },
 		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
 		"service": func(string) []string {
@@ -360,8 +366,8 @@ func TestIsolationSweep(t *testing.T) {
 		"sftp_users_list": {"server": srvA}, "sftp_user_create": {"server": srvA, "username": "stolen", "root_dir": "/tmp", "generate_password": true},
 		"sftp_user_update": {"server": srvA, "user": "sweep_sftp", "root_dir": "/tmp"},
 		"sftp_user_delete": {"server": srvA, "user": "sweep_sftp", "confirm": "sweep_sftp"},
-		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
-		"server_guests": {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
+		"update_server":    {"server": srvA, "color": "#000000", "name": "stolen"},
+		"server_guests":    {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
 		"server_import_status": {"server": srvA}, "server_import_run": {"server": srvA},
 		"server_import_decide": {"server": srvA, "item": "imp-site", "decision": "ignore"},
 		"get_app_repository":   {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
@@ -456,6 +462,23 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "shared_services_list", nil); strings.Contains(res.Text, "pg-shared-"+suffix) {
 		t.Errorf("shared_services_list as B leaked team A's shared service: %s", res.Text)
+	}
+
+	// H8 log drain MCP tools: a log drain of A's is not found by B, and app_logs_search on A's app is not found either.
+	for name, args := range map[string]map[string]any{
+		"log_drain_update": {"drain": drainA.ID, "name": "stolen"},
+		"log_drain_delete": {"drain": drainA.ID, "confirm": drainA.Name},
+		"log_drain_test":   {"drain": drainA.ID},
+		"log_drain_create": {"app": appA.App.ID, "kind": "syslog", "name": "stolen", "syslog_transport": "udp", "syslog_host": "x.example.test", "syslog_port": 514},
+		"app_logs_search":  {"app": appA.App.ID, "query": "x"},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError || !strings.Contains(res.Text, "not found") {
+			t.Errorf("MCP %s as team B on team A's id should be not found: %+v", name, res)
+		}
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "log_drains_list", nil); strings.Contains(res.Text, drainA.Name) {
+		t.Errorf("log_drains_list as B leaked team A's log drain: %s", res.Text)
 	}
 
 	// P3 data-service MCP tools: a service ref team B may not see is not found; nothing acts.

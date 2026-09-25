@@ -78,6 +78,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedInvitation(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedLogDrain(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedMcpToken(ctx, a); err != nil {
 		return err
 	}

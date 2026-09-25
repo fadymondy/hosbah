@@ -35,7 +35,7 @@ ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check
   CHECK (status IN ('pending', 'approved', 'rejected', 'used', 'expired'));
 -- 'team' (added MH-575 H2/H3): deleting a team-level notification channel or status page.
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_resource_type_check
-  CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member', 'team'));
+  CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member', 'team', 'log_drain'));
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_decided_check
   CHECK ((status IN ('pending', 'expired')) = (decided_by IS NULL));
 CREATE UNIQUE INDEX approval_requests_id_team_key ON approval_requests (id, team_id);

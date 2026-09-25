@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
@@ -196,6 +197,64 @@ func AppTools() []Tool {
 				}
 				fmt.Fprintf(&b, "(#%d is %s; last seq %d — pass after=%d for more)\n", d.Number, d.Status, lines[len(lines)-1].Seq, lines[len(lines)-1].Seq)
 				return b.String(), nil
+			},
+		},
+		{
+			Name: "app_logs_search", Scope: scopes.Read,
+			Description: "Search the app's current containers' logs: a plain substring or an RE2 regex (regex=true), optionally " +
+				"case-insensitive, with an error/warn level filter and a time window up to 7 days (since/until: 15m/1h/6h/24h/7d or " +
+				"RFC 3339; default the last hour). The agent filters the lines itself; at most limit matches are returned.",
+			InputSchema: schema([]string{"app"}, map[string]any{
+				"app": appArg, "q": str("A plain substring, or an RE2 pattern when regex=true"),
+				"regex": map[string]any{"type": "boolean", "description": "Treat q as an RE2 regular expression"},
+				"case_insensitive": map[string]any{"type": "boolean"},
+				"process":          str("web (default: every process) or worker:<name>"),
+				"level":            map[string]any{"type": "string", "enum": []string{"", "error", "warn"}},
+				"since":            str("15m, 1h, 6h, 24h, 7d, or an RFC 3339 time; default one hour before until"),
+				"until":            str("An RFC 3339 time; default now"),
+				"limit":            map[string]any{"type": "integer", "default": 200, "maximum": agentproto.MaxLogSearchLines},
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				op, err := s.LogsSearch(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, agentproto.LogsSearchParams{
+					Process: args.Str("process"), Query: args.Str("q"), Regex: args.Bool("regex"), CaseInsensitive: args.Bool("case_insensitive"),
+					Level: args.Str("level"), Since: args.Str("since"), Until: args.Str("until"), Limit: args.Int("limit", 200, 0, agentproto.MaxLogSearchLines),
+				})
+				if err != nil {
+					return "", err
+				}
+				env.Then = func(ctx context.Context) (string, error) {
+					var res agentproto.LogsSearchResult
+					if _, err := s.AwaitResult(ctx, op, 30*time.Second, &res); err != nil {
+						if errors.Is(err, deploy.ErrStillRunning) {
+							return fmt.Sprintf("The agent has not answered yet (operation %s).", op.ID), nil
+						}
+						return "", err
+					}
+					if len(res.Lines) == 0 {
+						return "No matching lines.", nil
+					}
+					var b strings.Builder
+					for _, l := range res.Lines {
+						lvl := l.Level
+						if lvl == "" {
+							lvl = "-"
+						}
+						fmt.Fprintf(&b, "%s  %-12s %-6s %s\n", l.At.UTC().Format(time.RFC3339), l.Process, lvl, l.Line)
+					}
+					if res.Truncated {
+						b.WriteString("(truncated — narrow the query or the time window for more)\n")
+					}
+					return b.String(), nil
+				}
+				return "", nil
 			},
 		},
 		{

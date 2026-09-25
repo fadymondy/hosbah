@@ -43,6 +43,7 @@ type Executor struct {
 	browsers  *browserHost  // owns the token gateways of this server's browsers
 	recipes   *recipeHost   // installed catalog recipes; runs this binary's own copy of a recipe
 	terminals *terminalHost // interactive terminal.open sessions
+	drains    *drainHost    // team log drains this server ships
 	// Restart is called after an operation that asked for it (agent.update) has reported its
 	// final status.
 	Restart func()
@@ -159,6 +160,13 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		e.handlers[kind] = h
 	}
 	e.handlers[agentproto.KindSFTPUser] = newSFTPHost().apply
+	e.handlers[agentproto.KindAppLogsSearch] = appLogsSearch
+	e.drains = newDrainHost()
+	for kind, h := range map[string]Handler{
+		agentproto.KindLogDrainSet: e.drains.set, agentproto.KindLogDrainStatus: e.drains.status, agentproto.KindLogDrainTest: e.drains.test,
+	} {
+		e.handlers[kind] = h
+	}
 	e.terminals = newTerminalHost(func(f agentproto.Frame) {
 		if e.termSend != nil {
 			e.termSend(f)
@@ -262,8 +270,12 @@ func (e *Executor) Resume(entries []agentproto.ResumeEntry) {
 	}
 }
 
-// Work hands queued operations to their lanes until ctx ends.
+// Work hands queued operations to their lanes until ctx ends. It also starts every persisted log
+// drain with this context (which outlives any single operation, unlike an OpContext's).
 func (e *Executor) Work(ctx context.Context) {
+	if e.drains != nil {
+		go e.drains.Run(ctx, e.priv, e.serverID)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -278,7 +290,8 @@ func (e *Executor) Work(ctx context.Context) {
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
-		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus:
+		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
+		agentproto.KindAppLogsSearch, agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest:
 		return "" // read-only: never queued behind a long action
 	case agentproto.KindBrowserCreate, agentproto.KindBrowserRemove:
 		// One lane per browser: its create and remove never interleave, and a first image pull of
@@ -356,6 +369,10 @@ func laneOf(op agentproto.SignedOp) string {
 			return "app:" + p.AppID
 		}
 		return "app:?"
+	case agentproto.KindLogDrainSet:
+		// Its own lane: two log.drains.set for the same drain must never interleave, but must
+		// never wait behind a build or a provisioning step either.
+		return "drains"
 	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBDrop, agentproto.KindDBBackup,
 		agentproto.KindDBRestore, agentproto.KindDBRemove, agentproto.KindDBUser, agentproto.KindDBQuery, agentproto.KindBucketCreate, agentproto.KindBucketRemove,
 		agentproto.KindDBLimits, agentproto.KindDBInsights, agentproto.KindDBCancelQuery:

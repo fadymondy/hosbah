@@ -33,6 +33,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterGithubInstallationRoutes(api, a)
 	RegisterImportIgnoreRoutes(api, a)
 	RegisterInvitationRoutes(api, a)
+	RegisterLogDrainRoutes(api, a)
 	RegisterMcpTokenRoutes(api, a)
 	RegisterMonitorRoutes(api, a)
 	RegisterMonitorIncidentRoutes(api, a)

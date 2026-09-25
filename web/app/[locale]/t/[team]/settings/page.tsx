@@ -8,6 +8,7 @@ import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { GitHubAppSection } from "@/components/github-app"
 import { NotificationChannelsSection } from "@/components/notification-channels"
+import { LogDrainsCard } from "@/components/log-drains"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
 import { StatusPagesSection } from "@/components/status-pages"
 import { TeamQuotasCard } from "@/components/team-quotas"
@@ -76,6 +77,7 @@ export default function SettingsPage() {
       <TeamQuotasCard team={team.slug} />
       <NotificationChannelsSection team={team.slug} manage={manage} />
       <StatusPagesSection team={team.slug} manage={manage} />
+      <LogDrainsCard team={team.slug} manage={manage} />
       <GitHubAppSection team={team.slug} />
     </PageBody>
   )

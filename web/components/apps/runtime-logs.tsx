@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { PlayIcon, ScrollTextIcon } from "lucide-react"
 
+import { LogSearchPanel } from "@/components/apps/log-search"
 import { useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
 import { ErrorBand } from "@/components/states"
@@ -62,58 +63,63 @@ export function RuntimeLogsPanel({
     }
   }
 
-  if (!operate) return <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("apps.logs.readOnly")}</p>
-
   return (
     <div data-testid="runtime-logs">
-      <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
-        <div className="basis-full space-y-1">
-          <p className="text-sm text-grid-muted">{t("apps.logs.hint")}</p>
-          {!live ? <p className="text-sm text-grid-muted">{t("apps.logs.notLive")}</p> : null}
-        </div>
-        <Field className="w-44">
-          <FieldLabel htmlFor="log-proc">{t("apps.logs.process")}</FieldLabel>
-          <Select value={process} onValueChange={(v) => v && setProcess(v as string)}>
-            <SelectTrigger id="log-proc" className="w-full">
-              <SelectValue>{(v: string) => <span dir="ltr">{v}</span>}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {names.map((n) => (
-                <SelectItem key={n} value={n}>
-                  <span dir="ltr">{n}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field className="w-28">
-          <FieldLabel htmlFor="log-tail">{t("apps.logs.tail")}</FieldLabel>
-          <Input id="log-tail" dir="ltr" type="number" min={0} max={1000} value={tail} onChange={(e) => setTail(e.target.value)} />
-        </Field>
-        <Field className="w-28">
-          <FieldLabel htmlFor="log-follow">{t("apps.logs.follow")}</FieldLabel>
-          <Input id="log-follow" dir="ltr" type="number" min={0} max={300} value={follow} onChange={(e) => setFollow(e.target.value)} />
-        </Field>
-        <Button disabled={busy} onClick={run}>
-          <PlayIcon />
-          {busy ? t("common.working") : t("apps.logs.fetch")}
-        </Button>
-      </div>
-      <ErrorBand message={error} />
-      <div className="min-h-40 border-b border-line bg-grid-card">
-        {op ? (
-          <OperationLog team={team} serverId={app.server_id} op={op} />
-        ) : (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ScrollTextIcon />
-              </EmptyMedia>
-              <EmptyDescription>{t("apps.logs.empty")}</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
-      </div>
+      {operate ? (
+        <>
+          <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
+            <div className="basis-full space-y-1">
+              <p className="text-sm text-grid-muted">{t("apps.logs.hint")}</p>
+              {!live ? <p className="text-sm text-grid-muted">{t("apps.logs.notLive")}</p> : null}
+            </div>
+            <Field className="w-44">
+              <FieldLabel htmlFor="log-proc">{t("apps.logs.process")}</FieldLabel>
+              <Select value={process} onValueChange={(v) => v && setProcess(v as string)}>
+                <SelectTrigger id="log-proc" className="w-full">
+                  <SelectValue>{(v: string) => <span dir="ltr">{v}</span>}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {names.map((n) => (
+                    <SelectItem key={n} value={n}>
+                      <span dir="ltr">{n}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="w-28">
+              <FieldLabel htmlFor="log-tail">{t("apps.logs.tail")}</FieldLabel>
+              <Input id="log-tail" dir="ltr" type="number" min={0} max={1000} value={tail} onChange={(e) => setTail(e.target.value)} />
+            </Field>
+            <Field className="w-28">
+              <FieldLabel htmlFor="log-follow">{t("apps.logs.follow")}</FieldLabel>
+              <Input id="log-follow" dir="ltr" type="number" min={0} max={300} value={follow} onChange={(e) => setFollow(e.target.value)} />
+            </Field>
+            <Button disabled={busy} onClick={run}>
+              <PlayIcon />
+              {busy ? t("common.working") : t("apps.logs.fetch")}
+            </Button>
+          </div>
+          <ErrorBand message={error} />
+          <div className="min-h-40 border-b border-line bg-grid-card">
+            {op ? (
+              <OperationLog team={team} serverId={app.server_id} op={op} />
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <ScrollTextIcon />
+                  </EmptyMedia>
+                  <EmptyDescription>{t("apps.logs.empty")}</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("apps.logs.readOnly")}</p>
+      )}
+      <LogSearchPanel path={path} processes={names} />
     </div>
   )
 }
