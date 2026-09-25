@@ -92,6 +92,10 @@ export default function DataServicePage() {
   // The table browser and SQL console (MH-574 F2) only work against Postgres and MySQL/MariaDB; the
   // backend refuses redis/minio queries with a clear message, so this is only mounted for those kinds.
   const canQueryData = manage && (s.kind === "postgres" || s.kind === "mysql")
+  // Databases, users, the table browser, the SQL console and insights all reach a Proxmox LXC guest
+  // the same way they reach a container (see internal/agent/dbtarget.go); only backups (restic has
+  // no path into a guest yet) and MinIO buckets stay unsupported there.
+  const isGuest = s.origin_kind === "guest"
 
   const actions = manage ? (
     <ConfirmButton
@@ -201,7 +205,7 @@ export default function DataServicePage() {
         <Section
           title={t("databases.backupsTitle")}
           action={
-            manage && s.status === "running" ? (
+            manage && s.status === "running" && !isGuest ? (
               <Button
                 size="sm"
                 onClick={async () => {
@@ -215,7 +219,9 @@ export default function DataServicePage() {
             ) : null
           }
         >
-          {detail.backups.length === 0 ? (
+          {isGuest ? (
+            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.guestBackupsUnsupported")}</p>
+          ) : detail.backups.length === 0 ? (
             <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noBackups")}</p>
           ) : (
             <TableBand>
@@ -271,7 +277,7 @@ export default function DataServicePage() {
           )}
         </Section>
 
-        {manage ? (
+        {manage && !isGuest ? (
           <Section title={t("databases.scheduleTitle")}>
             <div className="border-b border-line px-6 py-5">
               <div className="max-w-2xl">

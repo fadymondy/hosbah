@@ -31,6 +31,9 @@ func (s *Service) SetSchedule(ctx context.Context, q *db.Queries, teamID string,
 	if err := usable(svc); err != nil {
 		return db.BackupSchedule{}, err
 	}
+	if err := backupable(svc); err != nil {
+		return db.BackupSchedule{}, err
+	}
 	in.Cron = strings.TrimSpace(in.Cron)
 	if _, err := cronNext(in.Cron, time.Now().UTC()); err != nil {
 		return db.BackupSchedule{}, invalid("that is not a valid cron expression (five fields, e.g. 0 3 * * *)")

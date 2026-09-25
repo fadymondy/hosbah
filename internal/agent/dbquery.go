@@ -1,12 +1,9 @@
 package agent
 
 import (
-	"bytes"
-	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -36,12 +33,14 @@ func dbQuery(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
 	}
-	if !containerRunning(oc, p.Container) {
+	if !dbTargetRunning(oc, dbTargetOf(p.VMID, p.Container)) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 
@@ -210,10 +209,11 @@ func runPostgresQuery(oc *OpContext, p agentproto.DBQueryParams, root map[string
 	} else {
 		fmt.Fprintf(&script, "BEGIN READ ONLY;\nSET LOCAL statement_timeout = %d;\n%s\n;\nROLLBACK;\n", timeoutMS, sql)
 	}
-	args := append([]string{"-X", "-q", "-v", "ON_ERROR_STOP=1", "--csv", "-P", "footer=off", "-P", "null=" + dbQueryNullSentinel},
-		pgLogin(root, database)...)
-	env := []string{"PGPASSWORD=" + root["password"]}
-	out, errOut, err := execInTimeout(oc, env, script.String(), time.Duration(p.TimeoutSeconds+5)*time.Second, p.Container, append([]string{"psql"}, args...)...)
+	t := dbTargetOf(p.VMID, p.Container)
+	login, env := clientLogin("postgres", t, root, database)
+	args := append([]string{"-X", "-q", "-v", "ON_ERROR_STOP=1", "--csv", "-P", "footer=off", "-P", "null=" + dbQueryNullSentinel}, login...)
+	argv := clientArgv("postgres", t, append([]string{"psql"}, args...))
+	out, errOut, err := execInTargetTimeout(oc, env, script.String(), time.Duration(p.TimeoutSeconds+5)*time.Second, t, argv...)
 	if err != nil {
 		return nil, nil, errors.New("query failed: " + clip(firstLine(strings.TrimSpace(errOut)), 400))
 	}
@@ -324,9 +324,11 @@ func runMySQLQuery(oc *OpContext, p agentproto.DBQueryParams, root map[string]st
 	} else {
 		fmt.Fprintf(&script, "SET SESSION TRANSACTION READ ONLY;\nSTART TRANSACTION;\nSET SESSION MAX_EXECUTION_TIME=%d;\n%s\n;\nROLLBACK;\n", timeoutMS, sql)
 	}
-	env := []string{"MYSQL_PWD=" + root["password"]}
-	args := append([]string{"--batch"}, mysqlLogin(root)...)
-	out, errOut, err := execInTimeout(oc, env, script.String(), time.Duration(p.TimeoutSeconds+5)*time.Second, p.Container, append([]string{"mysql"}, args...)...)
+	t := dbTargetOf(p.VMID, p.Container)
+	login, env := clientLogin("mysql", t, root, "")
+	args := append([]string{"--batch"}, login...)
+	argv := clientArgv("mysql", t, append([]string{"mysql"}, args...))
+	out, errOut, err := execInTargetTimeout(oc, env, script.String(), time.Duration(p.TimeoutSeconds+5)*time.Second, t, argv...)
 	if err != nil {
 		return nil, nil, errors.New("query failed: " + clip(firstLine(strings.TrimSpace(errOut)), 400))
 	}
@@ -391,28 +393,3 @@ func unescapeMySQLBatch(s string) string {
 	return b.String()
 }
 
-// ---- shared exec helper -----------------------------------------------------------------------
-
-// execInTimeout is execIn with stdout and stderr kept apart (so a client's error text never lands
-// inside the data we parse) and a hard deadline of its own, independent of the operation's overall
-// context — a runaway statement is killed rather than left running against the caller's deadline.
-func execInTimeout(oc *OpContext, env []string, stdin string, timeout time.Duration, container string, args ...string) (stdout, stderr string, err error) {
-	ctx, cancel := context.WithTimeout(oc.Ctx, timeout)
-	defer cancel()
-	full := append([]string{"exec", "-i"}, envArgs(mapEnv(env))...)
-	full = append(full, container)
-	full = append(full, args...)
-	cmd := exec.CommandContext(ctx, "docker", full...) //#nosec G204 -- fixed argv; names are validated identifiers
-	cmd.Env = append(dockerBaseEnv(), env...)
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
-	var out, errb bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errb
-	err = cmd.Run()
-	if ctx.Err() == context.DeadlineExceeded {
-		return out.String(), "the statement timed out", ctx.Err()
-	}
-	return out.String(), errb.String(), err
-}

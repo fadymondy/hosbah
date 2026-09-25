@@ -110,8 +110,9 @@ func (s *Service) Query(ctx context.Context, q *db.Queries, teamID string, actor
 		if err != nil {
 			return nil, "", err
 		}
+		tgt, vmid, guestType, container := execTarget(svc)
 		p := agentproto.DBQueryParams{
-			ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), Database: target.Name, Mode: in.Mode,
+			ServiceID: svc.ID, Kind: svc.Kind, Target: tgt, VMID: vmid, GuestType: guestType, Container: container, Database: target.Name, Mode: in.Mode,
 			Table: in.Table, Limit: limit, Offset: offset, SQL: in.SQL, Write: in.Write, TimeoutSeconds: 30,
 			RootSecret: rootBox,
 		}

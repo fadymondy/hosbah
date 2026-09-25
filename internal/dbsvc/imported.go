@@ -26,10 +26,13 @@ import (
 // credentials_required. Power, stats, logs and destroy are the workload controls in internal/deploy.
 //
 // Supported: a Postgres, MySQL/MariaDB or Redis container (the engine's own client runs inside it
-// through docker exec, logging in as the given user over TCP to 127.0.0.1). Not supported yet, and
-// refused with 409 unsupported_origin: a database in a Proxmox guest (the hypervisor has no client for
-// it — its credentials can be stored after a TCP check, but no database feature reaches it), MongoDB
-// and MinIO found running, and a restore-test of an image that is not the engine's official one.
+// through docker exec, logging in as the given user over TCP to 127.0.0.1), and a Postgres or
+// MySQL/MariaDB service native to a Proxmox LXC guest (the same client runs through `pct exec`,
+// logging in as the postgres/root OS user — see internal/agent/dbtarget.go). Not supported yet, and
+// refused with 409 unsupported_origin: a database in a Proxmox QEMU VM (there is no client for it
+// without its own guest agent — its credentials can still be stored after a TCP check, but no database
+// feature reaches it), MinIO in any guest, MongoDB and MinIO found running, backups of a guest service,
+// and a restore-test of an image that is not the engine's official one.
 const SourceImported = deploy.SourceImported
 
 // CodeCredentialsRequired: an imported service has no credentials yet.
@@ -48,11 +51,15 @@ func usable(svc db.DataService) error {
 	}
 	w := deploy.WorkloadOfService(svc)
 	switch {
-	case w.OriginKind == "guest":
+	case w.OriginKind == "guest" && w.Origin.GuestType == "qemu":
 		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, svc.Name+
-			" runs in a Proxmox guest: databases, users and backups inside a guest are not supported yet (the hypervisor has no client for it)")
-	case w.OriginKind != "container":
+			" runs in a Proxmox QEMU VM: databases, users and backups inside it are not supported yet (there is no client for it without its own guest agent — a possible future addition)")
+	case w.OriginKind == "guest" && w.Origin.GuestType != "lxc":
+		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, svc.Name+" runs in a guest of an unknown type Hosbah can't reach")
+	case w.OriginKind != "guest" && w.OriginKind != "container":
 		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, svc.Name+" is not a container Hosbah can reach")
+	case w.OriginKind == "guest" && svc.Kind == "minio":
+		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, "MinIO in a Proxmox guest is not supported yet")
 	case svc.Kind != "postgres" && svc.Kind != "mysql" && svc.Kind != "redis":
 		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, "database features for an imported "+svc.Kind+" are not supported yet")
 	case w.State == importer.StateMissing:
@@ -63,10 +70,30 @@ func usable(svc db.DataService) error {
 	return nil
 }
 
+// backupable additionally refuses a Proxmox guest: restic's own client backs up files it can reach on
+// disk or through docker exec, neither of which pct exec offers yet, so backups (and by extension
+// restore-tests, which restore into a throwaway of the same kind) stay unsupported for a guest service
+// until that path is built — unlike db.create/db.user/db.query/db.insights, which only need the
+// engine's own client and already run through pct exec.
+func backupable(svc db.DataService) error {
+	if !isImported(svc) {
+		return nil
+	}
+	w := deploy.WorkloadOfService(svc)
+	if w.OriginKind == "guest" {
+		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, svc.Name+
+			" runs in a Proxmox guest: backups inside a guest are not supported yet (restic has no path into a guest through pct exec)")
+	}
+	return nil
+}
+
 // restorable additionally needs the engine's official image: the restore-test starts a throwaway
 // from DBImage(kind, version), which must be what the service runs.
 func restorable(svc db.DataService) error {
 	if err := usable(svc); err != nil || !isImported(svc) {
+		return err
+	}
+	if err := backupable(svc); err != nil {
 		return err
 	}
 	w := deploy.WorkloadOfService(svc)

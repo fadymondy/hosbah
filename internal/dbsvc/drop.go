@@ -77,7 +77,8 @@ func (s *Service) dropFrom(ctx context.Context, teamID string, svc db.DataServic
 		if err != nil {
 			return nil, "", err
 		}
-		p := agentproto.DBDropParams{ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), Database: d.Name, Users: names, RootSecret: rootBox}
+		target, vmid, guestType, container := execTarget(svc)
+		p := agentproto.DBDropParams{ServiceID: svc.ID, Kind: svc.Kind, Target: target, VMID: vmid, GuestType: guestType, Container: container, Database: d.Name, Users: names, RootSecret: rootBox}
 		return p, opID(d.ID, "drop:"+attempt), nil
 	}, agentproto.KindDBDrop, nil)
 	// Team scope, not system: RLS gives the system workers no DELETE on these tables.

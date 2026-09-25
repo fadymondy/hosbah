@@ -25,12 +25,14 @@ func dbInsights(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
 	}
-	if !containerRunning(oc, p.Container) {
+	if !dbTargetRunning(oc, dbTargetOf(p.VMID, p.Container)) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 	if p.TimeoutSeconds <= 0 {
@@ -128,7 +130,7 @@ type pgTopStatementRow struct {
 const pgStatStatementsHint = "pg_stat_statements is not loaded. Add it to shared_preload_libraries and restart Postgres, then CREATE EXTENSION pg_stat_statements; — Hosbah never changes the config itself."
 
 func pgInsights(oc *OpContext, p agentproto.DBInsightsParams, root map[string]string) (*agentproto.DBInsightsResult, error) {
-	qp := agentproto.DBQueryParams{Container: p.Container, TimeoutSeconds: p.TimeoutSeconds}
+	qp := agentproto.DBQueryParams{Container: p.Container, Target: p.Target, VMID: p.VMID, GuestType: p.GuestType, TimeoutSeconds: p.TimeoutSeconds}
 	_, rows, err := runPostgresQuery(oc, qp, root, p.Database, pgInsightsSQL, false)
 	if err != nil {
 		return nil, err
@@ -256,7 +258,7 @@ type mysqlInsightsPayload struct {
 const mysqlStatStatementsHint = "the performance_schema statements_digest consumer is disabled. Enable it (performance-schema-consumer-statements-digest=ON, needs a restart to persist), then top statements are available — Hosbah never changes the config itself."
 
 func mysqlInsights(oc *OpContext, p agentproto.DBInsightsParams, root map[string]string) (*agentproto.DBInsightsResult, error) {
-	qp := agentproto.DBQueryParams{Container: p.Container, TimeoutSeconds: p.TimeoutSeconds}
+	qp := agentproto.DBQueryParams{Container: p.Container, Target: p.Target, VMID: p.VMID, GuestType: p.GuestType, TimeoutSeconds: p.TimeoutSeconds}
 	_, rows, err := runMySQLQuery(oc, qp, root, mysqlInsightsSQL, false)
 	if err != nil {
 		return nil, err
@@ -317,12 +319,15 @@ func dbCancelQuery(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
 	}
-	if !containerRunning(oc, p.Container) {
+	t := dbTargetOf(p.VMID, p.Container)
+	if !dbTargetRunning(oc, t) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 
@@ -330,7 +335,7 @@ func dbCancelQuery(oc *OpContext) (any, int, error) {
 	switch p.Kind {
 	case "postgres":
 		sql := fmt.Sprintf("SELECT pg_cancel_backend(%d)", p.ID)
-		qp := agentproto.DBQueryParams{Container: p.Container, TimeoutSeconds: 10}
+		qp := agentproto.DBQueryParams{Container: p.Container, Target: p.Target, VMID: p.VMID, GuestType: p.GuestType, TimeoutSeconds: 10}
 		_, rows, err := runPostgresQuery(oc, qp, root, p.Database, sql, true)
 		if err != nil {
 			return nil, 1, err
@@ -344,9 +349,10 @@ func dbCancelQuery(oc *OpContext) (any, int, error) {
 			res.Detail = "no such backend, or it had already finished"
 		}
 	case "mysql":
-		env := []string{"MYSQL_PWD=" + root["password"]}
-		args := append(mysqlLogin(root), "-e", fmt.Sprintf("KILL QUERY %d", p.ID))
-		_, errOut, err := execInTimeout(oc, env, "", 10*time.Second, p.Container, append([]string{"mysql"}, args...)...)
+		login, env := clientLogin("mysql", t, root, "")
+		args := append(login, "-e", fmt.Sprintf("KILL QUERY %d", p.ID))
+		argv := clientArgv("mysql", t, append([]string{"mysql"}, args...))
+		_, errOut, err := execInTargetTimeout(oc, env, "", 10*time.Second, t, argv...)
 		if err != nil {
 			res = agentproto.DBCancelQueryResult{OK: false, Detail: clip(firstLine(strings.TrimSpace(errOut)), 300)}
 		} else {
