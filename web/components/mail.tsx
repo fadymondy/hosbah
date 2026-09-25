@@ -1,7 +1,17 @@
 "use client"
 
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { CheckCircle2Icon, KeyRoundIcon, MailIcon, PlusIcon, RefreshCcwIcon, Trash2Icon, UploadCloudIcon } from "lucide-react"
+import {
+  CheckCircle2Icon,
+  KeyRoundIcon,
+  LinkIcon,
+  MailIcon,
+  PlusIcon,
+  RefreshCcwIcon,
+  SearchCheckIcon,
+  Trash2Icon,
+  UploadCloudIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
@@ -20,12 +30,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import {
+  blacklistStatusVariant,
   dnsStatusVariant,
   mailStatusVariant,
+  type DeliverabilityReport,
   type MailAlias,
   type MailDnsPublishResult,
   type MailDomain,
   type MailDomainDns,
+  type MailRelay,
   type MailServer,
   type Mailbox,
 } from "@/lib/mail"
@@ -47,18 +60,21 @@ export function TeamMail() {
   const [servers, setServers] = useState<MailServer[] | null>(null)
   const [hostServers, setHostServers] = useState<Server[] | null>(null)
   const [domains, setDomains] = useState<MailDomain[] | null>(null)
+  const [apps, setApps] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [s, hs, d] = await Promise.all([
+      const [s, hs, d, a] = await Promise.all([
         apiFetch<{ servers: MailServer[] }>(`${base}/servers`),
         apiFetch<{ servers: Server[] }>(`/api/teams/${team.slug}/servers`),
         apiFetch<{ domains: MailDomain[] }>(`${base}/domains`),
+        apiFetch<{ apps: { id: string; name: string }[] }>(`/api/teams/${team.slug}/apps`),
       ])
       setServers(s.servers ?? [])
       setHostServers(hs.servers ?? [])
       setDomains(d.domains ?? [])
+      setApps(a.apps ?? [])
       setError(null)
     } catch (err) {
       setError(errorText(err))
@@ -151,7 +167,7 @@ export function TeamMail() {
         ) : (
           <div className="flex flex-col">
             {domains.map((d) => (
-              <DomainCard key={d.id} base={base} domain={d} manage={manage} onChanged={load} />
+              <DomainCard key={d.id} base={base} domain={d} manage={manage} apps={apps} onChanged={load} />
             ))}
           </div>
         )}
@@ -357,27 +373,43 @@ function AddDomainDialog({ base, servers, onSaved, ...controlled }: { base: stri
   )
 }
 
-/** One domain: its status, mailboxes, aliases and DNS records, each loaded lazily once expanded. */
-function DomainCard({ base, domain, manage, onChanged }: { base: string; domain: MailDomain; manage: boolean; onChanged: () => Promise<void> | void }) {
+/** One domain: its status, mailboxes, aliases, relay credentials and DNS records, each loaded lazily once expanded. */
+function DomainCard({
+  base,
+  domain,
+  manage,
+  apps,
+  onChanged,
+}: {
+  base: string
+  domain: MailDomain
+  manage: boolean
+  apps: { id: string; name: string }[]
+  onChanged: () => Promise<void> | void
+}) {
   const { t } = useI18n()
   const errorText = useErrorText()
   const domBase = `${base}/domains/${domain.id}`
   const [mailboxes, setMailboxes] = useState<Mailbox[] | null>(null)
   const [aliases, setAliases] = useState<MailAlias[] | null>(null)
+  const [relays, setRelays] = useState<MailRelay[] | null>(null)
   const [dns, setDns] = useState<MailDomainDns | null>(null)
   const [publishResult, setPublishResult] = useState<MailDnsPublishResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<"check" | "publish" | null>(null)
+  const [report, setReport] = useState<DeliverabilityReport | null | "loading">(null)
 
   const load = useCallback(async () => {
     try {
-      const [m, a, d] = await Promise.all([
+      const [m, a, r, d] = await Promise.all([
         apiFetch<{ mailboxes: Mailbox[] }>(`${domBase}/mailboxes`),
         apiFetch<{ aliases: MailAlias[] }>(`${domBase}/aliases`),
+        apiFetch<{ relays: MailRelay[] }>(`${domBase}/relays`),
         apiFetch<MailDomainDns>(`${domBase}/dns`),
       ])
       setMailboxes(m.mailboxes ?? [])
       setAliases(a.aliases ?? [])
+      setRelays(r.relays ?? [])
       setDns(d)
       setError(null)
     } catch (err) {
@@ -426,6 +458,17 @@ function DomainCard({ base, domain, manage, onChanged }: { base: string; domain:
     }
   }
 
+  async function runDeliverability() {
+    setReport("loading")
+    try {
+      const r = await apiFetch<DeliverabilityReport>(`${domBase}/deliverability`)
+      setReport(r)
+    } catch (err) {
+      toast.error(errorText(err))
+      setReport(null)
+    }
+  }
+
   return (
     <div className="border-b border-line">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
@@ -442,6 +485,10 @@ function DomainCard({ base, domain, manage, onChanged }: { base: string; domain:
           <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void checkDns()}>
             <RefreshCcwIcon />
             {busy === "check" ? t("common.working") : t("mail.dns.check")}
+          </Button>
+          <Button size="sm" variant="outline" disabled={report === "loading"} onClick={() => void runDeliverability()}>
+            <SearchCheckIcon />
+            {report === "loading" ? t("common.working") : t("mail.deliverability.run")}
           </Button>
           {manage ? (
             <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void publishDns()}>
@@ -462,6 +509,8 @@ function DomainCard({ base, domain, manage, onChanged }: { base: string; domain:
         </div>
       </div>
       <ErrorBand message={error} />
+
+      {report && report !== "loading" ? <DeliverabilityDialog report={report} onClose={() => setReport(null)} /> : null}
 
       {publishResult ? (
         <div className="mx-6 mb-4 flex items-start gap-3 border border-line bg-grid-soft px-4 py-3 text-sm">
@@ -541,7 +590,7 @@ function DomainCard({ base, domain, manage, onChanged }: { base: string; domain:
       </div>
 
       {/* Aliases */}
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <p className="text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.aliases.title")}</p>
           {manage ? <AliasDialog base={domBase} domain={domain.domain} onSaved={load} /> : null}
@@ -595,6 +644,38 @@ function DomainCard({ base, domain, manage, onChanged }: { base: string; domain:
                       </div>
                     </TableCell>
                   </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* SMTP relay credentials (MH-577 I6) */}
+      <div className="px-6 pb-6">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.relay.title")}</p>
+          {manage && domain.status === "active" && apps.length > 0 ? <RelayDialog base={domBase} domain={domain.domain} apps={apps} onSaved={load} /> : null}
+        </div>
+        {relays === null ? (
+          <LoadingRows rows={1} />
+        ) : relays.length === 0 ? (
+          <p className="text-sm text-grid-muted">{apps.length === 0 ? t("mail.relay.needApp") : t("mail.relay.empty")}</p>
+        ) : (
+          <div className="border border-line">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("mail.relay.email")}</TableHead>
+                  <TableHead>{t("mail.relay.app")}</TableHead>
+                  <TableHead>{t("mail.relay.attached")}</TableHead>
+                  <TableHead>{t("mail.statusLabel")}</TableHead>
+                  <TableHead className="text-end">{t("common.actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {relays.map((r) => (
+                  <RelayRow key={r.id} base={domBase} relay={r} apps={apps} manage={manage} onChanged={load} />
                 ))}
               </TableBody>
             </Table>
@@ -893,5 +974,263 @@ function AliasDialog({ base, domain, onSaved, ...controlled }: { base: string; d
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** MH-577 I5: a domain's deliverability report — DNS/PTR status plus DNSBL blacklist lookups. */
+function DeliverabilityDialog({ report, onClose }: { report: DeliverabilityReport; onClose: () => void }) {
+  const { t } = useI18n()
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("mail.deliverability.title", { domain: report.domain })}</DialogTitle>
+          <DialogDescription>{t("mail.deliverability.hint")}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="mb-2 text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.dns.records")}</p>
+            <div className="flex flex-col gap-2">
+              {report.dns.records.map((r, i) => (
+                <div key={`${r.type}-${r.name}-${i}`} className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant="outline" dir="ltr">
+                    {r.type}
+                  </Badge>
+                  <Badge variant={dnsStatusVariant(r.status)}>{t(`mail.dns.status.${r.status}`, undefined, r.status)}</Badge>
+                  <span dir="ltr" className="text-xs text-grid-muted">
+                    {r.name}
+                  </span>
+                </div>
+              ))}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="outline" dir="ltr">
+                  PTR
+                </Badge>
+                <Badge variant={dnsStatusVariant(report.dns.ptr.status)}>{t(`mail.dns.status.${report.dns.ptr.status}`, undefined, report.dns.ptr.status)}</Badge>
+                <span dir="ltr" className="text-xs text-grid-muted">
+                  {report.dns.ptr.hostname}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.deliverability.blacklists")}</p>
+            <div className="flex flex-col gap-2">
+              {report.blacklists.map((bl) => (
+                <div key={bl.zone} className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant={blacklistStatusVariant(bl.status)}>{t(`mail.deliverability.status.${bl.status}`, undefined, bl.status)}</Badge>
+                  <span dir="ltr" className="text-xs text-grid-muted">
+                    {bl.zone}
+                  </span>
+                  {bl.detail ? (
+                    <span dir="ltr" className="text-xs text-grid-muted">
+                      ({bl.detail})
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="border-t border-line pt-3 text-xs text-grid-muted">{report.spam_filter_note}</p>
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>{t("common.close")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** MH-577 I6: an SMTP relay credential row — rotate its password or revoke it, and attach it to its app. */
+function RelayRow({
+  base,
+  relay,
+  apps,
+  manage,
+  onChanged,
+}: {
+  base: string
+  relay: MailRelay
+  apps: { id: string; name: string }[]
+  manage: boolean
+  onChanged: () => Promise<void> | void
+}) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [newPassword, setNewPassword] = useState<string | null>(null)
+  const [busy, setBusy] = useState<"rotate" | "attach" | null>(null)
+  const appName = apps.find((a) => a.id === relay.app_id)?.name ?? relay.app_id
+
+  async function rotate() {
+    setBusy("rotate")
+    try {
+      const r = await apiFetch<{ password: string }>(`${base}/relays/${relay.id}/rotate`, { method: "POST" })
+      setNewPassword(r.password)
+      await onChanged()
+    } catch (err) {
+      toast.error(errorText(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function attach() {
+    setBusy("attach")
+    try {
+      await apiFetch(`${base}/relays/${relay.id}/attach`, { method: "POST" })
+      toast.success(t("mail.relay.attachedToast", { app: appName }))
+      await onChanged()
+    } catch (err) {
+      toast.error(errorText(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <>
+      <TableRow>
+        <TableCell dir="ltr" className="text-start font-medium">
+          {relay.email}
+        </TableCell>
+        <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+          {appName}
+        </TableCell>
+        <TableCell>
+          <Badge variant={relay.attached ? "default" : "outline"}>{relay.attached ? t("mail.relay.yes") : t("mail.relay.no")}</Badge>
+        </TableCell>
+        <TableCell>
+          <Badge variant={mailStatusVariant(relay.status)}>{t(`mail.status.${relay.status}`, undefined, relay.status)}</Badge>
+          {relay.error ? <p className="mt-1 max-w-64 text-xs text-grid-danger">{relay.error}</p> : null}
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap justify-end gap-2">
+            {manage && relay.status === "ready" ? (
+              <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void attach()}>
+                <LinkIcon />
+                {busy === "attach" ? t("common.working") : relay.attached ? t("mail.relay.reattach") : t("mail.relay.attach")}
+              </Button>
+            ) : null}
+            {manage ? (
+              <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void rotate()}>
+                <KeyRoundIcon />
+                {busy === "rotate" ? t("common.working") : t("mail.relay.rotate")}
+              </Button>
+            ) : null}
+            {manage ? (
+              <ConfirmButton
+                icon={<Trash2Icon />}
+                label={t("common.delete")}
+                title={t("mail.relay.revokeTitle", { name: relay.email })}
+                description={t("mail.relay.revokeBody")}
+                confirmLabel={t("common.delete")}
+                onConfirm={async () => {
+                  try {
+                    await apiFetch(`${base}/relays/${relay.id}`, { method: "DELETE" })
+                  } catch (err) {
+                    throw new Error(errorText(err))
+                  }
+                  await onChanged()
+                }}
+              />
+            ) : null}
+          </div>
+        </TableCell>
+      </TableRow>
+      {newPassword ? (
+        <TableRow>
+          <TableCell colSpan={5}>
+            <PasswordShown email={relay.email} password={newPassword} onClose={() => setNewPassword(null)} />
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
+  )
+}
+
+/** MH-577 I6: create an SMTP relay credential dedicated to one app. Hosbah generates the password and shows it once. */
+function RelayDialog({
+  base,
+  domain,
+  apps,
+  onSaved,
+  ...controlled
+}: { base: string; domain: string; apps: { id: string; name: string }[]; onSaved: () => Promise<void> | void } & Controlled) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [app, setApp] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, reset)
+
+  function reset() {
+    setError(null)
+    setApp(apps[0]?.id ?? "")
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await apiFetch<{ relay: MailRelay; password: string }>(base + "/relays", { method: "POST", body: { app } })
+      setOpen(false)
+      setCreated({ email: r.relay.email, password: r.password })
+      await onSaved()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        {fromCaller ? null : (
+          <DialogTrigger render={<Button size="sm" variant="outline" />}>
+            <PlusIcon />
+            {t("mail.relay.add")}
+          </DialogTrigger>
+        )}
+        <DialogContent>
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>{t("mail.relay.add")}</DialogTitle>
+              <DialogDescription>{t("mail.relay.addHint", { domain })}</DialogDescription>
+            </DialogHeader>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="relay-app">{t("mail.relay.app")}</FieldLabel>
+                <Select value={app} onValueChange={(v) => setApp(v ?? "")}>
+                  <SelectTrigger id="relay-app">
+                    <SelectValue>{(v: string) => apps.find((a) => a.id === v)?.name ?? v}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {apps.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{t("mail.relay.appHint")}</FieldDescription>
+              </Field>
+            </FieldGroup>
+            <FormError message={error} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" disabled={busy || !app}>
+                {busy ? t("common.working") : t("mail.relay.add")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {created ? <PasswordShown email={created.email} password={created.password} onClose={() => setCreated(null)} /> : null}
+    </>
   )
 }

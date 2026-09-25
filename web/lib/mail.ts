@@ -85,6 +85,45 @@ export type MailDnsPublishResult = {
   zone?: string
 }
 
+/** MH-577 I5: a mail domain's deliverability report. */
+export type BlacklistStatus = "ok" | "listed" | "error"
+
+export type BlacklistCheck = {
+  zone: string
+  status: BlacklistStatus
+  detail?: string
+}
+
+export type DeliverabilityReport = {
+  domain: string
+  dns: MailDomainDns
+  blacklists: BlacklistCheck[]
+  spam_filter_note: string
+}
+
+/** MH-577 I6: an SMTP relay credential dedicated to one app. */
+export type MailRelay = {
+  id: string
+  mail_domain_id: string
+  app_id: string
+  local_part: string
+  email: string
+  attached: boolean
+  status: MailboxStatus
+  error: string | null
+}
+
+export type MailRelayCreated = {
+  relay: MailRelay
+  password: string
+}
+
+export function blacklistStatusVariant(status: BlacklistStatus): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "ok") return "default"
+  if (status === "listed") return "destructive"
+  return "outline"
+}
+
 export function mailStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "running" || status === "active" || status === "ready") return "default"
   if (status === "failed") return "destructive"

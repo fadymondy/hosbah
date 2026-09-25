@@ -307,6 +307,7 @@ func TestIsolationSweep(t *testing.T) {
 		"owner":       func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
 		"mailbox":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
 		"alias":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
+		"relay":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f4"} }, // MH-577 I6: nothing of A's mail relay credentials is stored by these tests
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -674,6 +675,13 @@ func TestIsolationSweep(t *testing.T) {
 		"mail_aliases_list":    {"domain": "no-such-mail-domain.test"},
 		"mail_alias_add":       {"domain": "no-such-mail-domain.test", "local_part": "sales", "kind": "forward", "destinations": []string{"x@example.test"}},
 		"mail_alias_remove":    {"domain": "no-such-mail-domain.test", "alias": "00000000-0000-4000-8000-0000000000f3"},
+		// MH-577 I5/I6: deliverability report and relay credentials on a domain B may not see.
+		"mail_deliverability_report": {"domain": "no-such-mail-domain.test"},
+		"mail_relays_list":           {"domain": "no-such-mail-domain.test"},
+		"mail_relay_add":             {"domain": "no-such-mail-domain.test", "app": "no-such-app"},
+		"mail_relay_rotate":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4"},
+		"mail_relay_attach":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4"},
+		"mail_relay_revoke":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4", "confirm": "x"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {

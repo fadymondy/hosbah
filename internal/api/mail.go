@@ -71,6 +71,12 @@ type MailAliasPath struct {
 	Alias string `path:"alias" maxLength:"64"`
 }
 
+// MailRelayPath addresses one SMTP relay credential of a domain.
+type MailRelayPath struct {
+	MailDomainPath
+	Relay string `path:"relay" maxLength:"64"`
+}
+
 func mailServerIn(ctx context.Context, q *db.Queries, teamID, ref string) (db.MailServer, error) {
 	row, err := mail.ServerByRef(ctx, q, teamID, ref)
 	if err != nil {
@@ -509,6 +515,179 @@ func (d *deps) registerMail(api huma.API) {
 				return errNotFound
 			}
 			return mailErr(d.mailSvc().RemoveAlias(ctx, q, m.TeamID, webActor(id), srv, dom, row), "could not remove the alias")
+		})
+		return nil, err
+	})
+
+	// ---- deliverability (MH-577 I5) --------------------------------------------------------------
+
+	type deliverabilityOut struct{ Body mail.DeliverabilityReport }
+	huma.Register(api, huma.Operation{OperationID: "get-mail-domain-deliverability", Method: http.MethodGet, Path: "/api/teams/{team}/mail/domains/{domain}/deliverability",
+		Tags: tags, Summary: "A domain's deliverability report: DNS/PTR status plus DNSBL blacklist lookups of the mail server's IP",
+	}, func(ctx context.Context, in *MailDomainPath) (*deliverabilityOut, error) {
+		out := &deliverabilityOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			srv, err := domainServer(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return err
+			}
+			res, err := d.mailSvc().DeliverabilityReport(ctx, q, m.TeamID, srv, dom)
+			if err != nil {
+				return mailErr(err, "could not build the deliverability report")
+			}
+			out.Body = res
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- SMTP relay credentials (MH-577 I6) ------------------------------------------------------
+
+	type relayListOut struct {
+		Body struct {
+			Relays []mail.Relay `json:"relays"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-mail-relays", Method: http.MethodGet, Path: "/api/teams/{team}/mail/domains/{domain}/relays",
+		Summary: "A domain's SMTP relay credentials", Tags: tags,
+	}, func(ctx context.Context, in *MailDomainPath) (*relayListOut, error) {
+		out := &relayListOut{}
+		out.Body.Relays = []mail.Relay{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			rows, err := mail.ListRelays(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list relay credentials")
+			}
+			out.Body.Relays = rows
+			return nil
+		})
+		return out, err
+	})
+
+	type relayCreateOut struct{ Body mail.RelayCreated }
+	huma.Register(api, huma.Operation{OperationID: "add-mail-relay", Method: http.MethodPost, Path: "/api/teams/{team}/mail/domains/{domain}/relays",
+		DefaultStatus: http.StatusCreated, Tags: tags,
+		Summary: "Create an SMTP relay credential dedicated to one app. Hosbah generates the password and returns it once (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		MailDomainPath
+		Body struct {
+			App string `json:"app" minLength:"1" maxLength:"64" doc:"App id or name to dedicate this relay credential to."`
+		}
+	}) (*relayCreateOut, error) {
+		out := &relayCreateOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageMail, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			srv, err := domainServer(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return err
+			}
+			a, err := appIn(ctx, q, m, in.Body.App)
+			if err != nil {
+				return err
+			}
+			created, err := d.mailSvc().AddRelay(ctx, q, m.TeamID, webActor(id), srv, dom, a)
+			if err != nil {
+				return mailErr(err, "could not create the relay credential")
+			}
+			out.Body = created
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "delete-mail-relay", Method: http.MethodDelete, Path: "/api/teams/{team}/mail/domains/{domain}/relays/{relay}",
+		DefaultStatus: http.StatusNoContent, Tags: tags, Summary: "Revoke an SMTP relay credential, unsetting its SMTP_* env vars if attached (owner or admin)",
+	}, func(ctx context.Context, in *MailRelayPath) (*struct{}, error) {
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageMail, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			srv, err := domainServer(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return err
+			}
+			row, err := mail.RelayByRef(ctx, q, m.TeamID, in.Relay)
+			if err != nil || row.MailDomainID != dom.ID {
+				return errNotFound
+			}
+			a, err := appIn(ctx, q, m, row.AppID)
+			if err != nil {
+				return err
+			}
+			return mailErr(d.mailSvc().RevokeRelay(ctx, q, m.TeamID, webActor(id), srv, dom, a, row), "could not revoke the relay credential")
+		})
+		return nil, err
+	})
+
+	type relayRotateOut struct {
+		Body struct {
+			Password string `json:"password" doc:"Shown once."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "rotate-mail-relay", Method: http.MethodPost, Path: "/api/teams/{team}/mail/domains/{domain}/relays/{relay}/rotate",
+		Tags: tags, Summary: "Generate a new password for a relay credential and return it once (owner or admin)",
+	}, func(ctx context.Context, in *MailRelayPath) (*relayRotateOut, error) {
+		out := &relayRotateOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageMail, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			srv, err := domainServer(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return err
+			}
+			row, err := mail.RelayByRef(ctx, q, m.TeamID, in.Relay)
+			if err != nil || row.MailDomainID != dom.ID {
+				return errNotFound
+			}
+			a, err := appIn(ctx, q, m, row.AppID)
+			if err != nil {
+				return err
+			}
+			pw, err := d.mailSvc().RotateRelay(ctx, q, m.TeamID, webActor(id), srv, dom, a, row)
+			if err != nil {
+				return mailErr(err, "could not rotate the relay credential")
+			}
+			out.Body.Password = pw
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "attach-mail-relay", Method: http.MethodPost, Path: "/api/teams/{team}/mail/domains/{domain}/relays/{relay}/attach",
+		Tags: tags, Summary: "Push this relay credential's SMTP_* variables into its app's environment (owner or admin)",
+	}, func(ctx context.Context, in *MailRelayPath) (*struct{}, error) {
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageMail, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			dom, err := mailDomainIn(ctx, q, m.TeamID, in.Domain)
+			if err != nil {
+				return err
+			}
+			srv, err := domainServer(ctx, q, m.TeamID, dom)
+			if err != nil {
+				return err
+			}
+			row, err := mail.RelayByRef(ctx, q, m.TeamID, in.Relay)
+			if err != nil || row.MailDomainID != dom.ID {
+				return errNotFound
+			}
+			a, err := appIn(ctx, q, m, row.AppID)
+			if err != nil {
+				return err
+			}
+			return mailErr(d.mailSvc().AttachRelay(ctx, q, m.TeamID, webActor(id), srv, dom, a, row), "could not attach the relay credential to the app")
 		})
 		return nil, err
 	})

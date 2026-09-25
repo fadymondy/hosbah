@@ -2033,6 +2033,36 @@
       "empty": "No aliases yet.",
       "deleteTitle": "Remove {name}?",
       "deleteBody": "This cannot be undone."
+    },
+    "relay": {
+      "title": "SMTP relay credentials",
+      "add": "Add relay credential",
+      "addHint": "Creates a dedicated Stalwart account for {domain} that can only send mail, for one app to use as its outgoing SMTP.",
+      "app": "App",
+      "appHint": "The app this relay credential belongs to.",
+      "email": "Address",
+      "attached": "Attached",
+      "yes": "Yes",
+      "no": "No",
+      "attach": "Attach to app",
+      "reattach": "Re-attach to app",
+      "attachedToast": "Attached {app}'s SMTP environment to this relay.",
+      "rotate": "Rotate password",
+      "empty": "No relay credentials yet.",
+      "needApp": "Create an app on this team first, then add a relay credential for it.",
+      "revokeTitle": "Revoke {name}?",
+      "revokeBody": "Removes the Stalwart account and unsets the app's SMTP environment. This cannot be undone."
+    },
+    "deliverability": {
+      "title": "Deliverability report for {domain}",
+      "hint": "Published DNS, reverse DNS (PTR) and blacklist status, checked live from the control plane.",
+      "run": "Run deliverability report",
+      "blacklists": "Blacklist checks",
+      "status": {
+        "ok": "Not listed",
+        "listed": "Listed",
+        "error": "Could not check"
+      }
     }
   },
   "siteTemplates": {

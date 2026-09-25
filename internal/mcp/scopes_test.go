@@ -70,7 +70,7 @@ to find out, so it is a build-time failure instead.
 func TestDestructiveToolsNameAKnownResourceType(t *testing.T) {
 	// Mirrors approval_requests_resource_type_check in internal/db/schema/approval_request.sql.
 	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user", "team", "log_drain",
-		"script", "script_run", "service", "site_template", "product", "product_instance", "ssh_key"}
+		"script", "script_run", "service", "site_template", "product", "product_instance", "ssh_key", "mail_relay_credential"}
 	for _, srv := range []*Server{UserServer(), AdminServer()} {
 		for _, tool := range srv.Tools {
 			if !tool.Destructive {
@@ -114,6 +114,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"server_updates_run": true,
 		// MH-578 C10: removing a team SSH key, and installing/uninstalling one on a server.
 		"ssh_keys_remove": true, "ssh_keys_install": true, "ssh_keys_uninstall": true,
+		// MH-577 I6: revoking an SMTP relay credential removes its Stalwart principal.
+		"mail_relay_revoke": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {
