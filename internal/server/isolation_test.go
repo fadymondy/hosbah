@@ -286,7 +286,9 @@ func TestIsolationSweep(t *testing.T) {
 		"key":         func(string) []string { return []string{keyA.ID} },
 		"upgrade":     func(string) []string { return []string{upgradeA.ID} },
 		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
-		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
+		"owner":       func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
+		"mailbox":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
+		"alias":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -450,17 +452,17 @@ func TestIsolationSweep(t *testing.T) {
 		"list_app_monitors":  {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
-		"monitor_uptime": {"app": appA.App.ID, "monitor": monA.ID},
+		"monitor_uptime":              {"app": appA.App.ID, "monitor": monA.ID},
 		"notification_channel_update": {"channel": chanA.ID, "name": "stolen"}, "notification_channel_test": {"channel": chanA.ID},
 		"notification_channel_delete": {"channel": chanA.ID, "confirm": chanA.Name},
-		"status_page_update": {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
+		"status_page_update":          {"status_page": pageA.ID, "title": "stolen"}, "status_page_delete": {"status_page": pageA.ID, "confirm": pageA.Slug},
 		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
-		"get_script": {"script": scriptA.ID}, "save_script": {"script": scriptA.ID, "name": "stolen", "body": "echo hi"},
-		"delete_script": {"script": scriptA.ID, "confirm": scriptA.Name},
-		"run_script":    {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
+		"get_script":       {"script": scriptA.ID}, "save_script": {"script": scriptA.ID, "name": "stolen", "body": "echo hi"},
+		"delete_script":     {"script": scriptA.ID, "confirm": scriptA.Name},
+		"run_script":        {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
 		"script_run_status": {"run": scriptRunA},
 		"get_site_template": {"template": templateA.ID}, "save_site_template": {"template": templateA.ID,
 			"source_yaml": "name: " + templateA.Name + "\ndriver: node-api\nrepo_url: https://example.test/a-env/repo.git\n"},
@@ -468,9 +470,9 @@ func TestIsolationSweep(t *testing.T) {
 		"preview_site_template":    {"template": templateA.ID},
 		"create_app_from_template": {"template": templateA.ID, "name": "stolen", "server": srvA},
 		"export_app_template":      {"app": appA.App.ID},
-		"list_services":     {"server": srvA},
-		"service_action":    {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
-		"get_app_queues":   {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
+		"list_services":            {"server": srvA},
+		"service_action":           {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
+		"get_app_queues":           {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
 		"app_processes": {"app": appA.App.ID}, "app_process_action": {"app": appA.App.ID, "action": "restart", "process": "web"},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
 		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
@@ -492,15 +494,15 @@ func TestIsolationSweep(t *testing.T) {
 		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},
 		"app_apm_settings": {"app": appA.App.ID, "enabled": true}, "app_endpoints": {"app": appA.App.ID},
 		"app_traces": {"app": appA.App.ID, "method": "GET", "route": "/"}, "app_errors": {"app": appA.App.ID},
-		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
+		"app_error_status":   {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
 		"app_cache_settings": {"app": appA.App.ID, "enabled": true}, "app_cache_purge": {"app": appA.App.ID},
 		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
 		// MH-576 D7: SaaS products, instances, upgrades and keys of A's.
 		"product_instances": {"product": prodA.ID}, "provision_instance": {"product": prodA.ID, "server": srvA, "customer_ref": "stolen"},
 		"suspend_instance": {"product": prodA.ID, "instance": instA.ID}, "resume_instance": {"product": prodA.ID, "instance": instA.ID},
-		"upgrade_product":   {"product": prodA.ID},
-		"mint_product_key":  {"product": prodA.ID, "name": "stolen"},
-		"destroy_instance":  {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
+		"upgrade_product":  {"product": prodA.ID},
+		"mint_product_key": {"product": prodA.ID, "name": "stolen"},
+		"destroy_instance": {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -611,6 +613,38 @@ func TestIsolationSweep(t *testing.T) {
 			t.Errorf("MCP %s as team B on an unknown data service should error: %+v", name, res)
 		}
 	}
+	// MH-577 mail MCP tools: a server/domain/mailbox/alias ref team B may not see is not found; nothing acts.
+	for name, args := range map[string]map[string]any{
+		"mail_server_install":  {"server": "alpha-" + suffix, "hostname": "mail.example.test"},
+		"mail_server_remove":   {"server": "no-such-mail-server"},
+		"mail_domain_add":      {"server": "no-such-mail-server", "domain": "example.test"},
+		"mail_domain_remove":   {"domain": "no-such-mail-domain.test"},
+		"mail_dns_records":     {"domain": "no-such-mail-domain.test"},
+		"mail_dns_check":       {"domain": "no-such-mail-domain.test"},
+		"mail_dns_publish":     {"domain": "no-such-mail-domain.test"},
+		"mailboxes_list":       {"domain": "no-such-mail-domain.test"},
+		"mailbox_add":          {"domain": "no-such-mail-domain.test", "local_part": "postmaster"},
+		"mailbox_remove":       {"domain": "no-such-mail-domain.test", "mailbox": "postmaster"},
+		"mailbox_set_password": {"domain": "no-such-mail-domain.test", "mailbox": "postmaster"},
+		"mailbox_set_quota":    {"domain": "no-such-mail-domain.test", "mailbox": "postmaster", "quota_mb": 512},
+		"mail_aliases_list":    {"domain": "no-such-mail-domain.test"},
+		"mail_alias_add":       {"domain": "no-such-mail-domain.test", "local_part": "sales", "kind": "forward", "destinations": []string{"x@example.test"}},
+		"mail_alias_remove":    {"domain": "no-such-mail-domain.test", "alias": "00000000-0000-4000-8000-0000000000f3"},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError {
+			t.Errorf("MCP %s as team B on an unknown mail ref should error: %+v", name, res)
+		}
+	}
+	// Filtered by a server ref B cannot see, mail_domains_list must come back empty, never an error
+	// that could distinguish "exists but not yours" from "no such server" (a leak either way).
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "mail_domains_list", map[string]any{"server": "no-such-mail-server"}); res.IsError || !strings.Contains(res.Text, "No mail domains") {
+		t.Errorf("mail_domains_list filtered by an unknown server as B should answer empty, not error: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "mail_servers_list", nil); res.IsError {
+		t.Errorf("mail_servers_list as B (no mail servers of its own) should not error: %+v", res)
+	}
+
 	// A deploy-hook token is not a session: hooks of unknown tokens are 404, the TLS ask says no.
 	if code := httpStatus(t, "POST", ts.URL+"/hooks/deploy/cdh_nope", ""); code != 404 {
 		t.Errorf("unknown deploy hook -> %d", code)
