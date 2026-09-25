@@ -43,6 +43,9 @@ ALTER TABLE tunnels ADD CONSTRAINT tunnels_server_fk FOREIGN KEY (server_id, tea
 ALTER TABLE tunnels ADD CONSTRAINT tunnels_credential_fk FOREIGN KEY (credential_id) REFERENCES credentials (id) ON DELETE RESTRICT;
 -- Imported workloads: the tombstones of deleted imported records go with their server.
 ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+-- Import runs and their items go with their server.
+ALTER TABLE import_runs ADD CONSTRAINT import_runs_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+ALTER TABLE import_items ADD CONSTRAINT import_items_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 -- Server metrics history goes with its server.
 ALTER TABLE server_metrics ADD CONSTRAINT server_metrics_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 -- App traffic history goes with its app, and with the server that reported it.

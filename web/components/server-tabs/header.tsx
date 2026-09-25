@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
 /** Each section is its own page under /servers/{id}; "" is the overview. */
-export const SERVER_TABS = ["", "apps", "databases", "guests", "proxy", "tunnels", "github", "discovered", "operations", "settings"] as const
+export const SERVER_TABS = ["", "apps", "databases", "guests", "proxy", "tunnels", "github", "discovered", "import", "operations", "settings"] as const
 export type ServerTab = (typeof SERVER_TABS)[number]
 
 /**

@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
@@ -17,9 +19,59 @@ import (
 // Actor is who the importer's rows and audit entries name.
 const Actor = "system:import"
 
+// Decisions (import_ignores.decision; MH-574 A4): a member's sticky choice for one discovered
+// workload. A later sync always honours it instead of reclassifying the item.
+const (
+	DecisionIgnore        = "ignore"
+	DecisionApp           = "app"
+	DecisionDatabase      = "database"
+	DecisionSharedService = "shared_service"
+)
+
+// Item outcomes (import_items.outcome): what a sync did with one discovered workload.
+const (
+	OutcomeImportedApp           = "imported_app"
+	OutcomeImportedDataService   = "imported_data_service"
+	OutcomeImportedSharedService = "imported_shared_service"
+	OutcomeLinkedGuest           = "linked_guest"
+	OutcomeUpdated               = "updated"
+	OutcomeMissing               = "missing"
+	OutcomeRemoved               = "removed"
+	OutcomeSkipped               = "skipped"
+	OutcomeIgnored               = "ignored"
+	OutcomeError                 = "error"
+)
+
+// applyDecision applies a member's decision (import_ignores.decision) to a classified item: ignore
+// reports true (the caller keeps the item out); app and database force the item's target (app also
+// clears any detected data-service kind — it is no longer meaningful); no decision (or an unknown
+// one) leaves the item as Classify decided. DecisionSharedService is handled by the caller (Sync)
+// instead, since it needs database access. Pure: no I/O, for unit tests.
+func applyDecision(it Item, decision string) (Item, bool) {
+	switch decision {
+	case DecisionIgnore:
+		return it, true
+	case DecisionApp:
+		it.Target, it.Kind = TargetApp, ""
+	case DecisionDatabase:
+		it.Target = TargetDataService
+	}
+	return it, false
+}
+
 // Result counts what one sync did.
 type Result struct {
-	Created, Updated, Missing, Ignored, Removed int
+	Created, Updated, Missing, Ignored, Removed, SharedServices, Errors int
+}
+
+// itemOutcome is one row of import_items, built while syncing and inserted after the sync's own
+// transaction commits (so a per-item error never rolls back the whole sync — see Sync).
+type itemOutcome struct {
+	OriginKind, OriginKey, Name string
+	DetectedKind                *string
+	Target                      string
+	Outcome                     string
+	Reason, Error, RecordID     *string
 }
 
 // SyncFacts parses a facts document (agentproto.Facts JSON) and syncs its services. A document
@@ -60,22 +112,38 @@ func discoveredKeys(services []agentproto.Service) []string {
 // Sync upserts the imported apps and data services of one server from its discovered services, in
 // the server's team scope (RLS: the team's own rows only). Present → refreshed; no longer
 // discovered → imported_state missing (never deleted); tombstoned (deleted by the user) → skipped.
+//
+// A member's decision (import_ignores.decision, set through the import REST/MCP endpoints) is
+// consulted per item and always wins over classification: ignore keeps the item out (as before);
+// app / database forces the target; shared_service upserts the guest into the team's shared
+// services directory instead of an app or data service (only a Proxmox guest can become one — any
+// other kind is recorded skipped).
+//
+// The outcome of every discovered item, and the run as a whole, is recorded (import_runs,
+// import_items — MH-574 A4) so "import not working" has an answer: what was found, what it became,
+// why something was skipped, and any error. A per-item failure is recorded on that item and does
+// not stop the rest of the sync; a failure before syncing could even start (e.g. the server's own
+// row could not be read) is recorded as the run's error.
 func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services []agentproto.Service) (Result, error) {
 	var res Result
+	started := time.Now()
 	items := Classify(services)
+	var itemsOut []itemOutcome
+
 	err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
 		res = Result{}
+		itemsOut = nil
 		srv, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: serverID, TeamID: teamID})
 		if err != nil {
 			return nil // the server is gone (or not this team's): nothing to import into
 		}
-		ignoredKeys, err := q.ImportIgnoresOfServer(ctx, db.ImportIgnoresOfServerParams{ServerID: serverID, TeamID: teamID})
+		decisionRows, err := q.ImportDecisionsOfServer(ctx, db.ImportDecisionsOfServerParams{ServerID: serverID, TeamID: teamID})
 		if err != nil {
 			return err
 		}
-		ignored := map[string]bool{}
-		for _, k := range ignoredKeys {
-			ignored[k] = true
+		decisions := map[string]string{}
+		for _, d := range decisionRows {
+			decisions[d.OriginKey] = d.Decision
 		}
 		apps, err := q.ImportedAppsOfServer(ctx, db.ImportedAppsOfServerParams{ServerID: serverID, TeamID: teamID})
 		if err != nil {
@@ -150,21 +218,81 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 
 		seen := map[string]bool{}
 		for _, it := range items {
-			if ignored[it.OriginKey] {
+			decision := decisions[it.OriginKey]
+			var detectedKind *string
+			if it.Kind != "" {
+				k := it.Kind
+				detectedKind = &k
+			}
+			if decision == DecisionIgnore {
 				res.Ignored++
+				reason := "ignored by a team member"
+				itemsOut = append(itemsOut, itemOutcome{OriginKind: it.OriginKind, OriginKey: it.OriginKey, Name: it.Name,
+					DetectedKind: detectedKind, Target: it.Target, Outcome: OutcomeIgnored, Reason: &reason})
 				continue
+			}
+			if decision == DecisionSharedService {
+				seen[it.OriginKey] = true
+				out := itemOutcome{OriginKind: it.OriginKind, OriginKey: it.OriginKey, Name: it.Name, DetectedKind: detectedKind, Target: it.Target}
+				if it.OriginKind != "guest" || it.Origin.VMID == "" {
+					reason := "only a Proxmox guest can become a shared service"
+					out.Outcome, out.Reason = OutcomeSkipped, &reason
+				} else {
+					kind := it.Kind
+					if kind == "" {
+						kind = "other"
+					}
+					guestType := it.Origin.GuestType
+					if guestType != "lxc" && guestType != "qemu" {
+						guestType = "lxc"
+					}
+					var host *string
+					if it.Origin.Address != "" {
+						host = &it.Origin.Address
+					}
+					svc, err := q.UpsertSharedService(ctx, db.UpsertSharedServiceParams{
+						ID: sharedServiceID(serverID, it.Origin.VMID), TeamID: teamID, ServerID: serverID,
+						GuestVmid: it.Origin.VMID, GuestType: guestType, Kind: kind, Name: it.Name, Host: host, Port: nil,
+					})
+					if err != nil {
+						msg := err.Error()
+						out.Outcome, out.Error = OutcomeError, &msg
+						res.Errors++
+					} else {
+						out.Outcome, out.RecordID = OutcomeImportedSharedService, &svc.ID
+						res.SharedServices++
+					}
+				}
+				itemsOut = append(itemsOut, out)
+				continue
+			}
+			var ignore bool
+			it, ignore = applyDecision(it, decision)
+			if ignore {
+				// unreachable (DecisionIgnore is handled above), kept so applyDecision stays the
+				// single source of truth for what a decision does to an item
+				continue
+			}
+			if decision == DecisionApp {
+				detectedKind = nil
 			}
 			seen[it.OriginKey] = true
 			origin, _ := json.Marshal(it.Origin)
 			status := statusOf(it.State)
 			host, port := endpoint(it, serverIP)
+			out := itemOutcome{OriginKind: it.OriginKind, OriginKey: it.OriginKey, Name: it.Name, DetectedKind: detectedKind, Target: it.Target}
 			switch a, isApp := appByKey[it.OriginKey]; {
 			case isApp:
 				if err := q.RefreshImportedApp(ctx, db.RefreshImportedAppParams{OriginKind: &it.OriginKind, Origin: string(origin),
 					ImportedState: &it.State, Status: status, ID: a.ID, TeamID: teamID}); err != nil {
-					return err
+					msg := err.Error()
+					out.Outcome, out.Error = OutcomeError, &msg
+					res.Errors++
+				} else {
+					out.Outcome, out.RecordID = OutcomeUpdated, &a.ID
+					res.Updated++
 				}
-				res.Updated++
+				itemsOut = append(itemsOut, out)
 				continue
 			}
 			if d, ok := dsByKey[it.OriginKey]; ok {
@@ -174,21 +302,39 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 				}
 				if err := q.RefreshImportedDataService(ctx, db.RefreshImportedDataServiceParams{Version: version, Host: host, Port: port,
 					Origin: string(origin), ImportedState: &it.State, Status: status, ID: d.ID, TeamID: teamID}); err != nil {
-					return err
+					msg := err.Error()
+					out.Outcome, out.Error = OutcomeError, &msg
+					res.Errors++
+				} else {
+					out.Outcome, out.RecordID = OutcomeUpdated, &d.ID
+					res.Updated++
 				}
-				res.Updated++
+				itemsOut = append(itemsOut, out)
 				continue
 			}
 			if it.Target == TargetDataService {
+				if it.Kind == "" {
+					reason := "could not tell what database engine this is"
+					out.Outcome, out.Reason = OutcomeError, &reason
+					res.Errors++
+					itemsOut = append(itemsOut, out)
+					continue
+				}
 				name := UniqueName(it.Name, it.Kind, dsNames)
 				var container *string
 				if it.OriginKind == "container" {
 					container = &it.OriginKey
 				}
-				if _, err := q.InsertImportedDataService(ctx, db.InsertImportedDataServiceParams{ID: newUUID(), TeamID: teamID, ServerID: serverID,
+				id := newUUID()
+				if _, err := q.InsertImportedDataService(ctx, db.InsertImportedDataServiceParams{ID: id, TeamID: teamID, ServerID: serverID,
 					Name: name, Kind: it.Kind, Version: it.Version, Status: status, Container: container, Host: host, Port: port,
 					OriginKind: &it.OriginKind, OriginKey: &it.OriginKey, Origin: string(origin), ImportedState: &it.State, CreatedBy: Actor}); err != nil {
-					return err
+					msg := err.Error()
+					out.Outcome, out.Error = OutcomeError, &msg
+					res.Errors++
+				} else {
+					out.Outcome, out.RecordID = OutcomeImportedDataService, &id
+					res.Created++
 				}
 			} else {
 				name := UniqueName(it.Name, "site", appNames)
@@ -196,16 +342,22 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 				if _, p := FirstPublished(it.Origin.Ports); p > 0 {
 					appPort = int64(p)
 				}
-				if _, err := q.InsertImportedApp(ctx, db.InsertImportedAppParams{ID: newUUID(), TeamID: teamID, ServerID: serverID, Name: name,
+				id := newUUID()
+				if _, err := q.InsertImportedApp(ctx, db.InsertImportedAppParams{ID: id, TeamID: teamID, ServerID: serverID, Name: name,
 					Port: appPort, Status: status, OriginKind: &it.OriginKind, OriginKey: &it.OriginKey, Origin: string(origin),
 					ImportedState: &it.State, CreatedBy: Actor}); err != nil {
-					return err
+					msg := err.Error()
+					out.Outcome, out.Error = OutcomeError, &msg
+					res.Errors++
+				} else {
+					out.Outcome, out.RecordID = OutcomeImportedApp, &id
+					res.Created++
 				}
 			}
-			res.Created++
+			itemsOut = append(itemsOut, out)
 		}
 		for k, a := range appByKey {
-			if !seen[k] && !ignored[k] {
+			if !seen[k] && decisions[k] != DecisionIgnore {
 				if err := q.MarkImportedAppMissing(ctx, db.MarkImportedAppMissingParams{ID: a.ID, TeamID: teamID}); err != nil {
 					return err
 				}
@@ -215,7 +367,7 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 			}
 		}
 		for k, d := range dsByKey {
-			if !seen[k] && !ignored[k] {
+			if !seen[k] && decisions[k] != DecisionIgnore {
 				if err := q.MarkImportedDataServiceMissing(ctx, db.MarkImportedDataServiceMissingParams{ID: d.ID, TeamID: teamID}); err != nil {
 					return err
 				}
@@ -224,12 +376,49 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 				}
 			}
 		}
-		if res.Created > 0 || res.Missing > 0 || res.Removed > 0 {
+		// import_runs / import_items: the run's outcome, for the Import tab (MH-574 A4).
+		finished := time.Now()
+		run, err := q.UpsertImportRun(ctx, db.UpsertImportRunParams{
+			TeamID: teamID, ServerID: serverID, Status: "ok", Error: nil,
+			Discovered: int32(len(itemsOut)), Created: int32(res.Created), Updated: int32(res.Updated),
+			Missing: int32(res.Missing), Removed: int32(res.Removed), Ignored: int32(res.Ignored),
+			StartedAt: started, FinishedAt: &finished,
+		})
+		if err != nil {
+			return err
+		}
+		if err := q.DeleteImportItemsOfServer(ctx, db.DeleteImportItemsOfServerParams{ServerID: serverID, TeamID: teamID}); err != nil {
+			return err
+		}
+		for _, it := range itemsOut {
+			if _, err := q.InsertImportItem(ctx, db.InsertImportItemParams{
+				TeamID: teamID, ServerID: serverID, RunID: run.ID, OriginKind: it.OriginKind, OriginKey: it.OriginKey, Name: it.Name,
+				DetectedKind: it.DetectedKind, Target: it.Target, Outcome: it.Outcome, Reason: it.Reason, Error: it.Error, RecordID: it.RecordID,
+			}); err != nil {
+				return err
+			}
+		}
+		if res.Created > 0 || res.Missing > 0 || res.Removed > 0 || res.SharedServices > 0 {
 			return tenancy.Record(ctx, q, teamID, Actor, "server.workloads_imported", "server", serverID, map[string]any{
-				"created": res.Created, "missing": res.Missing, "updated": res.Updated, "removed": res.Removed})
+				"created": res.Created, "missing": res.Missing, "updated": res.Updated, "removed": res.Removed, "shared_services": res.SharedServices})
 		}
 		return nil
 	})
+	if err != nil {
+		// The sync itself failed before (or while) writing its run: record the failure so "import
+		// not working" has an answer instead of nothing at all. Best effort — a second failure here
+		// is only ever logged by the caller.
+		finished := time.Now()
+		msg := err.Error()
+		_ = tenancy.Tx(ctx, sqlDB, tenancy.Scope{TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
+			_, e := q.UpsertImportRun(ctx, db.UpsertImportRunParams{
+				TeamID: teamID, ServerID: serverID, Status: "error", Error: &msg,
+				Discovered: 0, Created: 0, Updated: 0, Missing: 0, Removed: 0, Ignored: 0,
+				StartedAt: started, FinishedAt: &finished,
+			})
+			return e
+		})
+	}
 	return res, err
 }
 
@@ -320,4 +509,19 @@ func newUUID() string {
 	b[8] = (b[8] & 0x3f) | 0x80
 	h := hex.EncodeToString(b)
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
+}
+
+// sharedServiceID is deterministic per (server, guest), matching internal/services.sharedServiceID,
+// so a later shared_services_scan of the same guest upserts the same row rather than a duplicate.
+func sharedServiceID(serverID, vmid string) string {
+	return "svc-" + shortHash(serverID+":"+vmid)
+}
+
+func shortHash(s string) string {
+	var x uint64 = 1469598103934665603
+	for i := 0; i < len(s); i++ {
+		x ^= uint64(s[i])
+		x *= 1099511628211
+	}
+	return strconv.FormatUint(x, 36)
 }

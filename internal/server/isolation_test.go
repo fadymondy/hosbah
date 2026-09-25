@@ -215,6 +215,7 @@ func TestIsolationSweep(t *testing.T) {
 		"team":       func(string) []string { return []string{teamA.ID, teamA.Slug} },
 		"member":     func(string) []string { return []string{memberA} },
 		"server":     func(string) []string { return []string{srvA, "alpha-" + suffix} }, // an id, and a name (must not resolve either)
+		"item":       func(string) []string { return []string{"imp-site", "imp-pg"} }, // an import item's origin key of A's server
 		"op":         func(string) []string { return []string{opA} },
 		"credential": func(string) []string { return []string{credA.ID} },
 		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
@@ -338,6 +339,8 @@ func TestIsolationSweep(t *testing.T) {
 		"github_disconnect": {"server": srvA}, "github_repos": {"server": srvA}, "github_branches": {"server": srvA, "repo": "octocat/api"},
 		"update_server": {"server": srvA, "color": "#000000", "name": "stolen"},
 		"server_guests": {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
+		"server_import_status": {"server": srvA}, "server_import_run": {"server": srvA},
+		"server_import_decide": {"server": srvA, "item": "imp-site", "decision": "ignore"},
 		"get_app_repository": {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
 		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
 		"get_app_dns": {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},

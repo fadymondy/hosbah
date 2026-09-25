@@ -11,6 +11,7 @@ import {
   ChevronRightIcon,
   ChevronsUpDownIcon,
   DatabaseIcon,
+  DownloadIcon,
   GithubIcon,
   LayersIcon,
   LayoutDashboardIcon,
@@ -54,6 +55,7 @@ const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads
   tunnels: { icon: CableIcon, group: "workloads" },
   github: { icon: GithubIcon, group: "sources" },
   discovered: { icon: RadarIcon, group: "sources" },
+  import: { icon: DownloadIcon, group: "sources" },
   operations: { icon: WorkflowIcon, group: "manage" },
   settings: { icon: SettingsIcon, group: "manage" },
 }
