@@ -18,6 +18,10 @@ import (
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
+// tokenRotateAfter (MH-580 J7): how old an active MCP token can get before list_mcp_tokens and the
+// web tokens page flag it for rotation. Not enforced — a flag, not an expiry.
+const tokenRotateAfter = 90 * 24 * time.Hour
+
 // UserServer is the team MCP at /api/mcp. A token belongs to one team and acts as the user who
 // minted it, with that user's CURRENT role: removing someone from the team kills their tokens,
 // and a viewer's token cannot invite even if it carries `write`.
@@ -25,7 +29,7 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "hosbah",
 		Version:       "0.1.0",
-		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...), NotificationChannelTools()...), StatusPageTools()...), LogDrainTools()...), RumTools()...), ApmTools()...), EdgeCacheTools()...), HTTPRulesTools()...), CostTools()...), ScriptTools()...), ServiceTools()...), SiteTemplateTools()...), ProductTools()...), FirewallTools()...), Fail2banTools()...), MailTools()...), CertCheckTools()...), ServerUpdateTools()...), SSHKeyTools()...),
+		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...), NotificationChannelTools()...), StatusPageTools()...), LogDrainTools()...), RumTools()...), ApmTools()...), EdgeCacheTools()...), HTTPRulesTools()...), CostTools()...), ScriptTools()...), ServiceTools()...), SiteTemplateTools()...), ProductTools()...), FirewallTools()...), Fail2banTools()...), MailTools()...), CertCheckTools()...), ServerUpdateTools()...), SSHKeyTools()...), AppScanTools()...),
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {
@@ -211,7 +215,7 @@ func UserTools() []Tool {
 		},
 		{
 			Name:        "list_mcp_tokens",
-			Description: "The team's MCP tokens: names, scopes, last use. Never the secret.",
+			Description: "The team's MCP tokens: names, scopes, age and last use. Never the secret. A token older than 90 days is flagged \"rotate?\".",
 			Scope:       scopes.Read,
 			InputSchema: schema(nil, map[string]any{}),
 			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
@@ -228,9 +232,51 @@ func UserTools() []Tool {
 					if r.RevokedAt != nil {
 						state = "revoked"
 					}
-					fmt.Fprintf(&b, "  %-8s %s  [%s]  (id %s)\n", state, r.Name, r.Scopes, r.ID)
+					age := time.Since(r.CreatedAt)
+					old := ""
+					if state == "active" && age > tokenRotateAfter {
+						old = "  rotate? (older than 90 days)"
+					}
+					fmt.Fprintf(&b, "  %-8s %s  [%s]  age %.0fd%s  (id %s)\n", state, r.Name, r.Scopes, age.Hours()/24, old, r.ID)
 				}
 				return b.String(), nil
+			},
+		},
+		{
+			Name:         "rotate_mcp_token",
+			Description:  "Rotate a team MCP token: mint a replacement with the same name and scopes, then revoke this one. Returns the new secret once.",
+			Scope:        scopes.Write,
+			InputSchema:  schema([]string{"id"}, map[string]any{"id": str("Token id (from list_mcp_tokens)")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageTokens); err != nil {
+					return "", err
+				}
+				old, err := env.Q.GetMcpToken(ctx, args.Str("id"))
+				if err != nil || old.TeamID != env.Caller.TeamID || old.RevokedAt != nil {
+					return "", errors.New("token not found")
+				}
+				days := 90
+				if old.ExpiresAt != nil {
+					if left := time.Until(*old.ExpiresAt); left > 0 {
+						days = int(left.Hours()/24) + 1
+					}
+				}
+				plain, hash := tokens.New(tokens.PrefixUserMCP)
+				exp := time.Now().Add(time.Duration(days) * 24 * time.Hour).UTC()
+				row, err := env.Q.InsertMcpToken(ctx, db.InsertMcpTokenParams{
+					TeamID: env.Caller.TeamID, UserID: env.Caller.UserID, Name: old.Name, TokenHash: hash, Scopes: old.Scopes, ExpiresAt: &exp,
+				})
+				if err != nil {
+					return "", errors.New("could not mint the replacement token")
+				}
+				if _, err := env.Q.RevokeMcpToken(ctx, db.RevokeMcpTokenParams{ID: old.ID, TeamID: env.Caller.TeamID}); err != nil {
+					return "", errors.New("could not revoke the previous token")
+				}
+				if err := tenancy.Record(ctx, env.Q, env.Caller.TeamID, actor(env), "mcp_token.rotated", "mcp_token", row.ID,
+					auditChanges(env, map[string]any{"name": row.Name, "previous_id": old.ID})); err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Rotated %q. New token (shown once): %s", row.Name, plain), nil
 			},
 		},
 		{

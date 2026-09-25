@@ -539,6 +539,9 @@ func TestIsolationSweep(t *testing.T) {
 		"ssh_keys_remove":    {"key": sshKeyA.ID, "confirm": sshKeyA.Name},
 		"ssh_keys_install":   {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
 		"ssh_keys_uninstall": {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
+		// MH-580 J5: image scans of A's app. J7: rotating A's team MCP token.
+		"app_scan": {"app": appA.App.ID}, "app_scan_results": {"app": appA.App.ID},
+		"rotate_mcp_token": {"id": tokA.ID},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

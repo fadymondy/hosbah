@@ -101,6 +101,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerMembers(api)
 	d.registerInvitations(api)
 	d.registerTokens(api)
+	d.registerAppScans(api)
 	d.registerAudit(api)
 	d.registerApprovals(api)
 	d.registerFeedback(api)

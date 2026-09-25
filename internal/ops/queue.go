@@ -61,6 +61,8 @@ func Timeout(kind string) time.Duration {
 		return 20 * time.Minute // pull the Stalwart image, start it, wait for the management API
 	case agentproto.KindMailDomain, agentproto.KindMailbox, agentproto.KindMailAlias:
 		return 2 * time.Minute // one HTTP call (or two) to the management API
+	case agentproto.KindAppScan:
+		return 15 * time.Minute // a first pull of the Trivy image and its vulnerability database can take minutes
 	case agentproto.KindDBBackup:
 		return 30 * time.Minute
 	case agentproto.KindBrowserCreate:

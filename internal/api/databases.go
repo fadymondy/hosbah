@@ -50,12 +50,16 @@ type DatabaseOut struct {
 	Error  *string `json:"error"`
 }
 type DatabaseUserOut struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Grants     string  `json:"grants" enum:"all,readwrite,readonly,none"`
-	Status     string  `json:"status"`
-	Error      *string `json:"error"`
-	DatabaseID *string `json:"database_id"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Grants     string    `json:"grants" enum:"all,readwrite,readonly,none"`
+	Status     string    `json:"status"`
+	Error      *string   `json:"error"`
+	DatabaseID *string   `json:"database_id"`
+	// UpdatedAt (MH-580 J7) doubles as "last rotated at": every password rotation bumps it
+	// (SetDatabaseUserPasswordSealed), and so does creation. The web card warns once this is more
+	// than 90 days old.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 type BackupOut struct {
 	ID              string     `json:"id"`
@@ -98,7 +102,7 @@ func toDataServiceOut(s db.DataService) DataServiceOut {
 		HasCredentials: dbsvc.HasCredentials(s), CredentialsRequired: dbsvc.CredentialsRequired(s)}
 }
 func toDatabaseUserOut(u db.DatabaseUser) DatabaseUserOut {
-	return DatabaseUserOut{ID: u.ID, Name: u.Name, Grants: u.Grants, Status: u.Status, Error: u.Error, DatabaseID: u.DatabaseID}
+	return DatabaseUserOut{ID: u.ID, Name: u.Name, Grants: u.Grants, Status: u.Status, Error: u.Error, DatabaseID: u.DatabaseID, UpdatedAt: u.UpdatedAt}
 }
 func toBackupOut(b db.Backup) BackupOut {
 	return BackupOut{ID: b.ID, Kind: b.Kind, Status: b.Status, Target: b.Target, SizeBytes: b.SizeBytes,

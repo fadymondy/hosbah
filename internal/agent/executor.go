@@ -126,6 +126,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindPkgAutoupdateSet: pkgAutoupdateSet,
 		agentproto.KindSSHKeyInstall:    sshkeyInstall,
 		agentproto.KindSSHKeyUninstall:  sshkeyUninstall,
+		agentproto.KindAppScan:          appScan,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -385,7 +386,7 @@ func laneOf(op agentproto.SignedOp) string {
 	case agentproto.KindAppBuild, agentproto.KindAppFastBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
 		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove,
 		agentproto.KindRealtimeRoute, agentproto.KindAppProcesses, agentproto.KindAppLimits,
-		agentproto.KindCacheSet, agentproto.KindCachePurge:
+		agentproto.KindCacheSet, agentproto.KindCachePurge, agentproto.KindAppScan:
 		var p struct {
 			AppID string `json:"app_id"`
 		}
