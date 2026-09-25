@@ -300,3 +300,55 @@ export type ProxyHost = {
   created_at: string
   updated_at: string
 }
+
+/** MH-580 J1: one rule of a server's firewall (GET/POST/PATCH/DELETE .../servers/{server}/firewall). */
+export type FirewallRule = {
+  id: string
+  server_id: string
+  action: "allow" | "deny"
+  proto: "tcp" | "udp" | "any"
+  port_start: number
+  port_end: number
+  source_cidr: string
+  comment: string
+  enabled: boolean
+  position: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** A server's firewall default policy and SSH port (GET/PUT .../servers/{server}/firewall/settings). */
+export type FirewallSettings = {
+  server_id: string
+  default_policy: "accept" | "drop"
+  ssh_port: number
+}
+
+/** POST .../servers/{server}/firewall/apply: what actually got rendered and loaded. */
+export type FirewallApplyResult = {
+  ruleset: string
+  rules_applied: number
+  ssh_port: number
+  default_policy: string
+}
+
+/** GET .../servers/{server}/firewall/status: the live `table inet hosbah`, read from the server. */
+export type FirewallStatusResult = {
+  active: boolean
+  ruleset: string
+}
+
+/** MH-580 J2: a server's last-saved fail2ban sshd jail settings (GET/POST .../servers/{server}/fail2ban/settings). */
+export type Fail2banSettings = {
+  server_id: string
+  enabled: boolean
+  bantime: number
+  findtime: number
+  maxretry: number
+}
+
+export type Fail2banInstallResult = { installed: boolean; active: boolean }
+
+/** GET .../servers/{server}/fail2ban/banned: the sshd jail's currently banned IPs, read live. */
+export type Fail2banBannedResult = { jail: string; active: boolean; banned: string[] }
