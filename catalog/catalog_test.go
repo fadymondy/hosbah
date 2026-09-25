@@ -230,3 +230,62 @@ func TestAStackWithThePreRenameTomlKeyStillParses(t *testing.T) {
 		t.Fatalf("the API sends both keys: %s", b)
 	}
 }
+
+// The MH-576 catalogue (n8n, MinIO, Uptime Kuma, WordPress, Odoo): every recipe of interest is a
+// pinned app, every credential is generated or comes from a data service (never a literal), a
+// data-service need is declared where the image genuinely requires one, and MinIO's console is the
+// one recipe using extra_port.
+func TestTheMH576CatalogueApps(t *testing.T) {
+	c, err := catalog.Builtin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]struct {
+		needsPostgres, needsMySQL, hasExtraPort bool
+	}{
+		"n8n":         {},
+		"minio":       {hasExtraPort: true},
+		"uptime-kuma": {},
+		"wordpress":   {needsMySQL: true},
+		"odoo":        {needsPostgres: true},
+	}
+	for id, w := range want {
+		r, ok := c.Get(id)
+		if !ok {
+			t.Fatalf("recipe %s is not in the catalogue", id)
+		}
+		if r.Kind != catalog.KindApp {
+			t.Errorf("%s: kind is %q, want app", id, r.Kind)
+		}
+		if err := catalog.ValidImage(r.Image); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+		if r.HasWebUI && r.Healthcheck == "" {
+			t.Errorf("%s has a web port but no healthcheck", id)
+		}
+		if r.Limits.MemoryMB == 0 || r.Limits.CPUs == 0 {
+			t.Errorf("%s: no limits", id)
+		}
+		if r.Needs.Postgres != w.needsPostgres {
+			t.Errorf("%s: needs.postgres = %v, want %v", id, r.Needs.Postgres, w.needsPostgres)
+		}
+		if r.Needs.MySQL != w.needsMySQL {
+			t.Errorf("%s: needs.mysql = %v, want %v", id, r.Needs.MySQL, w.needsMySQL)
+		}
+		if (r.ExtraPort != 0) != w.hasExtraPort {
+			t.Errorf("%s: extra_port set = %v, want %v", id, r.ExtraPort != 0, w.hasExtraPort)
+		}
+		// Every credential-shaped env is generated or comes from a data service — never a literal —
+		// and every generated one is marked secret.
+		for _, e := range r.Env {
+			isCredentialName := strings.Contains(e.Name, "PASSWORD") || strings.Contains(e.Name, "SECRET") ||
+				strings.Contains(e.Name, "ENCRYPTION_KEY") || strings.HasSuffix(e.Name, "_KEY") || strings.HasSuffix(e.Name, "_SALT")
+			if isCredentialName && e.Value != nil {
+				t.Errorf("%s: env %s looks like a credential but is a literal value", id, e.Name)
+			}
+			if e.Generate != nil && !e.Secret {
+				t.Errorf("%s: env %s is generated but not marked secret", id, e.Name)
+			}
+		}
+	}
+}

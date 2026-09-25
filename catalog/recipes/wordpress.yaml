@@ -1,0 +1,75 @@
+# Written from the official WordPress image's own documentation (hub.docker.com/_/wordpress:
+# "Environment Variables") and wordpress.org (Requirements: PHP, MySQL/MariaDB). The image takes its
+# database apart (host, user, password, name), not one connection URL.
+# verified: false — written from the documentation but not yet run end to end by Hosbah.
+id: wordpress
+name: WordPress
+summary: The WordPress content management system, with Apache and PHP built in.
+description: >-
+  WordPress is the widely used CMS and blogging platform. Hosbah runs the official wordpress image
+  (Apache and PHP already inside) against a managed MySQL/MariaDB service on the same server, with a
+  generated table prefix and WordPress's own unique authentication salts (generated separately so a
+  leak of one does not weaken the others). Uploads, themes and plugins live on a volume; WordPress's
+  own installer runs on first visit to the hostname to create the site title and the first admin
+  account. Needs an existing managed MySQL service on the app's server — create one first (databases)
+  if there is none yet.
+homepage: https://wordpress.org
+licence: GPL-2.0-or-later
+kind: app
+version: "1.0.0"
+verified: false
+image: library/wordpress:6.7.2-php8.3-apache
+port: 80
+# A static asset Apache serves directly, so it answers 200 whether or not the setup wizard (first
+# visit to the hostname) has run yet — /wp-login.php or / would 302 to it before then and never 2xx.
+healthcheck: /wp-includes/js/wp-emoji-release.min.js
+needs:
+  mysql: true
+env:
+  - name: WORDPRESS_DB_HOST
+    from: mysql_hostport
+    secret: true
+  - name: WORDPRESS_DB_NAME
+    from: mysql_database
+  - name: WORDPRESS_DB_USER
+    from: mysql_user
+    secret: true
+  - name: WORDPRESS_DB_PASSWORD
+    from: mysql_password
+    secret: true
+  - name: WORDPRESS_TABLE_PREFIX
+    generate: { length: 16, charset: alnum }
+    secret: true
+  - name: WORDPRESS_AUTH_KEY
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_SECURE_AUTH_KEY
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_LOGGED_IN_KEY
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_NONCE_KEY
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_AUTH_SALT
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_SECURE_AUTH_SALT
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_LOGGED_IN_SALT
+    generate: { length: 64, charset: alnum }
+    secret: true
+  - name: WORDPRESS_NONCE_SALT
+    generate: { length: 64, charset: alnum }
+    secret: true
+volumes:
+  - name: content
+    mount_path: /var/www/html/wp-content
+limits:
+  memory_mb: 512
+  cpus: 1
+exposes:
+  - env: WORDPRESS_URL
+    template: "https://{host}"

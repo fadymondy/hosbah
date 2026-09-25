@@ -206,7 +206,8 @@ func (d *deps) registerInstalls(api huma.API) {
 		Body struct {
 			Recipe   string `json:"recipe" minLength:"2" maxLength:"41" doc:"Recipe id from the catalog (kind app)."`
 			Name     string `json:"name" minLength:"1" maxLength:"31" doc:"^[a-z][a-z0-9-]{0,30}$, unique in the app."`
-			Postgres string `json:"postgres,omitempty" maxLength:"64" doc:"A managed Postgres service (name or id) on the app's server — only for a recipe that needs one."`
+			MySQL    string `json:"mysql,omitempty" maxLength:"64" doc:"A managed MySQL/MariaDB service (name or id) on the app's server — only for a recipe that needs one."`
+				Postgres string `json:"postgres,omitempty" maxLength:"64" doc:"A managed Postgres service (name or id) on the app's server — only for a recipe that needs one."`
 			Redis    string `json:"redis,omitempty" maxLength:"64" doc:"A managed Redis service (name or id) on the app's server — only for a recipe that needs one."`
 			Hostname string `json:"hostname,omitempty" maxLength:"253" doc:"Optional, for example search.example.com: creates a proxy host to the install's web UI."`
 		}
@@ -228,7 +229,7 @@ func (d *deps) registerInstalls(api huma.API) {
 			}
 			teamID, actor = m.TeamID, webActor(id)
 			created, err = d.dbs().CreateInstall(ctx, q, m.TeamID, actor, a, dbsvc.InstallSpec{Recipe: in.Body.Recipe, Name: in.Body.Name,
-				Postgres: in.Body.Postgres, Redis: in.Body.Redis, Hostname: in.Body.Hostname})
+				Postgres: in.Body.Postgres, MySQL: in.Body.MySQL, Redis: in.Body.Redis, Hostname: in.Body.Hostname})
 			return installErr(err, "could not install the recipe")
 		})
 		if err != nil {

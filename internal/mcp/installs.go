@@ -46,6 +46,9 @@ func InstallTools() []Tool {
 					if r.Needs.Postgres {
 						b.WriteString("  needs postgres")
 					}
+					if r.Needs.MySQL {
+						b.WriteString("  needs mysql")
+					}
 					if r.Needs.Redis {
 						b.WriteString("  needs redis")
 					}
@@ -101,6 +104,9 @@ func InstallTools() []Tool {
 						if k.HostPort != nil {
 							fmt.Fprintf(&b, "  127.0.0.1:%d on the server", *k.HostPort)
 						}
+						if k.ExtraHostPort != nil {
+							fmt.Fprintf(&b, "  extra 127.0.0.1:%d on the server", *k.ExtraHostPort)
+						}
 						if len(k.EnvInjected) > 0 {
 							fmt.Fprintf(&b, "  sets %s", strings.Join(k.EnvInjected, ", "))
 						}
@@ -148,6 +154,7 @@ func InstallTools() []Tool {
 				"recipe":   str("Recipe id from list_catalog (kind app)"),
 				"name":     str("Lowercase letter, then up to 30 lowercase letters, digits and dashes; unique in the app"),
 				"postgres": str("A managed Postgres service on the app's server — only for a recipe that needs one"),
+				"mysql":    str("A managed MySQL/MariaDB service on the app's server — only for a recipe that needs one"),
 				"redis":    str("A managed Redis service on the app's server — only for a recipe that needs one"),
 				"hostname": str("Optional, for example search.example.com: a proxy host to the install's web UI"),
 				"confirm":  str("The install's name, exactly")}),
@@ -173,7 +180,7 @@ func InstallTools() []Tool {
 				}
 				actor, teamID := mcpActor(env), env.Caller.TeamID
 				created, err := s.CreateInstall(ctx, env.Q, teamID, actor, a, dbsvc.InstallSpec{Recipe: args.Str("recipe"), Name: args.Str("name"),
-					Postgres: args.Str("postgres"), Redis: args.Str("redis"), Hostname: args.Str("hostname")})
+					Postgres: args.Str("postgres"), MySQL: args.Str("mysql"), Redis: args.Str("redis"), Hostname: args.Str("hostname")})
 				if err != nil {
 					return "", err
 				}
@@ -287,14 +294,17 @@ func recipeText(r catalog.Recipe) string {
 	if r.Port > 0 {
 		fmt.Fprintf(&b, "web port: %d (health %s)\n", r.Port, r.Healthcheck)
 	}
+	if r.ExtraPort > 0 {
+		fmt.Fprintf(&b, "extra port (%s): %d, published on the server's 127.0.0.1 only, not attached to the install's hostname\n", r.ExtraPortName, r.ExtraPort)
+	}
 	if len(r.Caps) > 0 {
 		fmt.Fprintf(&b, "capabilities: %s\n", strings.Join(r.Caps, ", "))
 	}
 	for _, v := range r.Volumes {
 		fmt.Fprintf(&b, "volume %s at %s\n", v.Name, v.MountPath)
 	}
-	if r.Needs.Postgres || r.Needs.Redis {
-		fmt.Fprintf(&b, "needs: postgres=%t redis=%t (an existing managed service on the app's server)\n", r.Needs.Postgres, r.Needs.Redis)
+	if r.Needs.Postgres || r.Needs.MySQL || r.Needs.Redis {
+		fmt.Fprintf(&b, "needs: postgres=%t mysql=%t redis=%t (an existing managed service on the app's server)\n", r.Needs.Postgres, r.Needs.MySQL, r.Needs.Redis)
 	}
 	for _, e := range r.Env {
 		switch {

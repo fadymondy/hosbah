@@ -160,6 +160,9 @@ func installRunArgs(p agentproto.RecipeInstallParams, r catalog.Recipe, envFile 
 	if r.Port > 0 {
 		args = append(args, publishArg(r.Port)...)
 	}
+	if r.ExtraPort > 0 {
+		args = append(args, publishArg(r.ExtraPort)...)
+	}
 	return append(args, r.Image)
 }
 
@@ -274,13 +277,22 @@ func (h *recipeHost) install(oc *OpContext) (any, int, error) {
 			}
 		}
 	}
+	extraHostPort := 0
+	if r.ExtraPort > 0 {
+		if extraHostPort, err = h.publishedPort(oc.Ctx, p.InstallID, r.ExtraPort); err != nil {
+			return fail("could not read the published "+r.ExtraPortName+" port", err)
+		}
+	}
 	oc.Progress(4, 4)
 	if hostPort > 0 {
 		oc.Info("%s is up on 127.0.0.1:%d (this server only)", r.Name, hostPort)
 	} else {
 		oc.Info("%s is up", r.Name)
 	}
-	return agentproto.RecipeInstallResult{Container: name, HostPort: hostPort}, 0, nil
+	if extraHostPort > 0 {
+		oc.Info("its %s is up on 127.0.0.1:%d (this server only)", r.ExtraPortName, extraHostPort)
+	}
+	return agentproto.RecipeInstallResult{Container: name, HostPort: hostPort, ExtraHostPort: extraHostPort}, 0, nil
 }
 
 func capsNote(caps []string) string {
@@ -429,8 +441,13 @@ func (h *recipeHost) status(oc *OpContext) (any, int, error) {
 		if st.Running {
 			running = append(running, name)
 			if c != nil {
-				if r, ok := c.Get(p.RecipeIDs[i]); ok && r.Port > 0 {
-					st.HostPort, _ = h.publishedPort(oc.Ctx, id, r.Port)
+				if r, ok := c.Get(p.RecipeIDs[i]); ok {
+					if r.Port > 0 {
+						st.HostPort, _ = h.publishedPort(oc.Ctx, id, r.Port)
+					}
+					if r.ExtraPort > 0 {
+						st.ExtraHostPort, _ = h.publishedPort(oc.Ctx, id, r.ExtraPort)
+					}
 				}
 			}
 		}
