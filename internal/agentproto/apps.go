@@ -113,6 +113,14 @@ type BuildParams struct {
 	Protect          []string `json:"protect,omitempty"`  // images never pruned (the live release)
 	RailpackFrontend string   `json:"railpack_frontend"`  // BuildKit frontend image, same version as the CLI
 	NoCache          bool     `json:"no_cache,omitempty"` // a requested full rebuild: ignore the layer cache
+	// PHPVersion (MH-576 D2) is "" or "auto" (Railpack detects it from composer.json), or a pinned
+	// 8.1-8.4, set as RAILPACK_PHP_VERSION on `railpack prepare`. Ignored for a Dockerfile app —
+	// it owns its own base image.
+	PHPVersion string `json:"php_version,omitempty"`
+	// PHPIni (MH-576 D2) is a validated php.ini directive map, written to a php.ini file at the
+	// checkout root before `railpack prepare` runs, unless the repository already has one of its
+	// own (never overwritten). Ignored for a Dockerfile app.
+	PHPIni map[string]string `json:"php_ini,omitempty"`
 }
 
 type BuildResult struct {

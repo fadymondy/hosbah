@@ -40,6 +40,7 @@ import { ResourcesCard } from "@/components/resources-panel"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
+import { SitePHPConfig } from "@/components/site/php-config"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -592,6 +593,7 @@ export function SiteSettings() {
         <>
           <SettingsPanel team={team.slug} path={path} detail={detail} manage={manage} onSaved={(a) => setDetail((d) => (d ? { ...d, app: a } : d))} />
           <ResourcesCard path={`${path}/resources`} manage={manage} processes={detail.processes.map((p) => p.name)} />
+          <SitePHPConfig />
         </>
       ) : (
         <>

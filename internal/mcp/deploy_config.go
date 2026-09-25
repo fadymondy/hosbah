@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -120,10 +121,18 @@ func DeployConfigTools() []Tool {
 		default:
 			return db.AppDeployConfig{}, err
 		}
+		phpVersion, phpIni := "auto", "{}"
+		if existing.PhpVersion != "" {
+			phpVersion = existing.PhpVersion
+		}
+		if existing.PhpIni != "" {
+			phpIni = existing.PhpIni
+		}
 		userID := env.Caller.UserID
 		row, err := env.Q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 			AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: string(raw),
 			BuilderImage: builderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
+			PhpVersion: phpVersion, PhpIni: phpIni,
 			Version: nextVersion, UpdatedBy: &userID,
 		})
 		if err != nil {
@@ -266,6 +275,109 @@ func DeployConfigTools() []Tool {
 					return "", err
 				}
 				return fmt.Sprintf("Restored %s's deploy configuration from version %d as version %d.\n%s", a.Name, version, row.Version, describeSteps(steps)), nil
+			},
+		},
+		{
+			Name: "app_php_config_get", Scope: scopes.Read,
+			Description: "An app's PHP version pin and php.ini overrides (MH-576 D2), applied on its next deploy for a Railpack " +
+				"PHP/Laravel build. A Dockerfile app only gets them as HOSBAH_PHP_VERSION/HOSBAH_PHP_INI env vars — informational, " +
+				"since it owns its own image.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				version, ini := "auto", map[string]string{}
+				if row, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID}); err == nil {
+					version = row.PhpVersion
+					_ = json.Unmarshal([]byte(row.PhpIni), &ini)
+				} else if !errors.Is(err, sql.ErrNoRows) {
+					return "", err
+				}
+				if len(ini) == 0 {
+					return fmt.Sprintf("%s: PHP version %s, no php.ini overrides.", a.Name, version), nil
+				}
+				keys := make([]string, 0, len(ini))
+				for k := range ini {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				var b strings.Builder
+				fmt.Fprintf(&b, "%s: PHP version %s, php.ini overrides:\n", a.Name, version)
+				for _, k := range keys {
+					fmt.Fprintf(&b, "  %s = %s\n", k, ini[k])
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "app_php_config_set", Scope: scopes.Deploy,
+			Description: "Save an app's PHP version pin (auto, 8.1-8.4) and php.ini overrides (memory_limit, upload_max_filesize, " +
+				"post_max_size, max_execution_time, max_input_time, max_input_vars, display_errors, date.timezone, opcache.*). Not " +
+				"versioned. Deployer, admin or owner.",
+			InputSchema: schema([]string{"app", "php_version"}, map[string]any{"app": appArg,
+				"php_version": map[string]any{"type": "string", "enum": deploy.PHPVersions},
+				"php_ini": map[string]any{
+					"type":                 "object",
+					"additionalProperties": map[string]any{"type": "string"},
+					"description":          "php.ini directive -> value. Known keys: " + strings.Join(deploy.PHPIniKeys, ", ") + ".",
+				}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				version := args.Str("php_version")
+				if !deploy.ValidPHPVersion(version) {
+					return "", fmt.Errorf("php_version must be one of %s", strings.Join(deploy.PHPVersions, ", "))
+				}
+				ini := map[string]string{}
+				if raw, ok := args["php_ini"].(map[string]any); ok {
+					for k, v := range raw {
+						s, ok := v.(string)
+						if !ok {
+							return "", fmt.Errorf("php_ini.%s must be a string", k)
+						}
+						ini[k] = s
+					}
+				}
+				if err := deploy.ValidatePHPIni(ini); err != nil {
+					return "", err
+				}
+				iniRaw, err := json.Marshal(ini)
+				if err != nil {
+					return "", err
+				}
+				existing, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID})
+				mode, preset, steps, builderImage, outputs, detectedPreset, cfgVersion := "auto", deploy.DetectPreset(nil), "", "", "[]", "", int32(1)
+				switch {
+				case err == nil:
+					mode, preset, steps, builderImage, outputs, detectedPreset, cfgVersion =
+						existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset, existing.Version
+				case errors.Is(err, sql.ErrNoRows):
+					raw, mErr := json.Marshal(deploy.PresetSteps(preset))
+					if mErr != nil {
+						return "", mErr
+					}
+					steps = string(raw)
+				default:
+					return "", err
+				}
+				userID := env.Caller.UserID
+				row, err := env.Q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
+					AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: steps,
+					BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
+					PhpVersion: version, PhpIni: string(iniRaw),
+					Version: cfgVersion, UpdatedBy: &userID,
+				})
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Saved %s's PHP configuration: version %s, %d php.ini override(s).", a.Name, row.PhpVersion, len(ini)), nil
 			},
 		},
 		{

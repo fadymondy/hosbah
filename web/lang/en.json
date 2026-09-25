@@ -2168,6 +2168,22 @@
     "backupsHint": "Snapshots and backups of what this site runs on.",
     "backupsData": "Backups belong to the data",
     "backupsDataHint": "A git-deployed site is rebuilt from its repository; what needs backing up is its databases. Schedules and restores are on each database.",
+    "php": {
+      "title": "PHP",
+      "hint": "The PHP version to build with and php.ini overrides, applied on the next deploy.",
+      "saved": "PHP settings saved",
+      "version": "PHP version",
+      "versionAuto": "Auto (detected)",
+      "versionHint": "Pins the PHP version Railpack builds with. Auto lets Railpack detect it from composer.json.",
+      "ini": "php.ini overrides",
+      "iniHint": "Applied as a php.ini on top of the image's defaults. Only a fixed set of safe keys is allowed.",
+      "iniEmpty": "No overrides yet.",
+      "key": "Setting",
+      "value": "Value",
+      "addSetting": "Add setting",
+      "removeSetting": "Remove setting",
+      "invalidValue": "That value isn't allowed: no \";\", \"[\", \"]\" or line breaks."
+    },
     "deployScript": {
       "hint": "How this site builds and releases on every deploy: the mode, the preset it started from, and each pipeline step.",
       "saved": "Deploy script saved",

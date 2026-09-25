@@ -517,6 +517,7 @@ func (r *runner) envBox(ctx context.Context, process string) (string, error) {
 		return "", err
 	}
 	r.injectApmEnv(ctx, env)
+	r.injectPHPEnv(ctx, env)
 	if len(env) == 0 {
 		return "", nil
 	}
@@ -561,6 +562,41 @@ func (r *runner) injectApmEnv(ctx context.Context, env map[string]string) {
 	for k, v := range defaults {
 		if _, set := env[k]; !set {
 			env[k] = v
+		}
+	}
+}
+
+// phpConfig (MH-576 D2) reads the app's saved php_version/php_ini, best-effort: a config read
+// failure (no row saved yet) just means the defaults ("auto", no overrides) apply.
+func (r *runner) phpConfig(ctx context.Context) (version string, ini map[string]string) {
+	var cfg db.AppDeployConfig
+	err := r.tx(ctx, func(q *db.Queries) error {
+		var err error
+		cfg, err = q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
+		return err
+	})
+	if err != nil {
+		return "", nil
+	}
+	_ = json.Unmarshal([]byte(cfg.PhpIni), &ini)
+	return cfg.PhpVersion, ini
+}
+
+// injectPHPEnv (MH-576 D2) exposes the app's PHP version and ini overrides to the running
+// container as HOSBAH_PHP_VERSION / HOSBAH_PHP_INI — informational for a Dockerfile app (it owns
+// its image and build; Hosbah cannot write a php.ini into it), redundant but harmless for a
+// Railpack one (which already got them at build time). Never overrides a var the app's own
+// environment already set.
+func (r *runner) injectPHPEnv(ctx context.Context, env map[string]string) {
+	version, ini := r.phpConfig(ctx)
+	if version != "" && version != "auto" {
+		if _, set := env["HOSBAH_PHP_VERSION"]; !set {
+			env["HOSBAH_PHP_VERSION"] = version
+		}
+	}
+	if len(ini) > 0 {
+		if _, set := env["HOSBAH_PHP_INI"]; !set {
+			env["HOSBAH_PHP_INI"] = PHPIniEnvValue(ini)
 		}
 	}
 }
@@ -748,11 +784,13 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		buildStep = "build:full"
 	}
 	if !fast {
+		phpVersion, phpIni := r.phpConfig(ctx)
 		if err := r.op(ctx, buildStep, agentproto.KindAppBuild, agentproto.BuildParams{
 			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
 			GitSource: src,
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
-			NoCache: r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
+			NoCache:    r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
+			PHPVersion: phpVersion, PHPIni: phpIni,
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
 		}

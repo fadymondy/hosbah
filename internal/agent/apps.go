@@ -185,8 +185,10 @@ func readConfigToml(src string) (toml, name string, err error) {
 
 // detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
 // the build plan and says what it found). hosbah.toml — or, when a repository has none, the
-// pre-rename cloudy.toml — is returned raw for the control plane to parse.
-func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
+// pre-rename cloudy.toml — is returned raw for the control plane to parse. railpackEnv is extra
+// process environment for `railpack prepare` (MH-576 D2: RAILPACK_PHP_VERSION), empty outside a
+// deploy that pinned one.
+func detect(oc *OpContext, src, workdir string, railpackEnv []string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
 	r.Files = topLevelFiles(src)
 	toml, name, err := readConfigToml(src)
@@ -210,7 +212,7 @@ func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, e
 	plan, info := filepath.Join(workdir, "railpack-plan.json"), filepath.Join(workdir, "railpack-info.json")
 	var code int
 	for attempt := 1; attempt <= 3; attempt++ {
-		code, err = oc.Run(railpackBin, "prepare", src, "--plan-out", plan, "--info-out", info)
+		code, err = oc.RunEnv(railpackEnv, railpackBin, "prepare", src, "--plan-out", plan, "--info-out", info)
 		if code != 75 { // 75 = transient (a download), worth retrying; anything else is final
 			break
 		}
@@ -225,6 +227,44 @@ func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, e
 		oc.Info("build: Railpack, detected %s", r.Provider)
 	}
 	return r, 0, nil
+}
+
+// railpackPHPEnv is the process environment `railpack prepare` gets to pin the PHP version
+// (MH-576 D2), overriding composer.json's "require.php" constraint — Railpack's own convention
+// for a language version override (RAILPACK_PHP_VERSION, alongside RAILPACK_NODE_VERSION etc).
+// "" or "auto" adds nothing: Railpack detects it itself. Mirrors deploy.RailpackPHPEnv, duplicated
+// here (not imported) because the agent binary never depends on the control-plane deploy package.
+func railpackPHPEnv(version string) []string {
+	if version == "" || version == "auto" {
+		return nil
+	}
+	return []string{"RAILPACK_PHP_VERSION=" + version}
+}
+
+// writePHPIniOverrides (MH-576 D2) writes settings as a php.ini at the checkout root, for
+// Railpack's PHP provider to merge into the image it builds. A no-op when there is nothing to
+// write, or when the repository already has its own php.ini — Hosbah never overwrites an app's
+// own file. The control plane validates keys and values (deploy.ValidatePHPIni) before they ever
+// reach a signed op, so this only renders; it never trusts them as shell input.
+func writePHPIniOverrides(src string, settings map[string]string) error {
+	if len(settings) == 0 {
+		return nil
+	}
+	dst := filepath.Join(src, "php.ini")
+	if _, err := os.Stat(dst); err == nil {
+		return nil // the app ships its own — leave it alone
+	}
+	keys := make([]string, 0, len(settings))
+	for k := range settings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString("; Written by Hosbah (MH-576 D2) — per-app php.ini overrides.\n")
+	for _, k := range keys {
+		fmt.Fprintf(&b, "%s = %s\n", k, settings[k])
+	}
+	return os.WriteFile(dst, []byte(b.String()), 0o644) //#nosec G306 -- world-readable ini, not a secret
 }
 
 // topLevelFiles lists a checkout's root entries (files and directories), for deploy.DetectPreset —
@@ -283,7 +323,7 @@ func appDetect(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, code, err
 	}
-	r, code, err := detect(oc, src, work)
+	r, code, err := detect(oc, src, work, nil)
 	r.Commit, r.Message = commit, msg
 	if err != nil {
 		return r, code, err
@@ -315,7 +355,14 @@ func appBuild(oc *OpContext) (any, int, error) {
 		return nil, code, err
 	}
 	oc.Progress(2, 4)
-	d, code, err := detect(oc, src, work)
+	// MH-576 D2: a pinned PHP version becomes RAILPACK_PHP_VERSION on `railpack prepare`; ini
+	// overrides are written to a php.ini at the checkout root first, unless the app ships its own
+	// (never overwritten — it owns that file). Both are no-ops for a Dockerfile app, and detect()
+	// itself only uses railpackEnv on the Railpack path.
+	if err := writePHPIniOverrides(src, p.PHPIni); err != nil {
+		oc.Info("php.ini overrides: %v — continuing without them", err)
+	}
+	d, code, err := detect(oc, src, work, railpackPHPEnv(p.PHPVersion))
 	if err != nil {
 		return nil, code, err
 	}

@@ -58,6 +58,16 @@ type DeployConfigOut struct {
 	CanSave        bool       `json:"can_save" doc:"Whether the caller may save a configuration (deploy)."`
 }
 
+// PHPConfigOut is GET/PUT …/deploy-config/php (MH-576 D2): an app's PHP version pin and php.ini
+// overrides, plus the choices the UI may offer (AvailableVersions, AvailableIniKeys).
+type PHPConfigOut struct {
+	Version           string            `json:"php_version"`
+	Ini               map[string]string `json:"php_ini"`
+	AvailableVersions []string          `json:"available_versions"`
+	AvailableIniKeys  []string          `json:"available_ini_keys"`
+	CanSave           bool              `json:"can_save" doc:"Whether the caller may save (deploy)."`
+}
+
 // DeployConfigVersionOut is one entry of GET …/deploy-config/versions.
 type DeployConfigVersionOut struct {
 	Version   int            `json:"version"`
@@ -74,6 +84,25 @@ type DeployPresetOut struct {
 	Steps        []DeployStepIn `json:"steps"`
 	BuilderImage string         `json:"builder_image"`
 	Outputs      []string       `json:"outputs"`
+}
+
+// existingPHPVersion/existingPHPIni (MH-576 D2) preserve an app_deploy_config row's php_version/
+// php_ini through a save of the pipeline steps (mode/preset/steps), which uses the same upsert but
+// must never clear a PHP setting saved through the dedicated …/deploy-config/php endpoint. A never
+// -saved row (its PhpVersion zero value, "") defaults to "auto" — the php_version check constraint
+// has no "" member.
+func existingPHPVersion(existing db.AppDeployConfig) string {
+	if existing.PhpVersion == "" {
+		return "auto"
+	}
+	return existing.PhpVersion
+}
+
+func existingPHPIni(existing db.AppDeployConfig) string {
+	if existing.PhpIni == "" {
+		return "{}"
+	}
+	return existing.PhpIni
 }
 
 func outputsOrEmpty(raw string) []string {
@@ -251,6 +280,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 				AppID: a.ID, TeamID: m.TeamID, Mode: in.Body.Mode, Preset: in.Body.Preset, Steps: string(raw),
 				BuilderImage: in.Body.BuilderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
+				PhpVersion: existingPHPVersion(existing), PhpIni: existingPHPIni(existing),
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -354,6 +384,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 				AppID: a.ID, TeamID: m.TeamID, Mode: target.Mode, Preset: target.Preset, Steps: target.Steps,
 				BuilderImage: existing.BuilderImage, Outputs: existing.Outputs, DetectedPreset: existing.DetectedPreset,
+				PhpVersion: existingPHPVersion(existing), PhpIni: existingPHPIni(existing),
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -403,6 +434,114 @@ func (d *deps) registerDeployConfig(api huma.API) {
 					BuilderImage: deploy.PresetBuilderImage(p), Outputs: outputs,
 				})
 			}
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- php version and ini overrides (MH-576 D2) ------------------------------------------
+
+	type phpOut struct{ Body PHPConfigOut }
+	huma.Register(api, huma.Operation{OperationID: "get-app-php-config", Method: http.MethodGet, Path: basePath + "/php", Tags: tags,
+		Summary: "An app's PHP version pin and php.ini overrides, applied on its next deploy (Railpack's PHP/Laravel builds; a " +
+			"Dockerfile app gets them only as HOSBAH_PHP_VERSION/HOSBAH_PHP_INI env vars, informational since it owns its own image). " +
+			"Any member.",
+	}, func(ctx context.Context, in *AppPath) (*phpOut, error) {
+		out := &phpOut{}
+		out.Body.Version = "auto"
+		out.Body.Ini = map[string]string{}
+		out.Body.AvailableVersions = deploy.PHPVersions
+		out.Body.AvailableIniKeys = deploy.PHPIniKeys
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			out.Body.CanSave = tenancy.Can(ctx, m, tenancy.AbilityDeploy)
+			row, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
+			if err == nil {
+				out.Body.Version = row.PhpVersion
+				var ini map[string]string
+				_ = json.Unmarshal([]byte(row.PhpIni), &ini)
+				if ini == nil {
+					ini = map[string]string{}
+				}
+				out.Body.Ini = ini
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return huma.Error500InternalServerError("could not read the deploy configuration")
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "put-app-php-config", Method: http.MethodPut, Path: basePath + "/php", Tags: tags,
+		Summary: "Save an app's PHP version pin and php.ini overrides. Not versioned (like builder_image/outputs). Deployer, admin or owner.",
+	}, func(ctx context.Context, in *struct {
+		AppPath
+		Body struct {
+			Version string            `json:"php_version" enum:"auto,8.1,8.2,8.3,8.4"`
+			Ini     map[string]string `json:"php_ini,omitempty" maxProperties:"32"`
+		}
+	}) (*phpOut, error) {
+		out := &phpOut{}
+		out.Body.AvailableVersions = deploy.PHPVersions
+		out.Body.AvailableIniKeys = deploy.PHPIniKeys
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			if err := need(ctx, m, tenancy.AbilityDeploy); err != nil {
+				return err
+			}
+			if !deploy.ValidPHPVersion(in.Body.Version) {
+				return huma.Error422UnprocessableEntity("php_version must be one of " + strings.Join(deploy.PHPVersions, ", "))
+			}
+			if err := deploy.ValidatePHPIni(in.Body.Ini); err != nil {
+				return huma.Error422UnprocessableEntity(err.Error())
+			}
+			ini := in.Body.Ini
+			if ini == nil {
+				ini = map[string]string{}
+			}
+			iniRaw, err := json.Marshal(ini)
+			if err != nil {
+				return huma.Error422UnprocessableEntity("the php.ini overrides could not be encoded")
+			}
+
+			existing, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
+			mode, preset, steps, builderImage, outputs, detectedPreset, version := "auto", deploy.DetectPreset(nil), "", "", "[]", "", int32(1)
+			switch {
+			case err == nil:
+				mode, preset, steps, builderImage, outputs, detectedPreset, version =
+					existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset, existing.Version
+			case errors.Is(err, sql.ErrNoRows):
+				raw, mErr := json.Marshal(deploy.PresetSteps(preset))
+				if mErr != nil {
+					return huma.Error500InternalServerError("could not build a default deploy configuration")
+				}
+				steps = string(raw)
+			default:
+				return huma.Error500InternalServerError("could not read the deploy configuration")
+			}
+
+			userID := id.ID
+			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
+				AppID: a.ID, TeamID: m.TeamID, Mode: mode, Preset: preset, Steps: steps,
+				BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
+				PhpVersion: in.Body.Version, PhpIni: string(iniRaw),
+				Version: version, UpdatedBy: &userID,
+			})
+			if err != nil {
+				return huma.Error500InternalServerError("could not save the PHP configuration")
+			}
+			out.Body.Version = row.PhpVersion
+			_ = json.Unmarshal([]byte(row.PhpIni), &out.Body.Ini)
+			if out.Body.Ini == nil {
+				out.Body.Ini = map[string]string{}
+			}
+			out.Body.CanSave = true
 			return nil
 		})
 		return out, err

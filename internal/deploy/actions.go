@@ -306,11 +306,30 @@ func (s *Service) chooseTrack(ctx context.Context, q *db.Queries, teamID string,
 		return TrackFull, "full rebuild requested"
 	}
 	mode := "auto"
+	phpActive := false
 	if cfg, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: teamID}); err == nil {
 		mode = cfg.Mode
+		phpActive = phpConfigActive(cfg.PhpVersion, cfg.PhpIni)
 	}
 	lastOK := a.CurrentReleaseID != nil
-	return ChooseTrack(mode, nil, lastOK)
+	track, reason := ChooseTrack(mode, nil, lastOK)
+	if track == TrackFast && phpActive {
+		// MH-576 D2: the fast track reuses the current live image and never calls `railpack
+		// prepare` again, so a pinned PHP version or ini override would silently not apply.
+		return TrackFull, "PHP version or php.ini overrides configured"
+	}
+	return track, reason
+}
+
+// phpConfigActive reports whether an app_deploy_configs row's php_version/php_ini differ from the
+// defaults ("auto", no overrides) — i.e. whether a build needs to actually apply them.
+func phpConfigActive(version, iniJSON string) bool {
+	if version != "" && version != "auto" {
+		return true
+	}
+	var ini map[string]string
+	_ = json.Unmarshal([]byte(iniJSON), &ini)
+	return len(ini) > 0
 }
 
 // DeploymentByRef resolves a deployment of an app by id or number ("12" or "#12").
