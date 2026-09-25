@@ -72,6 +72,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedDataService(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedDataServiceMetric(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedDatabase(ctx, a); err != nil {
 		return err
 	}

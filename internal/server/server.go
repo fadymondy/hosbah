@@ -111,6 +111,7 @@ func Boot() *app.App {
 	}
 	databases := dbsvc.New(a, svc, deploys)
 	databases.StartScheduler()
+	databases.StartMetricsSampler()
 	a.DBSvc = databases
 	// Servers connected before workload import existed: convert what their facts already list.
 	if _, err := importer.Backfill(context.Background(), a.SQLDB, a.Log); err != nil {
@@ -163,6 +164,7 @@ func Boot() *app.App {
 		realUsers.Stop()
 		watch.Stop()
 		databases.StopScheduler()
+		databases.StopMetricsSampler()
 		deploys.Stop()
 		svc.Stop()
 	}

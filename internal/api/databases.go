@@ -755,6 +755,7 @@ func (d *deps) registerDatabases(api huma.API) {
 	})
 
 	registerDataServiceInsights(d, api, tags)
+	registerDataServiceMetrics(d, api, tags)
 }
 
 // ---- DB metrics and slow queries (MH-575 F6) --------------------------------------------------
@@ -879,6 +880,40 @@ func registerDataServiceInsights(d *deps, api huma.API, tags []string) {
 				return dbErr(err, "could not cancel the query")
 			}
 			out.Body.OK, out.Body.Detail = res.OK, res.Detail
+			return nil
+		})
+		return out, err
+	})
+}
+
+// registerDataServiceMetrics is F6's history charts: the same KPIs Insights shows live, sampled
+// roughly once a minute (internal/dbsvc's sampler) and bucketed server-side like a server's own
+// /metrics endpoint (internal/metrics). AbilityView, not AbilityRevealSecrets: unlike Insights, a
+// bucket never carries query text or literal values a member typed — just aggregate numbers, the
+// same sensitivity as a server's CPU/memory history.
+func registerDataServiceMetrics(d *deps, api huma.API, tags []string) {
+	type seriesIn struct {
+		ServicePath
+		Range string `query:"range" enum:"1h,6h,24h,7d,30d" default:"1h"`
+	}
+	type seriesOut struct{ Body dbsvc.MetricSeries }
+	huma.Register(api, huma.Operation{OperationID: "get-data-service-metrics", Method: http.MethodGet,
+		Path: "/api/teams/{team}/data-services/{service}/metrics", Tags: tags,
+		Summary: "A data service's KPI history for a range, bucketed server-side (at most ~300 points): connections, cache hit ratio, size, slow-query count and transactions/queries per second. Postgres and MySQL only.",
+	}, func(ctx context.Context, in *seriesIn) (*seriesOut, error) {
+		r, err := rangeOf(in.Range)
+		if err != nil {
+			return nil, err
+		}
+		out := &seriesOut{}
+		err = d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			if out.Body, err = d.dbs().MetricsSeries(ctx, q, m.TeamID, svc.ID, r, time.Now()); err != nil {
+				return huma.Error500InternalServerError("could not read metrics")
+			}
 			return nil
 		})
 		return out, err

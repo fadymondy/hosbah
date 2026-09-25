@@ -66,8 +66,9 @@ type Service struct {
 	a           *app.App
 	ops         *ops.Service
 	deploy      *deploy.Service
-	log         *slog.Logger
-	schedCancel context.CancelFunc
+	log           *slog.Logger
+	schedCancel   context.CancelFunc
+	metricsCancel context.CancelFunc
 }
 
 // New builds the service. deploy is used to inject a sealed connection string when a service is

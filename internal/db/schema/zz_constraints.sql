@@ -95,3 +95,6 @@ ALTER TABLE app_installs ADD CONSTRAINT app_installs_sealed_check CHECK (secrets
 
 -- GitHub App installations belong to a team and go with it.
 ALTER TABLE github_installations ADD CONSTRAINT github_installations_team_fk FOREIGN KEY (team_id) REFERENCES teams (id) ON DELETE CASCADE;
+
+-- A data service's metrics history goes with its service (MH-575 F6).
+ALTER TABLE data_service_metrics ADD CONSTRAINT data_service_metrics_service_fk FOREIGN KEY (service_id, team_id) REFERENCES data_services (id, team_id) ON DELETE CASCADE;

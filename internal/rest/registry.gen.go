@@ -31,6 +31,7 @@ func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterCostLineItemRoutes(api, a)
 	RegisterCredentialRoutes(api, a)
 	RegisterDataServiceRoutes(api, a)
+	RegisterDataServiceMetricRoutes(api, a)
 	RegisterDatabaseRoutes(api, a)
 	RegisterDatabaseUserRoutes(api, a)
 	RegisterDeploymentRoutes(api, a)

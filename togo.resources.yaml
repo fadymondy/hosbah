@@ -1154,6 +1154,65 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: DataServiceMetric
+      table: data_service_metrics
+      fields:
+        - name: service_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: step
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: connections
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: max_connections
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: cache_hit_ratio
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: size_bytes
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: slow_query_count
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: tx_counter
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: rate_per_sec
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+      controller: true
     - name: Database
       table: databases
       fields:
