@@ -38,6 +38,9 @@ type Agent struct {
 	// also in the executor's journal, and the server's resume list after a reconnect replays
 	// whatever did not arrive.
 	live chan agentproto.Event
+	// termOut carries terminal.open sessions' term.data/term.close frames straight to the wire —
+	// never journalled, never replayed: a session a reconnect interrupts is simply over.
+	termOut chan agentproto.Frame
 }
 
 // New builds an agent from its enrolled state.
@@ -53,10 +56,12 @@ func New(st *State, version string, log *slog.Logger) (*Agent, error) {
 		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second, MetricsEvery: 5 * time.Second,
 		TrafficPollEvery: 20 * time.Second,
 		priv:             priv, sampler: NewSampler(), traffic: newTrafficCollector(), live: make(chan agentproto.Event, 4096),
+		termOut: make(chan agentproto.Frame, 256),
 	}
 	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
 	a.Exec.SetKey(priv)
 	a.Exec.emit = a.enqueue
+	a.Exec.termSend = a.enqueueTerm
 	a.Exec.Restart = a.restart
 	return a, nil
 }
@@ -67,6 +72,17 @@ func (a *Agent) enqueue(ev agentproto.Event) {
 	default:
 		// Full (a long disconnect with a chatty operation): the journal still holds the event and
 		// the next resume replays it.
+	}
+}
+
+// enqueueTerm hands a term.* frame to whichever connection is up. Unlike enqueue, there is no
+// journal behind it: a frame dropped here (a full buffer, or no connection) is simply gone — the
+// session itself notices (its reads keep failing, or the control plane closes it after the agent
+// reconnects with no matching session) and a fresh session is how the user recovers.
+func (a *Agent) enqueueTerm(f agentproto.Frame) {
+	select {
+	case a.termOut <- f:
+	default:
 	}
 }
 
@@ -236,6 +252,10 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 			if err := send(agentproto.Frame{Type: agentproto.TypeEvent, Event: &ev}); err != nil {
 				return err // the event is in the journal; the resume after reconnecting replays it
 			}
+		case f := <-a.termOut:
+			if err := send(f); err != nil {
+				return err // the session's next read/write fails and it closes itself
+			}
 		}
 	}
 }
@@ -251,6 +271,8 @@ func (a *Agent) reader(ctx context.Context, conn *websocket.Conn) error {
 			a.Exec.Submit(f.Op)
 		case agentproto.TypeResume:
 			a.Exec.Resume(f.Resume)
+		case agentproto.TypeTermData, agentproto.TypeTermResize, agentproto.TypeTermClose:
+			a.Exec.TermFrame(f)
 		case agentproto.TypeError:
 			return fmt.Errorf("control plane: %s", f.Error)
 		}

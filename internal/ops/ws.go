@@ -44,6 +44,7 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.hub.remove(ac)
 		s.flushMetrics(ac)
+		s.closeTerminalsOfServer(ac.serverID)
 		s.broker.Publish(ServerTopic(ac.serverID))
 		s.log.Info("agent disconnected", "server", ac.serverID)
 	}()
@@ -94,6 +95,8 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 			if f.Event != nil {
 				s.recordEvent(sctx, ac, *f.Event)
 			}
+		case agentproto.TypeTermData, agentproto.TypeTermClose:
+			s.routeTerminalFrame(ac, f)
 		}
 	}
 }
