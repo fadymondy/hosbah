@@ -17,6 +17,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/services"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -876,7 +877,12 @@ func (d *deps) registerApps(api huma.API) {
 			if err != nil {
 				return err
 			}
-			return actionErr(d.deploys().SetEnv(ctx, q, m.TeamID, webActor(id), a, in.Name, in.Body.Value), "could not set the variable")
+			if err := actionErr(d.deploys().SetEnv(ctx, q, m.TeamID, webActor(id), a, in.Name, in.Body.Value), "could not set the variable"); err != nil {
+				return err
+			}
+			// Best-effort: re-match the app's env to shared/data services. Never blocks the save.
+			_, _ = services.Detect(ctx, q, d.ops, m.TeamID, a)
+			return nil
 		})
 		return nil, err
 	})
@@ -889,7 +895,11 @@ func (d *deps) registerApps(api huma.API) {
 			if err != nil {
 				return err
 			}
-			return actionErr(d.deploys().UnsetEnv(ctx, q, m.TeamID, webActor(id), a, in.Name), "could not remove the variable")
+			if err := actionErr(d.deploys().UnsetEnv(ctx, q, m.TeamID, webActor(id), a, in.Name), "could not remove the variable"); err != nil {
+				return err
+			}
+			_, _ = services.Detect(ctx, q, d.ops, m.TeamID, a)
+			return nil
 		})
 		return nil, err
 	})

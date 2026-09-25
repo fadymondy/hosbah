@@ -15,6 +15,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/importer"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/scopes"
+	"github.com/fadymondy/hosbah/internal/services"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -382,6 +383,9 @@ func AppTools() []Tool {
 				if err := s.SetEnv(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, args.Str("name"), value); err != nil {
 					return "", err
 				}
+				if o, oerr := opsOf(env); oerr == nil {
+					_, _ = services.Detect(ctx, env.Q, o, env.Caller.TeamID, a)
+				}
 				return fmt.Sprintf("Set %s on %s. It applies from the next deploy or restart_app.", args.Str("name"), a.Name), nil
 			},
 		},
@@ -403,6 +407,9 @@ func AppTools() []Tool {
 				}
 				if err := s.UnsetEnv(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, args.Str("name")); err != nil {
 					return "", err
+				}
+				if o, oerr := opsOf(env); oerr == nil {
+					_, _ = services.Detect(ctx, env.Q, o, env.Caller.TeamID, a)
 				}
 				return fmt.Sprintf("Removed %s from %s.", args.Str("name"), a.Name), nil
 			},
