@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/quota"
@@ -176,11 +177,23 @@ func PlatformTools() []Tool {
 		},
 		{
 			Name:        "list_platform_audit",
-			Description: "The platform audit log (user, team and settings changes by platform admins), newest first, with the actor's email.",
+			Description: "The platform audit log (user, team and settings changes by platform admins), newest first, with the actor's email. Filter by actor, action prefix, target type/id, a date range (since/until, ISO-8601) or free-text search.",
 			Scope:       ScopeAdmin,
-			InputSchema: schema(nil, map[string]any{"limit": page(50), "offset": offset}),
+			InputSchema: schema(nil, map[string]any{
+				"limit": page(50), "offset": offset,
+				"actor": str("An actor id, or a substring of their email."), "action": str("Prefix match, e.g. \"team.\"."),
+				"target_type": str("e.g. \"user\", \"team\"."), "target_id": str("Exact match."),
+				"since": str("ISO-8601; entries at or after this time."), "until": str("ISO-8601; entries at or before this time."),
+				"q": str("Free-text search across action, target, details and actor email."),
+			}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
-				return asJSON(platform.ListAudit(ctx, env.Q, args.Int("limit", 50, 1, 200), args.Int("offset", 0, 0, 1<<30)))
+				since, _ := time.Parse(time.RFC3339, args.Str("since"))
+				until, _ := time.Parse(time.RFC3339, args.Str("until"))
+				f := platform.AuditFilter{
+					Actor: args.Str("actor"), Action: args.Str("action"), TargetType: args.Str("target_type"), TargetID: args.Str("target_id"),
+					Since: since, Until: until, Q: args.Str("q"),
+				}
+				return asJSON(platform.ListAudit(ctx, env.Q, f, args.Int("limit", 50, 1, 200), args.Int("offset", 0, 0, 1<<30)))
 			},
 		},
 	}

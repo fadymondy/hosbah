@@ -12,6 +12,7 @@ import { useTeam } from "@/lib/team"
 /** Each section is its own page under /servers/{id}; "" is the overview. */
 export const SERVER_TABS = [
   "",
+  "metrics",
   "apps",
   "databases",
   "guests",

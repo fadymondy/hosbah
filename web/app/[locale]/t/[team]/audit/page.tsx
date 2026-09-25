@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ScrollTextIcon } from "lucide-react"
 
+import { ListToolbar, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
@@ -12,27 +13,127 @@ import { apiFetch, type AuditEntry } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
+const PAGE_SIZE = 100
+
 export default function AuditPage() {
   const { t } = useI18n()
   const { team } = useTeam()
   useDocumentTitle(`${t("nav.audit")} — ${team.name}`)
   const fmt = useFormatDate()
   const errorText = useErrorText()
+
+  const [q, setQ] = useState("")
+  const [debouncedQ, setDebouncedQ] = useState("")
+  const [actor, setActor] = useState("")
+  const [action, setAction] = useState("")
+  const [subjectType, setSubjectType] = useState("")
+  const [subjectId, setSubjectId] = useState("")
+  const [since, setSince] = useState("")
+  const [until, setUntil] = useState("")
+  const [offset, setOffset] = useState(0)
+
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
+  const [total, setTotal] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const seq = useRef(0)
 
   useEffect(() => {
-    apiFetch<{ entries: AuditEntry[] }>(`/api/teams/${team.slug}/audit`)
-      .then((r) => setEntries(r.entries ?? []))
-      .catch((err) => {
-        setError(errorText(err))
-        setEntries([])
-      })
+    const id = setTimeout(() => setDebouncedQ(q.trim()), 250)
+    return () => clearTimeout(id)
+  }, [q])
+
+  const filters = {
+    actor: actor.trim(),
+    action: action.trim(),
+    subject_type: subjectType.trim(),
+    subject_id: subjectId.trim(),
+    since: since ? new Date(since).toISOString() : "",
+    until: until ? new Date(until).toISOString() : "",
+    q: debouncedQ,
+  }
+  const filterKey = JSON.stringify(filters)
+
+  useEffect(() => setOffset(0), [filterKey])
+
+  const load = useCallback(async () => {
+    const mine = ++seq.current
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
+    for (const [k, v] of Object.entries(JSON.parse(filterKey) as Record<string, string>)) {
+      if (v) params.set(k, v)
+    }
+    try {
+      const r = await apiFetch<{ entries: AuditEntry[]; total: number }>(`/api/teams/${team.slug}/audit?${params}`)
+      if (mine !== seq.current) return
+      setEntries(r.entries ?? [])
+      setTotal(r.total ?? 0)
+      setError(null)
+    } catch (err) {
+      if (mine !== seq.current) return
+      setError(errorText(err))
+      setEntries([])
+      setTotal(0)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [team.slug])
+  }, [team.slug, offset, filterKey])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = Boolean(actor || action || subjectType || subjectId || since || until || debouncedQ)
 
   return (
     <PageBody title={t("nav.audit")} description={t("audit.description")} bleed>
+      <ListToolbar q={q} onQ={setQ} placeholder={t("audit.filters.search")}>
+        <input
+          value={actor}
+          onChange={(e) => setActor(e.target.value)}
+          placeholder={t("audit.filters.actor")}
+          aria-label={t("audit.filters.actor")}
+          dir="ltr"
+          className="h-8 w-36 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          placeholder={t("audit.filters.action")}
+          aria-label={t("audit.filters.action")}
+          dir="ltr"
+          className="h-8 w-32 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={subjectType}
+          onChange={(e) => setSubjectType(e.target.value)}
+          placeholder={t("audit.filters.subjectType")}
+          aria-label={t("audit.filters.subjectType")}
+          dir="ltr"
+          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={subjectId}
+          onChange={(e) => setSubjectId(e.target.value)}
+          placeholder={t("audit.filters.subjectId")}
+          aria-label={t("audit.filters.subjectId")}
+          dir="ltr"
+          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          type="date"
+          value={since}
+          onChange={(e) => setSince(e.target.value)}
+          aria-label={t("audit.filters.since")}
+          dir="ltr"
+          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+        />
+        <input
+          type="date"
+          value={until}
+          onChange={(e) => setUntil(e.target.value)}
+          aria-label={t("audit.filters.until")}
+          dir="ltr"
+          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+        />
+      </ListToolbar>
       <ErrorBand message={error} />
       {entries === null ? (
         <LoadingRows />
@@ -42,7 +143,7 @@ export default function AuditPage() {
             <EmptyMedia variant="icon">
               <ScrollTextIcon />
             </EmptyMedia>
-            <EmptyTitle>{t("audit.emptyTitle")}</EmptyTitle>
+            <EmptyTitle>{filtered ? t("audit.noMatch") : t("audit.emptyTitle")}</EmptyTitle>
             <EmptyDescription>{t("audit.emptyHint")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -100,6 +201,7 @@ export default function AuditPage() {
           </Table>
         </TableBand>
       ) : null}
+      {entries !== null && !error ? <Pager offset={offset} pageSize={PAGE_SIZE} total={total} onOffset={setOffset} /> : null}
     </PageBody>
   )
 }

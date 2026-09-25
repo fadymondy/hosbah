@@ -205,6 +205,18 @@
     "uptime": "Uptime",
     "lastSeen": "Last heartbeat",
     "never": "Never",
+    "metrics": {
+      "title": "Metrics",
+      "hint": "History from this server's heartbeats, bucketed for the chosen range.",
+      "range": "Time range",
+      "ranges": { "1h": "1h", "6h": "6h", "24h": "24h", "7d": "7d", "30d": "30d" },
+      "network": "Network",
+      "rx": "Received",
+      "tx": "Sent",
+      "gpu": "GPU {n}",
+      "emptyTitle": "No history yet",
+      "emptyHint": "The chart fills in as the agent's heartbeats arrive."
+    },
     "presence": {
       "online": "Online",
       "offline": "Offline",
@@ -411,6 +423,7 @@
     "tabs": {
       "label": "Server sections",
       "overview": "Overview",
+      "metrics": "Metrics",
       "apps": "Apps",
       "databases": "Databases",
       "guests": "Guests",
@@ -877,6 +890,7 @@
     "description": "Every change made in this team, newest first.",
     "emptyTitle": "Nothing recorded yet",
     "emptyHint": "Changes to the team, members, invitations and tokens are recorded here.",
+    "noMatch": "No entries match these filters",
     "when": "When",
     "action": "Action",
     "subject": "Subject",
@@ -884,7 +898,16 @@
     "ip": "IP",
     "changes": "Changes",
     "system": "System",
-    "show": "Show"
+    "show": "Show",
+    "filters": {
+      "search": "Search action, subject, changes…",
+      "actor": "Actor (id or email)",
+      "action": "Action prefix",
+      "subjectType": "Subject type",
+      "subjectId": "Subject id",
+      "since": "From",
+      "until": "To"
+    }
   },
   "settings": {
     "description": "Team details.",
@@ -1130,6 +1153,15 @@
       "target": "On",
       "details": "Details",
       "when": "When",
+      "filters": {
+        "search": "Search action, target, details…",
+        "actor": "Actor (id or email)",
+        "action": "Action prefix",
+        "targetType": "Target type",
+        "targetId": "Target id",
+        "since": "From",
+        "until": "To"
+      },
       "actions": {
         "user_updated": "Updated a user",
         "user_deleted": "Deleted a user",
@@ -1601,6 +1633,7 @@
     "cpuChart": "CPU over the last hour",
     "memChart": "Memory over the last hour",
     "gpuChart": "GPU over the last hour",
+    "metricsLink": "Open the full metrics history",
     "uptimeDays": "up {d}d {h}h",
     "uptimeHours": "up {h}h {m}m",
     "lastSeen": "Last report {when}",

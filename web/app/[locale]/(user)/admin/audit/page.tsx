@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 
-import { ListEmpty, ListError, LoadingRows, Pager } from "@/components/admin/admin-list"
+import { ListEmpty, ListError, ListToolbar, LoadingRows, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAdminList, type AdminAuditEntry } from "@/lib/admin"
@@ -19,17 +20,81 @@ export default function AdminAuditPage() {
   const { t, locale } = useI18n()
   const fmt = useFormatDate()
   useDocumentTitle(t("admin.nav.audit"))
-  const list = useAdminList<AdminAuditEntry>("/api/admin/audit")
+  const [actor, setActor] = useState("")
+  const [action, setAction] = useState("")
+  const [targetType, setTargetType] = useState("")
+  const [targetId, setTargetId] = useState("")
+  const [since, setSince] = useState("")
+  const [until, setUntil] = useState("")
+  const list = useAdminList<AdminAuditEntry>("/api/admin/audit", {
+    actor: actor.trim() || undefined,
+    action: action.trim() || undefined,
+    target_type: targetType.trim() || undefined,
+    target_id: targetId.trim() || undefined,
+    since: since ? new Date(since).toISOString() : undefined,
+    until: until ? new Date(until).toISOString() : undefined,
+  })
   const items = list.data?.items ?? []
+  const filtered = Boolean(actor || action || targetType || targetId || since || until || list.q)
 
   return (
     <PageBody eyebrow={t("nav.platform")} title={t("admin.nav.audit")} description={t("admin.audit.hint")} bleed>
+      <ListToolbar q={list.q} onQ={list.setQ} placeholder={t("admin.audit.filters.search")}>
+        <input
+          value={actor}
+          onChange={(e) => setActor(e.target.value)}
+          placeholder={t("admin.audit.filters.actor")}
+          aria-label={t("admin.audit.filters.actor")}
+          dir="ltr"
+          className="h-8 w-36 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          placeholder={t("admin.audit.filters.action")}
+          aria-label={t("admin.audit.filters.action")}
+          dir="ltr"
+          className="h-8 w-32 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={targetType}
+          onChange={(e) => setTargetType(e.target.value)}
+          placeholder={t("admin.audit.filters.targetType")}
+          aria-label={t("admin.audit.filters.targetType")}
+          dir="ltr"
+          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          value={targetId}
+          onChange={(e) => setTargetId(e.target.value)}
+          placeholder={t("admin.audit.filters.targetId")}
+          aria-label={t("admin.audit.filters.targetId")}
+          dir="ltr"
+          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+        />
+        <input
+          type="date"
+          value={since}
+          onChange={(e) => setSince(e.target.value)}
+          aria-label={t("admin.audit.filters.since")}
+          dir="ltr"
+          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+        />
+        <input
+          type="date"
+          value={until}
+          onChange={(e) => setUntil(e.target.value)}
+          aria-label={t("admin.audit.filters.until")}
+          dir="ltr"
+          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+        />
+      </ListToolbar>
       {list.error ? (
         <ListError error={list.error} />
       ) : !list.data ? (
         <LoadingRows />
       ) : items.length === 0 ? (
-        <ListEmpty title={t("admin.audit.empty")} />
+        <ListEmpty title={filtered ? t("admin.list.noMatch") : t("admin.audit.empty")} />
       ) : (
         <div className="border-b border-line">
           <Table>
