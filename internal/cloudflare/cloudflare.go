@@ -180,13 +180,14 @@ func (c *Client) ZoneFor(ctx context.Context, hostname string) (Zone, error) {
 
 // Record is a DNS record.
 type Record struct {
-	ID      string `json:"id,omitempty"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	TTL     int    `json:"ttl,omitempty"` // 1 = automatic
-	Proxied *bool  `json:"proxied,omitempty"`
-	Comment string `json:"comment,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type"`
+	Name     string `json:"name"`
+	Content  string `json:"content"`
+	TTL      int    `json:"ttl,omitempty"`      // 1 = automatic
+	Priority int    `json:"priority,omitempty"` // MX only
+	Proxied  *bool  `json:"proxied,omitempty"`
+	Comment  string `json:"comment,omitempty"`
 }
 
 // Records lists records in a zone by exact name and (optionally) type.

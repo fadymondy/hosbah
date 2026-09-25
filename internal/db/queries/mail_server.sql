@@ -22,6 +22,12 @@ UPDATE mail_servers SET status = $3, error = $4, updated_at = now() WHERE id = $
 UPDATE mail_servers SET status = 'running', container = $3, admin_sealed = $4, error = NULL, updated_at = now()
 WHERE id = $1 AND team_id = $2;
 
+-- SetMailServerAdminSecret stores the generated admin credential right after insert, before
+-- mail.install ever runs, so a resumed install always resends the same secret. It does not touch
+-- status: that is set separately (installing, then running/failed by SetMailServerInstalled/Status).
+-- name: SetMailServerAdminSecret :exec
+UPDATE mail_servers SET admin_sealed = $3, updated_at = now() WHERE id = $1 AND team_id = $2;
+
 -- name: DeleteMailServerInTeam :execrows
 DELETE FROM mail_servers WHERE id = $1 AND team_id = $2;
 
