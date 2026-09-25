@@ -57,6 +57,10 @@ func Timeout(kind string) time.Duration {
 		return 90 * time.Second // docker inspect/stats/restart/stop/start of a handful of containers
 	case agentproto.KindDBProvision, agentproto.KindDBRestore:
 		return 20 * time.Minute // pull an image, start the engine, wait for readiness, restore
+	case agentproto.KindMailInstall:
+		return 20 * time.Minute // pull the Stalwart image, start it, wait for the management API
+	case agentproto.KindMailDomain, agentproto.KindMailbox, agentproto.KindMailAlias:
+		return 2 * time.Minute // one HTTP call (or two) to the management API
 	case agentproto.KindDBBackup:
 		return 30 * time.Minute
 	case agentproto.KindBrowserCreate:
