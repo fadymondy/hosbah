@@ -164,7 +164,8 @@
     "databases": "Databases",
     "approvals": "Approvals",
     "proxyHosts": "Proxy hosts",
-    "teamSettings": "Team settings"
+    "teamSettings": "Team settings",
+    "costs": "Costs"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -945,6 +946,59 @@
       "since": "From",
       "until": "To"
     }
+  },
+  "costs": {
+    "description": "What this team's infrastructure costs and how it is used.",
+    "overviewTitle": "Overview",
+    "overviewHint": "Server prices plus extra line items, over the chosen window.",
+    "kpiTotal": "Monthly total",
+    "kpiAllocated": "Allocated to apps",
+    "kpiIdle": "Idle / unallocated",
+    "kpiHints": "Right-sizing",
+    "overProvisionedCount": "{n} over-provisioned",
+    "underPressureCount": "{n} under pressure",
+    "serversTitle": "Servers",
+    "serversHint": "Each server's monthly price, usage over the window, and a right-sizing hint.",
+    "serversEmptyTitle": "No servers yet",
+    "serversEmptyHint": "Connect a server to start pricing and tracking its usage.",
+    "server": "Server",
+    "price": "Price",
+    "hint": "Hint",
+    "unpriced": "Not priced",
+    "setPrice": "Set price",
+    "editPrice": "Edit price",
+    "clearPrice": "Clear",
+    "clearPriceTitle": "Clear {name}'s price?",
+    "clearPriceBody": "The server goes back to unpriced; its apps show no allocated cost until it is priced again.",
+    "priceHint": "A monthly amount, split across this server's apps by their configured memory limit.",
+    "priceSaved": "Price saved",
+    "amount": "Amount",
+    "currency": "Currency",
+    "idleOf": "{amount} idle",
+    "showDetail": "Show detail",
+    "usageChart": "Usage",
+    "byApp": "By app",
+    "noApps": "No apps on this server.",
+    "app": "App",
+    "allocated": "Allocated",
+    "memoryLimit": "Memory limit",
+    "hints": {
+      "over_provisioned": "Over-provisioned",
+      "under_pressure": "Under pressure"
+    },
+    "appHints": {
+      "limit_far_exceeds_usage": "Limit far exceeds usage"
+    },
+    "lineItemsTitle": "Extra line items",
+    "lineItemsHint": "Other monthly costs outside per-server pricing, e.g. Cloudflare or backup storage.",
+    "lineItemsEmptyTitle": "No line items yet",
+    "lineItemsEmptyHint": "Add a line item for costs that are not a server, like a CDN or backup storage plan.",
+    "addLineItem": "Add line item",
+    "lineItemSaved": "Line item saved",
+    "name": "Name",
+    "added": "Added",
+    "deleteLineItemTitle": "Delete {name}?",
+    "deleteLineItemBody": "This line item is removed from the monthly total."
   },
   "settings": {
     "description": "Team details.",
