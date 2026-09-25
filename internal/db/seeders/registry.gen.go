@@ -90,6 +90,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedNotification(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedNotificationChannel(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedOperation(ctx, a); err != nil {
 		return err
 	}
@@ -121,6 +124,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 		return err
 	}
 	if err := SeedServerMetric(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedStatusPage(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedTeam(ctx, a); err != nil {

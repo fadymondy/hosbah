@@ -29,9 +29,11 @@ ORDER BY (id = sqlc.arg('ref')::text) DESC LIMIT 1;
 SELECT count(*) FROM monitors WHERE app_id = sqlc.arg('app_id') AND team_id = sqlc.arg('team_id');
 
 -- name: InsertMonitor :one
-INSERT INTO monitors (team_id, app_id, name, kind, target, expected_status, threshold, window_minutes, interval_seconds, enabled, notify_emails, notify_webhook)
+INSERT INTO monitors (team_id, app_id, name, kind, target, expected_status, threshold, window_minutes, interval_seconds, enabled, notify_emails,
+    notify_webhook, notify_channel_ids, heartbeat_interval_seconds, heartbeat_grace_seconds, ping_token_hash)
 VALUES (sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('name'), sqlc.arg('kind'), sqlc.arg('target'), sqlc.arg('expected_status'), sqlc.arg('threshold'),
-    sqlc.arg('window_minutes'), sqlc.arg('interval_seconds'), sqlc.arg('enabled'), sqlc.arg('notify_emails'), sqlc.arg('notify_webhook'))
+    sqlc.arg('window_minutes'), sqlc.arg('interval_seconds'), sqlc.arg('enabled'), sqlc.arg('notify_emails'), sqlc.arg('notify_webhook'),
+    sqlc.arg('notify_channel_ids'), sqlc.arg('heartbeat_interval_seconds'), sqlc.arg('heartbeat_grace_seconds'), sqlc.narg('ping_token_hash'))
 RETURNING *;
 
 -- name: UpdateMonitorInTeam :one
@@ -39,7 +41,8 @@ RETURNING *;
 -- changed, or the monitor was switched off) what the evaluator learned is forgotten.
 UPDATE monitors SET name = sqlc.arg('name'), target = sqlc.arg('target'), expected_status = sqlc.arg('expected_status'), threshold = sqlc.arg('threshold'),
     window_minutes = sqlc.arg('window_minutes'), interval_seconds = sqlc.arg('interval_seconds'), enabled = sqlc.arg('enabled'),
-    notify_emails = sqlc.arg('notify_emails'), notify_webhook = sqlc.arg('notify_webhook'),
+    notify_emails = sqlc.arg('notify_emails'), notify_webhook = sqlc.arg('notify_webhook'), notify_channel_ids = sqlc.arg('notify_channel_ids'),
+    heartbeat_interval_seconds = sqlc.arg('heartbeat_interval_seconds'), heartbeat_grace_seconds = sqlc.arg('heartbeat_grace_seconds'),
     state = CASE WHEN sqlc.arg('reset')::boolean THEN 'unknown' ELSE state END,
     last_error = CASE WHEN sqlc.arg('reset')::boolean THEN '' ELSE last_error END,
     consecutive_failures = CASE WHEN sqlc.arg('reset')::boolean THEN 0 ELSE consecutive_failures END,
@@ -47,6 +50,47 @@ UPDATE monitors SET name = sqlc.arg('name'), target = sqlc.arg('target'), expect
     updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
 RETURNING *;
+
+-- Hosbah heartbeat queries (MH-575 H3).
+
+-- name: MonitorByPingToken :one
+-- Token scope (Scope{TokenHash: hash}, like AppByDeployHook): the heartbeat monitor this ping
+-- token belongs to, whatever team it is in.
+SELECT * FROM monitors WHERE ping_token_hash = sqlc.arg('ping_token_hash');
+
+-- name: RecordHeartbeatPing :one
+-- Team scope, after tenancy.SetTeam to the monitor's own team: a ping arrived, on time or late —
+-- either way the monitor is healthy again as of now.
+UPDATE monitors SET last_ping_at = sqlc.arg('now')::timestamptz, last_checked_at = sqlc.arg('now')::timestamptz,
+    state = 'ok', last_error = '', consecutive_failures = 0, updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
+RETURNING *;
+
+-- name: ListDueHeartbeats :many
+-- System scope: enabled heartbeat monitors that are not already failing and have gone
+-- heartbeat_interval_seconds + heartbeat_grace_seconds since their last ping (or since they were
+-- created, if never pinged).
+SELECT * FROM monitors
+WHERE kind = 'heartbeat' AND enabled AND state <> 'failing'
+  AND coalesce(last_ping_at, created_at) + make_interval(secs => heartbeat_interval_seconds + heartbeat_grace_seconds) <= sqlc.arg('now')::timestamptz
+ORDER BY id
+LIMIT sqlc.arg('lim');
+
+-- name: MonitorUptimeSince :one
+-- Team scope: the failing seconds of a monitor since `since`, from its incidents (closed ones
+-- clipped to the window; the still-open one, if any, counted up to now). 1 - failing/window = uptime.
+SELECT coalesce(sum(
+    extract(epoch FROM (least(coalesce(resolved_at, sqlc.arg('now')::timestamptz), sqlc.arg('now')::timestamptz)
+      - greatest(opened_at, sqlc.arg('since')::timestamptz)))
+  ), 0)::double precision AS failing_seconds
+FROM monitor_incidents
+WHERE monitor_id = sqlc.arg('monitor_id') AND team_id = sqlc.arg('team_id')
+  AND coalesce(resolved_at, sqlc.arg('now')::timestamptz) > sqlc.arg('since')::timestamptz;
+
+-- name: MonitorsByIDsInTeam :many
+-- Team scope: the monitors a status page chooses to show, validated to exist and belong to this
+-- team before the page is saved (internal/api/status_pages.go).
+SELECT * FROM monitors WHERE team_id = sqlc.arg('team_id') AND id = ANY(string_to_array(sqlc.arg('ids')::text, ','));
 
 -- name: DeleteMonitorInTeam :execrows
 DELETE FROM monitors WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
@@ -59,7 +103,8 @@ DELETE FROM monitors WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
 UPDATE monitors SET last_checked_at = sqlc.arg('now')::timestamptz
 WHERE id IN (
     SELECT m.id FROM monitors m
-    WHERE m.enabled AND (m.last_checked_at IS NULL OR m.last_checked_at + make_interval(secs => m.interval_seconds) <= sqlc.arg('now')::timestamptz)
+    WHERE m.enabled AND m.kind <> 'heartbeat'
+      AND (m.last_checked_at IS NULL OR m.last_checked_at + make_interval(secs => m.interval_seconds) <= sqlc.arg('now')::timestamptz)
     ORDER BY m.last_checked_at NULLS FIRST
     LIMIT sqlc.arg('lim')
     FOR UPDATE SKIP LOCKED)

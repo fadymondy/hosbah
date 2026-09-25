@@ -28,6 +28,7 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/mail"
+	"github.com/fadymondy/hosbah/internal/notifications"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -60,9 +61,21 @@ type Service struct {
 	now       func() time.Time
 	transport http.RoundTripper
 	send      mail.Sender
+	notify    *notifications.Service
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+}
+
+// SetNotifier wires the team notification-channel service (internal/notifications) in: a monitor's
+// notify_channel_ids then also receive its incidents, alongside notify_emails / notify_webhook.
+// nil (the default) just skips channel delivery.
+func (s *Service) SetNotifier(n *notifications.Service) { s.mu.Lock(); s.notify = n; s.mu.Unlock() }
+
+func (s *Service) notifier() *notifications.Service {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.notify
 }
 
 // New builds the service. send nil = mail.FromEnv.
@@ -164,6 +177,7 @@ func (s *Service) Tick(ctx context.Context) (int, error) {
 			break
 		}
 	}
+	s.sweepHeartbeats(ctx)
 	return total, nil
 }
 
@@ -340,7 +354,7 @@ type Event struct {
 	At      time.Time  `json:"at"`
 
 	teamID, incidentID, webhook string
-	emails                      []string
+	emails, channelIDs          []string
 }
 
 // EventApp names the app of an event.
@@ -392,7 +406,7 @@ func (s *Service) apply(ctx context.Context, m db.Monitor, tg target, res result
 			needed = HTTPFailuresToOpen
 		}
 		base := Event{Monitor: MonitorRef{ID: up.ID, Name: up.Name, Kind: up.Kind}, App: EventApp{ID: tg.App.ID, Name: tg.App.Name},
-			Value: res.Value, At: now.UTC(), teamID: m.TeamID, webhook: up.NotifyWebhook, emails: up.NotifyEmails}
+			Value: res.Value, At: now.UTC(), teamID: m.TeamID, webhook: up.NotifyWebhook, emails: up.NotifyEmails, channelIDs: up.NotifyChannelIds}
 		switch {
 		case res.State == StateFailing && hasOpen:
 			return q.TouchMonitorIncident(ctx, db.TouchMonitorIncidentParams{ID: open.ID, TeamID: m.TeamID, LastValue: res.Value})
@@ -466,6 +480,10 @@ func (s *Service) announce(ctx context.Context, ev Event) {
 		if err := postWebhook(ctx, rt, ev); err != nil {
 			s.log.Warn("monitor webhook failed", "monitor", ev.Monitor.ID, "err", clip(err.Error(), 300))
 		}
+	}
+	if notify := s.notifier(); notify != nil && len(ev.channelIDs) > 0 {
+		notify.DeliverToChannels(ctx, ev.teamID, ev.channelIDs, notifications.Alert{Event: "monitor." + ev.Event, Title: ev.title(),
+			Reason: ev.Reason, Link: notifications.AppLink(ev.teamID, ev.App.ID), Subject: "app"})
 	}
 	if ev.Event != "opened" {
 		return
