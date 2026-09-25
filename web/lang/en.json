@@ -1624,6 +1624,26 @@
       "rows": "Rows",
       "statStatementsUnavailableTitle": "Top statements aren't available yet",
       "connectionsByState": "By state: {list}"
+    },
+    "metrics": {
+      "title": "History",
+      "hint": "Sampled about once a minute from the same reading Insights shows live.",
+      "range": "Time range",
+      "ranges": {
+        "1h": "1h",
+        "6h": "6h",
+        "24h": "24h",
+        "7d": "7d",
+        "30d": "30d"
+      },
+      "connections": "Connections",
+      "cacheHit": "Cache hit",
+      "size": "Size",
+      "slowQueries": "Slow queries",
+      "rate": "Transactions/sec",
+      "rateMysql": "Queries/sec",
+      "emptyTitle": "No history yet",
+      "emptyHint": "The chart fills in as readings are sampled, about once a minute."
     }
   },
   "approvals": {

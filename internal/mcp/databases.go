@@ -11,6 +11,7 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
 	"github.com/fadymondy/hosbah/internal/importer"
+	"github.com/fadymondy/hosbah/internal/metrics"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -566,6 +567,41 @@ func DatabaseTools() []Tool {
 				fmt.Fprintf(&b, "%d top statement(s) by total time:\n", len(res.TopStatements))
 				for _, t := range res.TopStatements {
 					fmt.Fprintf(&b, "  calls %-8d total %-10.1fms mean %-8.2fms rows %-8d %s\n", t.Calls, t.TotalTimeMS, t.MeanTimeMS, t.Rows, clipStr(t.Query, 200))
+				}
+				return b.String(), nil
+			},
+		},
+
+		{
+			Name: "db_metrics_history", Scope: scopes.Read,
+			Description: "A Postgres/MySQL data service's KPI history: connections vs max, cache hit ratio, database size, slow-query count and transactions/queries per second, sampled about once a minute.",
+			InputSchema: schema([]string{"database"}, map[string]any{"database": dbArg,
+				"range": map[string]any{"type": "string", "enum": []string{"1h", "6h", "24h", "7d", "30d"}, "default": "1h"}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				r, ok := metrics.Ranges[args.Str("range")]
+				if !ok {
+					r = metrics.Ranges["1h"]
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				series, err := s.MetricsSeries(ctx, env.Q, env.Caller.TeamID, svc.ID, r, time.Now())
+				if err != nil {
+					return "", errors.New("could not read metrics history")
+				}
+				if len(series.Points) == 0 {
+					return fmt.Sprintf("%s has no metrics history in the last %s yet.", svc.Name, r.Key), nil
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%s — last %s (%d point(s)):\n", svc.Name, r.Key, len(series.Points))
+				for _, p := range series.Points {
+					fmt.Fprintf(&b, "  %s  conn %.0f/%d  cache hit %.1f%%  size %s  slow %.0f  rate %.2f/s\n",
+						p.At.Format(time.RFC3339), p.Connections, p.MaxConnections, p.CacheHitRatio, bytesOf(uint64(p.SizeBytes)), p.SlowQueryCount, p.RatePerSec)
 				}
 				return b.String(), nil
 			},

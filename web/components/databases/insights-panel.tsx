@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { InfoIcon, RefreshCwIcon, XIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { DbMetricsHistory } from "@/components/databases/metrics-history"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -22,8 +23,8 @@ console does (its caller only mounts this component when `manage` is true, same 
 Postgres and MySQL/MariaDB only; the backend refuses redis/minio with the same "not supported" shape
 db.query uses, and an imported service with no credentials answers the same way through preflightQuery
 — so this component just renders whatever error apiFetch surfaces for that case, same as DataConsole.
-On-demand only: no history is sampled (MH-575 F6 explicitly allows skipping periodic sampling), so
-there are no charts here — the KPI tiles are the current reading, refreshed on demand or every 15s.
+The KPI tiles below are the current reading, refreshed on demand or every 15s; DbMetricsHistory (its
+own component, sharing H1's server-metrics chart and range picker) draws the sampled history above them.
 */
 
 type SizeInfo = { name: string; size_bytes: number }
@@ -136,6 +137,8 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
       </div>
 
       <ErrorBand message={error} />
+
+      <DbMetricsHistory teamSlug={teamSlug} serviceRef={serviceRef} kind={data.kind} />
 
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-px border-b border-line bg-line sm:grid-cols-3 lg:grid-cols-4">
