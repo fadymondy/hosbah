@@ -11,6 +11,7 @@ import {
   CheckIcon,
   ChevronRightIcon,
   ChevronsUpDownIcon,
+  CogIcon,
   DatabaseIcon,
   DownloadIcon,
   FolderIcon,
@@ -65,6 +66,7 @@ const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads
   sftp: { icon: KeyRoundIcon, group: "sources" },
   terminal: { icon: SquareTerminalIcon, group: "sources" },
   operations: { icon: WorkflowIcon, group: "manage" },
+  services: { icon: CogIcon, group: "manage" },
   settings: { icon: SettingsIcon, group: "manage" },
 }
 const SERVER_GROUPS = ["", "workloads", "sources", "manage"] as const

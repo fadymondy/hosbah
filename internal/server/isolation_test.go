@@ -146,6 +146,10 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/schedules", map[string]any{"name": "nightly-a", "cron": "0 3 * * *",
 		"command": "echo a-env-cron", "enabled": false}, 201, &schedA)
 	runA := seedScheduleRun(t, teamA.ID, schedA.ID, appA.App.ID, "succeeded", "a-env-output")
+	// D4/D5: a script of A's (server scripts / one-click installs), and one run of it with output.
+	var scriptA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/scripts", map[string]any{"name": "deploy-key-a", "body": "echo a-env-script"}, 201, &scriptA)
+	scriptRunA := seedScriptRun(t, teamA.ID, srvA, "ok", "a-env-script-output")
 	// Storage of app A: a volume.
 	var volA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/storage/volumes", map[string]any{"name": "a-env-data", "mount_path": "/data"}, 201, &volA)
@@ -244,7 +248,8 @@ func TestIsolationSweep(t *testing.T) {
 		"channel":     func(string) []string { return []string{chanA.ID} },
 		"status_page": func(string) []string { return []string{pageA.ID, pageA.Slug} },
 		"schedule":    func(string) []string { return []string{schedA.ID, schedA.Name} },
-		"run":         func(string) []string { return []string{runA} },
+		"run":         func(string) []string { return []string{runA, scriptRunA} },
+		"script":      func(string) []string { return []string{scriptA.ID, scriptA.Name} },
 		"volume":      func(string) []string { return []string{volA.ID, volA.Name} },
 		"bucket":      func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
 		"browser":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
@@ -387,6 +392,12 @@ func TestIsolationSweep(t *testing.T) {
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
+		"get_script": {"script": scriptA.ID}, "save_script": {"script": scriptA.ID, "name": "stolen", "body": "echo hi"},
+		"delete_script": {"script": scriptA.ID, "confirm": scriptA.Name},
+		"run_script":    {"script": scriptA.ID, "servers": []string{srvA}, "confirm": "run"},
+		"script_run_status": {"run": scriptRunA},
+		"list_services":     {"server": srvA},
+		"service_action":    {"server": srvA, "unit": "caddy.service", "action": "restart", "confirm": "caddy.service"},
 		"get_app_queues":   {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
 		"app_processes": {"app": appA.App.ID}, "app_process_action": {"app": appA.App.ID, "action": "restart", "process": "web"},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
@@ -431,6 +442,9 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) || strings.Contains(res.Text, "imp-site") {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_scripts", nil); strings.Contains(res.Text, scriptA.Name) {
+		t.Errorf("list_scripts as B leaked team A's script: %s", res.Text)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
 		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)

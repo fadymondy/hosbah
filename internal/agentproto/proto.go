@@ -69,6 +69,11 @@ const (
 	KindDockerCheck   = "docker.check"
 	KindProvisionStep = "provision.step"
 	KindAgentUpdate   = "agent.update"
+	// KindScriptRun (MH-576 D4): runs a script (team-owned or built-in) with bash on the server.
+	KindScriptRun = "script.run"
+	// KindServiceList / KindServiceAction (MH-576 D3): read and control systemd .service units.
+	KindServiceList   = "service.list"
+	KindServiceAction = "service.action"
 )
 
 // AgentKinds is what an agent will execute. Anything else is refused before it runs.
@@ -85,7 +90,8 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus,
 	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename, KindTerminalOpen, KindSFTPUser,
 	KindAppLogsSearch, KindLogDrainSet, KindLogDrainStatus, KindLogDrainTest,
-	KindDBUser, KindDBQuery, KindDBLimits, KindAppLimits, KindDBInsights, KindDBCancelQuery}
+	KindDBUser, KindDBQuery, KindDBLimits, KindAppLimits, KindDBInsights, KindDBCancelQuery,
+	KindScriptRun, KindServiceList, KindServiceAction}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.

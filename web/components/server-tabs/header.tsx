@@ -25,6 +25,7 @@ export const SERVER_TABS = [
   "sftp",
   "terminal",
   "operations",
+  "services",
   "settings",
 ] as const
 export type ServerTab = (typeof SERVER_TABS)[number]

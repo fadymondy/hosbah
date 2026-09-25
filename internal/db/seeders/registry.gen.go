@@ -144,6 +144,15 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedScheduleRun(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedScript(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedScriptRun(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedScriptRunServer(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedServer(ctx, a); err != nil {
 		return err
 	}

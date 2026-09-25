@@ -173,6 +173,10 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		}
 	})
 	e.handlers[agentproto.KindTerminalOpen] = e.terminals.open
+	e.handlers[agentproto.KindScriptRun] = newScriptHost().run
+	sv := newServiceHost()
+	e.handlers[agentproto.KindServiceList] = sv.list
+	e.handlers[agentproto.KindServiceAction] = sv.action
 	return e
 }
 
@@ -291,7 +295,7 @@ func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
 	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
 		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
-		agentproto.KindAppLogsSearch, agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest:
+		agentproto.KindAppLogsSearch, agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest, agentproto.KindServiceList:
 		return "" // read-only: never queued behind a long action
 	case agentproto.KindBrowserCreate, agentproto.KindBrowserRemove:
 		// One lane per browser: its create and remove never interleave, and a first image pull of

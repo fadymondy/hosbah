@@ -2550,6 +2550,133 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: Script
+      table: scripts
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: description
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: body
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: default_args
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: env_names
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: run_as
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: timeout_seconds
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ScriptRun
+      table: script_runs
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: script_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: builtin_name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: params
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ScriptRunServer
+      table: script_run_servers
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: script_run_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: operation_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: exit_code
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: started_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: finished_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+      controller: true
     - name: Server
       table: servers
       fields:

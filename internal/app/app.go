@@ -61,6 +61,9 @@ type App struct {
 	// Apm is the *apm.Service (typed any for the same reason): H7 traces and exceptions for apps,
 	// its retention sweep, and the public OTLP/HTTP JSON ingest routes.
 	Apm any
+	// Scripts is the *scripts.Service (typed any for the same reason): MH-576 D4/D5 the team script
+	// library, the built-in one-click installs, and running either on one or many servers.
+	Scripts any
 }
 
 // New builds the container from the kernel, opening the DB if configured.
