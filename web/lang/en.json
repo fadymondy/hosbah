@@ -2265,6 +2265,7 @@
       "apm": "APM",
       "monitors": "Alerts & monitors",
       "proxy": "Proxy manager",
+      "cache": "Edge cache",
       "dns": "DNS & SSL",
       "backups": "Backups",
       "settings": "Settings & actions"
@@ -2591,6 +2592,39 @@
         "resolved": "Mark resolved",
         "ignored": "Ignore"
       }
+    },
+    "cache": {
+      "title": "Edge cache",
+      "hint": "Cache this app's responses in a Varnish container in front of it, on its own server — off by default.",
+      "enable": "Enable the edge cache",
+      "enableHint": "Applies to the app's server at once.",
+      "ttl": "Cache TTL",
+      "ttlHint": "How long a cached response is served before it is fetched again.",
+      "ttlSeconds": "{seconds}s",
+      "bypassPaths": "Bypass paths",
+      "bypassPathsHint": "Requests to these paths always skip the cache, e.g. /admin or /api.",
+      "bypassPathsPlaceholder": "/admin",
+      "bypassCookies": "Bypass cookies",
+      "bypassCookiesHint": "Requests carrying any of these cookies always skip the cache, e.g. session.",
+      "bypassCookiesPlaceholder": "session",
+      "add": "Add",
+      "remove": "Remove",
+      "status": "Status",
+      "statuses": {
+        "off": "Off",
+        "pending": "Applying…",
+        "running": "Running",
+        "error": "Error"
+      },
+      "stats": "Hits / misses",
+      "statsHint": "Read off the Varnish container opportunistically — not a live counter.",
+      "lastPurged": "Last purged",
+      "never": "Never",
+      "purge": "Purge cache",
+      "purgeHint": "Bans every one of the app's hostnames from the cache right now.",
+      "purged": "Cache purged.",
+      "saved": "Edge cache settings saved.",
+      "disabledHint": "Turn the cache on to set a TTL and bypass rules."
     },
     "monitors": {
       "add": "Add monitor",

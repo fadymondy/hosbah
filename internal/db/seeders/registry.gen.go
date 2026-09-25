@@ -36,6 +36,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAppBucket(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppEdgeCache(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedAppInstall(ctx, a); err != nil {
 		return err
 	}

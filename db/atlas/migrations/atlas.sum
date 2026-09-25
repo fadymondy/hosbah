@@ -1,4 +1,4 @@
-h1:cu2wzX8obBWW8tARsIxfvhpyJfaPwYVvv6y/AiyExLc=
+h1:8jqj/9+OKbmuaX8qBdsLklc1KvcSaWPcQkyH3HIwzpY=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -83,3 +83,5 @@ h1:cu2wzX8obBWW8tARsIxfvhpyJfaPwYVvv6y/AiyExLc=
 20260925130014_add_script_approval_resource_types.sql h1:xihadEV81IY1JllS5KDSxhWC3lTcEdxZMfxrciHG9y4=
 20260925130015_add_script_run_servers_team_write.sql h1:VB0uTCPqZwLorYxHOPytjYABdoUs0sDw7UD3+2cAwps=
 20260925142247_app_deploy_configs_php_settings.sql h1:XByhSSMQ2mmynXelgEDKDL/z37Hk8R/4HYtnmDCV4Sg=
+20260925150000_add_app_edge_caches.sql h1:hGK7Zu7UuT81rHwFxaUdt9oYn4ULjPtHPZXThHmNZkY=
+20260925150010_add_app_edge_caches_row_level_security.sql h1:S3TMOvSf5iSovU5uSGv/YSU+M8jtRQnx68FXlYM1FBs=
