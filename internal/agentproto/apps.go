@@ -107,6 +107,7 @@ type BuildParams struct {
 	Keep             int      `json:"keep"`              // newest images of hosbah/<app> (and cloudy/<app>) to keep (5)
 	Protect          []string `json:"protect,omitempty"` // images never pruned (the live release)
 	RailpackFrontend string   `json:"railpack_frontend"` // BuildKit frontend image, same version as the CLI
+	NoCache          bool     `json:"no_cache,omitempty"` // a requested full rebuild: ignore the layer cache
 }
 
 type BuildResult struct {
@@ -218,6 +219,10 @@ type FastBuildResult struct {
 	// DetectedFiles is the checkout's top-level file names, for the control plane to run
 	// deploy.DetectPreset against and persist as app_deploy_configs.detected_preset.
 	DetectedFiles []string `json:"detected_files,omitempty"`
+	// HosbahToml is the checkout's hosbah.toml (or cloudy.toml, named by TomlFile), so a fast
+	// release keeps its release command and processes. Empty from agents before MH-573's fix.
+	HosbahToml string `json:"hosbah_toml,omitempty"`
+	TomlFile   string `json:"toml_file,omitempty"`
 }
 
 // Validate checks the fields common to every app op (see StartParams.Validate) plus fast_build's own.

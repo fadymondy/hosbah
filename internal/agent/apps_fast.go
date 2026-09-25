@@ -100,8 +100,13 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	}
 	oc.Progress(5, 5)
 
+	// The release command and processes come from the commit being deployed, as on the full track.
+	toml, tomlFile, err := readConfigToml(dir)
+	if err != nil {
+		return nil, 1, err
+	}
 	return agentproto.FastBuildResult{Commit: commit, PrevCommit: prevCommit, Message: msg, Changed: changed,
-		Image: image, ImageID: imageID, DetectedFiles: files}, 0, nil
+		Image: image, ImageID: imageID, DetectedFiles: files, HosbahToml: toml, TomlFile: tomlFile}, 0, nil
 }
 
 // fastBuildDockerfile (MH-573 A7b) is the fast track for an app with a Dockerfile: the exact image

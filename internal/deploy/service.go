@@ -571,7 +571,8 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 	}
 	r.notePreset(ctx, res.DetectedFiles)
 	*built = agentproto.BuildResult{
-		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast"},
+		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast",
+			HosbahToml: res.HosbahToml, TomlFile: res.TomlFile},
 		Image:        res.Image, ImageID: res.ImageID,
 	}
 	return true, nil
@@ -691,6 +692,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
 			GitSource: src,
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
+			NoCache: r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
 		}
@@ -724,8 +726,8 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 	eff := Resolve(cfg, Defaults{Port: int(r.app.Port), HealthPath: r.app.HealthcheckPath, HealthTimeout: int(r.app.HealthcheckTimeout)})
 	if fast && built.Toml() == "" && r.live != nil {
-		// The fast track does not read hosbah.toml, so it keeps the live release's processes and
-		// release command; otherwise a migration step would silently be skipped.
+		// An agent from before the fix does not return hosbah.toml from a fast build, so keep the
+		// live release's processes and release command rather than silently dropping them.
 		var prev Effective
 		if err := json.Unmarshal([]byte(r.live.Config), &prev); err == nil && prev.Port != 0 {
 			eff = prev

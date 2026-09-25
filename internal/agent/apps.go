@@ -167,24 +167,36 @@ func gitOut(oc *OpContext, dir string, args ...string) (string, error) {
 
 // ---- detection -----------------------------------------------------------------------------------
 
-// detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
-// the build plan and says what it found). hosbah.toml — or, when a repository has none, the
-// pre-rename cloudy.toml — is returned raw for the control plane to parse.
-func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
-	var r agentproto.DetectResult
-	r.Files = topLevelFiles(src)
+// readConfigToml reads hosbah.toml, or the pre-rename cloudy.toml, from a checkout. name is empty
+// when the repository has neither.
+func readConfigToml(src string) (toml, name string, err error) {
 	for _, name := range []string{"hosbah.toml", "cloudy.toml"} {
 		b, err := os.ReadFile(filepath.Join(src, name)) //#nosec G304 -- inside our checkout
 		if err != nil {
 			continue
 		}
 		if len(b) > agentproto.MaxHosbahToml {
-			return r, 1, errors.New(name + " is larger than 64 KiB")
+			return "", "", errors.New(name + " is larger than 64 KiB")
 		}
+		return string(b), name, nil
+	}
+	return "", "", nil
+}
+
+// detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
+// the build plan and says what it found). hosbah.toml — or, when a repository has none, the
+// pre-rename cloudy.toml — is returned raw for the control plane to parse.
+func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
+	var r agentproto.DetectResult
+	r.Files = topLevelFiles(src)
+	toml, name, err := readConfigToml(src)
+	if err != nil {
+		return r, 1, err
+	}
+	if name != "" {
 		// Both keys: a control plane from before the rename reads only cloudy_toml.
-		r.HosbahToml, r.LegacyToml, r.TomlFile = string(b), string(b), name
+		r.HosbahToml, r.LegacyToml, r.TomlFile = toml, toml, name
 		oc.Info("found %s", name)
-		break
 	}
 	if st, err := os.Stat(filepath.Join(src, "Dockerfile")); err == nil && st.Mode().IsRegular() {
 		r.Runtime = "dockerfile"
@@ -197,7 +209,6 @@ func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, e
 	r.Runtime = "railpack"
 	plan, info := filepath.Join(workdir, "railpack-plan.json"), filepath.Join(workdir, "railpack-info.json")
 	var code int
-	var err error
 	for attempt := 1; attempt <= 3; attempt++ {
 		code, err = oc.Run(railpackBin, "prepare", src, "--plan-out", plan, "--info-out", info)
 		if code != 75 { // 75 = transient (a download), worth retrying; anything else is final
@@ -313,6 +324,9 @@ func appBuild(oc *OpContext) (any, int, error) {
 	oc.Progress(3, 4)
 	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
 	args := []string{"buildx", "build", "--progress=plain", "--load", "-t", p.Image}
+	if p.NoCache {
+		args = append(args, "--no-cache")
+	}
 	args = append(args, labels...)
 	if d.Runtime == "dockerfile" {
 		args = append(args, "-f", filepath.Join(src, "Dockerfile"), src)
