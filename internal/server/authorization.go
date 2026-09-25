@@ -127,6 +127,13 @@ func isPublic(r *http.Request) bool {
 	if strings.HasPrefix(p, "/api/public/status/") {
 		return true
 	}
+	// The RUM beacon's ingest endpoint (internal/rum, MH-575 H5): POST /api/rum/{key}, authenticated
+	// only by the app's own non-secret ingest key (it travels in every visitor's page source) —
+	// exactly like the heartbeat ping and deploy-hook routes, except those live outside /api/ and
+	// this one does not, so it needs its own allow here.
+	if strings.HasPrefix(p, "/api/rum/") {
+		return true
+	}
 	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
 	// a single-use state bound to this browser) and the callback (accepts only that state). The
 	// start with ?link=1 attaches the provider to the signed-in account: member tier.

@@ -2116,6 +2116,7 @@
       "stacks": "Apps & stacks",
       "logs": "Logs",
       "analytics": "Analytics",
+      "web-vitals": "Web Vitals",
       "monitors": "Alerts & monitors",
       "proxy": "Proxy manager",
       "dns": "DNS & SSL",
@@ -2352,6 +2353,46 @@
       "noReferrers": "No referrers recorded yet.",
       "emptyTitle": "No traffic yet",
       "emptyHint": "Analytics appear once requests reach this site through its hostnames."
+    },
+    "rum": {
+      "title": "Real-user monitoring",
+      "hint": "Core Web Vitals reported by this app's own visitors' browsers — no synthetic checks, just what people actually experienced.",
+      "enable": "Enable real-user monitoring",
+      "enableHint": "Adds a tiny beacon script to the snippet below; paste it into the app's pages to start collecting.",
+      "snippet": "Beacon snippet",
+      "once": "Copy it now. The key is shown only once; Hosbah keeps only its hash.",
+      "rotate": "Rotate ingest key",
+      "rotateHint": "The current key stops working immediately; visitors using it are silently dropped, never shown an error.",
+      "snippetHidden": "A key already exists; its snippet was shown once when it was created. Rotate to get a new one.",
+      "snippetHiddenHint": "Rotate to get a new one.",
+      "vitalsTitle": "Core Web Vitals",
+      "vitalsHint": "p75 per metric, rated good / needs improvement / poor against Google's published thresholds.",
+      "range": "Time range",
+      "windows": {
+        "24h": "24h",
+        "7d": "7d",
+        "30d": "30d"
+      },
+      "metrics": {
+        "lcp": "LCP",
+        "cls": "CLS",
+        "inp": "INP",
+        "fcp": "FCP",
+        "ttfb": "TTFB"
+      },
+      "rating": {
+        "good": "Good",
+        "needs-improvement": "Needs improvement",
+        "poor": "Poor",
+        "unknown": "No data"
+      },
+      "samples": "{count} samples",
+      "samplesHeader": "Samples",
+      "paths": "Paths",
+      "path": "Path",
+      "noPaths": "No paths recorded yet.",
+      "emptyTitle": "No visits recorded yet",
+      "emptyHint": "Core Web Vitals appear once the beacon snippet is live on the app's pages and visitors load it."
     },
     "monitors": {
       "add": "Add monitor",

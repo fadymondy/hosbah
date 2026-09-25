@@ -1,4 +1,4 @@
-h1:ANqWKPxQ5f0V5+iM3tuAsQy39XiwQr7BEzTfFPOgJKo=
+h1:HahFNY9Dn4ucV6JvAY4FLrbrlPFRQxKoK8VptlfFTa4=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -71,3 +71,5 @@ h1:ANqWKPxQ5f0V5+iM3tuAsQy39XiwQr7BEzTfFPOgJKo=
 20260925073134_fix_monitors_threshold_check_heartbeat.sql h1:v/l6z6IcM456YWHuoKK0SxV677dNsmJy0bzqaVCqdbQ=
 20260925073821_approval_requests_log_drain_resource_type.sql h1:yU6QHk2PwP4Qpn6IlMdjC7C1MAWB0NbATtsk7H8Caa8=
 20260925090000_approval_requests_team_and_log_drain.sql h1:IussTC/Ad5cQMtcSxHMgrNZR7eTF8T10K1h7PM6Ow7Q=
+20260925092650_add_rum.sql h1:WDKA1rg0iVs/Q3qgWtz0AzEZl29th2enCLHn+OAt9rs=
+20260925092659_add_rum_row_level_security.sql h1:LdNJFYEULyGitG6DVYuAembphi5RgcY9N4wcn0F4CRI=

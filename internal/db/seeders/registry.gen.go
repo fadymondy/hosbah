@@ -30,6 +30,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAppRealtime(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppRumSetting(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedAppTrafficMinute(ctx, a); err != nil {
 		return err
 	}
@@ -115,6 +118,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 		return err
 	}
 	if err := SeedReportComment(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedRumSample(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedSchedule(ctx, a); err != nil {

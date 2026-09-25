@@ -55,6 +55,9 @@ type App struct {
 	// Notifications is the *notifications.Service (typed any for the same reason): a team's alert
 	// channels (email, Slack, Discord, webhook) and status pages.
 	Notifications any
+	// RUM is the *rum.Service (typed any for the same reason): H5 real-user monitoring (Core Web
+	// Vitals) for apps, its retention sweep, and the public beacon/ingest routes.
+	RUM any
 }
 
 // New builds the container from the kernel, opening the DB if configured.
