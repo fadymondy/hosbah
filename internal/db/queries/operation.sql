@@ -83,3 +83,9 @@ UPDATE operations SET status = 'timeout', finished_at = now(), updated_at = now(
 WHERE (status IN ('sent', 'running') AND coalesce(started_at, sent_at, created_at) + timeout_seconds * interval '1 second' < now())
    OR (status = 'pending' AND expires_at < now())
 RETURNING id, team_id, server_id, error;
+
+-- name: PruneFinishedOperationsOfKind :execrows
+-- Drops a team's finished operations of one kind older than the cutoff (the DB metrics sampler's
+-- db.insights reads, MH-575 F6); their logs go with them (ON DELETE CASCADE).
+DELETE FROM operations
+WHERE team_id = $1 AND kind = $2 AND status IN ('ok', 'failed', 'timeout') AND finished_at < $3;

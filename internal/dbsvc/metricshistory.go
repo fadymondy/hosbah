@@ -14,16 +14,18 @@ import (
 )
 
 // DB metrics history (MH-575 F6): every running Postgres/MySQL service's KPIs, sampled roughly once a
-// minute the same way F6's on-demand Insights panel reads them — db.insights over the existing agent
-// op queue, nothing new opened. One row per service per minute; retention mirrors internal/metrics
-// (server_metrics): minute rows for 24h, then folded into 15-minute rows for 30 days.
+// minutes the same way F6's on-demand Insights panel reads them — db.insights over the existing agent
+// op queue, nothing new opened. One row per service per sample; retention mirrors internal/metrics
+// (server_metrics): raw rows for 24h, then folded into 15-minute rows for 30 days.
 
 const (
 	// MetricsSampleEvery is how often the sampler wakes.
-	MetricsSampleEvery = time.Minute
+	MetricsSampleEvery = 5 * time.Minute
 	// MetricsRetentionEvery mirrors internal/ops.MetricsRetentionEvery so both history tables are
 	// compacted/pruned on the same cadence.
 	MetricsRetentionEvery = 5 * time.Minute
+	// MetricsOperationRetention is how long a finished sampling operation (db.insights) is kept.
+	MetricsOperationRetention = 24 * time.Hour
 	// MetricsMinuteRetention is how long minute rows are kept before folding into 15-minute rows.
 	MetricsMinuteRetention = 24 * time.Hour
 	// MetricsRetention is how long anything is kept.
@@ -85,8 +87,19 @@ func (s *Service) sampleAll(ctx context.Context) {
 	if err != nil || len(services) == 0 {
 		return
 	}
+	teams := map[string]bool{}
 	for _, svc := range services {
 		s.sampleOne(ctx, svc)
+		teams[svc.TeamID] = true
+	}
+	// Each sample is a db.insights operation; keep the queue table from growing by a row per
+	// service every tick by dropping finished ones after a day.
+	cutoff := time.Now().Add(-MetricsOperationRetention)
+	for teamID := range teams {
+		_ = s.sys(ctx, teamID, func(q *db.Queries) error {
+			_, err := q.PruneFinishedOperationsOfKind(ctx, db.PruneFinishedOperationsOfKindParams{TeamID: teamID, Kind: agentproto.KindDBInsights, FinishedAt: &cutoff})
+			return err
+		})
 	}
 }
 

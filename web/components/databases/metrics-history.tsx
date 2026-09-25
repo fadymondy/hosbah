@@ -12,8 +12,8 @@ import { humanBytes } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 
 /*
-DB metrics history charts (MH-575 F6): the same KPIs the Insights panel shows live, sampled roughly
-once a minute (internal/dbsvc's sampler, over the existing db.insights agent op) and bucketed
+DB metrics history charts (MH-575 F6): the same KPIs the Insights panel shows live, sampled every
+five minutes (internal/dbsvc's sampler, over the existing db.insights agent op) and bucketed
 server-side like a server's own metrics chart (internal/api home.go get-server-metrics / H1's
 ServerMetrics component). Reuses the exact same MetricChart component and range-picker shape so a
 data service's history looks like a server's.
