@@ -146,6 +146,23 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps/"+appA.App.ID+"/schedules", map[string]any{"name": "nightly-a", "cron": "0 3 * * *",
 		"command": "echo a-env-cron", "enabled": false}, 201, &schedA)
 	runA := seedScheduleRun(t, teamA.ID, schedA.ID, appA.App.ID, "succeeded", "a-env-output")
+	// D7: a SaaS product of A's, an instance of it, and a product key, so the swept {product},
+	// {instance}, {key} and {upgrade} routes have something to leak.
+	var prodA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/products", map[string]any{"name": "alpha-product-" + suffix[len(suffix)-6:],
+		"repo_url": "https://github.com/example/app", "branch": "main"}, 201, &prodA)
+	var instA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/products/"+prodA.ID+"/instances", map[string]any{"server": srvA,
+		"customer_ref": "cust-a-" + suffix, "name": "cust-a"}, 201, &instA)
+	var keyOut struct {
+		Key   struct{ ID string } `json:"key"`
+		Token string              `json:"token"`
+	}
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/products/"+prodA.ID+"/keys", map[string]any{"name": "billing-a"}, 201, &keyOut)
+	keyA := keyOut.Key
+	var upgradeA struct{ ID string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/products/"+prodA.ID+"/upgrades", map[string]any{}, 202, &upgradeA)
+
 	// D4/D5: a script of A's (server scripts / one-click installs), and one run of it with output.
 	var scriptA struct{ ID, Name string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/scripts", map[string]any{"name": "deploy-key-a", "body": "echo a-env-script"}, 201, &scriptA)
@@ -264,6 +281,10 @@ func TestIsolationSweep(t *testing.T) {
 		"proxy":       func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"sftp_user":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
 		"drain":       func(string) []string { return []string{drainA.ID, drainA.Name} },
+		"product":     func(string) []string { return []string{prodA.ID, prodA.Name} },
+		"instance":    func(string) []string { return []string{instA.ID, instA.Name} },
+		"key":         func(string) []string { return []string{keyA.ID} },
+		"upgrade":     func(string) []string { return []string{upgradeA.ID} },
 		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
 		"service": func(string) []string {
@@ -306,8 +327,17 @@ func TestIsolationSweep(t *testing.T) {
 			body := sampleBody(oapi, op.Op)
 			status, text := ub.do(op.Method, path, body)
 			want := http.StatusNotFound
-			if strings.HasPrefix(op.Path, "/api/admin/") {
+			switch {
+			case strings.HasPrefix(op.Path, "/api/admin/"):
 				want = http.StatusForbidden // platform administration, not a team route
+			case strings.HasPrefix(op.Path, "/api/products/"):
+				// The product-key public API (internal/api/product_keys_public.go) is not a
+				// /api/teams/{team}/... route at all: it is authenticated by a bearer hbk_… key,
+				// never a browser session, so team B's session cookie carries no Authorization
+				// header and is refused before any product/instance lookup happens. Its own
+				// cross-tenant isolation (a key cannot touch another product's instance) is
+				// checked below, with an actual key.
+				want = http.StatusUnauthorized
 			}
 			if status != want {
 				t.Errorf("as team B: %s %s -> %d (want %d): %s", op.Method, path, status, want, text)
@@ -319,6 +349,37 @@ func TestIsolationSweep(t *testing.T) {
 		t.Fatalf("the sweep only made %d calls — did the OpenAPI document shrink?", checked)
 	}
 	t.Logf("REST sweep: %d cross-team calls, all refused", checked)
+
+	// ---- product-key cross-tenant check -----------------------------------------------------
+	// The product-key public API (internal/api/product_keys_public.go) is not addressed by
+	// {team} at all — it is scoped entirely by which product the bearer key was minted for — so
+	// its isolation cannot be exercised by the generic sweep above (which only ever sends team
+	// B's session cookie, and gets 401 before any product/instance lookup runs). Mint a real key
+	// for a product of B's own, then use it against an instance of A's: still not found.
+	var prodB struct{ ID, Name string }
+	ub.mustJSON("POST", "/api/teams/"+teamB.ID+"/products", map[string]any{"name": "bravo-product-" + suffix[len(suffix)-6:],
+		"repo_url": "https://github.com/example/app", "branch": "main"}, 201, &prodB)
+	var keyB struct {
+		Token string `json:"token"`
+	}
+	ub.mustJSON("POST", "/api/teams/"+teamB.ID+"/products/"+prodB.ID+"/keys", map[string]any{"name": "billing-b"}, 201, &keyB)
+	for _, call := range []struct{ method, path, body string }{
+		{"POST", "/api/products/instances/" + instA.ID + "/suspend", "{}"},
+		{"POST", "/api/products/instances/" + instA.ID + "/resume", "{}"},
+		{"DELETE", "/api/products/instances/" + instA.ID, `{"confirm":"` + instA.Name + `"}`},
+	} {
+		req, _ := http.NewRequest(call.method, ts.URL+call.path, strings.NewReader(call.body))
+		req.Header.Set("Authorization", "Bearer "+keyB.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("product key of B's own product on A's instance %s %s -> %d (want 404)", call.method, call.path, resp.StatusCode)
+		}
+	}
 
 	// ---- routes without path parameters ----------------------------------------------------
 	// /api/me lists only B's own team.
@@ -434,6 +495,12 @@ func TestIsolationSweep(t *testing.T) {
 		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
 		"app_cache_settings": {"app": appA.App.ID, "enabled": true}, "app_cache_purge": {"app": appA.App.ID},
 		"server_usage": {"server": srvA}, "set_server_cost": {"server": srvA, "amount": 5}, "cost_line_items": {"action": "update", "id": "imp-site", "name": "stolen"},
+		// MH-576 D7: SaaS products, instances, upgrades and keys of A's.
+		"product_instances": {"product": prodA.ID}, "provision_instance": {"product": prodA.ID, "server": srvA, "customer_ref": "stolen"},
+		"suspend_instance": {"product": prodA.ID, "instance": instA.ID}, "resume_instance": {"product": prodA.ID, "instance": instA.ID},
+		"upgrade_product":   {"product": prodA.ID},
+		"mint_product_key":  {"product": prodA.ID, "name": "stolen"},
+		"destroy_instance":  {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -461,6 +528,8 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_site_templates", nil); strings.Contains(res.Text, templateA.Name) {
 		t.Errorf("list_site_templates as B leaked team A's template: %s", res.Text)
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_products", nil); strings.Contains(res.Text, prodA.Name) || strings.Contains(res.Text, prodA.ID) {
+		t.Errorf("list_products as B leaked team A's product: %s", res.Text)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_databases", nil); strings.Contains(res.Text, "imp-pg") {
 		t.Errorf("list_databases as B leaked team A's imported database: %s", res.Text)

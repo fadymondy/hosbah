@@ -140,6 +140,14 @@ func isPublic(r *http.Request) bool {
 	if strings.HasPrefix(p, "/api/otlp/") {
 		return true
 	}
+	// The SaaS product-key instance-provisioning API (internal/api/product_keys_public.go,
+	// MH-576 D7): POST/DELETE /api/products/instances[...], authenticated by the product's own
+	// secret hbk_ key (Authorization: Bearer), rate-limited per key (saasify.KeyRateLimiter) and
+	// scoped, inside the handler, to exactly that key's team and product — never a browser
+	// session, so it is public here the same way RUM and OTLP ingest are.
+	if strings.HasPrefix(p, "/api/products/") {
+		return true
+	}
 	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
 	// a single-use state bound to this browser) and the callback (accepts only that state). The
 	// start with ?link=1 attaches the provider to the signed-in account: member tier.

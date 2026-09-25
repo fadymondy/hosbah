@@ -37,9 +37,11 @@ ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check
 -- 'script', 'script_run', 'service' (added MH-576 D4/D5): deleting a script, running one, and a
 -- systemd service action are all destructive MCP tools that may need approval.
 -- 'site_template' (added MH-576 B11): deleting a team site template.
+-- 'product', 'product_instance' (added MH-576 D7): deleting a SaaS product and destroying one of
+-- its instances.
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_resource_type_check
   CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member', 'team', 'log_drain',
-    'script', 'script_run', 'service', 'site_template'));
+    'script', 'script_run', 'service', 'site_template', 'product', 'product_instance'));
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_decided_check
   CHECK ((status IN ('pending', 'expired')) = (decided_by IS NULL));
 CREATE UNIQUE INDEX approval_requests_id_team_key ON approval_requests (id, team_id);

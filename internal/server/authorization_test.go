@@ -36,6 +36,11 @@ func TestEveryAPIRouteHasTheIntendedTier(t *testing.T) {
 			want = "admin"
 		case op.Path == "/api/settings/public":
 			want = "public" // the one public Huma route: sign-up mode and announcement
+		case strings.HasPrefix(op.Path, "/api/products/"):
+			// MH-576 D7: the product-key public instance API is authenticated by its own
+			// bearer hbk_… key inside the handler (internal/api/product_keys_public.go),
+			// never a browser session, so the route tier itself must be public.
+			want = "public"
 		}
 		if got != want {
 			t.Errorf("%s %s is in tier %s, want %s", op.Method, op.Path, got, want)

@@ -20,6 +20,7 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   MessageSquareWarningIcon,
+  PackageIcon,
   PlusIcon,
   ScrollTextIcon,
   ServerIcon,
@@ -257,6 +258,8 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
             {t("nav.templates")}
+          <L href={`${base}/products`} icon={<PackageIcon />}>
+            {t("nav.products")}
           </L>
           <L href={`${base}/members`} icon={<UsersIcon />}>
             {t("nav.members")}

@@ -70,7 +70,7 @@ to find out, so it is a build-time failure instead.
 func TestDestructiveToolsNameAKnownResourceType(t *testing.T) {
 	// Mirrors approval_requests_resource_type_check in internal/db/schema/approval_request.sql.
 	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user", "team", "log_drain",
-		"script", "script_run", "service", "site_template"}
+		"script", "script_run", "service", "site_template", "product", "product_instance"}
 	for _, srv := range []*Server{UserServer(), AdminServer()} {
 		for _, tool := range srv.Tools {
 			if !tool.Destructive {
@@ -106,6 +106,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"delete_script": true, "run_script": true, "service_action": true,
 		// MH-576 B11: deleting a team site template.
 		"delete_site_template": true,
+		// MH-576 D7: destroying a SaaS product's customer instance.
+		"destroy_instance": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

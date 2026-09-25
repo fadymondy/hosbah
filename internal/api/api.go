@@ -28,6 +28,7 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/platform"
+	"github.com/fadymondy/hosbah/internal/saasify"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -51,6 +52,13 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerImport(api)
 	d.registerOperations(api)
 	d.registerApps(api)
+	if svc != nil && a != nil && a.SQLDB != nil {
+		saasify.WebhookDEK = func(ctx context.Context, teamID string) ([]byte, error) {
+			return svc.TeamDEK(ctx, db.New(a.SQLDB), teamID)
+		}
+	}
+	d.registerProducts(api)
+	d.registerProductKeysPublic(api)
 	d.registerWorkloads(api)
 	d.registerDatabases(api)
 	d.registerResources(api)
