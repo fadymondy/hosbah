@@ -268,6 +268,8 @@ func TestIsolationSweep(t *testing.T) {
 		"item":        func(string) []string { return []string{"imp-site", "imp-pg"} },    // an import item's origin key of A's server
 		"op":          func(string) []string { return []string{opA} },
 		"credential":  func(string) []string { return []string{credA.ID} },
+		"zone":        func(string) []string { return []string{"example.test"} },   // MH-578 E8: a zone of the DNS zone manager
+		"record":      func(string) []string { return []string{"rec-" + suffix} }, // MH-578 E8: a record id of the DNS zone manager
 		"token":       func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
 		"app":         func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
 		"snapshot":    func(string) []string { return []string{"pre-up"} },
@@ -446,6 +448,11 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
 		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
 		"remove_proxy_host": {"proxy": proxyA.ID},
+		// MH-578 E8: the DNS zone manager, against team A's (proxmox, not even Cloudflare) credential —
+		// B has none of its own either way, so every call must be not found.
+		"dns_records_list": {"credential": credA.ID, "zone": "example.test"},
+		"dns_record_upsert": {"credential": credA.ID, "zone": "example.test", "type": "TXT", "name": "stolen", "content": "stolen"},
+		"dns_record_delete": {"credential": credA.ID, "zone": "example.test", "record": "rec-" + suffix, "confirm": true},
 		"list_sites":        {"server": srvA},
 		"enable_tunnel":     {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
 		"update_app": {"app": appA.App.ID, "branch": "x", "title": "stolen", "color": "#000000"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
@@ -565,6 +572,11 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_proxy_hosts", nil); strings.Contains(res.Text, proxyA.Hostname) {
 		t.Errorf("list_proxy_hosts as B leaked team A's proxy host: %s", res.Text)
+	}
+	// MH-578 E8: B has no Cloudflare credential of its own, so the zone list is empty and never
+	// touches team A's (credA is a proxmox credential of A's, kept out of B's list either way).
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "dns_zones_list", nil); res.IsError || strings.Contains(res.Text, credA.ID) {
+		t.Errorf("dns_zones_list as B leaked team A's credential: %+v", res)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) || strings.Contains(res.Text, "imp-site") {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)

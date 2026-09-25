@@ -20,6 +20,10 @@ INSERT INTO domains (team_id, app_id, hostname, tls, verify_token) VALUES ($1, $
 -- name: ListDomainsOfApp :many
 SELECT * FROM domains WHERE app_id = $1 AND team_id = $2 ORDER BY hostname;
 
+-- name: ListDomainsOfTeam :many
+-- MH-578 E8: every app hostname of the team, for the DNS zone manager's "Hosbah manages this" badge.
+SELECT * FROM domains WHERE team_id = $1 ORDER BY hostname;
+
 -- name: DomainOfApp :one
 -- A domain of the app by id or by hostname.
 SELECT * FROM domains

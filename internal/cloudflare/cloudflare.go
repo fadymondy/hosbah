@@ -201,6 +201,24 @@ func (c *Client) Records(ctx context.Context, zoneID, name, typ string) ([]Recor
 	return rs, err
 }
 
+// AllRecords lists every record of a zone, unfiltered — the DNS zone manager's view of a zone
+// (internal/deploy/dnszones.go), unlike Records which only ever looks up one name at a time.
+func (c *Client) AllRecords(ctx context.Context, zoneID string) ([]Record, error) {
+	var all []Record
+	base := "/zones/" + url.PathEscape(zoneID) + "/dns_records"
+	for page := 1; ; page++ {
+		var rs []Record
+		env, err := c.do(ctx, http.MethodGet, base, url.Values{"per_page": {"100"}, "page": {fmt.Sprint(page)}}, nil, &rs)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rs...)
+		if env.ResultInfo == nil || page >= env.ResultInfo.TotalPages || len(rs) == 0 {
+			return all, nil
+		}
+	}
+}
+
 // Upsert makes the zone hold exactly one record of r.Type at r.Name with r's content: it updates
 // the first existing one, deletes any extra duplicates, or creates it. Calling it again is a no-op.
 func (c *Client) Upsert(ctx context.Context, zoneID string, r Record) (Record, error) {
@@ -282,9 +300,11 @@ func (c *Client) CreateRecord(ctx context.Context, zoneID string, r Record) (Rec
 
 // RecordPatch is a partial update: nil fields are left as they are.
 type RecordPatch struct {
-	Content *string `json:"content,omitempty"`
-	Proxied *bool   `json:"proxied,omitempty"`
-	Comment *string `json:"comment,omitempty"`
+	Content  *string `json:"content,omitempty"`
+	TTL      *int    `json:"ttl,omitempty"`
+	Priority *int    `json:"priority,omitempty"` // MX (and SRV) only
+	Proxied  *bool   `json:"proxied,omitempty"`
+	Comment  *string `json:"comment,omitempty"`
 }
 
 // PatchRecord updates only the given fields of one record.

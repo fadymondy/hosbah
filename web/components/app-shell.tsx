@@ -10,6 +10,7 @@ import {
   ChevronsUpDownIcon,
   CircleDollarSignIcon,
   FingerprintIcon,
+  GlobeIcon,
   KeyRoundIcon,
   LayoutGridIcon,
   LayoutTemplateIcon,
@@ -292,6 +293,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           </L>
           <L href={`${base}/certificates`} icon={<BadgeCheckIcon />}>
             {t("nav.certificates")}
+          </L>
+          <L href={`${base}/dns`} icon={<GlobeIcon />}>
+            {t("nav.dns")}
           </L>
           {/* Credentials are owner/admin only (the API answers 403 to anyone else). */}
           {teamCtx?.manage ? (
