@@ -567,7 +567,13 @@ func RevokeKey(ctx context.Context, q *db.Queries, teamID, actorID string, k db.
 // error if it does not exist, is revoked, or its product/team no longer exists. This is the only
 // entry point the public product-key REST endpoint uses; every instance action after it is scoped
 // to exactly this key's product_id AND team_id (see internal/api/product_keys_public.go).
-func ResolveKey(ctx context.Context, q *db.Queries, plainToken string) (db.ProductKey, db.Product, error) {
+// ResolveKey looks up a bearer product key and its product. The caller must open the transaction
+// with tenancy.Scope{TokenHash: tokens.Hash(plainToken)} (never a team scope — the caller doesn't
+// know the team yet), so the initial lookup is visible under product_keys' token-hash RLS policy.
+// Once the key row is found, ResolveKey switches the transaction to that key's team (tenancy.SetTeam)
+// before reading the product, so every read after this call — including the caller's own — runs in
+// the normal, already-team-scoped RLS policies.
+func ResolveKey(ctx context.Context, q *db.Queries, tx *sql.Tx, plainToken string) (db.ProductKey, db.Product, error) {
 	if !tokens.HasPrefix(plainToken, tokens.Product) {
 		return db.ProductKey{}, db.Product{}, notFound("key")
 	}
@@ -578,6 +584,9 @@ func ResolveKey(ctx context.Context, q *db.Queries, plainToken string) (db.Produ
 	}
 	if k.RevokedAt != nil {
 		return db.ProductKey{}, db.Product{}, &ActionError{Status: 401, Msg: "this key has been revoked"}
+	}
+	if err := tenancy.SetTeam(ctx, tx, k.TeamID); err != nil {
+		return db.ProductKey{}, db.Product{}, err
 	}
 	p, err := q.ProductByID(ctx, k.ProductID)
 	if err != nil || p.TeamID != k.TeamID {

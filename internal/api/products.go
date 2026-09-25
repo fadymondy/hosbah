@@ -52,6 +52,8 @@ func productErr(err error, fallback string) error {
 	}
 	if se, ok := err.(*saasify.ActionError); ok {
 		switch se.Status {
+		case http.StatusUnauthorized:
+			return huma.Error401Unauthorized(se.Msg)
 		case http.StatusNotFound:
 			return huma.Error404NotFound(se.Msg)
 		case http.StatusConflict:

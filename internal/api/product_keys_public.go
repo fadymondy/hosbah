@@ -22,6 +22,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/resources"
 	"github.com/fadymondy/hosbah/internal/saasify"
 	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
 func bearerToken(auth string) string {
@@ -33,8 +34,12 @@ func bearerToken(auth string) string {
 }
 
 // keyAuth resolves the bearer product key, rate-limits it, and runs fn in a transaction scoped
-// to exactly that key's team (never System — a product key never reaches another team's row,
-// but it also never needs the extra system policies).
+// to exactly that key's team. The team isn't known until the key is looked up, so the transaction
+// opens scoped to the token's hash instead (tenancy.Scope{TokenHash: hash}) — the same pattern as
+// the RUM beacon (internal/rum/public.go) and OTLP ingest (internal/apm/ingest.go) endpoints — and
+// saasify.ResolveKey switches it to the key's team as soon as the key row is found. That token-hash
+// scope is backed by the product_keys_token_select RLS policy (never System — a product key never
+// reaches another team's row, but it also never needs the extra system policies).
 func (d *deps) keyAuth(ctx context.Context, authHeader string, fn func(q *db.Queries, k db.ProductKey, p db.Product) error) error {
 	tok := bearerToken(authHeader)
 	if tok == "" {
@@ -43,13 +48,11 @@ func (d *deps) keyAuth(ctx context.Context, authHeader string, fn func(q *db.Que
 	if !saasify.KeyRateLimiter.Allow(saasify.HashForRateLimit(tok)) {
 		return huma.Error429TooManyRequests("too many requests")
 	}
-	return tenancy.Tx(ctx, d.a.SQLDB, tenancy.Scope{TeamID: ""}, func(q *db.Queries, tx *sql.Tx) error {
-		k, p, err := saasify.ResolveKey(ctx, q, tok)
+	hash := tokens.Hash(tok)
+	return tenancy.Tx(ctx, d.a.SQLDB, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
+		k, p, err := saasify.ResolveKey(ctx, q, tx, tok)
 		if err != nil {
 			return productErr(err, "invalid key")
-		}
-		if err := tenancy.SetTeam(ctx, tx, p.TeamID); err != nil {
-			return err
 		}
 		_ = q.TouchProductKey(ctx, k.ID)
 		return fn(q, k, p)
