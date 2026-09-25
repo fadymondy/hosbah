@@ -11,10 +11,16 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 )
 
-// Link says that one of an app's connection variables points at a data service of its server.
+// Link says that one of an app's connection variables points at a service of its team: either a
+// data service on its own server (ServiceKind "data", found here by comparing host:port for the
+// three variables Attach writes) or any shared service — including ones on other servers, and
+// variables beyond DATABASE_URL/REDIS_URL/S3_URL — found by internal/services.Detect and persisted
+// in app_service_links (ServiceKind "shared" or "data" with Source "auto"/"manual"). Both are
+// merged here, keyed by variable, so the canvas draws one edge per variable at most.
 type Link struct {
-	ServiceID string `json:"service_id"`
-	Variable  string `json:"variable" doc:"DATABASE_URL, REDIS_URL or S3_URL — the variable Attach set."`
+	ServiceID   string `json:"service_id"`
+	Variable    string `json:"variable" doc:"The connection variable that points at the service, e.g. DATABASE_URL, REDIS_URL, or an app-specific name."`
+	ServiceKind string `json:"service_kind,omitempty" enum:"data,shared" doc:"data: a data service on the app's own server. shared: a Proxmox guest classified as shared infra (internal/services)."`
 }
 
 // linkVars are the variables Attach writes, one per engine family (connString).
@@ -65,7 +71,25 @@ func (s *Service) Links(ctx context.Context, q *db.Queries, teamID string, a db.
 			continue
 		}
 		if id, ok := byAddr[u.Host]; ok {
-			out = append(out, Link{ServiceID: id, Variable: name})
+			out = append(out, Link{ServiceID: id, Variable: name, ServiceKind: "data"})
+		}
+	}
+
+	// Merge in what internal/services.Detect found and persisted (any variable name, any server —
+	// notably shared services, which the host:port scan above cannot see since it only looks at
+	// data services of the app's own server).
+	seen := map[string]bool{}
+	for _, l := range out {
+		seen[l.Variable] = true
+	}
+	links, err := q.ListAppServiceLinks(ctx, db.ListAppServiceLinksParams{AppID: a.ID, TeamID: teamID})
+	if err == nil {
+		for _, l := range links {
+			if seen[l.Variable] {
+				continue
+			}
+			out = append(out, Link{ServiceID: l.ServiceID, Variable: l.Variable, ServiceKind: l.ServiceKind})
+			seen[l.Variable] = true
 		}
 	}
 	return out, nil

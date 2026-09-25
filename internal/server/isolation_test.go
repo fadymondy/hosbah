@@ -172,6 +172,12 @@ func TestIsolationSweep(t *testing.T) {
 		t.Fatalf("team A's imported records are missing: %+v %+v", impApps, impDS)
 	}
 
+	// A2/A3: a shared service found on A's server (a Proxmox guest classified as a database), and
+	// an app-to-service link so both the shared-services and service-links routes have something to leak.
+	svcA := seedSharedService(t, teamA.ID, srvA, "pg-shared-"+suffix)
+	linkA := seedAppServiceLink(t, teamA.ID, appA.App.ID, svcA, "DATABASE_URL")
+	_ = linkA
+
 	// P5: a proxy host of A's (Caddy proxy manager) on that server.
 	var proxyA struct{ ID, Hostname string }
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/proxy-hosts", map[string]any{"server": srvA, "hostname": "nas-" + suffix + ".example.test",
@@ -231,7 +237,7 @@ func TestIsolationSweep(t *testing.T) {
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
-		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg"} }, // services B may not see (one of A's imported)
+		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA} }, // services B may not see (one of A's imported, one shared)
 		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
 		// both: an approval authorises destroying something, so being able to tell "exists but
@@ -358,6 +364,7 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_install": {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
 		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},
 		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
+		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -400,6 +407,19 @@ func TestIsolationSweep(t *testing.T) {
 			t.Errorf("MCP %s as team B on team A's imported record should be not found: %+v", name, res)
 		}
 	}
+	// A2 shared-service MCP tools: a shared service of A's is not found or renamed by B.
+	for name, args := range map[string]map[string]any{
+		"shared_service_update": {"service": svcA, "name": "stolen"},
+	} {
+		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
+		if !res.IsError {
+			t.Errorf("MCP %s as team B on team A's shared service should error: %+v", name, res)
+		}
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "shared_services_list", nil); strings.Contains(res.Text, "pg-shared-"+suffix) {
+		t.Errorf("shared_services_list as B leaked team A's shared service: %s", res.Text)
+	}
+
 	// P3 data-service MCP tools: a service ref team B may not see is not found; nothing acts.
 	for name, args := range map[string]map[string]any{
 		"get_database": {"database": "svc-x"}, "list_backups": {"database": "svc-x"}, "backup_now": {"database": "svc-x"},

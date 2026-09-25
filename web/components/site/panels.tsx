@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { ArchiveIcon, CogIcon, DatabaseIcon, LinkIcon, PlusIcon, Trash2Icon, UploadIcon } from "lucide-react"
+import { ArchiveIcon, CogIcon, DatabaseIcon, LinkIcon, PlusIcon, SearchIcon, Trash2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { DomainsPanel } from "@/components/apps/domains"
@@ -189,7 +189,81 @@ export function SiteDatabases() {
           </TableBand>
         </>
       )}
+      <ConnectedServices />
     </section>
+  )
+}
+
+type AppServiceLink = { variable: string; service_kind: "shared" | "data"; service_id: string; source: "auto" | "manual" }
+
+/**
+ * Connected services: what this site's env variables were detected pointing at — shared
+ * infrastructure (internal/services) and data services alike, keyed by variable name (see
+ * internal/dbsvc/links.go). "Detect" re-parses the env now instead of waiting for the next save.
+ */
+function ConnectedServices() {
+  const { t } = useI18n()
+  const { manage } = useTeam()
+  const errorText = useErrorText()
+  const { path } = useLoadedSite()
+  const [links, setLinks] = useState<AppServiceLink[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = () => {
+    apiFetch<{ links: AppServiceLink[] }>(`${path}/service-links`)
+      .then((r) => setLinks(r.links ?? []))
+      .catch(() => setLinks([]))
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(load, [path])
+
+  async function detect() {
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await apiFetch<{ links: AppServiceLink[] }>(`${path}/service-links/detect`, { method: "POST" })
+      setLinks(r.links ?? [])
+      toast.success(t("site.detectedServices", { count: r.links?.length ?? 0 }))
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (links !== null && links.length === 0 && !manage) return null
+
+  return (
+    <div className="border-t border-line px-6 py-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium">{t("site.connectedServices")}</h3>
+          <p className="text-xs text-grid-muted">{t("site.connectedServicesHint")}</p>
+        </div>
+        {manage ? (
+          <Button size="sm" variant="outline" onClick={() => void detect()} disabled={busy}>
+            <SearchIcon />
+            {t("site.detectServices")}
+          </Button>
+        ) : null}
+      </div>
+      <ErrorBand message={error} />
+      {links === null ? null : links.length === 0 ? (
+        <p className="text-sm text-grid-muted">{t("site.connectedServicesEmpty")}</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {links.map((l) => (
+            <li key={l.variable} className="flex items-center gap-2 rounded-md border border-line bg-grid-card px-3 py-1.5 text-xs">
+              <code dir="ltr" className="font-mono text-grid-fg">
+                {l.variable}
+              </code>
+              <Badge variant={l.service_kind === "shared" ? "secondary" : "outline"}>{l.service_kind}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

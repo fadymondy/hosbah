@@ -17,6 +17,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/agentproto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/importer"
+	"github.com/fadymondy/hosbah/internal/services"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -319,6 +320,11 @@ func (s *Service) recordEvent(ctx context.Context, ac *agentConn, ev agentproto.
 		// A Proxmox node's discovered guests are matched to the team's other servers.
 		if _, ierr := importer.AutoLinkFacts(ctx, s.a.SQLDB, ac.teamID, ac.serverID, importFacts); ierr != nil {
 			s.log.Warn("guests not auto-linked", "server", ac.serverID, "err", ierr)
+		}
+		// A Proxmox node's discovered guests are classified as shared services (Postgres, Redis,
+		// MinIO, SearXNG…) and kept in the team's directory.
+		if _, ierr := services.ScanFactsTx(ctx, s.a.SQLDB, ac.teamID, ac.serverID, importFacts); ierr != nil {
+			s.log.Warn("shared services not scanned", "server", ac.serverID, "err", ierr)
 		}
 	}
 	if requeued {

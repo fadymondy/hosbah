@@ -246,6 +246,9 @@ function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
           <L href={base} exact icon={<LayoutGridIcon />}>
             {t("nav.overview")}
           </L>
+          <L href={`${base}/shared-services`} icon={<WorkflowIcon />}>
+            {t("nav.sharedServices")}
+          </L>
           <L href={`${base}/members`} icon={<UsersIcon />}>
             {t("nav.members")}
           </L>
