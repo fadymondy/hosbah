@@ -5,6 +5,7 @@ import { PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
+import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
@@ -47,9 +48,250 @@ const EMPTY_RULE: RuleForm = { action: "allow", proto: "tcp", port_start: "", po
 export function ServerSecurity({ team, serverId }: { team: string; serverId: string }) {
   return (
     <>
+      <AccessSection team={team} serverId={serverId} />
       <FirewallSection team={team} serverId={serverId} />
       <Fail2banSection team={team} serverId={serverId} />
     </>
+  )
+}
+
+type DeployKey = { public_key?: string; fingerprint?: string; created_at?: string }
+
+/** MH-578 C9/C11: resetting the server's root password (chpasswd, sealed end to end, shown once)
+ * and its outbound git deploy key (generated on the server; add it to a GitHub repo through the
+ * team's App installation, or copy the public half by hand). Owner/admin only on the server. */
+function AccessSection({ team, serverId }: { team: string; serverId: string }) {
+  const { t } = useI18n()
+  const { manage } = useTeam()
+  const errorText = useErrorText()
+  const base = `/api/teams/${team}/servers/${serverId}`
+
+  const [key, setKey] = useState<DeployKey | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [genBusy, setGenBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const k = await apiFetch<DeployKey>(`${base}/deploy-key`)
+      setKey(k)
+      setError(null)
+    } catch (err) {
+      setError(errorText(err))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base])
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base])
+
+  async function generate() {
+    setGenBusy(true)
+    setError(null)
+    try {
+      const k = await apiFetch<DeployKey>(`${base}/deploy-key/generate`, { method: "POST" })
+      setKey(k)
+      toast.success(t("servers.security.access.deployKeyGenerated"))
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setGenBusy(false)
+    }
+  }
+
+  return (
+    <section aria-labelledby="access-h">
+      <SectionTitle id="access-h" title={t("servers.security.access.title")} hint={t("servers.security.access.hint")} />
+      <ErrorBand message={error} />
+      {!manage ? <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.security.readOnly")}</p> : null}
+
+      <div className="border-b border-line px-6 py-4">
+        <h3 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.access.rootPassword")}</h3>
+        <p className="mb-3 text-sm text-grid-muted">{t("servers.security.access.rootPasswordHint")}</p>
+        {manage ? <ResetPasswordDialog base={base} /> : null}
+      </div>
+
+      <div className="px-6 py-4">
+        <h3 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.access.deployKey")}</h3>
+        <p className="mb-3 text-sm text-grid-muted">{t("servers.security.access.deployKeyHint")}</p>
+        {key === null ? (
+          <LoadingRows rows={1} />
+        ) : !key.public_key ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-grid-muted">{t("servers.security.access.deployKeyEmpty")}</p>
+            {manage ? (
+              <Button size="sm" variant="outline" disabled={genBusy} onClick={() => void generate()}>
+                {genBusy ? t("common.working") : t("servers.security.access.deployKeyGenerate")}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <CopyField value={key.public_key} block />
+            <p dir="ltr" className="text-xs text-grid-muted">
+              {key.fingerprint}
+            </p>
+            {manage ? (
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={genBusy} onClick={() => void generate()}>
+                  {genBusy ? t("common.working") : t("servers.security.access.deployKeyRegenerate")}
+                </Button>
+                <AddToGitHubDialog base={base} onAdded={load} />
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** Reset the server's root password. Optionally caller-supplied (min 12 chars), otherwise
+ * generated. The new password is shown exactly once, from this response — never read back. */
+function ResetPasswordDialog({ base }: { base: string }) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [custom, setCustom] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ user: string; password: string } | null>(null)
+
+  function reset() {
+    setCustom("")
+    setError(null)
+    setResult(null)
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (custom && custom.length < 12) {
+      setError(t("servers.security.access.passwordTooShort"))
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await apiFetch<{ user: string; password: string }>(`${base}/root-password/reset`, {
+        method: "POST",
+        body: custom ? { password: custom } : {},
+      })
+      setResult(r)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        reset()
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" variant="destructive" />}>{t("servers.security.access.resetPassword")}</DialogTrigger>
+      <DialogContent>
+        {result ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t("servers.security.access.resetPasswordDone")}</DialogTitle>
+              <DialogDescription>{t("servers.security.access.resetPasswordDoneHint")}</DialogDescription>
+            </DialogHeader>
+            <CopyField value={result.password} />
+            <DialogFooter>
+              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>{t("servers.security.access.resetPasswordTitle")}</DialogTitle>
+              <DialogDescription>{t("servers.security.access.resetPasswordHint")}</DialogDescription>
+            </DialogHeader>
+            <Field>
+              <FieldLabel htmlFor="rp-custom">{t("servers.security.access.customPassword")}</FieldLabel>
+              <Input
+                id="rp-custom"
+                dir="ltr"
+                type="password"
+                minLength={12}
+                placeholder={t("servers.security.access.customPasswordPlaceholder")}
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+              />
+              <FieldDescription>{t("servers.security.access.customPasswordHint")}</FieldDescription>
+            </Field>
+            <FormError message={error} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" variant="destructive" disabled={busy}>
+                {busy ? t("common.working") : t("servers.security.access.resetPasswordConfirm")}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Add the server's deploy key to a GitHub repo through the team's App installation. */
+function AddToGitHubDialog({ base, onAdded }: { base: string; onAdded: () => Promise<void> }) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [repo, setRepo] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await apiFetch(`${base}/deploy-key/github-add`, { method: "POST", body: { repo: repo.trim() } })
+      toast.success(t("servers.security.access.githubAdded", { repo: repo.trim() }))
+      setOpen(false)
+      setRepo("")
+      await onAdded()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>{t("servers.security.access.addToGithub")}</DialogTrigger>
+      <DialogContent>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{t("servers.security.access.addToGithub")}</DialogTitle>
+            <DialogDescription>{t("servers.security.access.addToGithubHint")}</DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor="gh-repo">{t("servers.security.access.repo")}</FieldLabel>
+            <Input id="gh-repo" dir="ltr" required placeholder="owner/name" value={repo} onChange={(e) => setRepo(e.target.value)} />
+          </Field>
+          <FormError message={error} />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={busy || !repo.trim()}>
+              {busy ? t("common.working") : t("servers.security.access.addToGithubConfirm")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -2,6 +2,9 @@
 const nextConfig = {
   // Don't let `next dev` write AGENTS.md / CLAUDE.md into the app.
   agentRules: false,
+  // In a git worktree, web/node_modules is a junction into the main checkout: tell Turbopack the
+  // real project root so it doesn't refuse to follow that symlink out of the worktree.
+  ...(process.env.HOSBAH_TURBOPACK_ROOT ? { turbopack: { root: process.env.HOSBAH_TURBOPACK_ROOT } } : {}),
   // cloudy-app.fadymondy.com is the progress preview: Cloudflare → NPM → SSH reverse tunnel → this dev
   // server. Next 16 dev won't hydrate a page served to an origin that isn't listed here.
   allowedDevOrigins: ["127.0.0.1", "localhost", "cloudy-app.fadymondy.com", "dev.hosbah.com"],

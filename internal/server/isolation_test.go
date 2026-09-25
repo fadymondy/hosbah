@@ -302,11 +302,11 @@ func TestIsolationSweep(t *testing.T) {
 			}
 			return []string{keyA.ID}
 		},
-		"upgrade":     func(string) []string { return []string{upgradeA.ID} },
-		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
-		"owner":       func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
-		"mailbox":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
-		"alias":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
+		"upgrade": func(string) []string { return []string{upgradeA.ID} },
+		"kind":    func(string) []string { return []string{"frp", "tailscale"} },
+		"owner":   func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
+		"mailbox": func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
+		"alias":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -528,9 +528,9 @@ func TestIsolationSweep(t *testing.T) {
 		// MH-576 D7: SaaS products, instances, upgrades and keys of A's.
 		"product_instances": {"product": prodA.ID}, "provision_instance": {"product": prodA.ID, "server": srvA, "customer_ref": "stolen"},
 		"suspend_instance": {"product": prodA.ID, "instance": instA.ID}, "resume_instance": {"product": prodA.ID, "instance": instA.ID},
-		"upgrade_product":   {"product": prodA.ID},
-		"mint_product_key":  {"product": prodA.ID, "name": "stolen"},
-		"destroy_instance":  {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
+		"upgrade_product":  {"product": prodA.ID},
+		"mint_product_key": {"product": prodA.ID, "name": "stolen"},
+		"destroy_instance": {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
 		// MH-578 C8: package updates on A's server.
 		"server_updates_list":     {"server": srvA},
 		"server_updates_run":      {"server": srvA, "confirm": "alpha-" + suffix},
@@ -542,6 +542,11 @@ func TestIsolationSweep(t *testing.T) {
 		// MH-580 J5: image scans of A's app. J7: rotating A's team MCP token.
 		"app_scan": {"app": appA.App.ID}, "app_scan_results": {"app": appA.App.ID},
 		"rotate_mcp_token": {"id": tokA.ID},
+		// MH-578 C9/C11: resetting A's root password, and A's deploy key, from team B.
+		"security_reset_root_password":    {"server": srvA, "confirm": "alpha-" + suffix},
+		"server_deploy_key_get":           {"server": srvA},
+		"server_deploy_key_generate":      {"server": srvA},
+		"server_deploy_key_add_to_github": {"server": srvA, "repo": "octocat/hello-world", "confirm": "alpha-" + suffix},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

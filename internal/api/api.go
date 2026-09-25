@@ -87,6 +87,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerServerUpdates(api)
 	d.registerSSLCertificates(api)
 	d.registerSSHKeys(api)
+	d.registerServerSecurity(api)
 	d.registerSiteTemplates(api)
 	d.registerServices(api)
 	d.registerStorage(api)
