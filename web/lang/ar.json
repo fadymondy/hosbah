@@ -1425,6 +1425,7 @@
     "attachedDone": "تم حقن {variable}. يُطبَّق عند النشر أو إعادة التشغيل التالي.",
     "backupsTitle": "النسخ الاحتياطي",
     "backupNow": "انسخ الآن",
+    "guestBackupsUnsupported": "النسخ الاحتياطي داخل ضيف Proxmox غير مدعوم بعد.",
     "noBackups": "لا توجد نسخ بعد.",
     "backupKind": "النوع",
     "size": "الحجم",

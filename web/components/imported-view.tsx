@@ -150,7 +150,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
  * login added, its databases, users and backups are managed like any Hosbah database (the page
  * then shows the full database tools, see databases/[service]).
  */
-export function ImportedDatabaseView({ service, onChanged }: { service: DataService & { has_credentials?: boolean }; onChanged: () => void }) {
+export function ImportedDatabaseView({ service, onChanged }: { service: DataService; onChanged: () => void }) {
   const { t, locale } = useI18n()
   const { team, manage } = useTeam()
   const router = useRouter()
@@ -186,7 +186,7 @@ export function ImportedDatabaseView({ service, onChanged }: { service: DataServ
           ],
         ]}
       />
-      {manage && !service.has_credentials ? <DatabaseCredentials path={apiPath} onSaved={onChanged} /> : null}
+      {manage && service.credentials_required ? <DatabaseCredentials path={apiPath} onSaved={onChanged} /> : null}
       {manage ? (
         <DangerZone
           name={service.name}

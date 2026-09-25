@@ -30,8 +30,9 @@ func (s *Service) Insights(ctx context.Context, q *db.Queries, teamID string, sv
 		if err != nil {
 			return nil, "", err
 		}
+		target, vmid, guestType, container := execTarget(svc)
 		p := agentproto.DBInsightsParams{
-			ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), TimeoutSeconds: 15, RootSecret: rootBox,
+			ServiceID: svc.ID, Kind: svc.Kind, Target: target, VMID: vmid, GuestType: guestType, Container: container, TimeoutSeconds: 15, RootSecret: rootBox,
 		}
 		if err := p.Validate(); err != nil {
 			return nil, "", invalid(err.Error())
@@ -59,8 +60,9 @@ func (s *Service) CancelQuery(ctx context.Context, q *db.Queries, teamID string,
 		if err != nil {
 			return nil, "", err
 		}
+		target, vmid, guestType, container := execTarget(svc)
 		p := agentproto.DBCancelQueryParams{
-			ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), ID: id, RootSecret: rootBox,
+			ServiceID: svc.ID, Kind: svc.Kind, Target: target, VMID: vmid, GuestType: guestType, Container: container, ID: id, RootSecret: rootBox,
 		}
 		if err := p.Validate(); err != nil {
 			return nil, "", invalid(err.Error())

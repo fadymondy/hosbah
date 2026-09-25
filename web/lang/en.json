@@ -1425,6 +1425,7 @@
     "attachedDone": "Injected {variable}. It applies on the app's next deploy or restart.",
     "backupsTitle": "Backups",
     "backupNow": "Back up now",
+    "guestBackupsUnsupported": "Backups inside a Proxmox guest are not supported yet.",
     "noBackups": "No backups yet.",
     "backupKind": "Kind",
     "size": "Size",

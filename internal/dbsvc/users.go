@@ -79,8 +79,9 @@ func (s *Service) runUserOp(ctx context.Context, q *db.Queries, teamID string, s
 		if err != nil {
 			return nil, "", err
 		}
+		target, vmid, guestType, container := execTarget(svc)
 		p := agentproto.DBUserParams{
-			ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), Action: action,
+			ServiceID: svc.ID, Kind: svc.Kind, Target: target, VMID: vmid, GuestType: guestType, Container: container, Action: action,
 			Database: database, User: userName, Grants: grants, RootSecret: rootBox,
 		}
 		if newPassword != "" {

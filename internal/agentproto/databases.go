@@ -110,6 +110,52 @@ func DBImage(kind, version string) string {
 	return ""
 }
 
+// ---- imported-guest exec target ---------------------------------------------------------------
+//
+// db.create, db.drop, db.user, db.query, db.insights and db.cancel_query all run an engine's own
+// client against a running service. For an imported service that is a Docker container, that is
+// `docker exec <container> …`, exactly as for a Hosbah-managed one. For an imported service that is a
+// Proxmox LXC guest, there is no docker on the hypervisor side to reach into — the agent instead runs
+// `pct exec <vmid> -- …` on the node, against the engine installed natively in the guest (peer auth for
+// Postgres, auth_socket for MySQL/MariaDB — see internal/agent/dbtarget.go), so no stored credential is
+// even needed, let alone one that could travel on the argv. A guest that itself runs the engine in
+// Docker is not supported: pct exec has no flag to carry an environment variable into the nested
+// `docker exec`, so a password given that way would arrive empty — Container must be "" for a guest
+// target. A QEMU guest has no target at all: there is no client to run inside one without its guest
+// agent (a possible future addition), so GuestType only ever accepts "lxc" here — refused with a
+// precise message on both sides of the wire before any operation is even built.
+
+// validDBExecTarget checks the (target, vmid, guest_type, container) tuple these six params share.
+func validDBExecTarget(target, vmid, guestType, container string) error {
+	switch target {
+	case "", TargetContainer:
+		if !ValidContainerName(container) {
+			return fmt.Errorf("bad container %q", container)
+		}
+	case TargetGuest:
+		if !ValidVMID(vmid) {
+			return errors.New("a guest needs a vmid")
+		}
+		if guestType != "lxc" {
+			return errors.New("only a Proxmox LXC guest can run a database client — a QEMU VM has no client without its guest agent, not supported yet")
+		}
+		if container != "" {
+			return errors.New("a database in Docker inside a guest is not supported yet")
+		}
+	default:
+		return errors.New("target is container or guest")
+	}
+	return nil
+}
+
+// rootSecretRequired reports whether Validate must refuse an empty RootSecret. Every target does
+// except a native Proxmox LXC guest (target guest, container "" — validDBExecTarget refuses any other
+// container there): the agent authenticates as the matching OS user instead (Postgres peer auth,
+// MySQL/MariaDB auth_socket), so an imported guest with no stored credential at all still works.
+func rootSecretRequired(target, container string) bool {
+	return !(target == TargetGuest && container == "")
+}
+
 // RepoSpec is where a backup's restic repository lives. Target 'local' is a filesystem repo on the
 // server (the demo default); 'minio'/'s3' is an S3 endpoint. Secret is a box, context
 // DBSecretContext(service, "repo"), carrying RESTIC_PASSWORD and, for minio/s3, AWS_ACCESS_KEY_ID /
@@ -190,6 +236,9 @@ type DBCreateParams struct {
 	ServiceID  string `json:"service_id"`
 	Kind       string `json:"kind"`
 	Container  string `json:"container"`
+	Target     string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID       string `json:"vmid,omitempty"`       // guest
+	GuestType  string `json:"guest_type,omitempty"` // guest: lxc only
 	Database   string `json:"database"`
 	User       string `json:"user"`
 	Grants     string `json:"grants"`
@@ -203,16 +252,20 @@ func (p DBCreateParams) Validate() error {
 		return errors.New("bad service id")
 	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
 		return errors.New("databases (buckets) and users apply to postgres, mysql and minio")
+	case p.Target == TargetGuest && p.Kind == "minio":
+		return errors.New("minio buckets in a Proxmox guest are not supported yet")
 	case !ValidDBName(p.Database):
 		return fmt.Errorf("bad database name %q", p.Database)
 	case !ValidDBName(p.User):
 		return fmt.Errorf("bad user name %q", p.User)
 	case !ValidGrants(p.Grants):
 		return fmt.Errorf("bad grants %q", p.Grants)
-	case p.RootSecret == "" || p.UserSecret == "":
-		return errors.New("db.create needs the root and user secrets")
+	case p.UserSecret == "":
+		return errors.New("db.create needs the user secret")
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
+		return errors.New("db.create needs the root secret")
 	}
-	return nil
+	return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
 }
 
 // DBCreateResult: the database and user created.
@@ -336,6 +389,9 @@ type DBUserParams struct {
 	ServiceID  string `json:"service_id"`
 	Kind       string `json:"kind"`
 	Container  string `json:"container"`
+	Target     string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID       string `json:"vmid,omitempty"`       // guest
+	GuestType  string `json:"guest_type,omitempty"` // guest: lxc only
 	Action     string `json:"action"`
 	Database   string `json:"database,omitempty"`
 	User       string `json:"user"`
@@ -350,13 +406,15 @@ func (p DBUserParams) Validate() error {
 		return errors.New("bad service id")
 	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
 		return errors.New("users apply to postgres, mysql and minio")
+	case p.Target == TargetGuest && p.Kind == "minio":
+		return errors.New("minio buckets in a Proxmox guest are not supported yet")
 	case !ValidDBUserAction(p.Action):
 		return fmt.Errorf("bad action %q", p.Action)
 	case !ValidDBName(p.User):
 		return fmt.Errorf("bad user name %q", p.User)
-	case p.Container == "":
-		return errors.New("bad container")
-	case p.RootSecret == "":
+	case validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container) != nil:
+		return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
 		return errors.New("db.user needs the root secret")
 	}
 	switch p.Action {
@@ -403,6 +461,9 @@ type DBDropParams struct {
 	ServiceID  string   `json:"service_id"`
 	Kind       string   `json:"kind"`
 	Container  string   `json:"container"`
+	Target     string   `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID       string   `json:"vmid,omitempty"`       // guest
+	GuestType  string   `json:"guest_type,omitempty"` // guest: lxc only
 	Database   string   `json:"database"`
 	Users      []string `json:"users,omitempty"`
 	RootSecret string   `json:"root_secret"`
@@ -414,17 +475,19 @@ func (p DBDropParams) Validate() error {
 		return errors.New("bad service id")
 	case p.Kind != "postgres" && p.Kind != "mysql" && p.Kind != "minio":
 		return errors.New("databases apply to postgres, mysql and minio")
+	case p.Target == TargetGuest && p.Kind == "minio":
+		return errors.New("minio buckets in a Proxmox guest are not supported yet")
 	case !ValidDBName(p.Database):
 		return fmt.Errorf("bad database name %q", p.Database)
-	case p.Container == "" || p.RootSecret == "":
-		return errors.New("container and root secret are required")
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
+		return errors.New("root secret is required")
 	}
 	for _, u := range p.Users {
 		if !ValidDBName(u) {
 			return fmt.Errorf("bad user name %q", u)
 		}
 	}
-	return nil
+	return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
 }
 
 // ---- db.query (MH-574 F2: table browser and SQL console) -----------------------------------------
@@ -482,6 +545,9 @@ type DBQueryParams struct {
 	ServiceID      string `json:"service_id"`
 	Kind           string `json:"kind"`
 	Container      string `json:"container"`
+	Target         string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID           string `json:"vmid,omitempty"`       // guest
+	GuestType      string `json:"guest_type,omitempty"` // guest: lxc only
 	Database       string `json:"database"`
 	Mode           string `json:"mode"`
 	Table          string `json:"table,omitempty"`
@@ -503,9 +569,9 @@ func (p DBQueryParams) Validate() error {
 		return fmt.Errorf("bad database name %q", p.Database)
 	case !ValidDBQueryMode(p.Mode):
 		return fmt.Errorf("bad mode %q", p.Mode)
-	case p.Container == "":
-		return errors.New("bad container")
-	case p.RootSecret == "":
+	case validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container) != nil:
+		return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
 		return errors.New("db.query needs the root secret")
 	case p.Limit < 0 || p.Limit > DBQueryMaxLimit:
 		return fmt.Errorf("limit must be between 0 and %d", DBQueryMaxLimit)
@@ -577,6 +643,9 @@ type DBInsightsParams struct {
 	ServiceID      string `json:"service_id"`
 	Kind           string `json:"kind"`
 	Container      string `json:"container"`
+	Target         string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID           string `json:"vmid,omitempty"`       // guest
+	GuestType      string `json:"guest_type,omitempty"` // guest: lxc only
 	Database       string `json:"database,omitempty"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
 	RootSecret     string `json:"root_secret"`
@@ -590,9 +659,9 @@ func (p DBInsightsParams) Validate() error {
 		return errors.New("insights apply to postgres and mysql")
 	case p.Database != "" && !ValidDBName(p.Database):
 		return fmt.Errorf("bad database name %q", p.Database)
-	case p.Container == "":
-		return errors.New("bad container")
-	case p.RootSecret == "":
+	case validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container) != nil:
+		return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
 		return errors.New("db.insights needs the root secret")
 	case p.TimeoutSeconds < 1 || p.TimeoutSeconds > DBInsightsMaxTimeout:
 		return fmt.Errorf("timeout_seconds must be between 1 and %d", DBInsightsMaxTimeout)
@@ -665,6 +734,9 @@ type DBCancelQueryParams struct {
 	ServiceID  string `json:"service_id"`
 	Kind       string `json:"kind"`
 	Container  string `json:"container"`
+	Target     string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID       string `json:"vmid,omitempty"`       // guest
+	GuestType  string `json:"guest_type,omitempty"` // guest: lxc only
 	Database   string `json:"database,omitempty"`
 	ID         int64  `json:"id"`
 	RootSecret string `json:"root_secret"`
@@ -678,9 +750,9 @@ func (p DBCancelQueryParams) Validate() error {
 		return errors.New("cancel query applies to postgres and mysql")
 	case p.Database != "" && !ValidDBName(p.Database):
 		return fmt.Errorf("bad database name %q", p.Database)
-	case p.Container == "":
-		return errors.New("bad container")
-	case p.RootSecret == "":
+	case validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container) != nil:
+		return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
 		return errors.New("db.cancel_query needs the root secret")
 	case p.ID <= 0:
 		return errors.New("a positive process/pid id is required")

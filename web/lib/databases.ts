@@ -14,6 +14,8 @@ export interface DataService extends Imported {
   host: string | null
   port: number | null
   error: string | null
+  has_credentials?: boolean
+  credentials_required?: boolean
   created_at: string
 }
 

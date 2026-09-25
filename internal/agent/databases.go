@@ -286,7 +286,9 @@ func dbCreate(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
@@ -295,7 +297,7 @@ func dbCreate(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, 1, err
 	}
-	if !containerRunning(oc, p.Container) {
+	if !dbTargetRunning(oc, dbTargetOf(p.VMID, p.Container)) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 	switch p.Kind {
@@ -339,12 +341,17 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO "%[2]s";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "%[2]s";`, p.Database, p.User)
 	}
 	oc.Info("creating database %q and role %q (%s)", p.Database, p.User, p.Grants)
-	if out, err := execIn(oc, []string{"PGPASSWORD=" + root["password"]}, sql, p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)...); err != nil {
+	t := dbTargetOf(p.VMID, p.Container)
+	login, env := clientLogin("postgres", t, root, "")
+	argv := clientArgv("postgres", t, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, login...))
+	if out, err := execInTarget(oc, env, sql, t, argv...); err != nil {
 		oc.Info("%s", strings.TrimSpace(out))
 		return nil, 1, errors.New("could not create the database and role")
 	}
 	if inner != "" {
-		if out, err := execIn(oc, []string{"PGPASSWORD=" + root["password"]}, inner+"\n", p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, p.Database)...)...); err != nil {
+		loginDB, envDB := clientLogin("postgres", t, root, p.Database)
+		argvDB := clientArgv("postgres", t, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, loginDB...))
+		if out, err := execInTarget(oc, envDB, inner+"\n", t, argvDB...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return nil, 1, errors.New("could not apply the grants")
 		}
@@ -366,7 +373,10 @@ func dbCreateMySQL(oc *OpContext, p agentproto.DBCreateParams, root map[string]s
 		"GRANT %[4]s ON `%[1]s`.* TO '%[2]s'@'%%';\nFLUSH PRIVILEGES;\n",
 		p.Database, p.User, pgQuoteLiteral(userpw), priv)
 	oc.Info("creating database %q and user %q (%s)", p.Database, p.User, p.Grants)
-	if out, err := execIn(oc, []string{"MYSQL_PWD=" + root["password"]}, sql, p.Container, append([]string{"mysql"}, mysqlLogin(root)...)...); err != nil {
+	t := dbTargetOf(p.VMID, p.Container)
+	login, env := clientLogin("mysql", t, root, "")
+	argv := clientArgv("mysql", t, append([]string{"mysql"}, login...))
+	if out, err := execInTarget(oc, env, sql, t, argv...); err != nil {
 		oc.Info("%s", strings.TrimSpace(out))
 		return nil, 1, errors.New("could not create the database and user")
 	}
@@ -383,7 +393,9 @@ func dbUser(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
@@ -396,7 +408,7 @@ func dbUser(oc *OpContext) (any, int, error) {
 		}
 		userpw = user["password"]
 	}
-	if !containerRunning(oc, p.Container) {
+	if !dbTargetRunning(oc, dbTargetOf(p.VMID, p.Container)) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 	oc.Info("db.user %s %q on %s", p.Action, p.User, p.Container)
@@ -456,9 +468,13 @@ REVOKE ALL PRIVILEGES ON DATABASE "%[1]s" FROM "%[2]s";`, database, user)
 }
 
 func dbUserPostgres(oc *OpContext, p agentproto.DBUserParams, root map[string]string, userpw string) error {
-	login := append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)
-	loginDB := func(database string) []string { return append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, database)...) }
-	env := []string{"PGPASSWORD=" + root["password"]}
+	t := dbTargetOf(p.VMID, p.Container)
+	loginFlags, env := clientLogin("postgres", t, root, "")
+	login := clientArgv("postgres", t, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, loginFlags...))
+	loginDB := func(database string) []string {
+		flags, _ := clientLogin("postgres", t, root, database)
+		return clientArgv("postgres", t, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, flags...))
+	}
 	switch p.Action {
 	case "create":
 		sql := fmt.Sprintf(`\set ON_ERROR_STOP on
@@ -471,7 +487,7 @@ DO $$ BEGIN
 END $$;
 GRANT CONNECT ON DATABASE "%[3]s" TO "%[1]s";
 `, p.User, pgQuoteLiteral(userpw), p.Database) + pgGrantSQL(p.Database, p.User, p.Grants)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not create the user")
 		}
@@ -479,25 +495,25 @@ GRANT CONNECT ON DATABASE "%[3]s" TO "%[1]s";
 		sql := fmt.Sprintf(`\set ON_ERROR_STOP on
 ALTER ROLE "%[1]s" LOGIN PASSWORD %[2]s;
 `, p.User, pgQuoteLiteral(userpw))
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not rotate the user's password")
 		}
 	case "delete":
 		sql := fmt.Sprintf("\\set ON_ERROR_STOP on\nDROP ROLE IF EXISTS \"%s\";\n", p.User)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not delete the user — it may still own objects; revoke its grants first")
 		}
 	case "grant":
 		sql := "\\set ON_ERROR_STOP on\n" + pgGrantSQL(p.Database, p.User, p.Grants)
-		if out, err := execIn(oc, env, sql, p.Container, loginDB(p.Database)...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, loginDB(p.Database)...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not apply the grants")
 		}
 	case "revoke":
 		sql := "\\set ON_ERROR_STOP on\n" + pgRevokeSQL(p.Database, p.User)
-		if out, err := execIn(oc, env, sql, p.Container, loginDB(p.Database)...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, loginDB(p.Database)...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not revoke the grants")
 		}
@@ -518,39 +534,40 @@ func mysqlPrivOf(grants string) string {
 }
 
 func dbUserMySQL(oc *OpContext, p agentproto.DBUserParams, root map[string]string, userpw string) error {
-	env := []string{"MYSQL_PWD=" + root["password"]}
-	login := append([]string{"mysql"}, mysqlLogin(root)...)
+	t := dbTargetOf(p.VMID, p.Container)
+	loginFlags, env := clientLogin("mysql", t, root, "")
+	login := clientArgv("mysql", t, append([]string{"mysql"}, loginFlags...))
 	switch p.Action {
 	case "create":
 		sql := fmt.Sprintf("CREATE USER IF NOT EXISTS '%[1]s'@'%%' IDENTIFIED BY %[2]s;\n"+
 			"ALTER USER '%[1]s'@'%%' IDENTIFIED BY %[2]s;\n"+
 			"GRANT %[3]s ON `%[4]s`.* TO '%[1]s'@'%%';\nFLUSH PRIVILEGES;\n",
 			p.User, pgQuoteLiteral(userpw), mysqlPrivOf(p.Grants), p.Database)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not create the user")
 		}
 	case "rotate":
 		sql := fmt.Sprintf("ALTER USER '%[1]s'@'%%' IDENTIFIED BY %[2]s;\nFLUSH PRIVILEGES;\n", p.User, pgQuoteLiteral(userpw))
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not rotate the user's password")
 		}
 	case "delete":
 		sql := fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';\nFLUSH PRIVILEGES;\n", p.User)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not delete the user")
 		}
 	case "grant":
 		sql := fmt.Sprintf("GRANT %[1]s ON `%[2]s`.* TO '%[3]s'@'%%';\nFLUSH PRIVILEGES;\n", mysqlPrivOf(p.Grants), p.Database, p.User)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not apply the grants")
 		}
 	case "revoke":
 		sql := fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%[1]s`.* FROM '%[2]s'@'%%';\nFLUSH PRIVILEGES;\n", p.Database, p.User)
-		if out, err := execIn(oc, env, sql, p.Container, login...); err != nil {
+		if out, err := execInTarget(oc, env, sql, t, login...); err != nil {
 			oc.Info("%s", strings.TrimSpace(out))
 			return errors.New("could not revoke the grants")
 		}
@@ -1040,12 +1057,15 @@ func dbDrop(oc *OpContext) (any, int, error) {
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
 	}
-	p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	if p.Target != agentproto.TargetGuest {
+		p.Container = resolveName(oc.Ctx, appDocker, kindContainer, p.Container)
+	}
 	root, err := oc.openSecret(p.ServiceID, "root", p.RootSecret)
 	if err != nil {
 		return nil, 1, err
 	}
-	if !containerRunning(oc, p.Container) {
+	t := dbTargetOf(p.VMID, p.Container)
+	if !dbTargetRunning(oc, t) {
 		return nil, 1, errors.New("the data service is not running")
 	}
 	rootpw := root["password"]
@@ -1056,13 +1076,17 @@ func dbDrop(oc *OpContext) (any, int, error) {
 		for _, u := range p.Users {
 			sql += fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";\n", u)
 		}
-		out, err = execIn(oc, []string{"PGPASSWORD=" + rootpw}, sql, p.Container, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, pgLogin(root, "")...)...)
+		login, env := clientLogin("postgres", t, root, "")
+		argv := clientArgv("postgres", t, append([]string{"psql", "-v", "ON_ERROR_STOP=1"}, login...))
+		out, err = execInTarget(oc, env, sql, t, argv...)
 	case "mysql":
 		sql := fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;\n", p.Database)
 		for _, u := range p.Users {
 			sql += fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%';\n", u)
 		}
-		out, err = execIn(oc, []string{"MYSQL_PWD=" + rootpw}, sql, p.Container, append([]string{"mysql"}, mysqlLogin(root)...)...)
+		login, env := clientLogin("mysql", t, root, "")
+		argv := clientArgv("mysql", t, append([]string{"mysql"}, login...))
+		out, err = execInTarget(oc, env, sql, t, argv...)
 	case "minio":
 		env := []string{"MC_HOST_local=http://" + agentproto.MinIORootUser + ":" + rootpw + "@127.0.0.1:9000"}
 		out, err = execIn(oc, env, "", p.Container, "mc", "rb", "--force", "local/"+agentproto.BucketName(p.Database))

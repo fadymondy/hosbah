@@ -115,6 +115,131 @@ func TestDBUserValidate(t *testing.T) {
 	}
 }
 
+// TestDBExecTargetValidate covers validDBExecTarget across every params struct it guards: a
+// container (implicit or explicit target "container"), a native LXC guest, a QEMU guest (refused),
+// and an unknown target string (refused).
+func TestDBExecTargetValidate(t *testing.T) {
+	base := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Action: "delete", User: "app_ro", RootSecret: "r"}
+
+	container := base
+	container.Container = "hosbah-db-pg1"
+	if err := container.Validate(); err != nil {
+		t.Fatalf("a plain container target: %v", err)
+	}
+
+	explicitContainer := base
+	explicitContainer.Target, explicitContainer.Container = TargetContainer, "hosbah-db-pg1"
+	if err := explicitContainer.Validate(); err != nil {
+		t.Fatalf("target=container with a container: %v", err)
+	}
+
+	noContainer := base
+	if noContainer.Validate() == nil {
+		t.Fatal("a container target with no container name must be refused")
+	}
+
+	nativeGuest := base
+	nativeGuest.Target, nativeGuest.VMID, nativeGuest.GuestType = TargetGuest, "102", "lxc"
+	if err := nativeGuest.Validate(); err != nil {
+		t.Fatalf("a native lxc guest target: %v", err)
+	}
+
+	dockerInGuest := base
+	dockerInGuest.Target, dockerInGuest.VMID, dockerInGuest.GuestType, dockerInGuest.Container = TargetGuest, "102", "lxc", "hosbah-db-pg1"
+	if dockerInGuest.Validate() == nil {
+		t.Fatal("a database in Docker inside a guest is not supported and must be refused (pct exec cannot carry an env var into the nested docker exec)")
+	}
+
+	noVMID := base
+	noVMID.Target, noVMID.GuestType = TargetGuest, "lxc"
+	if noVMID.Validate() == nil {
+		t.Fatal("a guest target with no vmid must be refused")
+	}
+
+	qemu := base
+	qemu.Target, qemu.VMID, qemu.GuestType = TargetGuest, "102", "qemu"
+	if qemu.Validate() == nil {
+		t.Fatal("a QEMU guest must be refused")
+	}
+
+	badTarget := base
+	badTarget.Target, badTarget.Container = "somewhere-else", "hosbah-db-pg1"
+	if badTarget.Validate() == nil {
+		t.Fatal("an unknown target must be refused")
+	}
+}
+
+// TestDBCreateValidateRefusesMinioInGuest: minio has no client that runs through pct exec.
+func TestDBCreateValidateRefusesMinioInGuest(t *testing.T) {
+	p := DBCreateParams{ServiceID: testSvcID, Kind: "minio", Target: TargetGuest, VMID: "102", GuestType: "lxc",
+		Database: "b1", User: "k1", Grants: "all", RootSecret: "x", UserSecret: "y"}
+	if p.Validate() == nil {
+		t.Fatal("db.create for minio in a guest must be refused")
+	}
+}
+
+// TestDBCreateValidateNeedsContainer closes the gap DBCreateParams.Validate used to have: it never
+// checked Container at all before validDBExecTarget was added.
+func TestDBCreateValidateNeedsContainer(t *testing.T) {
+	p := DBCreateParams{ServiceID: testSvcID, Kind: "postgres", Database: "app", User: "app", Grants: "all", RootSecret: "x", UserSecret: "y"}
+	if p.Validate() == nil {
+		t.Fatal("db.create with no container and no guest target must be refused")
+	}
+}
+
+// TestRootSecretOptionalForNativeGuest: a native LXC guest (target guest, container "") never sends a
+// stored credential — it authenticates as the OS user instead — so RootSecret may be empty there, and
+// only there. DBUser still needs UserSecret for create/rotate regardless.
+func TestRootSecretOptionalForNativeGuest(t *testing.T) {
+	del := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Target: TargetGuest, VMID: "102", GuestType: "lxc",
+		Action: "delete", User: "app_ro"}
+	if err := del.Validate(); err != nil {
+		t.Fatalf("db.user delete on a native guest with no root secret: %v", err)
+	}
+	create := del
+	create.Action, create.Database, create.Grants = "create", "app", "all"
+	if create.Validate() == nil {
+		t.Fatal("db.user create must still need a user secret, even on a native guest")
+	}
+	create.UserSecret = "u"
+	if err := create.Validate(); err != nil {
+		t.Fatalf("db.user create on a native guest with a user secret but no root secret: %v", err)
+	}
+
+	// The same guest with a container set (docker-in-guest) is refused outright, so RootSecret being
+	// empty there never gets a chance to matter — but confirm the refusal wins first.
+	withContainer := del
+	withContainer.Container = "hosbah-db-pg1"
+	if withContainer.Validate() == nil {
+		t.Fatal("a guest with a container must be refused before RootSecret is even considered")
+	}
+
+	// A plain container (not a guest) still needs the root secret.
+	container := DBUserParams{ServiceID: testSvcID, Kind: "postgres", Container: "hosbah-db-pg1", Action: "delete", User: "app_ro"}
+	if container.Validate() == nil {
+		t.Fatal("a container target still needs the root secret")
+	}
+
+	// db.query, db.insights and db.cancel_query follow the same rule.
+	q := DBQueryParams{ServiceID: testSvcID, Kind: "postgres", Target: TargetGuest, VMID: "102", GuestType: "lxc",
+		Database: "app", Mode: "tables", TimeoutSeconds: 10}
+	if err := q.Validate(); err != nil {
+		t.Fatalf("db.query on a native guest with no root secret: %v", err)
+	}
+	ins := DBInsightsParams{ServiceID: testSvcID, Kind: "postgres", Target: TargetGuest, VMID: "102", GuestType: "lxc", TimeoutSeconds: 10}
+	if err := ins.Validate(); err != nil {
+		t.Fatalf("db.insights on a native guest with no root secret: %v", err)
+	}
+	cq := DBCancelQueryParams{ServiceID: testSvcID, Kind: "postgres", Target: TargetGuest, VMID: "102", GuestType: "lxc", ID: 1}
+	if err := cq.Validate(); err != nil {
+		t.Fatalf("db.cancel_query on a native guest with no root secret: %v", err)
+	}
+	cqContainer := DBCancelQueryParams{ServiceID: testSvcID, Kind: "postgres", Container: "hosbah-db-pg1", ID: 1}
+	if cqContainer.Validate() == nil {
+		t.Fatal("a container target still needs the root secret for db.cancel_query")
+	}
+}
+
 func TestRepoValidate(t *testing.T) {
 	if (RepoSpec{Target: "local", Repo: "/var/lib/hosbah/restic/x"}).Validate() != nil {
 		t.Fatal("valid local repo rejected")

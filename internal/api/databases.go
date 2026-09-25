@@ -22,23 +22,24 @@ import (
 
 // DataServiceOut is a managed data service. Never the sealed root credential.
 type DataServiceOut struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	Kind           string           `json:"kind" enum:"postgres,mysql,redis,minio,mongodb" doc:"mongodb only for imported services"`
-	Version        string           `json:"version"`
-	Status         string           `json:"status" enum:"new,provisioning,running,failed,stopped"`
-	ServerID       string           `json:"server_id"`
-	Host           *string          `json:"host"`
-	Port           *int64           `json:"port"`
-	Error          *string          `json:"error"`
-	Container      *string          `json:"container" doc:"The container name (managed, or an imported container)"`
-	Source         string           `json:"source" enum:"managed,imported" doc:"imported: found running on the server; controllable (power, stats, logs, destroy) and, once it has credentials, a normal database"`
-	OriginKind     *string          `json:"origin_kind" doc:"imported only: container or guest"`
-	Origin         *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
-	ImportedState  *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
-	LastSeenAt     *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
-	HasCredentials bool             `json:"has_credentials" doc:"Whether Hosbah holds credentials for it (always for a managed service). An imported one gets them through POST …/credentials; until then databases, users and backups answer 409 credentials_required."`
-	CreatedAt      time.Time        `json:"created_at"`
+	ID                  string           `json:"id"`
+	Name                string           `json:"name"`
+	Kind                string           `json:"kind" enum:"postgres,mysql,redis,minio,mongodb" doc:"mongodb only for imported services"`
+	Version             string           `json:"version"`
+	Status              string           `json:"status" enum:"new,provisioning,running,failed,stopped"`
+	ServerID            string           `json:"server_id"`
+	Host                *string          `json:"host"`
+	Port                *int64           `json:"port"`
+	Error               *string          `json:"error"`
+	Container           *string          `json:"container" doc:"The container name (managed, or an imported container)"`
+	Source              string           `json:"source" enum:"managed,imported" doc:"imported: found running on the server; controllable (power, stats, logs, destroy) and, once it has credentials, a normal database"`
+	OriginKind          *string          `json:"origin_kind" doc:"imported only: container or guest"`
+	Origin              *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
+	ImportedState       *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt          *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
+	HasCredentials      bool             `json:"has_credentials" doc:"Whether Hosbah holds credentials for it (always for a managed service). An imported one gets them through POST …/credentials; until then databases, users and backups answer 409 credentials_required."`
+	CredentialsRequired bool             `json:"credentials_required" doc:"Whether the credentials form must be filled in before databases, users and backups work. False for a managed service and for an imported native Proxmox LXC guest (it authenticates as the matching OS user instead — no stored credential needed), even when has_credentials is also false there."`
+	CreatedAt           time.Time        `json:"created_at"`
 }
 
 // DatabaseOut / DatabaseUserOut / BackupOut / ScheduleOut are the detail page's rows.
@@ -94,7 +95,7 @@ func toDataServiceOut(s db.DataService) DataServiceOut {
 	return DataServiceOut{ID: s.ID, Name: s.Name, Kind: s.Kind, Version: s.Version, Status: s.Status,
 		ServerID: s.ServerID, Host: s.Host, Port: s.Port, Error: s.Error, CreatedAt: s.CreatedAt, Container: s.Container,
 		Source: s.Source, OriginKind: s.OriginKind, Origin: originOf(s.Origin), ImportedState: s.ImportedState, LastSeenAt: s.LastSeenAt,
-		HasCredentials: dbsvc.HasCredentials(s)}
+		HasCredentials: dbsvc.HasCredentials(s), CredentialsRequired: dbsvc.CredentialsRequired(s)}
 }
 func toDatabaseUserOut(u db.DatabaseUser) DatabaseUserOut {
 	return DatabaseUserOut{ID: u.ID, Name: u.Name, Grants: u.Grants, Status: u.Status, Error: u.Error, DatabaseID: u.DatabaseID}

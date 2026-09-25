@@ -283,9 +283,10 @@ func (s *Service) createInto(ctx context.Context, teamID string, svc db.DataServ
 		if err != nil {
 			return nil, "", err
 		}
+		target, vmid, guestType, container := execTarget(svc)
 		p := agentproto.DBCreateParams{
-			ServiceID: svc.ID, Kind: svc.Kind, Container: contOf(svc), Database: dbRow.Name, User: userRow.Name,
-			Grants: userRow.Grants, RootSecret: rootBox, UserSecret: userBox,
+			ServiceID: svc.ID, Kind: svc.Kind, Target: target, VMID: vmid, GuestType: guestType, Container: container,
+			Database: dbRow.Name, User: userRow.Name, Grants: userRow.Grants, RootSecret: rootBox, UserSecret: userBox,
 		}
 		return p, opID(dbRow.ID, "create"), nil
 	}, agentproto.KindDBCreate, nil)
@@ -304,6 +305,9 @@ func (s *Service) createInto(ctx context.Context, teamID string, svc db.DataServ
 // Backup queues a manual backup and runs it in the background.
 func (s *Service) Backup(ctx context.Context, q *db.Queries, teamID string, actor Actor, svc db.DataService, kind string) (db.Backup, error) {
 	if err := usable(svc); err != nil {
+		return db.Backup{}, err
+	}
+	if err := backupable(svc); err != nil {
 		return db.Backup{}, err
 	}
 	if svc.Status != "running" {
@@ -594,9 +598,16 @@ func (s *Service) spawn(fn func(context.Context)) {
 	}()
 }
 
-// sealRoot re-seals the service's root credential to the target agent's key.
+// sealRoot re-seals the service's root credential to the target agent's key. An imported native
+// Proxmox LXC guest with no stored credential needs none sealed at all — the agent authenticates as
+// the matching OS user instead (Postgres peer auth, MySQL/MariaDB auth_socket) — so it returns ("",
+// nil) rather than importedRoot's "give it credentials first" error. If a member did give it
+// credentials anyway, they are harmless to seal and used as before.
 func (s *Service) sealRoot(agentKey string, dek []byte, teamID string, svc db.DataService) (string, error) {
 	if isImported(svc) {
+		if !HasCredentials(svc) && deploy.WorkloadOfService(svc).OriginKind == "guest" {
+			return "", nil
+		}
 		// An imported service: the credentials a member gave (user, password, database), checked by db.probe.
 		root, err := importedRoot(dek, teamID, svc)
 		if err != nil {
@@ -654,6 +665,21 @@ func contOf(svc db.DataService) string {
 		return *svc.Container
 	}
 	return agentproto.DBContainerName(svc.Name)
+}
+
+// execTarget derives where db.create, db.drop, db.user, db.query, db.insights and db.cancel_query
+// should run their client for svc: a Docker container on the server itself (target "", the container
+// contOf resolves — every managed service, and an imported container), or an imported Proxmox LXC
+// guest (target "guest", its vmid, guest_type "lxc", container always "" — the engine installed
+// natively there; a guest running its engine in Docker is refused before this is ever built, since pct
+// exec has no way to carry a password into a nested docker exec). A QEMU guest never reaches here:
+// usable() refuses it before any of these six operations is ever built.
+func execTarget(svc db.DataService) (target, vmid, guestType, container string) {
+	w := deploy.WorkloadOfService(svc)
+	if isImported(svc) && w.OriginKind == "guest" {
+		return agentproto.TargetGuest, w.Origin.VMID, w.Origin.GuestType, ""
+	}
+	return "", "", "", contOf(svc)
 }
 
 func rootContext(serviceID string) string       { return "dbroot:" + serviceID }

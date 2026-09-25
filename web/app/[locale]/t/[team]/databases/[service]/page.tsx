@@ -83,15 +83,20 @@ export default function DataServicePage() {
 
   const s = detail.service
   // An imported database is shown read-only: Hosbah has no credentials for it and never changes it.
-  // An imported database without its admin login: power/stats/logs and the credentials form. With
-  // it, the full database tools below apply, with the workload controls on top.
+  // An imported database that still needs its admin login gets power/stats/logs and the credentials
+  // form (credentials_required — false for a native Proxmox LXC guest, which authenticates as the
+  // matching OS user instead and never needs one). Once it is not required, the full database tools
+  // below apply, with the workload controls on top.
   const imported = isImported(s)
-  if (imported && !(s as { has_credentials?: boolean }).has_credentials)
-    return <ImportedDatabaseView service={s} onChanged={() => void load()} />
+  if (imported && s.credentials_required) return <ImportedDatabaseView service={s} onChanged={() => void load()} />
   const isRedis = s.kind === "redis"
   // The table browser and SQL console (MH-574 F2) only work against Postgres and MySQL/MariaDB; the
   // backend refuses redis/minio queries with a clear message, so this is only mounted for those kinds.
   const canQueryData = manage && (s.kind === "postgres" || s.kind === "mysql")
+  // Databases, users, the table browser, the SQL console and insights all reach a Proxmox LXC guest
+  // the same way they reach a container (see internal/agent/dbtarget.go); only backups (restic has
+  // no path into a guest yet) and MinIO buckets stay unsupported there.
+  const isGuest = s.origin_kind === "guest"
 
   const actions = manage ? (
     <ConfirmButton
@@ -201,7 +206,7 @@ export default function DataServicePage() {
         <Section
           title={t("databases.backupsTitle")}
           action={
-            manage && s.status === "running" ? (
+            manage && s.status === "running" && !isGuest ? (
               <Button
                 size="sm"
                 onClick={async () => {
@@ -215,7 +220,9 @@ export default function DataServicePage() {
             ) : null
           }
         >
-          {detail.backups.length === 0 ? (
+          {isGuest ? (
+            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.guestBackupsUnsupported")}</p>
+          ) : detail.backups.length === 0 ? (
             <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noBackups")}</p>
           ) : (
             <TableBand>
@@ -271,7 +278,7 @@ export default function DataServicePage() {
           )}
         </Section>
 
-        {manage ? (
+        {manage && !isGuest ? (
           <Section title={t("databases.scheduleTitle")}>
             <div className="border-b border-line px-6 py-5">
               <div className="max-w-2xl">
