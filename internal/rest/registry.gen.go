@@ -12,7 +12,11 @@ import (
 func RegisterRoutes(api huma.API, a *app.App) {
 	RegisterAdminMcpTokenRoutes(api, a)
 	RegisterAgentEnrollmentRoutes(api, a)
+	RegisterApmExceptionEventRoutes(api, a)
+	RegisterApmIssueRoutes(api, a)
+	RegisterApmSpanRoutes(api, a)
 	RegisterAppRoutes(api, a)
+	RegisterAppApmSettingRoutes(api, a)
 	RegisterAppBrowserRoutes(api, a)
 	RegisterAppBucketRoutes(api, a)
 	RegisterAppInstallRoutes(api, a)

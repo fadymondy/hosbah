@@ -9,6 +9,7 @@
 //	hbh_  app deploy-hook token         (apps)                was cdh_  (internal/deploy)
 //	hbp_  heartbeat ping token          (monitors)             new in MH-575 H3
 //	hbr_  RUM ingest key (public, not a secret — travels in page source)  new in MH-575 H5
+//	hbt_  APM ingest key (secret: bearer for OTLP traces/logs)             new in MH-575 H7
 //	(none) invitation link token        (invitations)
 //
 // New tokens get the hb*_ prefix. Tokens minted before the rename keep working: the prefix is
@@ -30,6 +31,7 @@ const (
 	PrefixHook     = "hbh_"
 	PrefixPing     = "hbp_"
 	PrefixRum      = "hbr_"
+	PrefixApm      = "hbt_"
 
 	// Before the rename from Cloudy. Accepted, never minted.
 	LegacyPrefixUserMCP  = "cld_"
@@ -46,6 +48,7 @@ var (
 	Hook     = []string{PrefixHook, LegacyPrefixHook}
 	Ping     = []string{PrefixPing}
 	Rum      = []string{PrefixRum}
+	Apm      = []string{PrefixApm}
 )
 
 // HasPrefix reports whether token starts with one of the family's prefixes.

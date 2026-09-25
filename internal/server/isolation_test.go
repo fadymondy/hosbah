@@ -260,6 +260,8 @@ func TestIsolationSweep(t *testing.T) {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
 		"backup":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
+		"trace_id": func(string) []string { return []string{"00000000000000000000000000000000"} }, // apm_spans: nothing stored by this id either way
+		"issue":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f1"} },
 		"user":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d2", "some_user"} }, // a database user under {service}: not tenant B's either way
 		"database": func(string) []string { return []string{"some_db"} },                                           // a database under {service}: not tenant B's either way
 		"table":    func(string) []string { return []string{"some_table"} },                                        // a table under {database}: not tenant B's either way
@@ -404,6 +406,9 @@ func TestIsolationSweep(t *testing.T) {
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
 		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
 		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},
+		"app_apm_settings": {"app": appA.App.ID, "enabled": true}, "app_endpoints": {"app": appA.App.ID},
+		"app_traces": {"app": appA.App.ID, "method": "GET", "route": "/"}, "app_errors": {"app": appA.App.ID},
+		"app_error_status": {"app": appA.App.ID, "issue_id": "1", "status": "resolved"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

@@ -134,6 +134,12 @@ func isPublic(r *http.Request) bool {
 	if strings.HasPrefix(p, "/api/rum/") {
 		return true
 	}
+	// The OTLP/HTTP JSON ingest endpoints (internal/apm, MH-575 H7): POST /api/otlp/v1/traces and
+	// /api/otlp/v1/logs, authenticated by the app's own secret APM ingest key (a Bearer/x-hosbah-key
+	// header, never a query param or path segment — unlike the RUM key this one is a real secret).
+	if strings.HasPrefix(p, "/api/otlp/") {
+		return true
+	}
 	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
 	// a single-use state bound to this browser) and the callback (accepts only that state). The
 	// start with ?link=1 attaches the provider to the signed-in account: member tier.

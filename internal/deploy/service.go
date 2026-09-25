@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/apm"
 	"github.com/fadymondy/hosbah/internal/app"
 	"github.com/fadymondy/hosbah/internal/cloudflare"
 	"github.com/fadymondy/hosbah/internal/crypto"
@@ -58,7 +59,14 @@ type Service struct {
 	apps AppsDomain
 	// cfOpts, when set, configures every Cloudflare client (tests).
 	cfOpts []cloudflare.Option
+	// apmSvc is set by SetApm once internal/apm's Service exists (server.go wires it after both are
+	// constructed); nil until then, and in any test that does not need APM env injection.
+	apmSvc *apm.Service
 }
+
+// SetApm wires the APM service in, for env auto-injection (injectApmEnv). Call once, after both
+// services are constructed.
+func (s *Service) SetApm(svc *apm.Service) { s.apmSvc = svc }
 
 // New builds the service; Start launches its worker.
 func New(a *app.App, o *ops.Service) *Service {
@@ -505,11 +513,54 @@ func (r *runner) envBox(ctx context.Context, process string) (string, error) {
 		}
 		return nil
 	})
-	if err != nil || len(env) == 0 {
+	if err != nil {
 		return "", err
+	}
+	r.injectApmEnv(ctx, env)
+	if len(env) == 0 {
+		return "", nil
 	}
 	raw, _ := json.Marshal(env)
 	return agentproto.SealBox(r.agentKey, agentproto.EnvContext(r.app.ID, r.dep.ID, process), raw)
+}
+
+// injectApmEnv adds the standard OpenTelemetry OTLP/HTTP JSON exporter env vars when APM (MH-575
+// H7, internal/apm) is enabled for the app, so its own OTel SDK finds Hosbah's ingest endpoints with
+// zero code beyond the SDK itself. Never overrides a var the user already set under the app's own
+// environment. Best-effort: a settings-read or key-open failure just skips injection, it never fails
+// the deploy.
+func (r *runner) injectApmEnv(ctx context.Context, env map[string]string) {
+	if r.s.apmSvc == nil {
+		return
+	}
+	var setting db.AppApmSetting
+	err := r.tx(ctx, func(q *db.Queries) error {
+		var err error
+		setting, err = q.AppApmSettingOfApp(ctx, db.AppApmSettingOfAppParams{TeamID: r.dep.TeamID, AppID: r.app.ID})
+		return err
+	})
+	if err != nil || !setting.Enabled || setting.KeySealed == nil {
+		return
+	}
+	plain, err := crypto.Open(r.dek, r.dep.TeamID, apm.EnvSealContext(r.app.ID), *setting.KeySealed)
+	if err != nil {
+		return
+	}
+	base := r.s.apmSvc.PublicURL()
+	if base == "" {
+		return
+	}
+	defaults := map[string]string{
+		"OTEL_EXPORTER_OTLP_ENDPOINT": base + "/api/otlp",
+		"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+		"OTEL_EXPORTER_OTLP_HEADERS":  "Authorization=Bearer " + string(plain),
+		"OTEL_SERVICE_NAME":           r.app.Name,
+	}
+	for k, v := range defaults {
+		if _, set := env[k]; !set {
+			env[k] = v
+		}
+	}
 }
 
 // fastBuild (MH-573 A7) tries the fast track: app.fast_build runs the app's own install/build/

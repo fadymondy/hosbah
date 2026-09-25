@@ -68,6 +68,178 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: ApmExceptionEvent
+      table: apm_exception_events
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: issue_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: trace_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: span_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: message
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: stacktrace
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ApmIssue
+      table: apm_issues
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: fingerprint
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: message
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: first_seen
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: last_seen
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: count
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ApmSpan
+      table: apm_spans
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: trace_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: span_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: parent_span_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: service
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: http_method
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: http_route
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: http_status
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: duration_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: error
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: start_time
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: attrs
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+      controller: true
     - name: App
       table: apps
       fields:
@@ -171,6 +343,40 @@ resources:
           gql: String
           pg: timestamptz
           "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: AppApmSetting
+      table: app_apm_settings
+      fields:
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: key_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: key_sealed
+          go: string
+          gql: String!
+          pg: text
+          "null": false
         - name: created_by
           go: string
           gql: String!
