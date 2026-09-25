@@ -682,15 +682,20 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		r.logf("info", "cloning with a fresh token of the team's GitHub App installation")
 	}
 	fast := r.dep.Track != nil && *r.dep.Track == TrackFast
+	buildStep := "build"
 	if fast {
 		ok, err := r.fastBuild(ctx, image, src, &built)
 		if err != nil {
 			return nil, err
 		}
 		fast = ok // aborted or unavailable: falls through to the full build below
+		// Operations are idempotent by the op id derived from the step, and app.fast_build already
+		// used "build": the fallback must be a step of its own, or it is answered with the aborted
+		// fast build's result and never runs.
+		buildStep = "build:full"
 	}
 	if !fast {
-		if err := r.op(ctx, "build", agentproto.KindAppBuild, agentproto.BuildParams{
+		if err := r.op(ctx, buildStep, agentproto.KindAppBuild, agentproto.BuildParams{
 			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
 			GitSource: src,
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
