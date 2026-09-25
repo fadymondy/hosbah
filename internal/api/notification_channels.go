@@ -34,7 +34,7 @@ type ChannelCreateIn struct {
 	Emails  []string `json:"emails,omitempty" maxItems:"10" doc:"kind email: who is notified."`
 	URL     *string  `json:"url,omitempty" maxLength:"500" doc:"kind slack, discord, webhook: an https:// URL."`
 	Secret  *string  `json:"secret,omitempty" maxLength:"200" doc:"kind webhook only: an HMAC-SHA256 signing secret, sent as X-Hosbah-Signature."`
-	Events  []string `json:"events,omitempty" doc:"Which of deploy.failed, server.offline, backup.failed this channel receives."`
+	Events  []string `json:"events,omitempty" doc:"Which of deploy.failed, server.offline, backup.failed, cert.expiring this channel receives."`
 	Enabled *bool    `json:"enabled,omitempty" doc:"Default true."`
 }
 

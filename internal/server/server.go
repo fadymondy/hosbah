@@ -34,6 +34,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/provisioning"
 	"github.com/fadymondy/hosbah/internal/rum"
 	"github.com/fadymondy/hosbah/internal/schedules"
+	"github.com/fadymondy/hosbah/internal/certcheck"
 	"github.com/fadymondy/hosbah/internal/scripts"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -157,7 +158,13 @@ func Boot() *app.App {
 	scriptsSvc := scripts.New(a, svc)
 	scriptsSvc.Start()
 	a.Scripts = scriptsSvc
+	// Certificate watch (MH-580 J6): TLS-dials every team's app domains and proxy hosts every few
+	// hours and alerts through the same notification channels above (event cert.expiring).
+	certs := certcheck.New(a, notify)
+	certs.Start()
+	a.CertCheck = certs
 	a.Stop = func() {
+		certs.Stop()
 		scriptsSvc.Close()
 		crons.Close()
 		apmSvc.Stop()

@@ -98,6 +98,14 @@ func Timeout(kind string) time.Duration {
 		return 30 * time.Second
 	case agentproto.KindServiceAction:
 		return 2 * time.Minute
+	case agentproto.KindPkgList:
+		return 3 * time.Minute // apt-get update + list/check-update
+	case agentproto.KindPkgUpgrade:
+		return 30 * time.Minute
+	case agentproto.KindPkgAutoupdateSet:
+		return 3 * time.Minute
+	case agentproto.KindSSHKeyInstall, agentproto.KindSSHKeyUninstall:
+		return time.Minute
 	}
 	return 10 * time.Minute
 }

@@ -222,6 +222,12 @@ func TestIsolationSweep(t *testing.T) {
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/log-drains", map[string]any{"kind": "syslog", "name": "drain-a-" + suffix,
 		"syslog": map[string]any{"transport": "udp", "host": "sweep.example.test", "port": 514}}, 201, &drainA)
 
+	// MH-578 C10: an SSH key of A's in the team key library, so the swept {key} routes under
+	// …/ssh-keys and the ssh_keys_* MCP tools have something to leak.
+	var sshKeyA struct{ ID, Name string }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/ssh-keys", map[string]any{"name": "deploy-a-" + suffix,
+		"public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBltbBb6xxYQ3xzz7C+3qXjBXA6R+6YkKn6f4qz1L4nQ a-env-key"}, 201, &sshKeyA)
+
 	// P4: a pending approval request of A's, made the only way one can be made — by turning the
 	// team setting on and letting a destructive MCP call be held. Sweeping it matters because an
 	// approval is a capability to destroy something: B must not be able to read it or decide it.
@@ -283,7 +289,12 @@ func TestIsolationSweep(t *testing.T) {
 		"drain":       func(string) []string { return []string{drainA.ID, drainA.Name} },
 		"product":     func(string) []string { return []string{prodA.ID, prodA.Name} },
 		"instance":    func(string) []string { return []string{instA.ID, instA.Name} },
-		"key":         func(string) []string { return []string{keyA.ID} },
+		"key": func(path string) []string {
+			if strings.Contains(path, "/ssh-keys/") {
+				return []string{sshKeyA.ID} // MH-578 C10: a team SSH key of A's, not a product key
+			}
+			return []string{keyA.ID}
+		},
 		"upgrade":     func(string) []string { return []string{upgradeA.ID} },
 		"kind":        func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":       func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
@@ -501,6 +512,14 @@ func TestIsolationSweep(t *testing.T) {
 		"upgrade_product":   {"product": prodA.ID},
 		"mint_product_key":  {"product": prodA.ID, "name": "stolen"},
 		"destroy_instance":  {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
+		// MH-578 C8: package updates on A's server.
+		"server_updates_list":     {"server": srvA},
+		"server_updates_run":      {"server": srvA, "confirm": "alpha-" + suffix},
+		"server_updates_auto_set": {"server": srvA, "enabled": true},
+		// MH-578 C10: A's SSH key, and installing/uninstalling it on A's server.
+		"ssh_keys_remove":    {"key": sshKeyA.ID, "confirm": sshKeyA.Name},
+		"ssh_keys_install":   {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
+		"ssh_keys_uninstall": {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -525,6 +544,14 @@ func TestIsolationSweep(t *testing.T) {
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_scripts", nil); strings.Contains(res.Text, scriptA.Name) {
 		t.Errorf("list_scripts as B leaked team A's script: %s", res.Text)
+	}
+	// MH-578 C10: the team SSH key library is B's own only.
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "ssh_keys_list", nil); strings.Contains(res.Text, sshKeyA.Name) {
+		t.Errorf("ssh_keys_list as B leaked team A's SSH key: %s", res.Text)
+	}
+	// MH-580 J6: the certificate watch lists B's own team's hostnames only.
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "ssl_certificates", nil); strings.Contains(res.Text, domA.Hostname) || strings.Contains(res.Text, proxyA.Hostname) {
+		t.Errorf("ssl_certificates as B leaked team A's hostname: %s", res.Text)
 	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_site_templates", nil); strings.Contains(res.Text, templateA.Name) {
 		t.Errorf("list_site_templates as B leaked team A's template: %s", res.Text)

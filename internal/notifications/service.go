@@ -62,10 +62,13 @@ const (
 	EventDeployFailed  = "deploy.failed"
 	EventServerOffline = "server.offline"
 	EventBackupFailed  = "backup.failed"
+	// EventCertExpiring (MH-580 J6): a team TLS certificate is 14, 7 or 1 day(s) from expiry, or a
+	// check failed outright (internal/certcheck).
+	EventCertExpiring = "cert.expiring"
 )
 
 // Events is every event name a channel may subscribe to.
-var Events = []string{EventDeployFailed, EventServerOffline, EventBackupFailed}
+var Events = []string{EventDeployFailed, EventServerOffline, EventBackupFailed, EventCertExpiring}
 
 func invalid(msg string) error  { return &deploy.ActionError{Status: 422, Msg: msg} }
 func conflict(msg string) error { return &deploy.ActionError{Status: 409, Msg: msg} }
@@ -103,7 +106,7 @@ type Channel struct {
 	Emails    []string  `json:"emails" doc:"kind email: who is notified."`
 	URLHint   string    `json:"url_hint" doc:"kind slack, discord, webhook: the configured URL, masked to its host. Empty for email."`
 	SecretSet bool      `json:"secret_set" doc:"kind webhook: an HMAC-SHA256 signing secret is configured."`
-	Events    []string  `json:"events" doc:"Which of deploy.failed, server.offline, backup.failed this channel receives."`
+	Events    []string  `json:"events" doc:"Which of deploy.failed, server.offline, backup.failed, cert.expiring this channel receives."`
 	Enabled   bool      `json:"enabled"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -400,7 +403,7 @@ func Delete(ctx context.Context, q *db.Queries, teamID, id string) error {
 
 // Alert is one thing to tell a channel about.
 type Alert struct {
-	Event   string // e.g. deploy.failed, server.offline, backup.failed, or "monitor.<opened|resolved>"
+	Event   string // e.g. deploy.failed, server.offline, backup.failed, cert.expiring, or "monitor.<opened|resolved>"
 	Title   string
 	Reason  string
 	Link    string // the web app's link to whatever this is about; "" = none
