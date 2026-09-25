@@ -117,7 +117,7 @@ func rtTable() routeTable {
 // The config Caddy is sent: for EVERY hostname of the site, the path route comes before the site's
 // catch-all, with what a long-lived websocket needs.
 func TestRenderCaddyRoutesTheRealtimePathBeforeTheCatchAll(t *testing.T) {
-	cfg := renderCaddy(rtTable())
+	cfg := renderCaddy(rtTable(), true)
 	for server, hosts := range map[string][]string{"hosbah_http": {"shop.localhost"}, "hosbah_https": {"shop.internal.test", "shop.example.com"}} {
 		suffix := "-" + strings.TrimPrefix(server, "hosbah_")
 		routes := routesOf(t, cfg, server)
@@ -169,7 +169,7 @@ func TestRenderCaddyWholeSiteAndInvalidRealtime(t *testing.T) {
 	e := tb.Apps[rtApp]
 	e.Realtime = &agentproto.RealtimeRoute{Path: "/", Upstream: "127.0.0.1:40002", WholeSite: true}
 	tb.Apps[rtApp] = e
-	if b, _ := json.Marshal(renderCaddy(tb)); !strings.Contains(string(b), `"path":["/*"]`) {
+	if b, _ := json.Marshal(renderCaddy(tb, true)); !strings.Contains(string(b), `"path":["/*"]`) {
 		t.Errorf("the whole site: %s", b)
 	}
 	// A table on disk that was tampered with never reaches Caddy.
@@ -181,7 +181,7 @@ func TestRenderCaddyWholeSiteAndInvalidRealtime(t *testing.T) {
 		rt := rt
 		e.Realtime = &rt
 		tb.Apps[rtApp] = e
-		if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "hosbah-realtime-") {
+		if b, _ := json.Marshal(renderCaddy(tb, true)); strings.Contains(string(b), "hosbah-realtime-") {
 			t.Errorf("%s was rendered: %s", name, b)
 		}
 	}
@@ -194,7 +194,7 @@ func TestChangeRealtimeRemovesAndSetsOnlyTheRealtimeHalf(t *testing.T) {
 	if missing || hosts != 3 {
 		t.Fatalf("hosts %d, missing %v", hosts, missing)
 	}
-	b, _ := json.Marshal(renderCaddy(tb))
+	b, _ := json.Marshal(renderCaddy(tb, true))
 	s := string(b)
 	if strings.Contains(s, "hosbah-realtime-") || strings.Contains(s, "40002") || strings.Contains(s, `"path"`) {
 		t.Errorf("the realtime route lingers: %s", s)
@@ -207,7 +207,7 @@ func TestChangeRealtimeRemovesAndSetsOnlyTheRealtimeHalf(t *testing.T) {
 	if _, missing := changeRealtime(&tb, rtApp, &agentproto.RealtimeRoute{Path: "/ws", Upstream: "127.0.0.1:40002"}); missing {
 		t.Fatal("the app is routed")
 	}
-	if b, _ := json.Marshal(renderCaddy(tb)); !strings.Contains(string(b), `"path":["/ws*"]`) {
+	if b, _ := json.Marshal(renderCaddy(tb, true)); !strings.Contains(string(b), `"path":["/ws*"]`) {
 		t.Errorf("set again: %s", b)
 	}
 	// An app that is not routed here cannot get a realtime route.
@@ -216,7 +216,7 @@ func TestChangeRealtimeRemovesAndSetsOnlyTheRealtimeHalf(t *testing.T) {
 	}
 	// route.set describes the whole route: without Realtime it is gone (setRoute replaces the entry).
 	tb.Apps[rtApp] = routeEntry{Hosts: tb.Apps[rtApp].Hosts, Upstream: "127.0.0.1:40003"}
-	if b, _ := json.Marshal(renderCaddy(tb)); strings.Contains(string(b), "hosbah-realtime-") {
+	if b, _ := json.Marshal(renderCaddy(tb, true)); strings.Contains(string(b), "hosbah-realtime-") {
 		t.Errorf("a route.set without realtime keeps it: %s", b)
 	}
 }

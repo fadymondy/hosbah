@@ -16,7 +16,7 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 			"b": {Upstream: "127.0.0.1:40002", Hosts: []agentproto.Route{{Hostname: "shop.example.com", TLS: "auto"}}},
 			"c": {Upstream: "", Hosts: []agentproto.Route{{Hostname: "gone.localhost", TLS: "off"}}}, // removed: no upstream
 		},
-	})
+	}, true)
 	b, _ := json.Marshal(cfg)
 	s := string(b)
 
@@ -61,7 +61,7 @@ func TestRenderCaddySplitsByTLSAndAsks(t *testing.T) {
 }
 
 func TestRenderCaddyEmpty(t *testing.T) {
-	cfg := renderCaddy(routeTable{Apps: map[string]routeEntry{}})
+	cfg := renderCaddy(routeTable{Apps: map[string]routeEntry{}}, true)
 	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	if _, ok := servers["hosbah_https"]; ok {
 		t.Error(":443 should not be bound with no TLS routes")
@@ -80,7 +80,7 @@ func TestRenderCaddyProxyHosts(t *testing.T) {
 			"p2": {Host: agentproto.Route{Hostname: "pve.example.com", TLS: "internal"}, Dial: "10.0.0.2:8006", TLS: true, SkipVerify: true},
 			"p3": {Host: agentproto.Route{Hostname: "printer.lan.test", TLS: "off"}, Dial: "10.0.0.9:80"},
 		},
-	})
+	}, true)
 	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
 	pj, _ := json.Marshal(servers["hosbah_http"])
 	sj, _ := json.Marshal(servers["hosbah_https"])
@@ -101,5 +101,35 @@ func TestRenderCaddyProxyHosts(t *testing.T) {
 	routes := servers["hosbah_http"].(map[string]any)["routes"].([]any)
 	if routes[len(routes)-1].(map[string]any)["@id"] != "hosbah-fallback" {
 		t.Error("fallback is not last")
+	}
+}
+
+// A Caddy that cannot write its access log must still load: renderCaddy(accessLog=false) omits the
+// top-level logging block and both servers' "logs" keys entirely, rather than reference a directory
+// Caddy cannot create — the bug that broke every route.set/proxy.set when /var/lib/hosbah (root-only)
+// was used as the log directory.
+func TestRenderCaddyOmitsLoggingWhenDisabled(t *testing.T) {
+	table := routeTable{Apps: map[string]routeEntry{
+		"a": {Upstream: "127.0.0.1:40001", Hosts: []agentproto.Route{{Hostname: "go.localhost", TLS: "off"}, {Hostname: "go.internal.test", TLS: "internal"}}},
+	}}
+
+	enabled, _ := json.Marshal(renderCaddy(table, true))
+	if !strings.Contains(string(enabled), `"logging"`) || !strings.Contains(string(enabled), `"logs"`) {
+		t.Fatalf("accessLog=true must render a logging block: %s", enabled)
+	}
+
+	disabled := renderCaddy(table, false)
+	if _, ok := disabled["logging"]; ok {
+		t.Error("accessLog=false must not render a top-level logging block")
+	}
+	servers := disabled["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	for name, s := range servers {
+		if _, ok := s.(map[string]any)["logs"]; ok {
+			t.Errorf("%s must not reference a logger when accessLog=false", name)
+		}
+	}
+	db, _ := json.Marshal(disabled)
+	if strings.Contains(string(db), accessLoggerName) || strings.Contains(string(db), accessLogPath) {
+		t.Errorf("accessLog=false must not mention the logger or its path at all: %s", db)
 	}
 }

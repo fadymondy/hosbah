@@ -9,8 +9,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -47,14 +49,54 @@ const (
 	caddyHTTPS = "hosbah_https"
 )
 
+// accessLogDir is where Caddy writes its JSON access log. It is deliberately NOT under WorkDir
+// (/var/lib/hosbah, root-owned and mode 0700): Caddy runs as its own "caddy" system user (see
+// tools.go's unit file), which cannot create files there, and a Caddy that cannot open its log
+// writer refuses to load the config at all — breaking every route.set/proxy.set on the server.
+// /var/log/hosbah-caddy is prepared and, when a caddy user exists, chowned to it by
+// prepareAccessLogDir (called by root, before any config referencing it is rendered).
+const accessLogDir = "/var/log/hosbah-caddy"
+
 // accessLogPath is where Caddy writes one JSON-lines access log of every request through either
-// server (apps and proxy hosts alike); internal/agent's traffic aggregator (analytics.go) tails it.
-// Caddy itself keeps it bounded (roll_size_mb/roll_keep below), so a disconnected agent never lets
-// it grow past a few hundred MB.
-const accessLogPath = agentproto.WorkDir + "/access.log"
+// server (apps and proxy hosts alike); internal/agent's traffic aggregator (analytics.go) tails it,
+// running as root, so it can read the file regardless of who owns it. Caddy itself keeps it bounded
+// (roll_size_mb/roll_keep below), so a disconnected agent never lets it grow past a few hundred MB.
+const accessLogPath = accessLogDir + "/access.log"
 
 // accessLoggerName is the shared logger both servers write to.
 const accessLoggerName = "hosbah_access"
+
+// prepareAccessLogDir creates accessLogDir and, when a "caddy" system user exists (the Caddy unit
+// runs as User=caddy), hands it ownership so Caddy can create and roll access.log itself. When
+// there is no caddy user — Caddy running as root, e.g. a minimal container — the directory is left
+// root-owned, which Caddy-as-root can already write to. Any error here means the caller must render
+// the config WITHOUT the logging block: analytics can never be allowed to break routing.
+func prepareAccessLogDir() error {
+	if err := os.MkdirAll(accessLogDir, 0o755); err != nil {
+		return err
+	}
+	u, err := user.Lookup("caddy")
+	if err != nil {
+		return nil // no caddy user: Caddy runs as root, root already owns this directory
+	}
+	uid, uerr := strconv.Atoi(u.Uid)
+	gid, gerr := strconv.Atoi(u.Gid)
+	if uerr != nil || gerr != nil {
+		return fmt.Errorf("caddy user has a non-numeric uid/gid: %s/%s", u.Uid, u.Gid)
+	}
+	return os.Chown(accessLogDir, uid, gid)
+}
+
+// wantAccessLogging prepares accessLogDir and reports whether renderCaddy should wire the logging
+// block in. A failure is logged as a warning and traffic analytics stay off until it is fixed;
+// routing itself is never affected.
+func wantAccessLogging(oc *OpContext) bool {
+	if err := prepareAccessLogDir(); err != nil {
+		oc.Info("warning: could not prepare %s for Caddy's access log (%v) — traffic analytics are off until this is fixed; routing is unaffected", accessLogDir, err)
+		return false
+	}
+	return true
+}
 
 type routeEntry struct {
 	Hosts    []agentproto.Route `json:"hosts"`
@@ -155,8 +197,11 @@ type proxyEntry struct {
 	SkipVerify bool             `json:"skip_verify,omitempty"`
 }
 
-// renderCaddy turns the route table into Caddy's JSON config.
-func renderCaddy(t routeTable) map[string]any {
+// renderCaddy turns the route table into Caddy's JSON config. accessLog wires the access-log
+// writer and both servers' logs block in only when true — the caller has already made sure Caddy
+// can actually write there (wantAccessLogging); when it could not, the logging block is left out
+// entirely so a permissions problem never keeps Caddy from loading the config at all.
+func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	ids := make([]string, 0, len(t.Apps))
 	for id := range t.Apps {
 		ids = append(ids, id)
@@ -249,11 +294,17 @@ func renderCaddy(t routeTable) map[string]any {
 		}},
 	})
 
-	servers := map[string]any{
-		caddyHTTP: map[string]any{"listen": []string{":80"}, "routes": httpRoutes, "logs": map[string]any{"default_logger_name": accessLoggerName}},
+	httpServer := map[string]any{"listen": []string{":80"}, "routes": httpRoutes}
+	if accessLog {
+		httpServer["logs"] = map[string]any{"default_logger_name": accessLoggerName}
 	}
+	servers := map[string]any{caddyHTTP: httpServer}
 	if len(httpsRoutes) > 0 {
-		servers[caddyHTTPS] = map[string]any{"listen": []string{":443"}, "routes": httpsRoutes, "logs": map[string]any{"default_logger_name": accessLoggerName}}
+		httpsServer := map[string]any{"listen": []string{":443"}, "routes": httpsRoutes}
+		if accessLog {
+			httpsServer["logs"] = map[string]any{"default_logger_name": accessLoggerName}
+		}
+		servers[caddyHTTPS] = httpsServer
 	}
 	apps := map[string]any{"http": map[string]any{"servers": servers}}
 
@@ -278,10 +329,12 @@ func renderCaddy(t routeTable) map[string]any {
 		}
 		apps["tls"] = map[string]any{"automation": automation}
 	}
-	return map[string]any{
+	cfg := map[string]any{
 		"admin": map[string]any{"listen": "localhost:2019"},
 		"apps":  apps,
-		"logging": map[string]any{
+	}
+	if accessLog {
+		cfg["logging"] = map[string]any{
 			"logs": map[string]any{
 				accessLoggerName: map[string]any{
 					"writer": map[string]any{
@@ -299,8 +352,9 @@ func renderCaddy(t routeTable) map[string]any {
 					"include": []string{"http.log.access"},
 				},
 			},
-		},
+		}
 	}
+	return cfg
 }
 
 func caddyUp(ctx context.Context) bool {
@@ -334,14 +388,14 @@ func caddyLoad(ctx context.Context, cfg map[string]any) error {
 	return nil
 }
 
-func writeConfigFile() error {
+func writeConfigFile(oc *OpContext) error {
 	routesMu.Lock()
 	defer routesMu.Unlock()
 	t, err := loadRoutes()
 	if err != nil {
 		return err
 	}
-	return writeCaddyFile(renderCaddy(t))
+	return writeCaddyFile(renderCaddy(t, wantAccessLogging(oc)))
 }
 
 func writeCaddyFile(cfg map[string]any) error {
@@ -370,7 +424,7 @@ func applyRoutes(oc *OpContext, change func(*routeTable)) error {
 	if change != nil {
 		change(&t)
 	}
-	cfg := renderCaddy(t)
+	cfg := renderCaddy(t, wantAccessLogging(oc))
 	if err := caddyLoad(oc.Ctx, cfg); err != nil {
 		return err
 	}

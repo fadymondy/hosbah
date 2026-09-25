@@ -195,7 +195,7 @@ func stepCaddy(oc *OpContext, p agentproto.ProvisionParams) (any, int, error) {
 		return nil, code, err
 	}
 	oc.Progress(3, 5)
-	if err := writeConfigFile(); err != nil {
+	if err := writeConfigFile(oc); err != nil {
 		return nil, 1, err
 	}
 	if err := os.WriteFile(cs.unitPath, []byte(cs.unitFile()), 0o644); err != nil { //#nosec G306 -- a unit file
