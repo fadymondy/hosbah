@@ -114,6 +114,7 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"server_updates_run": true,
 		// MH-578 C10: removing a team SSH key, and installing/uninstalling one on a server.
 		"ssh_keys_remove": true, "ssh_keys_install": true, "ssh_keys_uninstall": true,
+		"security_reset_root_password": true, "server_deploy_key_add_to_github": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

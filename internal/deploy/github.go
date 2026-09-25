@@ -57,6 +57,10 @@ type GitHubApp interface {
 	// InstallationRepos lists the repositories an installation can reach (GET
 	// /installation/repositories with a fresh installation token, every page, at most max).
 	InstallationRepos(ctx context.Context, installationID int64, max int) ([]GitHubAppRepo, error)
+	// AddDeployKey adds publicKey as a deploy key of owner/repo (MH-578 C11), with a fresh
+	// installation token. readOnly deploy keys can only fetch; Hosbah's server deploy keys are
+	// always read-only. Returns GitHub's numeric key id.
+	AddDeployKey(ctx context.Context, installationID int64, owner, repo, title, publicKey string, readOnly bool) (int64, error)
 }
 
 // ErrInstallationNotFound: GitHub does not know that installation (for this App).
@@ -116,6 +120,9 @@ func (unconfiguredGitHub) InstallationToken(context.Context, int64) (string, tim
 func (unconfiguredGitHub) VerifyWebhook([]byte, string) bool { return false }
 func (unconfiguredGitHub) Installation(context.Context, int64) (GitHubInstallation, error) {
 	return GitHubInstallation{}, ErrGitHubNotConfigured
+}
+func (unconfiguredGitHub) AddDeployKey(context.Context, int64, string, string, string, string, bool) (int64, error) {
+	return 0, ErrGitHubNotConfigured
 }
 func (unconfiguredGitHub) InstallationRepos(context.Context, int64, int) ([]GitHubAppRepo, error) {
 	return nil, ErrGitHubNotConfigured
@@ -319,4 +326,48 @@ func (g *githubApp) InstallationRepos(ctx context.Context, installationID int64,
 		repos = repos[:max]
 	}
 	return repos, nil
+}
+
+// AddDeployKey: POST /repos/{owner}/{repo}/keys with a fresh installation token. 422 (GitHub's
+// answer when the exact key is already attached to that repository, or the title is taken) is
+// reported as a plain error the caller can show — Hosbah does not try to disambiguate GitHub's
+// message further.
+func (g *githubApp) AddDeployKey(ctx context.Context, installationID int64, owner, repo, title, publicKey string, readOnly bool) (int64, error) {
+	token, _, err := g.InstallationToken(ctx, installationID)
+	if err != nil {
+		return 0, err
+	}
+	body, _ := json.Marshal(map[string]any{"title": title, "key": publicKey, "read_only": readOnly})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("%s/repos/%s/%s/keys", g.api, owner, repo), strings.NewReader(string(body)))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := g.http.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusCreated {
+		var ghErr struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(raw, &ghErr)
+		if ghErr.Message == "" {
+			ghErr.Message = fmt.Sprintf("GitHub answered %d", resp.StatusCode)
+		}
+		return 0, fmt.Errorf("GitHub refused the deploy key: %s", ghErr.Message)
+	}
+	var out struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return 0, errors.New("GitHub's deploy-key answer is unreadable")
+	}
+	return out.ID, nil
 }

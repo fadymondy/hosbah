@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -143,6 +144,35 @@ func (s *Service) CloneToken(ctx context.Context, teamID, repoURL, agentKey stri
 		return "", err
 	}
 	return agentproto.SealBox(agentKey, agentproto.GitTokenContext(repoURL), []byte(token))
+}
+
+// AddDeployKeyToRepo adds publicKey (one OpenSSH authorized_keys line) as a read-only deploy key
+// of ownerRepo ("owner/name") on GitHub, through the team's installation that covers it. It fails
+// with ErrGitHubNotConfigured (no App), or a plain error naming the repository when no installation
+// of the team covers it, or whatever GitHub itself refused with.
+func (s *Service) AddDeployKeyToRepo(ctx context.Context, teamID, ownerRepo, title, publicKey string) (int64, error) {
+	g := s.gh()
+	if !g.Configured() {
+		return 0, ErrGitHubNotConfigured
+	}
+	owner, repo, ok := strings.Cut(ownerRepo, "/")
+	if !ok || owner == "" || repo == "" {
+		return 0, errors.New("repo must be \"owner/name\"")
+	}
+	var (
+		in db.GithubInstallation
+		found bool
+	)
+	if err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
+		in, found = installationForRepo(ctx, q, teamID, "https://github.com/"+ownerRepo)
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+	if !found {
+		return 0, fmt.Errorf("no connected GitHub installation of this team covers %s", ownerRepo)
+	}
+	return g.AddDeployKey(ctx, in.InstallationID, owner, repo, title, publicKey, true)
 }
 
 // InstallationError is a refusal of the setup callback, with the code the web page shows.

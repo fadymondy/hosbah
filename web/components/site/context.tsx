@@ -75,3 +75,13 @@ export function useLoadedSite() {
   const detail = v.detail as AppDetail
   return { ...v, detail, app: detail.app as App }
 }
+
+/**
+ * Like useLoadedSite, but null outside a SiteProvider instead of throwing — for components (such
+ * as SiteRules) reused somewhere that is not an app page, e.g. a proxy host's own rules editor.
+ */
+export function useLoadedSiteOptional() {
+  const v = useContext(Ctx)
+  if (!v || !v.detail) return null
+  return { ...v, detail: v.detail, app: v.detail.app as App }
+}

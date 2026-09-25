@@ -6,6 +6,7 @@ import { NetworkIcon, PlusIcon } from "lucide-react"
 import { ConfirmButton } from "@/components/confirm-button"
 import { EditDialog, ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { FormError, useErrorText } from "@/components/form-error"
+import { SiteRules } from "@/components/site/rules"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -141,6 +142,7 @@ export function ServerProxy({ serverId }: { serverId: string }) {
                           </Button>
                         ) : null}
                         <EditProxy host={h} team={team.slug} onSaved={load} />
+                        <ProxyRules host={h} team={team.slug} />
                         <Button size="sm" variant="outline" onClick={() => act(h.id, "PATCH", { enabled: !h.enabled })}>
                           {h.enabled ? t("proxy.disable") : t("proxy.enable")}
                         </Button>
@@ -302,6 +304,27 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Redirects, response headers, basic auth and IP access rules for one proxy host — the same editor
+ * apps use (MH-578), reused here against /api/teams/{team}/proxy-hosts/{host}/rules.
+ */
+function ProxyRules({ host, team }: { host: ProxyHost; team: string }) {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>{t("proxy.rules")}</DialogTrigger>
+      <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto p-0">
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle dir="ltr">{host.hostname}</DialogTitle>
+          <DialogDescription>{t("proxy.rulesHint")}</DialogDescription>
+        </DialogHeader>
+        {open ? <SiteRules basePath={`/api/teams/${team}/proxy-hosts/${host.id}/rules`} /> : null}
       </DialogContent>
     </Dialog>
   )

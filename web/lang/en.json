@@ -462,6 +462,33 @@
     },
     "security": {
       "readOnly": "Your role can view this but not change it.",
+      "access": {
+        "title": "Access",
+        "hint": "The server's root password, and the outbound git deploy key it uses to fetch private repos.",
+        "rootPassword": "Root password",
+        "rootPasswordHint": "Set a new root password with chpasswd. Hosbah generates a strong one unless you give it one, seals it to the server's own key, and shows it to you exactly once — nothing is stored or logged.",
+        "resetPassword": "Reset root password",
+        "resetPasswordTitle": "Reset the root password?",
+        "resetPasswordHint": "This changes the server's root login right away. Anyone using the old password loses access.",
+        "customPassword": "Custom password",
+        "customPasswordPlaceholder": "Leave blank to generate one",
+        "customPasswordHint": "At least 12 characters. Leave blank to have Hosbah generate a strong password for you.",
+        "passwordTooShort": "Password must be at least 12 characters.",
+        "resetPasswordConfirm": "Reset password",
+        "resetPasswordDone": "Password reset",
+        "resetPasswordDoneHint": "Copy it now — Hosbah does not store or show it again.",
+        "deployKey": "Deploy key",
+        "deployKeyHint": "An ed25519 keypair generated on the server itself; only the public half ever leaves it. Use it to grant this server read-only access to a private Git repository.",
+        "deployKeyEmpty": "No deploy key generated yet.",
+        "deployKeyGenerate": "Generate deploy key",
+        "deployKeyRegenerate": "Regenerate",
+        "deployKeyGenerated": "Deploy key generated.",
+        "addToGithub": "Add to GitHub",
+        "addToGithubHint": "Adds this server's public key as a read-only deploy key of a repository your team's connected GitHub App installation can reach.",
+        "addToGithubConfirm": "Add key",
+        "repo": "Repository",
+        "githubAdded": "Deploy key added to {repo}."
+      },
       "firewall": {
         "title": "Firewall",
         "hint": "Rules render into one nftables table on the server (table inet hosbah) and load only when you press Apply.",
@@ -1861,7 +1888,9 @@
     "remove": "Remove",
     "removeConfirm": "Remove {host}? Caddy stops serving it at once.",
     "save": "Add proxy host",
-    "noServers": "Enrol a server first — proxy hosts run on a server's Caddy."
+    "noServers": "Enrol a server first — proxy hosts run on a server's Caddy.",
+    "rules": "Rules",
+    "rulesHint": "Redirects, response headers, basic auth and IP access rules for this proxy host, rendered into its Caddy route."
   },
   "sharedServices": {
     "description": "Proxmox guests classified as shared infrastructure — a shared Postgres, Redis, a browser box — found on every facts refresh. Rename, recategorise or hide one; the change sticks.",

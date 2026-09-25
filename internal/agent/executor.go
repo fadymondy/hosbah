@@ -126,6 +126,8 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindPkgAutoupdateSet: pkgAutoupdateSet,
 		agentproto.KindSSHKeyInstall:    sshkeyInstall,
 		agentproto.KindSSHKeyUninstall:  sshkeyUninstall,
+		agentproto.KindPasswdSet:        passwdSet,
+		agentproto.KindDeployKeyGenerate: deployKeyGenerate,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{

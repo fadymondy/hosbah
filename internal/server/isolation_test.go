@@ -539,6 +539,11 @@ func TestIsolationSweep(t *testing.T) {
 		"ssh_keys_remove":    {"key": sshKeyA.ID, "confirm": sshKeyA.Name},
 		"ssh_keys_install":   {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
 		"ssh_keys_uninstall": {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
+		// MH-578 C9/C11: resetting A's root password, and A's deploy key, from team B.
+		"security_reset_root_password":    {"server": srvA, "confirm": "alpha-" + suffix},
+		"server_deploy_key_get":           {"server": srvA},
+		"server_deploy_key_generate":      {"server": srvA},
+		"server_deploy_key_add_to_github": {"server": srvA, "repo": "octocat/hello-world", "confirm": "alpha-" + suffix},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

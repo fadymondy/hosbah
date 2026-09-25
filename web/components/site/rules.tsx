@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { PlusIcon, XIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
-import { useLoadedSite } from "@/components/site/context"
+import { useLoadedSiteOptional } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -52,13 +52,17 @@ function emptyRules(): HTTPRules {
  * Redirects, response headers and access rules (MH-578 E4-E6) rendered into this app's own Caddy
  * route by the agent. Rate limiting is not offered: the agent's plain Caddy build has no rate-limit
  * module, and this project does not rebuild Caddy to add one (see internal/deploy/httprules.go).
+ *
+ * Reused for proxy hosts (MH-578 C-rules): pass `basePath` to point at
+ * `/api/teams/{team}/proxy-hosts/{proxy}/rules` instead of an app's own `{path}/rules`. Without it,
+ * this falls back to the app rendered by `useLoadedSite()`.
  */
-export function SiteRules() {
+export function SiteRules({ basePath }: { basePath?: string } = {}) {
   const { t } = useI18n()
   const { manage } = useTeam()
-  const { path } = useLoadedSite()
+  const site = useLoadedSiteOptional()
   const errorText = useErrorText()
-  const base = `${path}/rules`
+  const base = basePath ?? `${site?.path}/rules`
 
   const [rules, setRules] = useState<HTTPRules | null>(null)
   const [error, setError] = useState<string | null>(null)
