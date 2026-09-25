@@ -1,0 +1,47 @@
+# Written from n8n's own documentation (docs.n8n.io: "Server setup" > "Environment variables",
+# "Deployment" > "Docker", "Hosting n8n behind a reverse proxy") and the n8nio/n8n image's Dockerfile.
+# verified: false — written from the documentation but not yet run end to end by Hosbah.
+id: n8n
+name: n8n
+summary: "A workflow automation tool: build integrations with a visual, node-based editor."
+description: >-
+  n8n connects apps and APIs with a visual workflow editor: triggers, actions and its own scripting
+  node. Hosbah runs the official image with a generated encryption key (N8N_ENCRYPTION_KEY, which
+  protects saved credentials — back it up, it cannot be recovered) and keeps its data, including the
+  built-in SQLite database, workflows and credentials, on a volume. Create the first owner account on
+  first visit to the hostname. n8n does not take a single connection URL for an external database
+  (only split host/user/password variables), so this recipe keeps its default embedded SQLite, which
+  is fine for one user or a small team; heavier use should watch the container's memory. Give it a
+  hostname so webhook URLs (Settings > n8n API, or a trigger node's "Webhook URLs") resolve to
+  somewhere reachable — open n8n's own settings and set the public URL there once it is up.
+homepage: https://n8n.io
+licence: Apache-2.0
+kind: app
+version: "1.0.0"
+verified: false
+image: n8nio/n8n:1.68.0
+port: 5678
+healthcheck: /healthz
+env:
+  - name: N8N_ENCRYPTION_KEY
+    generate: { length: 32, charset: hex }
+    secret: true
+  - name: N8N_PORT
+    value: "5678"
+  - name: N8N_PROTOCOL
+    value: "http"
+  - name: N8N_RUNNERS_ENABLED
+    value: "true"
+  - name: GENERIC_TIMEZONE
+    value: "UTC"
+  - name: N8N_DIAGNOSTICS_ENABLED
+    value: "false"
+volumes:
+  - name: data
+    mount_path: /home/node/.n8n
+limits:
+  memory_mb: 1024
+  cpus: 1
+exposes:
+  - env: N8N_URL
+    template: "https://{host}"

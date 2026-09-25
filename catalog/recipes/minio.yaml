@@ -1,0 +1,49 @@
+# Written from MinIO's own documentation (min.io/docs: "MinIO Server Config Settings", "Deploy a
+# Single-Node Single-Drive Deployment", the MINIO_ROOT_USER/MINIO_ROOT_PASSWORD and
+# MINIO_CONSOLE_ADDRESS settings) and the minio/minio image's entrypoint. This is a second, standalone
+# MinIO container next to a site — separate from Hosbah's own managed "minio" data service kind
+# (internal/dbsvc), which every server already gets for S3-compatible buckets.
+# verified: false — written from the documentation but not yet run end to end by Hosbah.
+id: minio
+name: MinIO
+summary: A self-hosted, S3-compatible object store with a web console, for a site's own bucket.
+description: >-
+  MinIO serves S3-compatible object storage plus a web console to browse it. Hosbah generates the
+  root user and password (MINIO_ROOT_USER, MINIO_ROOT_PASSWORD — sealed, set on the site) and keeps
+  data on a volume. The S3 API (port 9000) gets the install's hostname, so MINIO_S3_URL is
+  https://<hostname> — point an S3 client at it with path-style addressing. The console (port 9001)
+  is a second, extra port: Hosbah does not attach a hostname to it yet, but its address on the
+  server's 127.0.0.1 shows in the install's status (list_app_installs / GET installs) once it is up;
+  reach it by adding a proxy host to that port yourself, or over an SSH tunnel.
+homepage: https://min.io
+licence: AGPL-3.0-only
+kind: app
+version: "1.0.0"
+verified: false
+image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+port: 9000
+healthcheck: /minio/health/live
+extra_port: 9001
+extra_port_name: console
+env:
+  - name: MINIO_ROOT_USER
+    generate: { length: 20, charset: alnum }
+    secret: true
+    inject_as: MINIO_ROOT_USER
+  - name: MINIO_ROOT_PASSWORD
+    generate: { length: 32, charset: alnum }
+    secret: true
+    inject_as: MINIO_ROOT_PASSWORD
+  - name: MINIO_CONSOLE_ADDRESS
+    value: ":9001"
+  - name: MINIO_BROWSER_REDIRECT
+    value: "false"
+volumes:
+  - name: data
+    mount_path: /data
+limits:
+  memory_mb: 512
+  cpus: 1
+exposes:
+  - env: MINIO_S3_URL
+    template: "https://{host}"

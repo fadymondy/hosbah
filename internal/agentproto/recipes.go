@@ -100,8 +100,9 @@ func (p RecipeInstallParams) Validate() error {
 }
 
 type RecipeInstallResult struct {
-	Container string `json:"container"`
-	HostPort  int    `json:"host_port"` // on 127.0.0.1; 0 for a headless recipe
+	Container     string `json:"container"`
+	HostPort      int    `json:"host_port"`       // on 127.0.0.1; 0 for a headless recipe
+	ExtraHostPort int    `json:"extra_host_port"` // on 127.0.0.1; 0 when the recipe has no extra_port
 }
 
 // RecipeRemoveParams: recipe.remove. The volumes are found by the install's derived prefix, so a
@@ -147,11 +148,12 @@ func (p RecipeStatusParams) Validate() error {
 // InstallState is one install as the server sees it. HostPort is the loopback port its HTTP port is
 // published on NOW (Docker picks a new one when the container restarts); 0 when unknown or headless.
 type InstallState struct {
-	InstallID   string `json:"install_id"`
-	Running     bool   `json:"running"`
-	Restarts    int    `json:"restarts"`
-	MemoryBytes *int64 `json:"memory_bytes"`
-	HostPort    int    `json:"host_port"`
+	InstallID     string `json:"install_id"`
+	Running       bool   `json:"running"`
+	Restarts      int    `json:"restarts"`
+	MemoryBytes   *int64 `json:"memory_bytes"`
+	HostPort      int    `json:"host_port"`
+	ExtraHostPort int    `json:"extra_host_port"` // on 127.0.0.1; 0 when the recipe has no extra_port
 }
 
 type RecipeStatusResult struct {

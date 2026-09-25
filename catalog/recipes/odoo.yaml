@@ -1,0 +1,46 @@
+# Written from the official Odoo image's own documentation (hub.docker.com/_/odoo: "How to use this
+# image", the HOST/PORT/USER/PASSWORD variables) and Odoo's own docs (odoo.com/documentation:
+# "Deployment", the /web/health route added in 17.0). The image takes its database server apart
+# (host, port, user, password), not one connection URL, and creates its own database(s) through its
+# own setup wizard — the connecting role needs CREATEDB on the managed Postgres service.
+# verified: false — written from the documentation but not yet run end to end by Hosbah.
+id: odoo
+name: Odoo
+summary: The Odoo business apps suite (CRM, sales, inventory, accounting and more), community edition.
+description: >-
+  Odoo is a suite of business apps (CRM, sales, inventory, accounting, website, and more) sharing one
+  database. Hosbah runs the official Community image against a managed Postgres service on the same
+  server: the role given a Postgres user must be able to CREATE DATABASE, because Odoo's own database
+  manager (first visit to the hostname) creates and names the database itself. Filestore (attachments,
+  reports) and sessions live on a volume. Odoo is heavier than the other recipes here — give it a
+  server with real headroom.
+homepage: https://www.odoo.com
+licence: LGPL-3.0-only
+kind: app
+version: "1.0.0"
+verified: false
+image: library/odoo:17.0
+port: 8069
+healthcheck: /web/health
+needs:
+  postgres: true
+env:
+  - name: HOST
+    from: postgres_host
+  - name: PORT
+    from: postgres_port
+  - name: USER
+    from: postgres_user
+    secret: true
+  - name: PASSWORD
+    from: postgres_password
+    secret: true
+volumes:
+  - name: data
+    mount_path: /var/lib/odoo
+limits:
+  memory_mb: 2048
+  cpus: 2
+exposes:
+  - env: ODOO_URL
+    template: "https://{host}"

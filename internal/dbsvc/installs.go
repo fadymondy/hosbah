@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,6 +82,7 @@ type AppInstall struct {
 	Running       *bool     `json:"running" doc:"Whether its container runs; null when the server did not answer."`
 	Restarts      *int64    `json:"restarts"`
 	MemoryBytes   *int64    `json:"memory_bytes"`
+	ExtraHostPort *int64    `json:"extra_host_port" doc:"The recipe's extra_port (e.g. an admin console) on the server's 127.0.0.1; null until the server answered, and for a recipe without one. Not proxied automatically."`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -104,6 +108,7 @@ type InstallSpec struct {
 	Recipe   string
 	Name     string
 	Postgres string // a managed Postgres on the same server, when the recipe needs one
+	MySQL    string // a managed MySQL/MariaDB on the same server, when the recipe needs one
 	Redis    string
 	Hostname string // optional: a proxy host to the install's web UI
 }
@@ -177,6 +182,10 @@ func WithInstallStatus(installs []AppInstall, res agentproto.RecipeStatusResult)
 			if st.InstallID == installs[i].ID {
 				running, restarts := st.Running, int64(st.Restarts)
 				installs[i].Running, installs[i].Restarts, installs[i].MemoryBytes = &running, &restarts, st.MemoryBytes
+				if st.ExtraHostPort > 0 {
+					extra := int64(st.ExtraHostPort)
+					installs[i].ExtraHostPort = &extra
+				}
 			}
 		}
 	}
@@ -243,36 +252,81 @@ func generateValue(g catalog.RecipeGenerate) string {
 	return randFrom(pwAlphabet, g.Length)
 }
 
-// neededService resolves the data service a recipe needs: the caller's choice, of the right kind,
-// running, on the app's server. Step 1 never creates one.
-func (s *Service) neededService(ctx context.Context, q *db.Queries, teamID string, a db.App, needed bool, kind, ref string) (string, error) {
+// resolvedService resolves the data service a recipe needs: the caller's choice, of the right kind,
+// running, on the app's server. Step 1 never creates one. A zero db.DataService (ID == "") means the
+// recipe does not need this kind.
+func (s *Service) resolvedService(ctx context.Context, q *db.Queries, teamID string, a db.App, needed bool, kind, ref string) (db.DataService, error) {
 	ref = strings.TrimSpace(ref)
 	if !needed {
 		if ref != "" {
-			return "", invalid("this recipe does not use a " + kind + " service")
+			return db.DataService{}, invalid("this recipe does not use a " + kind + " service")
 		}
-		return "", nil
+		return db.DataService{}, nil
 	}
 	if ref == "" {
-		return "", invalid("this recipe needs a managed " + kind + " service on the app's server: give its name or id as " + kind)
+		return db.DataService{}, invalid("this recipe needs a managed " + kind + " service on the app's server: give its name or id as " + kind)
 	}
 	svc, err := ServiceByRef(ctx, q, teamID, ref)
 	if err != nil {
-		return "", err
+		return db.DataService{}, err
 	}
 	if err := usable(svc); err != nil {
-		return "", err
+		return db.DataService{}, err
 	}
 	switch {
 	case svc.Kind != kind:
-		return "", invalid(svc.Name + " is a " + svc.Kind + " service, not " + kind)
+		return db.DataService{}, invalid(svc.Name + " is a " + svc.Kind + " service, not " + kind)
 	case svc.ServerID != a.ServerID:
-		return "", invalid(svc.Name + " is on another server — an install uses a data service on the app's own server")
+		return db.DataService{}, invalid(svc.Name + " is on another server — an install uses a data service on the app's own server")
 	case svc.Status != "running" || svc.Host == nil || svc.Port == nil:
-		return "", conflict("the service is not running yet")
+		return db.DataService{}, conflict("the service is not running yet")
 	}
-	_, connURL, err := s.connString(ctx, q, teamID, svc, "")
-	return connURL, err
+	return svc, nil
+}
+
+// serviceParts is a data service's connection string, and its pieces, for a recipe that takes a
+// connection apart (env: from: postgres_host, mysql_user, …) instead of one URL.
+type serviceParts struct{ URL, Host, Port, HostPort, Database, User, Password string }
+
+// connParts resolves a service's connection into serviceParts. Zero db.DataService (ID == "") yields
+// a zero serviceParts — used when a recipe does not need that kind.
+func (s *Service) connParts(ctx context.Context, q *db.Queries, teamID string, svc db.DataService) (serviceParts, error) {
+	if svc.ID == "" {
+		return serviceParts{}, nil
+	}
+	host, port := derefStr(svc.Host), int(derefInt(svc.Port))
+	hostPort := fmt.Sprintf("%s:%d", host, port)
+	if svc.Kind == "redis" {
+		return serviceParts{URL: fmt.Sprintf("redis://%s:%d", host, port), Host: host, Port: strconv.Itoa(port), HostPort: hostPort}, nil
+	}
+	users, err := q.ListDatabaseUsersOfService(ctx, db.ListDatabaseUsersOfServiceParams{DataServiceID: svc.ID, TeamID: teamID})
+	if err != nil || len(users) == 0 {
+		return serviceParts{}, conflict("create a database and user first")
+	}
+	u := users[0]
+	dbName := u.Name
+	if u.DatabaseID != nil {
+		if d, err := q.DatabaseInTeam(ctx, db.DatabaseInTeamParams{ID: *u.DatabaseID, TeamID: teamID}); err == nil {
+			dbName = d.Name
+		}
+	}
+	dek, err := s.ops.TeamDEK(ctx, q, teamID)
+	if err != nil {
+		return serviceParts{}, err
+	}
+	pt, err := crypto.Open(dek, teamID, userContext(svc.ID, u.Name), u.PasswordSealed)
+	if err != nil {
+		return serviceParts{}, errors.New("the user password could not be opened")
+	}
+	scheme := "postgres"
+	if svc.Kind == "mysql" {
+		scheme = "mysql"
+	}
+	ui := url.UserPassword(u.Name, string(pt))
+	return serviceParts{
+		URL:  fmt.Sprintf("%s://%s@%s:%d/%s", scheme, ui.String(), host, port, dbName),
+		Host: host, Port: strconv.Itoa(port), HostPort: hostPort, Database: dbName, User: u.Name, Password: string(pt),
+	}, nil
 }
 
 // CreateInstall records the install, reserves its hostname, sets its variables on the site and
@@ -319,13 +373,38 @@ func (s *Service) CreateInstall(ctx context.Context, q *db.Queries, teamID strin
 			return out, conflict("install " + name + " already exists on " + a.Name)
 		}
 	}
-	pgURL, err := s.neededService(ctx, q, teamID, a, r.Needs.Postgres, "postgres", in.Postgres)
+	pgSvc, err := s.resolvedService(ctx, q, teamID, a, r.Needs.Postgres, "postgres", in.Postgres)
 	if err != nil {
 		return out, err
 	}
-	redisURL, err := s.neededService(ctx, q, teamID, a, r.Needs.Redis, "redis", in.Redis)
+	mysqlSvc, err := s.resolvedService(ctx, q, teamID, a, r.Needs.MySQL, "mysql", in.MySQL)
 	if err != nil {
 		return out, err
+	}
+	redisSvc, err := s.resolvedService(ctx, q, teamID, a, r.Needs.Redis, "redis", in.Redis)
+	if err != nil {
+		return out, err
+	}
+	pgParts, err := s.connParts(ctx, q, teamID, pgSvc)
+	if err != nil {
+		return out, err
+	}
+	mysqlParts, err := s.connParts(ctx, q, teamID, mysqlSvc)
+	if err != nil {
+		return out, err
+	}
+	redisParts, err := s.connParts(ctx, q, teamID, redisSvc)
+	if err != nil {
+		return out, err
+	}
+	fromValue := map[string]string{
+		catalog.FromPostgresURL: pgParts.URL, catalog.FromPostgresHost: pgParts.Host, catalog.FromPostgresPort: pgParts.Port,
+		catalog.FromPostgresHostPort: pgParts.HostPort,
+		catalog.FromPostgresDatabase: pgParts.Database, catalog.FromPostgresUser: pgParts.User, catalog.FromPostgresPassword: pgParts.Password,
+		catalog.FromMySQLURL: mysqlParts.URL, catalog.FromMySQLHost: mysqlParts.Host, catalog.FromMySQLPort: mysqlParts.Port,
+		catalog.FromMySQLHostPort: mysqlParts.HostPort,
+		catalog.FromMySQLDatabase: mysqlParts.Database, catalog.FromMySQLUser: mysqlParts.User, catalog.FromMySQLPassword: mysqlParts.Password,
+		catalog.FromRedisURL: redisParts.URL,
 	}
 
 	// The container's secret env (the box) and the generated values (sealed at rest).
@@ -335,10 +414,8 @@ func (s *Service) CreateInstall(ctx context.Context, q *db.Queries, teamID strin
 		case e.Generate != nil:
 			generated[e.Name] = generateValue(*e.Generate)
 			boxed[e.Name] = generated[e.Name]
-		case e.From == catalog.FromPostgresURL:
-			boxed[e.Name] = pgURL
-		case e.From == catalog.FromRedisURL:
-			boxed[e.Name] = redisURL
+		case e.From != "":
+			boxed[e.Name] = fromValue[e.From]
 		}
 	}
 	// What the site gets. Nothing that needs an address when there is none.

@@ -39,12 +39,56 @@ const (
 	KindStack = "stack"
 )
 
-// Where an env value comes from when it is neither literal nor generated. Both need the matching
-// `needs` flag and the caller's choice of a managed data service on the same server.
+// Where an env value comes from when it is neither literal nor generated: one whole connection URL,
+// or one of its parts, of a managed data service on the same server as the install. Each needs the
+// matching `needs` flag and the caller's choice of that service. The *_host, *_port and *_database
+// parts are for images (WordPress, Odoo, …) that take a data service apart instead of one URL; only
+// the credential parts (*_url, *_user, *_password) must say secret: true.
 const (
-	FromPostgresURL = "postgres_url"
-	FromRedisURL    = "redis_url"
+	FromPostgresURL      = "postgres_url"
+	FromPostgresHost     = "postgres_host"
+	FromPostgresPort     = "postgres_port"
+	FromPostgresHostPort = "postgres_hostport" // "host:port", for an image that takes one address field
+	FromPostgresDatabase = "postgres_database"
+	FromPostgresUser     = "postgres_user"
+	FromPostgresPassword = "postgres_password"
+	FromMySQLURL         = "mysql_url"
+	FromMySQLHost        = "mysql_host"
+	FromMySQLPort        = "mysql_port"
+	FromMySQLHostPort    = "mysql_hostport" // "host:port", for an image that takes one address field (e.g. WordPress's WORDPRESS_DB_HOST)
+	FromMySQLDatabase    = "mysql_database"
+	FromMySQLUser        = "mysql_user"
+	FromMySQLPassword    = "mysql_password"
+	FromRedisURL         = "redis_url"
 )
+
+// fromRequirement names, for a `from`, which `needs` flag it requires.
+var fromRequirement = map[string]string{
+	FromPostgresURL: "postgres", FromPostgresHost: "postgres", FromPostgresPort: "postgres", FromPostgresHostPort: "postgres",
+	FromPostgresDatabase: "postgres", FromPostgresUser: "postgres", FromPostgresPassword: "postgres",
+	FromMySQLURL: "mysql", FromMySQLHost: "mysql", FromMySQLPort: "mysql", FromMySQLHostPort: "mysql",
+	FromMySQLDatabase: "mysql", FromMySQLUser: "mysql", FromMySQLPassword: "mysql",
+	FromRedisURL: "redis",
+}
+
+// fromNeedsSecret: the from values that carry a credential, which must say secret: true.
+var fromNeedsSecret = map[string]bool{
+	FromPostgresURL: true, FromPostgresUser: true, FromPostgresPassword: true,
+	FromMySQLURL: true, FromMySQLUser: true, FromMySQLPassword: true,
+	FromRedisURL: true,
+}
+
+func (n RecipeNeeds) has(what string) bool {
+	switch what {
+	case "postgres":
+		return n.Postgres
+	case "mysql":
+		return n.MySQL
+	case "redis":
+		return n.Redis
+	}
+	return false
+}
 
 // Charsets of a generated value. Both are safe inside a URL, an env file and a template.
 const (
@@ -67,19 +111,20 @@ const (
 var AllowedCaps = []string{"CHOWN", "DAC_OVERRIDE", "FOWNER", "NET_BIND_SERVICE", "SETGID", "SETUID"}
 
 var (
-	idRE       = regexp.MustCompile(`^[a-z][a-z0-9-]{1,40}$`)
-	versionRE  = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,4}){0,2}$`)
-	licenceRE  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+-]{0,40}$`)
-	envNameRE  = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
-	healthRE   = regexp.MustCompile(`^/[A-Za-z0-9._/-]{0,100}$`)
-	repoRE     = regexp.MustCompile(`^https://github\.com/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`)
-	branchRE   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$`)
-	runtimeRE  = regexp.MustCompile(`^[a-z][a-z0-9-]{0,20}$`)
-	imageRE    = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(:[0-9]{1,5})?(/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$`)
-	tagRE      = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
-	digestRE   = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
-	placeRE    = regexp.MustCompile(`\{([^{}]*)\}`)
-	floatingRE = regexp.MustCompile(`^(latest|stable|edge|main|master|nightly|dev|develop)$`)
+	idRE            = regexp.MustCompile(`^[a-z][a-z0-9-]{1,40}$`)
+	versionRE       = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,4}){0,2}$`)
+	licenceRE       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+-]{0,40}$`)
+	envNameRE       = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
+	healthRE        = regexp.MustCompile(`^/[A-Za-z0-9._/-]{0,100}$`)
+	repoRE          = regexp.MustCompile(`^https://github\.com/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`)
+	branchRE        = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$`)
+	runtimeRE       = regexp.MustCompile(`^[a-z][a-z0-9-]{0,20}$`)
+	imageRE         = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(:[0-9]{1,5})?(/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)+$`)
+	tagRE           = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
+	extraPortNameRE = regexp.MustCompile(`^[a-z][a-z0-9-]{0,20}$`)
+	digestRE        = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+	placeRE         = regexp.MustCompile(`\{([^{}]*)\}`)
+	floatingRE      = regexp.MustCompile(`^(latest|stable|edge|main|master|nightly|dev|develop)$`)
 )
 
 // Recipe is one document of the catalog. App fields are top-level; a stack's are under `stack`.
@@ -95,15 +140,17 @@ type Recipe struct {
 	Verified    bool   `yaml:"verified" json:"verified" doc:"false: written from the documentation but not yet run end to end by Hosbah."`
 	HasWebUI    bool   `yaml:"-" json:"has_web_ui" doc:"Derived: an app with an HTTP port a hostname can be put in front of."`
 
-	Image       string         `yaml:"image,omitempty" json:"image,omitempty" doc:"App: the image, pinned by tag or digest."`
-	Port        int            `yaml:"port,omitempty" json:"port,omitempty" doc:"App: the container's HTTP port; 0 for a headless service."`
-	Healthcheck string         `yaml:"healthcheck,omitempty" json:"healthcheck,omitempty" doc:"App: a path that answers 2xx when it is up."`
-	Env         []RecipeEnv    `yaml:"env,omitempty" json:"env"`
-	Volumes     []RecipeVolume `yaml:"volumes,omitempty" json:"volumes"`
-	Limits      RecipeLimits   `yaml:"limits,omitempty" json:"limits"`
-	Caps        []string       `yaml:"caps,omitempty" json:"caps" doc:"App: capabilities added back after --cap-drop ALL, from a fixed allow-list."`
-	Needs       RecipeNeeds    `yaml:"needs,omitempty" json:"needs"`
-	Exposes     []RecipeExpose `yaml:"exposes,omitempty" json:"exposes"`
+	Image         string         `yaml:"image,omitempty" json:"image,omitempty" doc:"App: the image, pinned by tag or digest."`
+	Port          int            `yaml:"port,omitempty" json:"port,omitempty" doc:"App: the container's HTTP port; 0 for a headless service."`
+	Healthcheck   string         `yaml:"healthcheck,omitempty" json:"healthcheck,omitempty" doc:"App: a path that answers 2xx when it is up."`
+	ExtraPort     int            `yaml:"extra_port,omitempty" json:"extra_port,omitempty" doc:"App: a second container port published on 127.0.0.1 (needs port), e.g. a separate admin console. Not attached to the install's hostname; its published port shows in the install's status."`
+	ExtraPortName string         `yaml:"extra_port_name,omitempty" json:"extra_port_name,omitempty" doc:"A short label for extra_port, e.g. \"console\"."`
+	Env           []RecipeEnv    `yaml:"env,omitempty" json:"env"`
+	Volumes       []RecipeVolume `yaml:"volumes,omitempty" json:"volumes"`
+	Limits        RecipeLimits   `yaml:"limits,omitempty" json:"limits"`
+	Caps          []string       `yaml:"caps,omitempty" json:"caps" doc:"App: capabilities added back after --cap-drop ALL, from a fixed allow-list."`
+	Needs         RecipeNeeds    `yaml:"needs,omitempty" json:"needs"`
+	Exposes       []RecipeExpose `yaml:"exposes,omitempty" json:"exposes"`
 
 	Stack *RecipeStack `yaml:"stack,omitempty" json:"stack,omitempty"`
 }
@@ -139,6 +186,7 @@ type RecipeLimits struct {
 // RecipeNeeds names the managed data services the install uses. The caller chooses existing ones.
 type RecipeNeeds struct {
 	Postgres bool `yaml:"postgres,omitempty" json:"postgres"`
+	MySQL    bool `yaml:"mysql,omitempty" json:"mysql"`
 	Redis    bool `yaml:"redis,omitempty" json:"redis"`
 }
 
@@ -273,8 +321,8 @@ func (r Recipe) Validate() error {
 		}
 		return r.validateApp()
 	case KindStack:
-		if r.Image != "" || r.Port != 0 || r.Healthcheck != "" || len(r.Env)+len(r.Volumes)+len(r.Caps)+len(r.Exposes) > 0 ||
-			r.Limits != (RecipeLimits{}) || r.Needs != (RecipeNeeds{}) {
+		if r.Image != "" || r.Port != 0 || r.Healthcheck != "" || r.ExtraPort != 0 || r.ExtraPortName != "" ||
+			len(r.Env)+len(r.Volumes)+len(r.Caps)+len(r.Exposes) > 0 || r.Limits != (RecipeLimits{}) || r.Needs != (RecipeNeeds{}) {
 			return errors.New("a stack recipe has no app fields (image, port, env, volumes, limits, caps, needs, exposes)")
 		}
 		if r.Stack == nil {
@@ -294,6 +342,16 @@ func (r Recipe) validateApp() error {
 	}
 	if r.Healthcheck != "" && (r.Port == 0 || !healthRE.MatchString(r.Healthcheck)) {
 		return errors.New("healthcheck is a path like /healthz and needs a port")
+	}
+	switch {
+	case r.ExtraPort != 0 && r.Port == 0:
+		return errors.New("extra_port needs a primary port")
+	case r.ExtraPort != 0 && (r.ExtraPort < 1 || r.ExtraPort > 65535 || r.ExtraPort == r.Port):
+		return errors.New("extra_port must be 1 to 65535 and differ from port")
+	case r.ExtraPort != 0 && !extraPortNameRE.MatchString(r.ExtraPortName):
+		return errors.New("extra_port_name is required, a short lowercase label")
+	case r.ExtraPort == 0 && r.ExtraPortName != "":
+		return errors.New("extra_port_name without extra_port")
 	}
 	if r.Limits.MemoryMB < MinMemoryMB || r.Limits.MemoryMB > MaxMemoryMB {
 		return fmt.Errorf("limits.memory_mb is required, %d to %d", MinMemoryMB, MaxMemoryMB)
@@ -361,12 +419,16 @@ func (r Recipe) validateApp() error {
 			if !e.Secret {
 				return fmt.Errorf("env %s is generated, so it must say secret: true", e.Name)
 			}
-		case e.From == FromPostgresURL && r.Needs.Postgres, e.From == FromRedisURL && r.Needs.Redis:
-			if !e.Secret {
-				return fmt.Errorf("env %s carries a connection string, so it must say secret: true", e.Name)
+		case e.From != "":
+			need, known := fromRequirement[e.From]
+			if !known || !r.Needs.has(need) {
+				return fmt.Errorf("env %s: from %q is unknown, or the recipe does not declare the matching needs", e.Name, e.From)
+			}
+			if fromNeedsSecret[e.From] && !e.Secret {
+				return fmt.Errorf("env %s carries a credential, so it must say secret: true", e.Name)
 			}
 		default:
-			return fmt.Errorf("env %s: from %q is unknown, or the recipe does not declare the matching needs", e.Name, e.From)
+			return fmt.Errorf("env %s needs exactly one of value, generate and from", e.Name)
 		}
 		if e.InjectAs != "" {
 			if e.From != "" {
