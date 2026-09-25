@@ -18,6 +18,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/account"
 	"github.com/fadymondy/hosbah/internal/api"
+	"github.com/fadymondy/hosbah/internal/apm"
 	"github.com/fadymondy/hosbah/internal/app"
 	"github.com/fadymondy/hosbah/internal/config"
 	"github.com/fadymondy/hosbah/internal/crypto"
@@ -140,7 +141,23 @@ func Boot() *app.App {
 	// rum.Service.CorsPreflight).
 	k.UseMiddleware(realUsers.CorsPreflight)
 	a.RUM = realUsers
-	a.Stop = func() { crons.Close(); realUsers.Stop(); watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
+	// APM (MH-575 H7): traces and grouped exceptions for apps. The OTLP/HTTP JSON ingest routes are
+	// anonymous like RUM's, but bearer-key authenticated (the key is a real secret, unlike RUM's).
+	// Deploys auto-inject the OTEL_* env vars once wired into deploys (SetApm).
+	apmSvc := apm.New(a, svc)
+	apmSvc.Start()
+	apmSvc.MountPublic(k.Router)
+	a.Apm = apmSvc
+	deploys.SetApm(apmSvc)
+	a.Stop = func() {
+		crons.Close()
+		apmSvc.Stop()
+		realUsers.Stop()
+		watch.Stop()
+		databases.StopScheduler()
+		deploys.Stop()
+		svc.Stop()
+	}
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)

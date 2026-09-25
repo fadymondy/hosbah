@@ -58,6 +58,9 @@ type App struct {
 	// RUM is the *rum.Service (typed any for the same reason): H5 real-user monitoring (Core Web
 	// Vitals) for apps, its retention sweep, and the public beacon/ingest routes.
 	RUM any
+	// Apm is the *apm.Service (typed any for the same reason): H7 traces and exceptions for apps,
+	// its retention sweep, and the public OTLP/HTTP JSON ingest routes.
+	Apm any
 }
 
 // New builds the container from the kernel, opening the DB if configured.

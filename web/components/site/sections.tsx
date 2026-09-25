@@ -20,6 +20,7 @@ import {
   RadioIcon,
   RocketIcon,
   ScrollTextIcon,
+  WaypointsIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -51,6 +52,7 @@ export const SITE_SECTIONS: SiteSection[] = [
   { key: "logs", icon: ScrollTextIcon, group: "observe", for: "both", ready: true },
   { key: "analytics", icon: ChartNoAxesColumnIcon, group: "observe", for: "both", ready: true },
   { key: "web-vitals", icon: GaugeIcon, group: "observe", for: "both", ready: true },
+  { key: "apm", icon: WaypointsIcon, group: "observe", for: "both", ready: true },
   { key: "monitors", icon: BellRingIcon, group: "observe", for: "both", ready: true },
   { key: "proxy", icon: NetworkIcon, group: "network", for: "both", ready: true },
   { key: "dns", icon: CloudIcon, group: "network", for: "both", ready: true },

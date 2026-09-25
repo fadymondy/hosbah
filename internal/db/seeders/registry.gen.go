@@ -15,7 +15,19 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAgentEnrollment(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedApmExceptionEvent(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedApmIssue(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedApmSpan(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedApp(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedAppApmSetting(ctx, a); err != nil {
 		return err
 	}
 	if err := SeedAppBrowser(ctx, a); err != nil {
