@@ -403,6 +403,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
 		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
+		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {

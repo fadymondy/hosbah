@@ -8,6 +8,7 @@
 //	hbe_  agent enrolment token         (agent_enrollments)   was cle_  (internal/ops)
 //	hbh_  app deploy-hook token         (apps)                was cdh_  (internal/deploy)
 //	hbp_  heartbeat ping token          (monitors)             new in MH-575 H3
+//	hbr_  RUM ingest key (public, not a secret — travels in page source)  new in MH-575 H5
 //	(none) invitation link token        (invitations)
 //
 // New tokens get the hb*_ prefix. Tokens minted before the rename keep working: the prefix is
@@ -28,6 +29,7 @@ const (
 	PrefixEnrol    = "hbe_"
 	PrefixHook     = "hbh_"
 	PrefixPing     = "hbp_"
+	PrefixRum      = "hbr_"
 
 	// Before the rename from Cloudy. Accepted, never minted.
 	LegacyPrefixUserMCP  = "cld_"
@@ -43,6 +45,7 @@ var (
 	Enrol    = []string{PrefixEnrol, LegacyPrefixEnrol}
 	Hook     = []string{PrefixHook, LegacyPrefixHook}
 	Ping     = []string{PrefixPing}
+	Rum      = []string{PrefixRum}
 )
 
 // HasPrefix reports whether token starts with one of the family's prefixes.

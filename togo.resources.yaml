@@ -398,6 +398,35 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppRumSetting
+      table: app_rum_settings
+      fields:
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: enabled
+          go: bool
+          gql: Boolean!
+          pg: boolean
+          "null": false
+        - name: key_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
     - name: AppTrafficMinute
       table: app_traffic_minutes
       fields:
@@ -2103,6 +2132,60 @@ resources:
           gql: String
           pg: text
           "null": true
+      controller: true
+    - name: RumSample
+      table: rum_samples
+      fields:
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: path
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: device
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: effective_type
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: lcp_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: cls
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: inp_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: fcp_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: ttfb_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
       controller: true
     - name: Schedule
       table: schedules

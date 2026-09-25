@@ -31,6 +31,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/rum"
 	"github.com/fadymondy/hosbah/internal/schedules"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -128,7 +129,18 @@ func Boot() *app.App {
 	crons := schedules.New(a, svc)
 	crons.Start()
 	a.Schedules = crons
-	a.Stop = func() { crons.Close(); watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
+	// Real-user monitoring (MH-575 H5): the beacon (/rum.js) and its ingest endpoint
+	// (POST /api/rum/{key}) are anonymous, outside /api/teams, authenticated only by the app's own
+	// non-secret ingest key — the same shape as the heartbeat ping and deploy-hook routes.
+	realUsers := rum.New(a, svc)
+	realUsers.Start()
+	realUsers.MountPublic(k.Router)
+	// Ahead of chi's router (so ahead of the auth plugin's own blanket CORS middleware, which would
+	// otherwise answer the ingest endpoint's cross-origin preflight itself — see the comment on
+	// rum.Service.CorsPreflight).
+	k.UseMiddleware(realUsers.CorsPreflight)
+	a.RUM = realUsers
+	a.Stop = func() { crons.Close(); realUsers.Stop(); watch.Stop(); databases.StopScheduler(); deploys.Stop(); svc.Stop() }
 
 	humaAPI := humachi.New(k.Router, humaConfig())
 	api.Register(humaAPI, a, svc)
