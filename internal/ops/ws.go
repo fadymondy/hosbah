@@ -88,6 +88,8 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 			s.heartbeat(sctx, ac, f)
 		case agentproto.TypeMetrics:
 			s.liveMetricsFrame(sctx, ac, f)
+		case agentproto.TypeTraffic:
+			s.trafficFrame(sctx, ac, f)
 		case agentproto.TypeEvent:
 			if f.Event != nil {
 				s.recordEvent(sctx, ac, *f.Event)

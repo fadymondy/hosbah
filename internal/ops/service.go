@@ -116,12 +116,13 @@ func New(a *app.App, cfg Config) (*Service, error) {
 func (s *Service) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	s.wg.Add(5)
+	s.wg.Add(6)
 	go s.dispatchLoop(ctx)
 	go s.sweepLoop(ctx)
 	go s.controlPlaneLoop(ctx)
 	go s.metricsRetentionLoop(ctx)
 	go s.factsRefreshLoop(ctx)
+	go s.trafficRetentionLoop(ctx)
 }
 
 // Stop is the counterpart of Start.

@@ -17,6 +17,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/services"
 	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/traffic"
 )
 
 // AppTools are the P2 app tools. They call the same deploy actions as the REST API, so the rules
@@ -240,6 +241,45 @@ func AppTools() []Tool {
 				for _, d := range rows {
 					fmt.Fprintf(&b, "  %s  tls %s  %s  (TXT %s = %s)\n", d.Hostname, d.Tls,
 						map[bool]string{true: "verified", false: "not verified"}[d.VerifiedAt != nil], deploy.VerifyName(d.Hostname), deploy.VerifyValue(d.VerifyToken))
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "app_analytics", Scope: scopes.Read,
+			Description: "An app's traffic history from Caddy's access log: requests over time, status breakdown, top paths and referrers, unique visitors, p50/p95 latency.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg,
+				"range": map[string]any{"type": "string", "enum": []string{"1h", "24h", "7d", "30d"}, "default": "1h"}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				r, ok := traffic.Ranges[args.Str("range")]
+				if !ok {
+					r = traffic.Ranges["1h"]
+				}
+				s, err := traffic.AppSeries(ctx, env.Q, env.Caller.TeamID, a.ID, r, time.Now())
+				if err != nil {
+					return "", errors.New("could not read analytics")
+				}
+				if s.Totals.Requests == 0 {
+					return fmt.Sprintf("%s has no traffic in the last %s.", a.Name, r.Key), nil
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "%s — last %s\nrequests: %d · visitors: %d · error rate: %.1f%% · p95: %.0fms\n",
+					a.Name, r.Key, s.Totals.Requests, s.Totals.Visitors, s.Totals.ErrorRate*100, s.Totals.P95Ms)
+				if len(s.TopPaths) > 0 {
+					b.WriteString("top paths:\n")
+					for _, p := range s.TopPaths {
+						fmt.Fprintf(&b, "  %-30s %d\n", p.Key, p.Count)
+					}
+				}
+				if len(s.TopReferrers) > 0 {
+					b.WriteString("top referrers:\n")
+					for _, ref := range s.TopReferrers {
+						fmt.Fprintf(&b, "  %-30s %d\n", ref.Key, ref.Count)
+					}
 				}
 				return b.String(), nil
 			},

@@ -48,6 +48,10 @@ const (
 	// TypeMetrics is a light, frequent reading (agent -> server, Metrics only) between heartbeats,
 	// for live charts. It does not count as a heartbeat; control planes that predate it ignore it.
 	TypeMetrics = "metrics"
+	// TypeTraffic carries one or more apps' finished minute of Caddy access-log aggregates
+	// (agent -> server, Traffic only), sent once a minute. Control planes that predate it ignore
+	// it (an unknown frame type is simply not switched on).
+	TypeTraffic = "traffic"
 )
 
 // Operation kinds. Typed only: there is no free-form shell.
@@ -97,17 +101,18 @@ const (
 
 // Frame is every WebSocket message.
 type Frame struct {
-	Type         string        `json:"type"`
-	Nonce        string        `json:"nonce,omitempty"`
-	ServerID     string        `json:"server_id,omitempty"`
-	Signature    string        `json:"signature,omitempty"`
-	AgentVersion string        `json:"agent_version,omitempty"`
-	Protocol     int           `json:"protocol,omitempty"`
-	Op           *SignedOp     `json:"op,omitempty"`
-	Event        *Event        `json:"event,omitempty"`
-	Metrics      *Metrics      `json:"metrics,omitempty"`
-	Resume       []ResumeEntry `json:"resume,omitempty"`
-	Error        string        `json:"error,omitempty"`
+	Type         string          `json:"type"`
+	Nonce        string          `json:"nonce,omitempty"`
+	ServerID     string          `json:"server_id,omitempty"`
+	Signature    string          `json:"signature,omitempty"`
+	AgentVersion string          `json:"agent_version,omitempty"`
+	Protocol     int             `json:"protocol,omitempty"`
+	Op           *SignedOp       `json:"op,omitempty"`
+	Event        *Event          `json:"event,omitempty"`
+	Metrics      *Metrics        `json:"metrics,omitempty"`
+	Traffic      []TrafficMinute `json:"traffic,omitempty"`
+	Resume       []ResumeEntry   `json:"resume,omitempty"`
+	Error        string          `json:"error,omitempty"`
 }
 
 // SignedOp is an operation as the agent receives it.
@@ -168,6 +173,32 @@ type Metrics struct {
 	// non-virtual interfaces (/proc/net/dev deltas). Zero on the first beat.
 	NetRxBytesPerSec float64 `json:"net_rx_bytes_per_sec,omitempty"`
 	NetTxBytesPerSec float64 `json:"net_tx_bytes_per_sec,omitempty"`
+}
+
+// KeyCount is one entry of a ranked list (a path or a referrer host, and how many requests it
+// had), already sorted and capped by the agent.
+type KeyCount struct {
+	Key   string `json:"key"`
+	Count int64  `json:"count"`
+}
+
+// TrafficMinute is one app's Caddy access-log aggregate for one whole, finished minute. The agent
+// builds it from its own routes table (which app a hostname belongs to) and Caddy's JSON access
+// log; the control plane never sees a raw IP address or user agent, only these counts.
+type TrafficMinute struct {
+	AppID          string     `json:"app_id"`
+	At             time.Time  `json:"at" doc:"Start of the minute (UTC, truncated to the minute)."`
+	Requests       int64      `json:"requests"`
+	Status2xx      int64      `json:"status_2xx"`
+	Status3xx      int64      `json:"status_3xx"`
+	Status4xx      int64      `json:"status_4xx"`
+	Status5xx      int64      `json:"status_5xx"`
+	BytesOut       int64      `json:"bytes_out"`
+	DurationP50Ms  float64    `json:"duration_p50_ms"`
+	DurationP95Ms  float64    `json:"duration_p95_ms"`
+	UniqueVisitors int64      `json:"unique_visitors" doc:"Distinct sha256(ip+user_agent) seen in the minute."`
+	TopPaths       []KeyCount `json:"top_paths"`
+	TopReferrers   []KeyCount `json:"top_referrers"`
 }
 
 // ---- signing ---------------------------------------------------------------------------------

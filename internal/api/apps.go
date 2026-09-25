@@ -19,6 +19,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/services"
 	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/traffic"
 )
 
 // ---- contract ------------------------------------------------------------------------------------
@@ -465,6 +466,33 @@ func (d *deps) registerApps(api huma.API) {
 			}
 			out.Body, err = d.appDetail(ctx, q, m, a)
 			return err
+		})
+		return out, err
+	})
+
+	type analyticsIn struct {
+		AppPath
+		Range string `query:"range" enum:"1h,24h,7d,30d" default:"1h"`
+	}
+	type analyticsOut struct{ Body traffic.AnalyticsSeries }
+	huma.Register(api, huma.Operation{OperationID: "get-app-analytics", Method: http.MethodGet, Path: "/api/teams/{team}/apps/{app}/analytics",
+		Summary: "An app's traffic history for a range: requests over time, status breakdown, top paths and referrers, visitors", Tags: tags,
+	}, func(ctx context.Context, in *analyticsIn) (*analyticsOut, error) {
+		r, ok := traffic.Ranges[in.Range]
+		if !ok {
+			r = traffic.Ranges["1h"]
+		}
+		out := &analyticsOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			out.Body, err = traffic.AppSeries(ctx, q, m.TeamID, a.ID, r, time.Now())
+			if err != nil {
+				return huma.Error500InternalServerError("could not read analytics")
+			}
+			return nil
 		})
 		return out, err
 	})

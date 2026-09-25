@@ -1705,6 +1705,7 @@
       "browsers": "Browsers",
       "stacks": "Apps & stacks",
       "logs": "Logs",
+      "analytics": "Analytics",
       "monitors": "Alerts & monitors",
       "proxy": "Proxy manager",
       "dns": "DNS & SSL",
@@ -1919,6 +1920,28 @@
         "unmanaged": "Not managed here",
         "private": "Private server"
       }
+    },
+    "analytics": {
+      "hint": "Traffic through this site's hostnames, read from the Caddy proxy.",
+      "range": "Time range",
+      "ranges": {
+        "1h": "1h",
+        "24h": "24h",
+        "7d": "7d",
+        "30d": "30d"
+      },
+      "requests": "Requests",
+      "visitors": "Visitors",
+      "errorRate": "Error rate",
+      "p95": "p95 latency",
+      "statusBreakdown": "Status codes",
+      "topPaths": "Top paths",
+      "topReferrers": "Top referrers",
+      "path": "Path",
+      "noPaths": "No paths recorded yet.",
+      "noReferrers": "No referrers recorded yet.",
+      "emptyTitle": "No traffic yet",
+      "emptyHint": "Analytics appear once requests reach this site through its hostnames."
     },
     "monitors": {
       "add": "Add monitor",

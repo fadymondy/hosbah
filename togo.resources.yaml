@@ -398,6 +398,90 @@ resources:
           pg: text
           "null": false
       controller: true
+    - name: AppTrafficMinute
+      table: app_traffic_minutes
+      fields:
+        - name: app_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: server_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: step
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: requests
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status_2xx
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status_3xx
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status_4xx
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: status_5xx
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: bytes_out
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: duration_p50_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: duration_p95_ms
+          go: float64
+          gql: Float!
+          pg: double precision
+          "null": false
+        - name: unique_visitors
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: top_paths
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: top_referrers
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+      controller: true
     - name: AppVolume
       table: app_volumes
       fields:

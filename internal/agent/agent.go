@@ -26,10 +26,14 @@ type Agent struct {
 	// MetricsEvery is the cadence of the light "metrics" readings between heartbeats (live
 	// charts). 0 sends none.
 	MetricsEvery time.Duration
-	Exec         *Executor
+	// TrafficPollEvery is how often the Caddy access log is tailed; finished minutes are sent as
+	// they complete regardless of this cadence. 0 disables traffic analytics entirely.
+	TrafficPollEvery time.Duration
+	Exec             *Executor
 
 	priv    ed25519.PrivateKey
 	sampler *Sampler
+	traffic *trafficCollector
 	// live carries events to whichever connection is up. It is only a fast path: every event is
 	// also in the executor's journal, and the server's resume list after a reconnect replays
 	// whatever did not arrive.
@@ -47,7 +51,8 @@ func New(st *State, version string, log *slog.Logger) (*Agent, error) {
 	}
 	a := &Agent{
 		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second, MetricsEvery: 5 * time.Second,
-		priv: priv, sampler: NewSampler(), live: make(chan agentproto.Event, 4096),
+		TrafficPollEvery: 20 * time.Second,
+		priv:             priv, sampler: NewSampler(), traffic: newTrafficCollector(), live: make(chan agentproto.Event, 4096),
 	}
 	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
 	a.Exec.SetKey(priv)
@@ -195,6 +200,14 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 		defer t.Stop()
 		mt = t.C
 	}
+	// Traffic: the access log is polled at TrafficPollEvery, but a finished minute is shipped as
+	// soon as its bucket closes, whichever poll notices first — no waiting a whole extra cycle.
+	var tt <-chan time.Time
+	if a.TrafficPollEvery > 0 && a.traffic != nil {
+		t := time.NewTicker(a.TrafficPollEvery)
+		defer t.Stop()
+		tt = t.C
+	}
 	if err := heartbeat(); err != nil {
 		return err
 	}
@@ -211,6 +224,13 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 			m.GPUs = lastGPUs
 			if err := send(agentproto.Frame{Type: agentproto.TypeMetrics, Metrics: &m}); err != nil {
 				return err
+			}
+		case <-tt:
+			a.traffic.poll()
+			if buckets := a.traffic.collect(time.Now()); len(buckets) > 0 {
+				if err := send(agentproto.Frame{Type: agentproto.TypeTraffic, Traffic: buckets}); err != nil {
+					return err
+				}
 			}
 		case ev := <-a.live:
 			if err := send(agentproto.Frame{Type: agentproto.TypeEvent, Event: &ev}); err != nil {

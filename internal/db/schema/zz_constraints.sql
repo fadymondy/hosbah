@@ -45,6 +45,9 @@ ALTER TABLE tunnels ADD CONSTRAINT tunnels_credential_fk FOREIGN KEY (credential
 ALTER TABLE import_ignores ADD CONSTRAINT import_ignores_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 -- Server metrics history goes with its server.
 ALTER TABLE server_metrics ADD CONSTRAINT server_metrics_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+-- App traffic history goes with its app, and with the server that reported it.
+ALTER TABLE app_traffic_minutes ADD CONSTRAINT app_traffic_minutes_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_traffic_minutes ADD CONSTRAINT app_traffic_minutes_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
 
 -- A guest server's parent must be a node server in the same team; unenrolling the node unlinks its
 -- guests rather than blocking or cascading.

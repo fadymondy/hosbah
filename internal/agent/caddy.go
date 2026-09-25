@@ -47,6 +47,15 @@ const (
 	caddyHTTPS = "hosbah_https"
 )
 
+// accessLogPath is where Caddy writes one JSON-lines access log of every request through either
+// server (apps and proxy hosts alike); internal/agent's traffic aggregator (analytics.go) tails it.
+// Caddy itself keeps it bounded (roll_size_mb/roll_keep below), so a disconnected agent never lets
+// it grow past a few hundred MB.
+const accessLogPath = agentproto.WorkDir + "/access.log"
+
+// accessLoggerName is the shared logger both servers write to.
+const accessLoggerName = "hosbah_access"
+
 type routeEntry struct {
 	Hosts    []agentproto.Route `json:"hosts"`
 	Upstream string             `json:"upstream"`
@@ -241,10 +250,10 @@ func renderCaddy(t routeTable) map[string]any {
 	})
 
 	servers := map[string]any{
-		caddyHTTP: map[string]any{"listen": []string{":80"}, "routes": httpRoutes},
+		caddyHTTP: map[string]any{"listen": []string{":80"}, "routes": httpRoutes, "logs": map[string]any{"default_logger_name": accessLoggerName}},
 	}
 	if len(httpsRoutes) > 0 {
-		servers[caddyHTTPS] = map[string]any{"listen": []string{":443"}, "routes": httpsRoutes}
+		servers[caddyHTTPS] = map[string]any{"listen": []string{":443"}, "routes": httpsRoutes, "logs": map[string]any{"default_logger_name": accessLoggerName}}
 	}
 	apps := map[string]any{"http": map[string]any{"servers": servers}}
 
@@ -272,6 +281,25 @@ func renderCaddy(t routeTable) map[string]any {
 	return map[string]any{
 		"admin": map[string]any{"listen": "localhost:2019"},
 		"apps":  apps,
+		"logging": map[string]any{
+			"logs": map[string]any{
+				accessLoggerName: map[string]any{
+					"writer": map[string]any{
+						"output":       "file",
+						"filename":     accessLogPath,
+						"roll_size_mb": 64,
+						"roll_keep":    3,
+						// A day's rolled-off logs are dropped: the traffic aggregator only ever reads the
+						// live tail, never replays old files, so nothing but disk space is lost.
+						"roll_keep_days": 3,
+					},
+					"encoder": map[string]any{"format": "json"},
+					// Only the access log goes here (not Caddy's admin/startup chatter): request handling
+					// emits "http.log.access", nothing else does.
+					"include": []string{"http.log.access"},
+				},
+			},
+		},
 	}
 }
 

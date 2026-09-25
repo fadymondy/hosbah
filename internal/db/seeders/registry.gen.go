@@ -30,6 +30,9 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedAppRealtime(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedAppTrafficMinute(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedAppVolume(ctx, a); err != nil {
 		return err
 	}

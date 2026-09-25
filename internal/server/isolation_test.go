@@ -322,7 +322,7 @@ func TestIsolationSweep(t *testing.T) {
 	for name, args := range map[string]map[string]any{
 		"get_app": {"app": appA.App.ID}, "list_deployments": {"app": appA.App.Name}, "get_deployment": {"app": appA.App.ID, "deployment": "1"},
 		"deploy_logs": {"app": appA.App.ID, "deployment": appA.Deployment.ID}, "list_env": {"app": appA.App.ID},
-		"list_domains": {"app": appA.App.ID}, "deploy_app": {"app": appA.App.ID}, "cancel_deployment": {"app": appA.App.ID, "deployment": "1"},
+		"list_domains": {"app": appA.App.ID}, "app_analytics": {"app": appA.App.ID}, "deploy_app": {"app": appA.App.ID}, "cancel_deployment": {"app": appA.App.ID, "deployment": "1"},
 		"rollback_app": {"app": appA.App.ID}, "restart_app": {"app": appA.App.ID}, "pause_autodeploy": {"app": appA.App.ID},
 		"set_env": {"app": appA.App.ID, "name": "X", "value": "y"}, "unset_env": {"app": appA.App.ID, "name": "SECRET_A"},
 		"add_domain": {"app": appA.App.ID, "hostname": "b.example.test"}, "verify_domain": {"app": appA.App.ID, "domain": domA.ID},
