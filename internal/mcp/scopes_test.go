@@ -70,7 +70,7 @@ to find out, so it is a build-time failure instead.
 func TestDestructiveToolsNameAKnownResourceType(t *testing.T) {
 	// Mirrors approval_requests_resource_type_check in internal/db/schema/approval_request.sql.
 	known := []string{"app", "server", "database", "domain", "data_service", "backup", "invitation", "member", "user", "team", "log_drain",
-		"script", "script_run", "service", "site_template", "product", "product_instance", "ssh_key"}
+		"script", "script_run", "service", "site_template", "product", "product_instance", "ssh_key", "mail_relay_credential"}
 	for _, srv := range []*Server{UserServer(), AdminServer()} {
 		for _, tool := range srv.Tools {
 			if !tool.Destructive {
@@ -99,7 +99,7 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"permanently_destroy_app": true, "permanently_destroy_data_service": true, "delete_snapshot": true,
 		"sftp_user_delete": true,
 		// DB metrics and slow queries (MH-575 F6): cancelling a running query/backend.
-		"db_cancel_query": true,
+		"db_cancel_query":             true,
 		"notification_channel_delete": true, "status_page_delete": true,
 		"log_drain_delete": true,
 		// MH-576 D4/D5/D3: deleting a script, running one, and a systemd service action.
@@ -117,6 +117,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"security_reset_root_password": true, "server_deploy_key_add_to_github": true,
 		// MH-578 E8: deleting a record in the DNS zone manager can break a hostname Hosbah, or the team, depends on.
 		"dns_record_delete": true,
+		// MH-577 I6: revoking an SMTP relay credential removes its Stalwart principal.
+		"mail_relay_revoke": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

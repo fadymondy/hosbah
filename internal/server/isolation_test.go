@@ -268,8 +268,8 @@ func TestIsolationSweep(t *testing.T) {
 		"item":        func(string) []string { return []string{"imp-site", "imp-pg"} },    // an import item's origin key of A's server
 		"op":          func(string) []string { return []string{opA} },
 		"credential":  func(string) []string { return []string{credA.ID} },
-		"zone":        func(string) []string { return []string{"example.test"} },   // MH-578 E8: a zone of the DNS zone manager
-		"record":      func(string) []string { return []string{"rec-" + suffix} }, // MH-578 E8: a record id of the DNS zone manager
+		"zone":        func(string) []string { return []string{"example.test"} },     // MH-578 E8: a zone of the DNS zone manager
+		"record":      func(string) []string { return []string{"rec-" + suffix} },    // MH-578 E8: a record id of the DNS zone manager
 		"token":       func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
 		"app":         func(string) []string { return []string{appA.App.ID, appA.App.Name, impAppID} },
 		"snapshot":    func(string) []string { return []string{"pre-up"} },
@@ -309,6 +309,7 @@ func TestIsolationSweep(t *testing.T) {
 		"owner":   func(string) []string { return []string{"octocat"} },                                            // GitHub owner of a repository (the server is A's)
 		"mailbox": func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f2", "postmaster"} }, // MH-577: nothing of A's mail is stored by these tests
 		"alias":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f3"} },
+		"relay":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000f4"} }, // MH-577 I6: nothing of A's mail relay credentials is stored by these tests
 		"service": func(string) []string {
 			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
 		}, // services B may not see (one of A's imported, one shared)
@@ -450,7 +451,7 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_proxy_host": {"proxy": proxyA.ID},
 		// MH-578 E8: the DNS zone manager, against team A's (proxmox, not even Cloudflare) credential —
 		// B has none of its own either way, so every call must be not found.
-		"dns_records_list": {"credential": credA.ID, "zone": "example.test"},
+		"dns_records_list":  {"credential": credA.ID, "zone": "example.test"},
 		"dns_record_upsert": {"credential": credA.ID, "zone": "example.test", "type": "TXT", "name": "stolen", "content": "stolen"},
 		"dns_record_delete": {"credential": credA.ID, "zone": "example.test", "record": "rec-" + suffix, "confirm": true},
 		"list_sites":        {"server": srvA},
@@ -694,6 +695,13 @@ func TestIsolationSweep(t *testing.T) {
 		"mail_aliases_list":    {"domain": "no-such-mail-domain.test"},
 		"mail_alias_add":       {"domain": "no-such-mail-domain.test", "local_part": "sales", "kind": "forward", "destinations": []string{"x@example.test"}},
 		"mail_alias_remove":    {"domain": "no-such-mail-domain.test", "alias": "00000000-0000-4000-8000-0000000000f3"},
+		// MH-577 I5/I6: deliverability report and relay credentials on a domain B may not see.
+		"mail_deliverability_report": {"domain": "no-such-mail-domain.test"},
+		"mail_relays_list":           {"domain": "no-such-mail-domain.test"},
+		"mail_relay_add":             {"domain": "no-such-mail-domain.test", "app": "no-such-app"},
+		"mail_relay_rotate":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4"},
+		"mail_relay_attach":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4"},
+		"mail_relay_revoke":          {"domain": "no-such-mail-domain.test", "relay": "00000000-0000-4000-8000-0000000000f4", "confirm": "x"},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {

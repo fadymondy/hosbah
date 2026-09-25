@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
@@ -433,6 +434,166 @@ func MailTools() []Tool {
 				return "Removed alias " + row.LocalPart + "@" + dom.Domain + ".", nil
 			},
 		},
+		{
+			Name: "mail_deliverability_report", Scope: scopes.Read,
+			Description: "A mail domain's deliverability report: DNS/PTR status plus DNSBL blacklist lookups of the mail server's public IPv4 (zen.spamhaus.org, bl.spamcop.net, b.barracudacentral.org, dnsbl.sorbs.net).",
+			InputSchema: schema([]string{"domain"}, map[string]any{"domain": domainArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				dom, srv, err := findMailDomain(ctx, env, args.Str("domain"))
+				if err != nil {
+					return "", err
+				}
+				s, err := mailSvcOf(env)
+				if err != nil {
+					return "", err
+				}
+				res, err := s.DeliverabilityReport(ctx, env.Q, env.Caller.TeamID, srv, dom)
+				if err != nil {
+					return "", err
+				}
+				var b strings.Builder
+				b.WriteString(recordsText(res.DNS.Records))
+				fmt.Fprintf(&b, "PTR %s -> %s: %s", res.DNS.PTR.ServerIP, res.DNS.PTR.Hostname, res.DNS.PTR.Status)
+				if res.DNS.PTR.Found != "" {
+					fmt.Fprintf(&b, " (found %s)", res.DNS.PTR.Found)
+				}
+				b.WriteString("\n")
+				for _, bl := range res.Blacklists {
+					fmt.Fprintf(&b, "  %-24s %s", bl.Zone, bl.Status)
+					if bl.Detail != "" {
+						fmt.Fprintf(&b, " (%s)", bl.Detail)
+					}
+					b.WriteString("\n")
+				}
+				b.WriteString(res.SpamFilterNote + "\n")
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "mail_relays_list", Scope: scopes.Read,
+			Description: "A mail domain's SMTP relay credentials (dedicated sending-only mailboxes attached to an app's env).",
+			InputSchema: schema([]string{"domain"}, map[string]any{"domain": domainArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				dom, _, err := findMailDomain(ctx, env, args.Str("domain"))
+				if err != nil {
+					return "", err
+				}
+				rows, err := mail.ListRelays(ctx, env.Q, env.Caller.TeamID, dom)
+				if err != nil {
+					return "", errors.New("could not list relay credentials")
+				}
+				if len(rows) == 0 {
+					return dom.Domain + " has no relay credentials yet. mail_relay_add creates one for an app.", nil
+				}
+				var b strings.Builder
+				for _, r := range rows {
+					attached := "not attached"
+					if r.Attached {
+						attached = "attached"
+					}
+					fmt.Fprintf(&b, "  %-32s app %-16s %-10s %s  (id %s)\n", r.Email, r.AppID, r.Status, attached, r.ID)
+				}
+				return b.String(), nil
+			},
+		},
+		{
+			Name: "mail_relay_add", Scope: scopes.SecretsRead,
+			Description: "Create an SMTP relay credential dedicated to one app (a send-only mailbox). Hosbah generates the password and returns it once — save it now, or use mail_relay_attach to push it into the app's env directly.",
+			InputSchema: schema([]string{"domain", "app"}, map[string]any{"domain": domainArg, "app": str("App name or id to dedicate this relay credential to")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageMail); err != nil {
+					return "", err
+				}
+				s, err := mailSvcOf(env)
+				if err != nil {
+					return "", err
+				}
+				dom, srv, err := findMailDomain(ctx, env, args.Str("domain"))
+				if err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				created, err := s.AddRelay(ctx, env.Q, env.Caller.TeamID, mcpActor(env), srv, dom, a)
+				if err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Created relay credential %s (id %s) for app %s. Password: %s — shown once. Use mail_relay_attach to push SMTP_* env vars to the app.",
+					created.Relay.Email, created.Relay.ID, a.Name, created.Password), nil
+			},
+		},
+		{
+			Name: "mail_relay_rotate", Scope: scopes.SecretsRead,
+			Description: "Generate a new password for a relay credential and return it once. If the credential is already attached to its app, its SMTP_* env vars are updated immediately.",
+			InputSchema: schema([]string{"domain", "relay"}, map[string]any{"domain": domainArg, "relay": str("Relay credential id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageMail); err != nil {
+					return "", err
+				}
+				s, err := mailSvcOf(env)
+				if err != nil {
+					return "", err
+				}
+				dom, srv, row, a, err := findMailRelay(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				pw, err := s.RotateRelay(ctx, env.Q, env.Caller.TeamID, mcpActor(env), srv, dom, a, row)
+				if err != nil {
+					return "", err
+				}
+				return "New password for " + row.LocalPart + "@" + dom.Domain + ": " + pw + " — shown once.", nil
+			},
+		},
+		{
+			Name: "mail_relay_attach", Scope: scopes.Write,
+			Description: "Push a relay credential's SMTP_HOST/SMTP_PORT/SMTP_USERNAME/SMTP_PASSWORD/SMTP_FROM into its app's environment.",
+			InputSchema: schema([]string{"domain", "relay"}, map[string]any{"domain": domainArg, "relay": str("Relay credential id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageMail); err != nil {
+					return "", err
+				}
+				s, err := mailSvcOf(env)
+				if err != nil {
+					return "", err
+				}
+				dom, srv, row, a, err := findMailRelay(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := s.AttachRelay(ctx, env.Q, env.Caller.TeamID, mcpActor(env), srv, dom, a, row); err != nil {
+					return "", err
+				}
+				return "Attached " + row.LocalPart + "@" + dom.Domain + " to " + a.Name + "'s SMTP_* env vars.", nil
+			},
+		},
+		{
+			Name: "mail_relay_revoke", Scope: scopes.Destructive, Destructive: true, ResourceType: "mail_relay_credential",
+			Description: "Revoke an SMTP relay credential. Removes its Stalwart principal and, if attached, unsets its SMTP_* env vars from the app. confirm must equal the credential's email.",
+			InputSchema: schema([]string{"domain", "relay", "confirm"}, map[string]any{"domain": domainArg, "relay": str("Relay credential id"), "confirm": str("The relay credential's email, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageMail); err != nil {
+					return "", err
+				}
+				s, err := mailSvcOf(env)
+				if err != nil {
+					return "", err
+				}
+				dom, srv, row, a, err := findMailRelay(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, row.LocalPart+"@"+dom.Domain); err != nil {
+					return "", err
+				}
+				if err := s.RevokeRelay(ctx, env.Q, env.Caller.TeamID, mcpActor(env), srv, dom, a, row); err != nil {
+					return "", err
+				}
+				return "Revoked relay credential " + row.LocalPart + "@" + dom.Domain + ".", nil
+			},
+		},
 	}
 }
 
@@ -464,6 +625,28 @@ func findMailDomain(ctx context.Context, env *Env, ref string) (db.MailDomain, d
 		return db.MailDomain{}, db.MailServer{}, errors.New("mail server not found")
 	}
 	return dom, srv, nil
+}
+
+// findMailRelay resolves a relay credential together with its domain, mail server and app, since
+// every relay write needs all four.
+func findMailRelay(ctx context.Context, env *Env, args Args) (db.MailDomain, db.MailServer, db.MailRelayCredential, db.App, error) {
+	dom, srv, err := findMailDomain(ctx, env, args.Str("domain"))
+	if err != nil {
+		return db.MailDomain{}, db.MailServer{}, db.MailRelayCredential{}, db.App{}, err
+	}
+	ref := args.Str("relay")
+	if ref == "" {
+		return db.MailDomain{}, db.MailServer{}, db.MailRelayCredential{}, db.App{}, errors.New("relay is required (a relay credential id)")
+	}
+	row, err := mail.RelayByRef(ctx, env.Q, env.Caller.TeamID, ref)
+	if err != nil || row.MailDomainID != dom.ID {
+		return db.MailDomain{}, db.MailServer{}, db.MailRelayCredential{}, db.App{}, errors.New("relay credential not found")
+	}
+	a, err := deploy.AppByRef(ctx, env.Q, env.Caller.TeamID, row.AppID)
+	if err != nil {
+		return db.MailDomain{}, db.MailServer{}, db.MailRelayCredential{}, db.App{}, errors.New("app not found")
+	}
+	return dom, srv, row, a, nil
 }
 
 // strSliceArg reads a JSON array-of-strings argument (the MCP client sends real JSON, not a

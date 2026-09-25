@@ -23,6 +23,9 @@ type Resolver interface {
 	LookupTXT(ctx context.Context, name string) ([]string, error)
 	LookupMX(ctx context.Context, name string) ([]*net.MX, error)
 	LookupAddr(ctx context.Context, addr string) ([]string, error)
+	// LookupHost resolves a DNSBL query name (MH-577 I5): a "not found" answer means the address is
+	// clean, a resolved address means it is listed.
+	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
 // resolver is the Resolver the service uses; net.DefaultResolver unless a test overrides it.
