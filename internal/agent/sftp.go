@@ -55,8 +55,15 @@ func (h *sftpHost) upsert(oc *OpContext, p agentproto.SFTPUserParams) (any, int,
 	if code, err := sftpWriteDropIn(oc); err != nil {
 		return nil, code, err
 	}
+	existed := sftpUserExists(p.Username)
 	if code, err := sftpUpsertSystemUser(oc, p.Username, real, p.ReadOnly); err != nil {
 		return nil, code, err
+	}
+	if err := sftpVerifyEffective(oc, p.Username, p.ReadOnly); err != nil {
+		if !existed {
+			_, _ = sftpRemoveSystemUser(oc, p.Username)
+		}
+		return nil, 2, err
 	}
 	if code, err := sftpWriteAuthorizedKeys(oc, real, p.PublicKeys); err != nil {
 		return nil, code, err

@@ -180,12 +180,32 @@ func sftpUpsertSystemUser(oc *OpContext, username, home string, readOnly bool) (
 	if exec.Command("id", "-u", username).Run() != nil { //#nosec G204 -- fixed argv
 		return oc.Run("useradd", "--system", "--no-create-home", "--home-dir", home, "--shell", "/usr/sbin/nologin", "--gid", group, username)
 	}
+	if err := sftpManaged(username); err != nil {
+		return 2, err
+	}
 	return oc.Run("usermod", "--home", home, "--shell", "/usr/sbin/nologin", "--gid", group, username)
+}
+
+// sftpManaged refuses to touch an existing login whose primary group is not one of the two
+// hosbah-sftp groups: a username like root, ubuntu or www-data passes the name check but belongs
+// to the server, and usermod (nologin, new home) or userdel on it would lock people out.
+func sftpManaged(username string) error {
+	out, err := exec.Command("id", "-gn", username).Output() //#nosec G204 -- fixed argv, validated name
+	if err != nil {
+		return fmt.Errorf("could not read the groups of %s: %w", username, err)
+	}
+	if g := strings.TrimSpace(string(out)); g != sftpGroupRW && g != sftpGroupRO {
+		return fmt.Errorf("a system user named %s already exists on this server and is not an SFTP user Hosbah manages; pick another username", username)
+	}
+	return nil
 }
 
 func sftpRemoveSystemUser(oc *OpContext, username string) (int, error) {
 	if exec.Command("id", "-u", username).Run() != nil { //#nosec G204 -- fixed argv
 		return 0, nil // already gone: delete is idempotent
+	}
+	if err := sftpManaged(username); err != nil {
+		return 2, err
 	}
 	return oc.Run("userdel", username)
 }
@@ -193,7 +213,8 @@ func sftpRemoveSystemUser(oc *OpContext, username string) (int, error) {
 // sftpWriteAuthorizedKeys: sshd resolves ~/.ssh/authorized_keys against the user's real home
 // (from /etc/passwd) BEFORE it chroots — which here is exactly the chroot root, so the same file
 // also appears at /.ssh/authorized_keys once inside. Root-owned and not group/other-writable, the
-// same StrictModes rule sshd applies to every authorized_keys file.
+// same StrictModes rule sshd applies to every authorized_keys file. sshd opens the file with the
+// user's own privileges, so the directory is 0755 and the file 0644: readable, but only root writes.
 func sftpWriteAuthorizedKeys(oc *OpContext, home string, keys []string) (int, error) {
 	sshDir := filepath.Join(home, ".ssh")
 	akPath := filepath.Join(sshDir, "authorized_keys")
@@ -201,18 +222,21 @@ func sftpWriteAuthorizedKeys(oc *OpContext, home string, keys []string) (int, er
 		_ = os.Remove(akPath) // password-only: no stale keys left granting access
 		return 0, nil
 	}
-	if err := os.MkdirAll(sshDir, 0o700); err != nil {
+	if err := os.MkdirAll(sshDir, 0o755); err != nil {
 		return 1, err
 	}
 	if err := os.Chown(sshDir, 0, 0); err != nil { //#nosec G302 -- StrictModes requires root ownership
 		oc.Info("could not chown %s: %v", sshDir, err)
 	}
-	if err := os.Chmod(sshDir, 0o700); err != nil {
+	if err := os.Chmod(sshDir, 0o755); err != nil {
 		oc.Info("could not chmod %s: %v", sshDir, err)
 	}
 	content := strings.Join(keys, "\n") + "\n"
-	if err := os.WriteFile(akPath, []byte(content), 0o600); err != nil { //#nosec G306 -- StrictModes requires 0600 or tighter
+	if err := os.WriteFile(akPath, []byte(content), 0o644); err != nil { //#nosec G306 -- public keys; sshd reads the file as the user, so it must be readable
 		return 1, err
+	}
+	if err := os.Chmod(akPath, 0o644); err != nil {
+		oc.Info("could not chmod %s: %v", akPath, err)
 	}
 	if err := os.Chown(akPath, 0, 0); err != nil {
 		oc.Info("could not chown %s: %v", akPath, err)
@@ -225,4 +249,41 @@ func sftpWriteAuthorizedKeys(oc *OpContext, home string, keys []string) (int, er
 // own logging could capture it.
 func sftpSetPassword(oc *OpContext, username, password string) (int, error) {
 	return oc.RunStdin(username+":"+password+"\n", "chpasswd")
+}
+
+// sftpVerifyEffective asks sshd itself (sshd -T with the user's connection spec) what it would
+// apply to this login. If the server's sshd_config does not Include sshd_config.d, or an earlier
+// Match wins, the drop-in is silently ignored and the user would get plain, unchrooted sftp to the
+// whole filesystem, so that is refused.
+func sftpVerifyEffective(oc *OpContext, username string, readOnly bool) error {
+	out, err := exec.Command("sshd", "-T", "-C", "user="+username+",host=localhost,addr=127.0.0.1").Output() //#nosec G204 -- validated name
+	if err != nil {
+		return fmt.Errorf("could not check the effective sshd settings: %w", err)
+	}
+	return sftpCheckEffective(string(out), readOnly)
+}
+
+func sftpCheckEffective(cfg string, readOnly bool) error {
+	chroot, force := "", ""
+	for _, line := range strings.Split(cfg, "\n") {
+		k, v, _ := strings.Cut(strings.TrimSpace(line), " ")
+		switch strings.ToLower(k) {
+		case "chrootdirectory":
+			chroot = strings.TrimSpace(v)
+		case "forcecommand":
+			force = strings.TrimSpace(v)
+		}
+	}
+	want := "internal-sftp"
+	if readOnly {
+		want = "internal-sftp -R"
+	}
+	if chroot == "" || chroot == "none" || force != want {
+		return errors.New("sshd does not apply Hosbah's SFTP rule to this user (does sshd_config Include /etc/ssh/sshd_config.d/*.conf before any Match block?); the user was not created")
+	}
+	return nil
+}
+
+func sftpUserExists(username string) bool {
+	return exec.Command("id", "-u", username).Run() == nil //#nosec G204 -- validated name
 }

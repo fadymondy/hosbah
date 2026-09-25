@@ -32,3 +32,9 @@ func sftpSetPassword(oc *OpContext, username, password string) (int, error) {
 }
 
 func sftpRemoveSystemUser(oc *OpContext, username string) (int, error) { return 1, errSFTPUnsupported }
+
+func sftpVerifyEffective(oc *OpContext, username string, readOnly bool) error {
+	return errSFTPUnsupported
+}
+
+func sftpUserExists(username string) bool { return false }

@@ -31,3 +31,19 @@ func TestRenderSFTPDropIn(t *testing.T) {
 		t.Fatal("renderSFTPDropIn must be deterministic (it is compared byte-for-byte to decide whether to rewrite the file)")
 	}
 }
+
+func TestSFTPCheckEffective(t *testing.T) {
+	ok := "port 22\nchrootdirectory /srv/x\nforcecommand internal-sftp\n"
+	if err := sftpCheckEffective(ok, false); err != nil {
+		t.Fatal(err)
+	}
+	if sftpCheckEffective(ok, true) == nil {
+		t.Fatal("a read-only user under the read-write rule must be refused")
+	}
+	if sftpCheckEffective("chrootdirectory /srv/x\nforcecommand internal-sftp -R\n", true) != nil {
+		t.Fatal("read-only rule should pass")
+	}
+	if sftpCheckEffective("chrootdirectory none\n", false) == nil {
+		t.Fatal("an ignored drop-in (no chroot) must be refused")
+	}
+}
