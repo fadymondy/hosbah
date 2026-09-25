@@ -10,6 +10,7 @@
 //	hbp_  heartbeat ping token          (monitors)             new in MH-575 H3
 //	hbr_  RUM ingest key (public, not a secret — travels in page source)  new in MH-575 H5
 //	hbt_  APM ingest key (secret: bearer for OTLP traces/logs)             new in MH-575 H7
+//	hbk_  SaaS product key (product_keys), scoped to one product           new in MH-576 D7
 //	(none) invitation link token        (invitations)
 //
 // New tokens get the hb*_ prefix. Tokens minted before the rename keep working: the prefix is
@@ -32,6 +33,7 @@ const (
 	PrefixPing     = "hbp_"
 	PrefixRum      = "hbr_"
 	PrefixApm      = "hbt_"
+	PrefixProduct  = "hbk_"
 
 	// Before the rename from Cloudy. Accepted, never minted.
 	LegacyPrefixUserMCP  = "cld_"
@@ -49,6 +51,7 @@ var (
 	Ping     = []string{PrefixPing}
 	Rum      = []string{PrefixRum}
 	Apm      = []string{PrefixApm}
+	Product  = []string{PrefixProduct}
 )
 
 // HasPrefix reports whether token starts with one of the family's prefixes.

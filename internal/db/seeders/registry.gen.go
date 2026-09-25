@@ -123,6 +123,18 @@ func SeedAll(ctx context.Context, a *app.App) error {
 	if err := SeedProcessType(ctx, a); err != nil {
 		return err
 	}
+	if err := SeedProduct(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedProductInstance(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedProductKey(ctx, a); err != nil {
+		return err
+	}
+	if err := SeedProductUpgrade(ctx, a); err != nil {
+		return err
+	}
 	if err := SeedProxyHost(ctx, a); err != nil {
 		return err
 	}

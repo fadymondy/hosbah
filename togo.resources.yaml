@@ -2037,6 +2037,257 @@ resources:
           pg: text
           "null": true
       controller: true
+    - name: Product
+      table: products
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: title
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: description
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: source_kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: source_ref
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: repo_url
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: branch
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: runtime
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: port
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: healthcheck_path
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: healthcheck_timeout
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: resources_memory_mb
+          go: int64
+          gql: Int
+          pg: bigint
+          "null": true
+        - name: resources_cpus
+          go: float64
+          gql: Float
+          pg: double precision
+          "null": true
+        - name: domain_suffix
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: env_defaults
+          go: string
+          gql: String!
+          pg: jsonb
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ProductInstance
+      table: product_instances
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: product_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: app_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: customer_ref
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: hostname
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: database_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+      controller: true
+    - name: ProductKey
+      table: product_keys
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: product_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: name
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: key_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: webhook_url
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: webhook_secret_sealed
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: last_used_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+        - name: revoked_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
+    - name: ProductUpgrade
+      table: product_upgrades
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: product_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: ref
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: status
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: total
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: completed
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: failed
+          go: int64
+          gql: Int!
+          pg: bigint
+          "null": false
+        - name: current_instance_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: error
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: created_by
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: finished_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
+      controller: true
     - name: ProxyHost
       table: proxy_hosts
       fields:
