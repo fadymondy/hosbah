@@ -15,7 +15,7 @@ description: >-
   hostname so webhook URLs (Settings > n8n API, or a trigger node's "Webhook URLs") resolve to
   somewhere reachable — open n8n's own settings and set the public URL there once it is up.
 homepage: https://n8n.io
-licence: Apache-2.0
+licence: LicenseRef-n8n-SUL-1.0
 kind: app
 version: "1.0.0"
 verified: false
