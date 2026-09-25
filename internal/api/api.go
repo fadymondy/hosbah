@@ -73,6 +73,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerSFTPUsers(api)
 	d.registerRepository(api)
 	d.registerDNS(api)
+	d.registerDNSZones(api)
 	d.registerMonitors(api)
 	d.registerNotificationChannels(api)
 	d.registerStatusPages(api)

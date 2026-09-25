@@ -114,6 +114,8 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"server_updates_run": true,
 		// MH-578 C10: removing a team SSH key, and installing/uninstalling one on a server.
 		"ssh_keys_remove": true, "ssh_keys_install": true, "ssh_keys_uninstall": true,
+		// MH-578 E8: deleting a record in the DNS zone manager can break a hostname Hosbah, or the team, depends on.
+		"dns_record_delete": true,
 	}
 	got := map[string]bool{}
 	for _, tool := range UserServer().Tools {

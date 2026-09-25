@@ -25,6 +25,10 @@ SELECT * FROM credentials WHERE team_id = $1 ORDER BY created_at DESC;
 -- name: CredentialInTeam :one
 SELECT * FROM credentials WHERE id = $1 AND team_id = $2;
 
+-- name: CredentialInTeamByRef :one
+-- MH-578 E8: a credential of the team by id or name (name is unique per team).
+SELECT * FROM credentials WHERE team_id = sqlc.arg('team_id')::text AND (id = sqlc.arg('ref')::text OR name = sqlc.arg('ref')::text);
+
 -- name: DeleteCredentialInTeam :execrows
 DELETE FROM credentials WHERE id = $1 AND team_id = $2;
 
