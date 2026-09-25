@@ -97,6 +97,41 @@ func allowPrivate(ctx context.Context, hostnames []string) context.Context {
 	return context.WithValue(ctx, allowPrivateKey{}, set)
 }
 
+// AllowPrivateContext is the exported form of allowPrivate: any other caller of SafeDialContext /
+// SafeTransport (the agent's log-drain sinks, judging their own "internal" flag rather than a
+// monitor's exception) that wants rule 3 for a request marks its hostnames this way.
+func AllowPrivateContext(ctx context.Context, hostnames []string) context.Context {
+	return allowPrivate(ctx, hostnames)
+}
+
+// ResolveDialable resolves host and returns the first address rule 2 (and, when allowPrivate,
+// rule 3) permits to be dialled — the same judgement SafeDialContext applies to an HTTP connect,
+// exported for callers that dial something other than HTTP (the agent's syslog sink, TCP or UDP).
+func ResolveDialable(ctx context.Context, resolve Resolver, host string, allowPrivate bool) (net.IP, error) {
+	if resolve == nil {
+		resolve = defaultResolver
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	var ips []net.IP
+	if ip := net.ParseIP(host); ip != nil {
+		ips = []net.IP{ip}
+	} else {
+		var err error
+		if ips, err = resolve(ctx, host); err != nil {
+			return nil, err
+		}
+	}
+	var exempt map[string]bool
+	if allowPrivate {
+		exempt = map[string]bool{host: true}
+	}
+	out := dialable(host, ips, exempt)
+	if len(out) == 0 {
+		return nil, ErrRefusedAddress
+	}
+	return out[0], nil
+}
+
 // Resolver looks a hostname up (net.DefaultResolver.LookupIP in production).
 type Resolver func(ctx context.Context, host string) ([]net.IP, error)
 

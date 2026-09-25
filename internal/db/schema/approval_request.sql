@@ -34,7 +34,7 @@ CREATE TABLE approval_requests (
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_status_check
   CHECK (status IN ('pending', 'approved', 'rejected', 'used', 'expired'));
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_resource_type_check
-  CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member'));
+  CHECK (resource_type IN ('app', 'server', 'database', 'domain', 'data_service', 'backup', 'invitation', 'member', 'log_drain'));
 ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_decided_check
   CHECK ((status IN ('pending', 'expired')) = (decided_by IS NULL));
 CREATE UNIQUE INDEX approval_requests_id_team_key ON approval_requests (id, team_id);

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { GitHubAppSection } from "@/components/github-app"
+import { LogDrainsCard } from "@/components/log-drains"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
 import { TeamQuotasCard } from "@/components/team-quotas"
 import { Button } from "@/components/ui/button"
@@ -72,6 +73,7 @@ export default function SettingsPage() {
         ) : null}
       </form>
       <TeamQuotasCard team={team.slug} />
+      <LogDrainsCard team={team.slug} manage={manage} />
       <GitHubAppSection team={team.slug} />
     </PageBody>
   )

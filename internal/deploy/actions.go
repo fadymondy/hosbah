@@ -703,3 +703,19 @@ func (s *Service) RuntimeLogs(ctx context.Context, q *db.Queries, teamID string,
 	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindAppLogs, Params: raw, CreatedBy: actor.UserID})
 	return op, err
 }
+
+// LogsSearch queues app.logs.search: the agent filters the app's current containers' logs itself
+// and relays back only the matching lines (H4). The caller awaits the result the same way it
+// awaits workload.stats — see api.awaitInto.
+func (s *Service) LogsSearch(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, p agentproto.LogsSearchParams) (db.Operation, error) {
+	if IsImported(a) {
+		return db.Operation{}, invalid("a raw container's logs are searched through workload logs, not app logs")
+	}
+	p.AppID = a.ID
+	if err := p.Validate(); err != nil {
+		return db.Operation{}, invalid(err.Error())
+	}
+	raw, _ := json.Marshal(p)
+	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindAppLogsSearch, Params: raw, CreatedBy: actor.UserID})
+	return op, err
+}

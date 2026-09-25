@@ -24,6 +24,12 @@ import (
 
 // ---- contract ------------------------------------------------------------------------------------
 
+// AppLogsSearchOut is a log search's answer, or null result while the operation is still running.
+type AppLogsSearchOut struct {
+	Operation OperationOut                `json:"operation"`
+	Result    *agentproto.LogsSearchResult `json:"result"`
+}
+
 // AppOut is an app as the API shows it. Never the deploy-hook token or its hash.
 type AppOut struct {
 	ID                 string           `json:"id"`
@@ -1102,6 +1108,55 @@ func (d *deps) registerApps(api huma.API) {
 			return nil
 		})
 		return out, err
+	})
+
+	// ---- H4: log search ----
+
+	type appLogSearchOut struct{ Body AppLogsSearchOut }
+	huma.Register(api, huma.Operation{OperationID: "search-app-logs", Method: http.MethodGet, Path: "/api/teams/{team}/apps/{app}/logs/search", Tags: tags,
+		Summary: "Search the app's current containers' logs (a plain substring or an RE2 regex, optionally case-insensitive, with a level " +
+			"filter and a time window up to 7 days). The agent filters the lines itself and relays back only the matches. result is null if " +
+			"the agent did not answer within wait (owner, admin, deployer or viewer).",
+	}, func(ctx context.Context, in *struct {
+		AppPath
+		WaitQuery
+		Query           string `query:"q" maxLength:"500" doc:"A plain substring, or an RE2 pattern when regex=true. Empty matches every line."`
+		Regex           bool   `query:"regex" doc:"Treat q as an RE2 regular expression."`
+		CaseInsensitive bool   `query:"case_insensitive"`
+		Process         string `query:"process" maxLength:"40" doc:"web (default: every process) or worker:<name>"`
+		Level           string `query:"level" enum:",error,warn" doc:"Only lines the heuristic reads as this level."`
+		Since           string `query:"since" maxLength:"40" doc:"15m, 1h, 6h, 24h, 7d, or an RFC 3339 time; default one hour before until."`
+		Until           string `query:"until" maxLength:"40" doc:"15m, 1h, 6h, 24h, 7d, or an RFC 3339 time; default now."`
+		Limit           int    `query:"limit" minimum:"0" maximum:"1000" doc:"At most this many matching lines (default 200)."`
+	}) (*appLogSearchOut, error) {
+		var op db.Operation
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			op, err = d.deploys().LogsSearch(ctx, q, m.TeamID, webActor(id), a, agentproto.LogsSearchParams{
+				Process: in.Process, Query: in.Query, Regex: in.Regex, CaseInsensitive: in.CaseInsensitive,
+				Level: in.Level, Since: in.Since, Until: in.Until, Limit: in.Limit,
+			})
+			if err != nil {
+				return actionErr(err, "could not search the logs")
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		var res agentproto.LogsSearchResult
+		done, ok, err := d.awaitInto(ctx, op, in.Wait, &res)
+		if err != nil {
+			return nil, err
+		}
+		out := &appLogSearchOut{Body: AppLogsSearchOut{Operation: toOperationOut(done)}}
+		if ok {
+			out.Body.Result = &res
+		}
+		return out, nil
 	})
 
 	huma.Register(api, huma.Operation{OperationID: "stream-app", Method: http.MethodGet, Path: "/api/teams/{team}/apps/{app}/stream",
