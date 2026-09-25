@@ -10,6 +10,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/platform"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -22,6 +23,15 @@ func platformErr(err error) error {
 	var pe *platform.Error
 	if errors.As(err, &pe) {
 		return huma.NewError(pe.Status, pe.Msg)
+	}
+	return nil
+}
+
+// quotaErr turns a *quota.Error into the Huma error with its status (nil if err is not one).
+func quotaErr(err error) error {
+	var qe *quota.Error
+	if errors.As(err, &qe) {
+		return huma.NewError(qe.Status, qe.Msg)
 	}
 	return nil
 }
@@ -238,6 +248,45 @@ func (d *deps) registerPlatformAdmin(api huma.API) {
 		return out, d.asAdmin(ctx, func(q *db.Queries, actor string) (err error) {
 			out.Body, err = platform.UpdateSettings(ctx, q, actor, platform.SettingsPatch{SignupMode: b.SignupMode, Announcement: b.Announcement,
 				AnnouncementLevel: b.AnnouncementLevel, SupportEmail: b.SupportEmail, MaxTeamsPerUser: b.MaxTeamsPerUser, MaxServersPerTeam: b.MaxServersPerTeam})
+			return err
+		})
+	})
+
+	// ---- quotas ----
+	type quotaOut struct{ Body quota.Quota }
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-get-team-quota", Method: http.MethodGet, Path: "/api/admin/teams/{id}/quota",
+		Summary: "A team's quota (max servers/apps/data services; null = unlimited)", Tags: tags,
+	}, func(ctx context.Context, in *AdminIDPath) (*quotaOut, error) {
+		out := &quotaOut{}
+		return out, d.asAdmin(ctx, func(q *db.Queries, _ string) error {
+			t, err := platform.FindTeam(ctx, q, in.ID)
+			if err != nil {
+				return huma.Error404NotFound("team not found")
+			}
+			out.Body, err = quota.Get(ctx, q, t.ID)
+			return err
+		})
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "admin-set-team-quota", Method: http.MethodPut, Path: "/api/admin/teams/{id}/quota",
+		Summary: "Set a team's quota (a platform admin's own guardrail on top of the platform-wide settings; null clears a field back to unlimited)", Tags: tags,
+	}, func(ctx context.Context, in *struct {
+		AdminIDPath
+		Body struct {
+			MaxServers      *int64 `json:"max_servers,omitempty" minimum:"0" maximum:"100000"`
+			MaxApps         *int64 `json:"max_apps,omitempty" minimum:"0" maximum:"100000"`
+			MaxDataServices *int64 `json:"max_data_services,omitempty" minimum:"0" maximum:"100000"`
+		}
+	}) (*quotaOut, error) {
+		out := &quotaOut{}
+		return out, d.asAdmin(ctx, func(q *db.Queries, actor string) error {
+			t, err := platform.FindTeam(ctx, q, in.ID)
+			if err != nil {
+				return huma.Error404NotFound("team not found")
+			}
+			out.Body, err = quota.Set(ctx, q, t.ID, actor, quota.Quota{MaxServers: in.Body.MaxServers, MaxApps: in.Body.MaxApps, MaxDataServices: in.Body.MaxDataServices})
 			return err
 		})
 	})

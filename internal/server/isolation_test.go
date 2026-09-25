@@ -373,6 +373,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},
 		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
+		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -438,6 +439,7 @@ func TestIsolationSweep(t *testing.T) {
 		"db_user_create": {"database": "svc-x", "target_database": "x", "user": "u1"}, "db_user_rotate_password": {"database": "svc-x", "user": "u1"},
 		"db_user_delete": {"database": "svc-x", "user": "u1", "confirm": "u1"}, "db_user_grant": {"database": "svc-x", "user": "u1", "grants": "readonly"},
 		"db_user_revoke": {"database": "svc-x", "user": "u1"},
+		"data_service_resources_get": {"database": "svc-x"}, "data_service_resources_set": {"database": "svc-x", "memory_mb": 512, "cpus": 1},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {
@@ -460,6 +462,10 @@ func TestIsolationSweep(t *testing.T) {
 		if strings.Contains(res.Text, ua2Email) || strings.Contains(res.Text, "a-read") || strings.Contains(res.Text, "pending-"+suffix) {
 			t.Errorf("MCP %s as team B leaked team A data: %s", name, res.Text)
 		}
+	}
+	// team_quotas_get always reads the caller's own team (there is no team argument to point at A's).
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "team_quotas_get", nil); res.IsError || strings.Contains(res.Text, teamA.ID) {
+		t.Errorf("team_quotas_get as B should report only B's own usage: %+v", res)
 	}
 
 	// A's read-only token: whoami works, an out-of-scope call fails in-band.

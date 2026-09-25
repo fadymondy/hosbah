@@ -16,6 +16,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/platform"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -171,6 +172,24 @@ func (d *deps) registerTeams(api huma.API) {
 			}
 			n, _ := q.CountMembers(ctx, m.TeamID)
 			out.Body = TeamOut{ID: t.ID, Name: t.Name, Slug: t.Slug, Role: m.Role, MemberCount: n, RequireDestructiveApproval: t.RequireDestructiveApproval, CreatedAt: t.CreatedAt}
+			return nil
+		})
+		return out, err
+	})
+
+	type quotasOut struct{ Body quota.Usage }
+	huma.Register(api, huma.Operation{
+		OperationID: "get-team-quotas", Method: http.MethodGet, Path: "/api/teams/{team}/quotas",
+		Summary: "This team's quota (servers/apps/data services: a null limit is unlimited) and its current usage against it. Any member.",
+		Tags:    []string{"Teams"},
+	}, func(ctx context.Context, in *TeamPath) (*quotasOut, error) {
+		out := &quotasOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			u, err := quota.GetUsage(ctx, q, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not read this team's quota")
+			}
+			out.Body = u
 			return nil
 		})
 		return out, err

@@ -529,6 +529,9 @@ func provisioningErr(err error) error {
 	if pe := platformErr(err); pe != nil {
 		return pe
 	}
+	if qe := quotaErr(err); qe != nil {
+		return qe
+	}
 	var ue *provisioning.UserError
 	if errors.As(err, &ue) {
 		if ue.Conflict {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fadymondy/hosbah/internal/platform"
+	"github.com/fadymondy/hosbah/internal/quota"
 )
 
 // PlatformTools are the admin server's platform-administration tools. Each is a thin wrapper
@@ -140,6 +141,40 @@ func PlatformTools() []Tool {
 			},
 		},
 		{
+			Name:        "get_team_quota",
+			Description: "A team's quota (max_servers, max_apps, max_data_services; null = unlimited), by id or slug.",
+			Scope:       ScopeAdmin,
+			InputSchema: schema([]string{"team"}, map[string]any{"team": str("Id or slug")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				t, err := platform.FindTeam(ctx, env.Q, args.Str("team"))
+				if err != nil {
+					return "", errors.New("team not found")
+				}
+				return asJSON(quota.Get(ctx, env.Q, t.ID))
+			},
+		},
+		{
+			Name: "set_team_quota",
+			Description: "Set a team's quota, by id or slug — a platform admin's own guardrail on top of the platform-wide settings. " +
+				"Omitted fields are left alone; send 0 to make a field unlimited again.",
+			Scope: ScopeAdmin,
+			InputSchema: schema([]string{"team"}, map[string]any{
+				"team":              str("Id or slug"),
+				"max_servers":       map[string]any{"type": "integer", "minimum": 0, "description": "0 = unlimited"},
+				"max_apps":          map[string]any{"type": "integer", "minimum": 0, "description": "0 = unlimited"},
+				"max_data_services": map[string]any{"type": "integer", "minimum": 0, "description": "0 = unlimited"},
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				t, err := platform.FindTeam(ctx, env.Q, args.Str("team"))
+				if err != nil {
+					return "", errors.New("team not found")
+				}
+				q := quota.Quota{MaxServers: unlimitedIfZero(optInt(args, "max_servers")), MaxApps: unlimitedIfZero(optInt(args, "max_apps")),
+					MaxDataServices: unlimitedIfZero(optInt(args, "max_data_services"))}
+				return asJSON(quota.Set(ctx, env.Q, t.ID, env.Caller.UserID, q))
+			},
+		},
+		{
 			Name:        "list_platform_audit",
 			Description: "The platform audit log (user, team and settings changes by platform admins), newest first, with the actor's email.",
 			Scope:       ScopeAdmin,
@@ -176,6 +211,15 @@ func optString(a Args, k string) *string {
 		return &v
 	}
 	return nil
+}
+
+// unlimitedIfZero turns the update_settings/set_team_quota convention (0 means "clear back to
+// unlimited") into the quota package's own (nil means unlimited).
+func unlimitedIfZero(v *int64) *int64 {
+	if v == nil || *v == 0 {
+		return nil
+	}
+	return v
 }
 
 func optInt(a Args, k string) *int64 {
