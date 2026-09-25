@@ -723,6 +723,15 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		return nil, err
 	}
 	eff := Resolve(cfg, Defaults{Port: int(r.app.Port), HealthPath: r.app.HealthcheckPath, HealthTimeout: int(r.app.HealthcheckTimeout)})
+	if fast && built.Toml() == "" && r.live != nil {
+		// The fast track does not read hosbah.toml, so it keeps the live release's processes and
+		// release command; otherwise a migration step would silently be skipped.
+		var prev Effective
+		if err := json.Unmarshal([]byte(r.live.Config), &prev); err == nil && prev.Port != 0 {
+			eff = prev
+			r.logf("info", "fast track: keeping the processes and release command of release v%d", r.live.Version)
+		}
+	}
 	r.logf("info", "processes: %s · port %d · health check GET %s within %ds", strings.Join(append([]string{"web"}, eff.Workers()...), ", "),
 		eff.Port, eff.HealthPath, eff.HealthTimeout)
 	if err := r.tx(ctx, func(q *db.Queries) error {
