@@ -150,6 +150,7 @@ func dbProvision(oc *OpContext) (any, int, error) {
 		"--label", agentproto.LabelDataService + "=" + p.ServiceID, "--label", agentproto.LabelKind + "=" + p.Kind,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
 		"-v", p.Volume + ":" + dataDirOf(p.Kind), "-p", publish}
+	args = append(args, p.Resources.DockerArgs()...)
 	// The image goes after the run options and before any container command, so redis'
 	// server flags stay a command and don't get parsed as run options.
 	var pairs []string
@@ -180,6 +181,30 @@ func dbProvision(oc *OpContext) (any, int, error) {
 	version := dbServerVersion(oc, p.Kind, p.Container, root["password"])
 	oc.Info("%s is ready (%s)", p.Container, version)
 	return agentproto.DBProvisionResult{Container: p.Container, Volume: p.Volume, Host: p.Bind, Port: p.Port, Version: version}, 0, nil
+}
+
+// dbLimits: db.limits — a live `docker update` of a data service's container (no restart).
+func dbLimits(oc *OpContext) (any, int, error) {
+	p, err := decode[agentproto.DBLimitsParams](oc)
+	if err != nil {
+		return nil, 2, err
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	args := append([]string{"update"}, p.Resources.DockerArgs()...)
+	if len(args) == 1 {
+		return agentproto.DBLimitsResult{}, 0, nil // unlimited on both — nothing to change
+	}
+	if !containerRunning(oc, p.Container) {
+		oc.Info("%s is not running — skipped", p.Container)
+		return agentproto.DBLimitsResult{}, 0, nil
+	}
+	if _, err := oc.Run("docker", append(args, p.Container)...); err != nil {
+		return nil, 1, fmt.Errorf("could not update %s", p.Container)
+	}
+	oc.Info("updated limits on %s", p.Container)
+	return agentproto.DBLimitsResult{Applied: true}, 0, nil
 }
 
 func dbDockerReady(oc *OpContext) (int, error) {

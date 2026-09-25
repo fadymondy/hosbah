@@ -59,6 +59,20 @@ DELETE FROM apps WHERE id = $1 AND team_id = $2;
 -- name: CountAppsOnServer :one
 SELECT count(*) FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'git';
 
+-- name: CountAppsOfTeam :one
+-- Team quotas (MH-574 E13): git apps only — an import found something already running, it did not
+-- consume the team's "create an app" quota.
+SELECT count(*) FROM apps WHERE team_id = $1 AND source = 'git';
+
+-- name: GetAppResources :one
+SELECT id, resources_memory_mb, resources_cpus, resources_processes FROM apps WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: UpdateAppResources :one
+UPDATE apps SET resources_memory_mb = sqlc.narg('resources_memory_mb'), resources_cpus = sqlc.narg('resources_cpus'),
+    resources_processes = sqlc.arg('resources_processes')::jsonb, updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id')
+RETURNING *;
+
 -- name: AppByDeployHook :one
 -- Token scope (app.token_hash = the presented deploy-hook token's hash).
 SELECT * FROM apps WHERE deploy_hook_hash = $1;

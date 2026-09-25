@@ -37,11 +37,11 @@ type Executor struct {
 	emit         func(agentproto.Event)
 	// termSend delivers a term.* frame straight to the connection, bypassing the event journal
 	// (set by the Agent that owns this executor; nil, and dropped, until then).
-	termSend func(agentproto.Frame)
-	handlers map[string]Handler
-	browsers     *browserHost  // owns the token gateways of this server's browsers
-	recipes      *recipeHost   // installed catalog recipes; runs this binary's own copy of a recipe
-	terminals    *terminalHost // interactive terminal.open sessions
+	termSend  func(agentproto.Frame)
+	handlers  map[string]Handler
+	browsers  *browserHost  // owns the token gateways of this server's browsers
+	recipes   *recipeHost   // installed catalog recipes; runs this binary's own copy of a recipe
+	terminals *terminalHost // interactive terminal.open sessions
 	// Restart is called after an operation that asked for it (agent.update) has reported its
 	// final status.
 	Restart func()
@@ -108,6 +108,8 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindCaddyCerts:      caddyCerts,
 		agentproto.KindAppExec:         newExecHost().appExec,
 		agentproto.KindAppProcesses:    appProcesses,
+		agentproto.KindAppLimits:       appLimits,
+		agentproto.KindDBLimits:        dbLimits,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -338,7 +340,7 @@ func laneOf(op agentproto.SignedOp) string {
 		return "host"
 	case agentproto.KindAppBuild, agentproto.KindAppFastBuild, agentproto.KindAppRelease, agentproto.KindAppStart, agentproto.KindRouteSet,
 		agentproto.KindAppDrain, agentproto.KindAppRollback, agentproto.KindAppRemove, agentproto.KindVolumeRemove,
-		agentproto.KindRealtimeRoute, agentproto.KindAppProcesses:
+		agentproto.KindRealtimeRoute, agentproto.KindAppProcesses, agentproto.KindAppLimits:
 		var p struct {
 			AppID string `json:"app_id"`
 		}
@@ -347,7 +349,8 @@ func laneOf(op agentproto.SignedOp) string {
 		}
 		return "app:?"
 	case agentproto.KindDBProvision, agentproto.KindDBCreate, agentproto.KindDBDrop, agentproto.KindDBBackup,
-		agentproto.KindDBRestore, agentproto.KindDBRemove, agentproto.KindDBUser, agentproto.KindDBQuery, agentproto.KindBucketCreate, agentproto.KindBucketRemove:
+		agentproto.KindDBRestore, agentproto.KindDBRemove, agentproto.KindDBUser, agentproto.KindDBQuery, agentproto.KindBucketCreate, agentproto.KindBucketRemove,
+		agentproto.KindDBLimits:
 		var p struct {
 			ServiceID string `json:"service_id"`
 		}

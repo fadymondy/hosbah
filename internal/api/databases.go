@@ -194,6 +194,8 @@ func dbErr(err error, fallback string) error {
 			return huma.Error409Conflict(de.Message)
 		case http.StatusUnprocessableEntity:
 			return huma.Error422UnprocessableEntity(de.Message)
+		case http.StatusForbidden:
+			return huma.Error403Forbidden(de.Message)
 		}
 	}
 	var se huma.StatusError

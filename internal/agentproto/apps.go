@@ -307,6 +307,8 @@ type StartParams struct {
 	// Realtime, on one worker only: publish this container port on an ephemeral 127.0.0.1 port, the
 	// way web's is, so Caddy can send the site's websocket path to it (realtime.go).
 	Realtime *RealtimePublish `json:"realtime,omitempty"`
+	// Resources (MH-574 E13): memory/CPU caps for this process's container. Zero value = unlimited.
+	Resources ResourceLimits `json:"resources,omitempty"`
 }
 
 type StartResult struct {
@@ -553,6 +555,9 @@ func (p StartParams) Validate() error {
 		if err := p.Realtime.Validate(); err != nil {
 			return err
 		}
+	}
+	if err := p.Resources.Validate(); err != nil {
+		return err
 	}
 	return ValidateMounts(p.AppID, p.Mounts)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/providers/sshboot"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -62,6 +63,10 @@ func refuse(msg string) error { return &UserError{Msg: msg} }
 func AddServer(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, actorID string, in AddInput) (db.Server, *ops.Install, error) {
 	// The platform's max_servers_per_team (a *platform.Error, 403) — checked first, for every way in.
 	if err := platform.CheckServerLimit(ctx, q, teamID); err != nil {
+		return db.Server{}, nil, err
+	}
+	// The team's own max_servers, a platform admin's per-team quota (a *quota.Error, 403).
+	if err := quota.CheckServers(ctx, q, teamID); err != nil {
 		return db.Server{}, nil, err
 	}
 	if in.Connect != nil && in.Provider != "byo" {

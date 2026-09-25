@@ -13,6 +13,8 @@ CREATE TABLE data_services (
     port bigint,
     root_sealed text,
     error text,
+    resources_memory_mb bigint,
+    resources_cpus double precision,
     source text NOT NULL DEFAULT 'managed',
     origin_kind text,
     origin_key text,
@@ -48,3 +50,8 @@ ALTER TABLE data_services ADD CONSTRAINT data_services_origin_kind_check CHECK (
 ALTER TABLE data_services ADD CONSTRAINT data_services_imported_state_check CHECK (imported_state IS NULL OR imported_state IN ('running', 'stopped', 'missing'));
 ALTER TABLE data_services ADD CONSTRAINT data_services_imported_origin_check CHECK (source <> 'imported' OR (origin_kind IS NOT NULL AND origin_key IS NOT NULL));
 CREATE UNIQUE INDEX data_services_server_origin_key ON data_services (server_id, origin_key) WHERE source = 'imported';
+
+-- Resource limits (MH-574 E13): NULL = unlimited. Imported services keep both NULL and refuse to be set
+-- (Hosbah has no container of its own to update).
+ALTER TABLE data_services ADD CONSTRAINT data_services_resources_memory_check CHECK (resources_memory_mb IS NULL OR resources_memory_mb BETWEEN 32 AND 1048576);
+ALTER TABLE data_services ADD CONSTRAINT data_services_resources_cpus_check CHECK (resources_cpus IS NULL OR resources_cpus BETWEEN 0.05 AND 256);

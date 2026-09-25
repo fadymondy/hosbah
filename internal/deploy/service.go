@@ -238,7 +238,9 @@ func (r *runner) logf(stream, format string, args ...any) {
 }
 
 func (r *runner) step(ctx context.Context, name string) {
-	_ = r.tx(ctx, func(q *db.Queries) error { return q.SetDeploymentStep(ctx, db.SetDeploymentStepParams{ID: r.dep.ID, Step: &name}) })
+	_ = r.tx(ctx, func(q *db.Queries) error {
+		return q.SetDeploymentStep(ctx, db.SetDeploymentStepParams{ID: r.dep.ID, Step: &name})
+	})
 	r.logf("info", "── %s", name)
 }
 
@@ -389,8 +391,8 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 			body += fmt.Sprintf("\nRelease v%d is still serving.", r.live.Version)
 		}
 		return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: r.dep.TeamID, Kind: "deploy.failed",
-			Title:       fmt.Sprintf("%s #%d of %s failed", strings.ToUpper(r.dep.Kind[:1])+r.dep.Kind[1:], r.dep.Number, r.app.Name),
-			Body:        &body, SubjectType: ptr("deployment"), SubjectID: &r.dep.ID})
+			Title: fmt.Sprintf("%s #%d of %s failed", strings.ToUpper(r.dep.Kind[:1])+r.dep.Kind[1:], r.dep.Number, r.app.Name),
+			Body:  &body, SubjectType: ptr("deployment"), SubjectID: &r.dep.ID})
 	})
 	if err != nil {
 		r.s.log.Error("could not finish a deployment", "deployment", r.dep.ID, "err", err)
@@ -573,7 +575,7 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 	*built = agentproto.BuildResult{
 		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast",
 			HosbahToml: res.HosbahToml, TomlFile: res.TomlFile},
-		Image:        res.Image, ImageID: res.ImageID,
+		Image: res.Image, ImageID: res.ImageID,
 	}
 	return true, nil
 }
@@ -724,7 +726,9 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	if err != nil {
 		return nil, err
 	}
-	eff := Resolve(cfg, Defaults{Port: int(r.app.Port), HealthPath: r.app.HealthcheckPath, HealthTimeout: int(r.app.HealthcheckTimeout)})
+	appRes, appProcRes := appResources(r.app)
+	eff := Resolve(cfg, Defaults{Port: int(r.app.Port), HealthPath: r.app.HealthcheckPath, HealthTimeout: int(r.app.HealthcheckTimeout),
+		Resources: appRes, ProcessResources: appProcRes})
 	if fast && built.Toml() == "" && r.live != nil {
 		// An agent from before the fix does not return hosbah.toml from a fast build, so keep the
 		// live release's processes and release command rather than silently dropping them.
@@ -862,7 +866,7 @@ func (r *runner) startParams(ctx context.Context, image, process string, eff Eff
 		return agentproto.StartParams{}, fmt.Errorf("volumes: %w", err)
 	}
 	p := agentproto.StartParams{AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, Image: image, Process: process,
-		Command: eff.Processes[process], Env: box, Mounts: mounts}
+		Command: eff.Processes[process], Env: box, Mounts: mounts, Resources: eff.ResourcesFor(process)}
 	rt, err := r.realtimeOnce(ctx, eff)
 	if err != nil {
 		return agentproto.StartParams{}, fmt.Errorf("realtime: %w", err)

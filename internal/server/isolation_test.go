@@ -109,8 +109,8 @@ func TestIsolationSweep(t *testing.T) {
 
 	// P2: an app on that server with a deployment, a variable and a domain.
 	var appA struct {
-		App struct{ ID, Name string } `json:"app"`
-		Deployment struct{ ID string } `json:"deployment"`
+		App        struct{ ID, Name string } `json:"app"`
+		Deployment struct{ ID string }       `json:"deployment"`
 	}
 	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps", map[string]any{"name": "alpha-app-" + suffix[len(suffix)-6:], "server": srvA,
 		"repo_url": "https://github.com/example/app", "deploy": true}, 201, &appA)
@@ -215,7 +215,7 @@ func TestIsolationSweep(t *testing.T) {
 		"team":       func(string) []string { return []string{teamA.ID, teamA.Slug} },
 		"member":     func(string) []string { return []string{memberA} },
 		"server":     func(string) []string { return []string{srvA, "alpha-" + suffix} }, // an id, and a name (must not resolve either)
-		"item":       func(string) []string { return []string{"imp-site", "imp-pg"} }, // an import item's origin key of A's server
+		"item":       func(string) []string { return []string{"imp-site", "imp-pg"} },    // an import item's origin key of A's server
 		"op":         func(string) []string { return []string{opA} },
 		"credential": func(string) []string { return []string{credA.ID} },
 		"token":      func(string) []string { return []string{inv2.Invitation.ID} }, // an id is not a token
@@ -233,16 +233,18 @@ func TestIsolationSweep(t *testing.T) {
 		"bucket":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c1", "a-env-bucket"} },
 		"browser":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c2", "a-env-browser"} },
 		"install":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000c3", "a-env-install"} },
-		"recipe":     func(string) []string { return []string{"searxng", "no-such-recipe"} }, // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
+		"recipe":     func(string) []string { return []string{"searxng", "no-such-recipe"} },                  // not tenant data, but the route is team-scoped: 404 in A's URL even for a real recipe
 		"job":        func(string) []string { return []string{"9f3c1a52-7d0e-4c55-b0a1-5a7d3f1e8c21", "17"} }, // a failed job of app A's queues: nothing of it is stored
 		"proxy":      func(string) []string { return []string{proxyA.ID, proxyA.Hostname} },
 		"kind":       func(string) []string { return []string{"frp", "tailscale"} },
 		"owner":      func(string) []string { return []string{"octocat"} }, // GitHub owner of a repository (the server is A's)
-		"service":    func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA} }, // services B may not see (one of A's imported, one shared)
-		"backup":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
-		"user":       func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d2", "some_user"} }, // a database user under {service}: not tenant B's either way
-		"database":   func(string) []string { return []string{"some_db"} },                                          // a database under {service}: not tenant B's either way
-		"table":      func(string) []string { return []string{"some_table"} },                                       // a table under {database}: not tenant B's either way
+		"service": func(string) []string {
+			return []string{"00000000-0000-4000-8000-0000000000d1", "svc-x", impSvcID, "imp-pg", svcA}
+		}, // services B may not see (one of A's imported, one shared)
+		"backup":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
+		"user":     func(string) []string { return []string{"00000000-0000-4000-8000-0000000000d2", "some_user"} }, // a database user under {service}: not tenant B's either way
+		"database": func(string) []string { return []string{"some_db"} },                                           // a database under {service}: not tenant B's either way
+		"table":    func(string) []string { return []string{"some_table"} },                                        // a table under {database}: not tenant B's either way
 		// An approval request of team A's, plus a made-up id. Team B must get the same 404 for
 		// both: an approval authorises destroying something, so being able to tell "exists but
 		// not yours" from "does not exist" would be a way to enumerate another team's pending
@@ -333,8 +335,8 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},
 		"verify_proxy_host": {"proxy": proxyA.ID}, "update_proxy_host": {"proxy": proxyA.Hostname, "upstream": "1.2.3.4:80"},
 		"remove_proxy_host": {"proxy": proxyA.ID},
-		"list_sites": {"server": srvA},
-		"enable_tunnel": {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
+		"list_sites":        {"server": srvA},
+		"enable_tunnel":     {"server": srvA, "credential": credA.ID}, "disable_tunnel": {"server": srvA, "kind": "frp"},
 		"update_app": {"app": appA.App.ID, "branch": "x", "title": "stolen", "color": "#000000"}, "list_releases": {"app": appA.App.ID}, "rotate_deploy_hook": {"app": appA.App.ID},
 		"attach_database": {"app": appA.App.ID, "database": "svc-x"}, "run_server_step": {"server": srvA, "kind": "system.info"},
 		"update_member_role": {"member": memberA, "role": "viewer"}, "delete_credential": {"credential": credA.ID, "confirm": "pve-a"},
@@ -347,18 +349,18 @@ func TestIsolationSweep(t *testing.T) {
 		"server_guests": {"server": srvA}, "server_set_parent": {"server": srvA, "parent": srvA},
 		"server_import_status": {"server": srvA}, "server_import_run": {"server": srvA},
 		"server_import_decide": {"server": srvA, "item": "imp-site", "decision": "ignore"},
-		"get_app_repository": {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
+		"get_app_repository":   {"app": appA.App.ID}, "list_app_commits": {"app": appA.App.Name, "branch": "main"},
 		"compare_app_commits": {"app": appA.App.ID, "base": "main", "head": "dev"},
-		"get_app_dns": {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},
+		"get_app_dns":         {"app": appA.App.ID}, "get_app_certificates": {"app": appA.App.Name},
 		"set_app_dns_record": {"app": appA.App.ID, "hostname": domA.Hostname, "takeover": true},
-		"list_app_monitors": {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
+		"list_app_monitors":  {"app": appA.App.ID}, "list_app_incidents": {"app": appA.App.Name},
 		"create_app_monitor": {"app": appA.App.ID, "name": "stolen", "kind": "cpu", "threshold": 90},
 		"update_app_monitor": {"app": appA.App.ID, "monitor": monA.ID, "enabled": true}, "delete_app_monitor": {"app": appA.App.ID, "monitor": monA.Name},
 		"list_app_schedules": {"app": appA.App.ID}, "list_schedule_runs": {"app": appA.App.Name, "schedule": schedA.ID},
 		"create_app_schedule": {"app": appA.App.ID, "name": "stolen", "cron": "* * * * *", "command": "env"},
 		"update_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID, "enabled": true}, "delete_app_schedule": {"app": appA.App.ID, "schedule": schedA.Name},
 		"run_app_schedule": {"app": appA.App.ID, "schedule": schedA.ID},
-		"get_app_queues": {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
+		"get_app_queues":   {"app": appA.App.ID}, "list_app_failed_jobs": {"app": appA.App.Name},
 		"app_processes": {"app": appA.App.ID}, "app_process_action": {"app": appA.App.ID, "action": "restart", "process": "web"},
 		"retry_app_failed_job": {"app": appA.App.ID, "job": "17"}, "forget_app_failed_job": {"app": appA.App.Name, "job": "17"},
 		"retry_all_app_failed_jobs": {"app": appA.App.ID}, "flush_app_failed_jobs": {"app": appA.App.ID},
@@ -366,15 +368,16 @@ func TestIsolationSweep(t *testing.T) {
 		"remove_app_volume": {"app": appA.App.Name, "volume": volA.Name, "confirm": volA.Name, "delete_data": true},
 		"create_app_bucket": {"app": appA.App.ID, "service": "svc-x", "bucket": "stolen-bucket"},
 		"remove_app_bucket": {"app": appA.App.ID, "bucket": "a-env-bucket", "confirm": "a-env-bucket"},
-		"get_app_realtime": {"app": appA.App.ID}, "remove_app_realtime": {"app": appA.App.Name},
-		"set_app_realtime": {"app": appA.App.ID, "kind": "ws", "process": "stolen", "port": 6001, "path": "/stolen"},
+		"get_app_realtime":  {"app": appA.App.ID}, "remove_app_realtime": {"app": appA.App.Name},
+		"set_app_realtime":  {"app": appA.App.ID, "kind": "ws", "process": "stolen", "port": 6001, "path": "/stolen"},
 		"list_app_browsers": {"app": appA.App.ID}, "create_app_browser": {"app": appA.App.ID, "name": "stolen"},
 		"remove_app_browser": {"app": appA.App.Name, "browser": "a-env-browser", "confirm": "a-env-browser"},
-		"list_app_installs": {"app": appA.App.ID}, "install_recipe": {"app": appA.App.ID, "recipe": "mailpit", "name": "stolen", "confirm": "stolen"},
-		"remove_install": {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
+		"list_app_installs":  {"app": appA.App.ID}, "install_recipe": {"app": appA.App.ID, "recipe": "mailpit", "name": "stolen", "confirm": "stolen"},
+		"remove_install":        {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
 		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},
 		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
+		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError || !strings.Contains(res.Text, "not found") || strings.Contains(res.Text, "a-env-") {
@@ -404,7 +407,7 @@ func TestIsolationSweep(t *testing.T) {
 	for name, args := range map[string]map[string]any{
 		"get_app": {"app": impAppID}, "delete_app": {"app": impAppID, "confirm": "imp-site"}, "deploy_app": {"app": "imp-site"},
 		"get_database": {"database": impSvcID}, "delete_data_service": {"database": "imp-pg", "confirm": "imp-pg"},
-		"backup_now": {"database": impSvcID},
+		"backup_now":     {"database": impSvcID},
 		"workload_power": {"app": impAppID, "action": "stop"}, "workload_stats": {"app": impAppID}, "workload_logs": {"app": "imp-site"},
 		"recreate_container": {"app": impAppID}, "resize_guest": {"app": impAppID, "cores": 2}, "list_snapshots": {"app": impAppID},
 		"create_snapshot": {"app": impAppID, "name": "snap1"}, "rollback_snapshot": {"app": impAppID, "name": "snap1"},
@@ -436,13 +439,14 @@ func TestIsolationSweep(t *testing.T) {
 		"reveal_db_url": {"database": "svc-x"}, "restore_backup": {"database": "svc-x", "confirm": "svc-x"},
 		"create_db": {"database": "svc-x", "name": "x"}, "drop_database": {"database": "svc-x", "name": "x", "confirm": "x"},
 		"delete_data_service": {"database": "svc-x", "confirm": "svc-x"}, "set_backup_schedule": {"database": "svc-x", "cron": "0 3 * * *"},
-		"db_users_list": {"database": "svc-x"},
+		"db_users_list":  {"database": "svc-x"},
 		"db_user_create": {"database": "svc-x", "target_database": "x", "user": "u1"}, "db_user_rotate_password": {"database": "svc-x", "user": "u1"},
 		"db_user_delete": {"database": "svc-x", "user": "u1", "confirm": "u1"}, "db_user_grant": {"database": "svc-x", "user": "u1", "grants": "readonly"},
 		"db_user_revoke": {"database": "svc-x", "user": "u1"},
 		"db_tables":      {"database": "svc-x", "target_database": "x"}, "db_table_columns": {"database": "svc-x", "target_database": "x", "table": "t"},
 		"db_table_rows": {"database": "svc-x", "target_database": "x", "table": "t"}, "db_query": {"database": "svc-x", "target_database": "x", "sql": "select 1"},
-		"db_execute": {"database": "svc-x", "target_database": "x", "sql": "select 1", "confirm": "svc-x"},
+		"db_execute":                 {"database": "svc-x", "target_database": "x", "sql": "select 1", "confirm": "svc-x"},
+		"data_service_resources_get": {"database": "svc-x"}, "data_service_resources_set": {"database": "svc-x", "memory_mb": 512, "cpus": 1},
 	} {
 		res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, name, args)
 		if !res.IsError {
@@ -465,6 +469,10 @@ func TestIsolationSweep(t *testing.T) {
 		if strings.Contains(res.Text, ua2Email) || strings.Contains(res.Text, "a-read") || strings.Contains(res.Text, "pending-"+suffix) {
 			t.Errorf("MCP %s as team B leaked team A data: %s", name, res.Text)
 		}
+	}
+	// team_quotas_get always reads the caller's own team (there is no team argument to point at A's).
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "team_quotas_get", nil); res.IsError || strings.Contains(res.Text, teamA.ID) {
+		t.Errorf("team_quotas_get as B should report only B's own usage: %+v", res)
 	}
 
 	// A's read-only token: whoami works, an out-of-scope call fails in-band.

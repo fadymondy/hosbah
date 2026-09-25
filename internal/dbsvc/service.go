@@ -32,8 +32,19 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
+
+// asServiceError copies a *quota.Error's status and message as this package's own *Error, so a
+// quota refusal reaches the REST and MCP layers the same way every other one does.
+func asServiceError(err error) error {
+	var qe *quota.Error
+	if errors.As(err, &qe) {
+		return &Error{Status: qe.Status, Message: qe.Msg}
+	}
+	return err
+}
 
 // Actor is who asked (reused from deploy so audit reads the same across P2 and P3).
 type Actor = deploy.Actor
@@ -145,6 +156,9 @@ func (s *Service) CreateService(ctx context.Context, q *db.Queries, teamID strin
 	if _, err := q.DataServiceByNameInTeam(ctx, db.DataServiceByNameInTeamParams{TeamID: teamID, Name: in.Name}); err == nil {
 		return db.DataService{}, conflict("a data service named " + in.Name + " already exists")
 	}
+	if err := quota.CheckDataServices(ctx, q, teamID); err != nil {
+		return db.DataService{}, asServiceError(err)
+	}
 	dek, err := s.ops.TeamDEK(ctx, q, teamID)
 	if err != nil {
 		return db.DataService{}, err
@@ -187,6 +201,7 @@ func (s *Service) provision(ctx context.Context, teamID string, svc db.DataServi
 			ServiceID: svc.ID, Name: svc.Name, Kind: svc.Kind, Version: svc.Version,
 			Image: agentproto.DBImage(svc.Kind, svc.Version), Container: agentproto.DBContainerName(svc.Name),
 			Volume: agentproto.DBVolumeName(svc.Name), Bind: bind, Port: port, RootSecret: rootBox,
+			Resources: serviceResources(svc),
 		}
 		return p, opID(svc.ID, "provision"), nil
 	}, agentproto.KindDBProvision, &res)

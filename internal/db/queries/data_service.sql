@@ -78,3 +78,13 @@ WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'import
 -- name: SetImportedDataServiceState :exec
 UPDATE data_services SET imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
+
+-- name: CountDataServicesOfTeam :one
+-- Team quotas (MH-574 E13): managed services only — an imported one did not consume the "create a
+-- data service" quota.
+SELECT count(*) FROM data_services WHERE team_id = $1 AND source = 'managed';
+
+-- name: UpdateDataServiceResources :one
+UPDATE data_services SET resources_memory_mb = sqlc.narg('resources_memory_mb'), resources_cpus = sqlc.narg('resources_cpus'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'managed'
+RETURNING *;
