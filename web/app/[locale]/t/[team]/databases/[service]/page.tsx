@@ -8,6 +8,7 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
+import { ResourcesCard } from "@/components/resources-panel"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -183,6 +184,12 @@ export default function DataServicePage() {
             </div>
           </Section>
         ) : null}
+
+        <ResourcesCard
+          path={`/api/teams/${team.slug}/data-services/${s.id}/resources`}
+          manage={manage}
+          readOnlyReason={imported ? t("resources.importedHint") : undefined}
+        />
 
         <Section
           title={t("databases.backupsTitle")}

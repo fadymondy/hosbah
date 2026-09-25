@@ -179,7 +179,11 @@ export function ServerCard({
       </Link>
 
       {online && m ? (
-        <div className="grid grid-cols-1 gap-4 border-t border-line px-5 py-4 sm:grid-cols-3">
+        <Link
+          href={`${href}/metrics`}
+          className="grid grid-cols-1 gap-4 border-t border-line px-5 py-4 hover:bg-grid-soft sm:grid-cols-3"
+          title={t("home.metricsLink")}
+        >
           <div className="flex min-w-0 flex-col gap-2">
             <Meter
               label={t("home.cpu")}
@@ -213,7 +217,7 @@ export function ServerCard({
               />
             )}
           </div>
-        </div>
+        </Link>
       ) : (
         <p className="border-t border-line px-5 py-4 text-xs text-grid-muted">
           {server.last_seen_at ? t("home.lastSeen", { when: ago(server.last_seen_at) }) : t("home.noReport")}

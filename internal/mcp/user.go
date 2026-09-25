@@ -25,7 +25,7 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "hosbah",
 		Version:       "0.1.0",
-		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...),
+		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...),
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {
@@ -177,15 +177,25 @@ func UserTools() []Tool {
 		},
 		{
 			Name:        "list_audit",
-			Description: "Recent entries of the team's audit log (needs an owner/admin role).",
+			Description: "Recent entries of the team's audit log (needs an owner/admin role). Filter by actor, action prefix, subject type/id, a date range (since/until, ISO-8601) or free-text search.",
 			Scope:       scopes.Read,
-			InputSchema: schema(nil, map[string]any{"limit": map[string]any{"type": "integer", "default": 20, "maximum": 200}}),
+			InputSchema: schema(nil, map[string]any{
+				"limit": map[string]any{"type": "integer", "default": 20, "maximum": 200}, "offset": map[string]any{"type": "integer", "default": 0, "minimum": 0},
+				"actor": str("A causer id, or a substring of their email."), "action": str("Prefix match, e.g. \"server.\"."),
+				"subject_type": str("e.g. \"server\", \"app\"."), "subject_id": str("Exact match."),
+				"since": str("ISO-8601; entries at or after this time."), "until": str("ISO-8601; entries at or before this time."),
+				"q": str("Free-text search across action, subject, changes and actor email."),
+			}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityViewAudit); err != nil {
 					return "", err
 				}
-				tid := env.Caller.TeamID
-				rows, err := env.Q.ListTeamActivity(ctx, db.ListTeamActivityParams{TeamID: &tid, Limit: int32(args.Int("limit", 20, 1, 200))})
+				rows, err := env.Q.ListTeamActivity(ctx, db.ListTeamActivityParams{
+					TeamID: env.Caller.TeamID, Actor: args.Str("actor"), Action: args.Str("action"),
+					SubjectType: args.Str("subject_type"), SubjectID: args.Str("subject_id"),
+					Since: args.Str("since"), Until: args.Str("until"), Q: args.Str("q"),
+					Lim: int32(args.Int("limit", 20, 1, 200)), Off: int32(args.Int("offset", 0, 0, 1<<30)),
+				})
 				if err != nil {
 					return "", errors.New("could not read the audit log")
 				}

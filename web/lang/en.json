@@ -205,6 +205,18 @@
     "uptime": "Uptime",
     "lastSeen": "Last heartbeat",
     "never": "Never",
+    "metrics": {
+      "title": "Metrics",
+      "hint": "History from this server's heartbeats, bucketed for the chosen range.",
+      "range": "Time range",
+      "ranges": { "1h": "1h", "6h": "6h", "24h": "24h", "7d": "7d", "30d": "30d" },
+      "network": "Network",
+      "rx": "Received",
+      "tx": "Sent",
+      "gpu": "GPU {n}",
+      "emptyTitle": "No history yet",
+      "emptyHint": "The chart fills in as the agent's heartbeats arrive."
+    },
     "presence": {
       "online": "Online",
       "offline": "Offline",
@@ -411,6 +423,7 @@
     "tabs": {
       "label": "Server sections",
       "overview": "Overview",
+      "metrics": "Metrics",
       "apps": "Apps",
       "databases": "Databases",
       "guests": "Guests",
@@ -420,6 +433,7 @@
       "discovered": "Discovered",
       "import": "Import",
       "files": "Files",
+      "sftp": "SFTP",
       "terminal": "Terminal",
       "operations": "Operations",
       "settings": "Settings",
@@ -877,6 +891,7 @@
     "description": "Every change made in this team, newest first.",
     "emptyTitle": "Nothing recorded yet",
     "emptyHint": "Changes to the team, members, invitations and tokens are recorded here.",
+    "noMatch": "No entries match these filters",
     "when": "When",
     "action": "Action",
     "subject": "Subject",
@@ -884,14 +899,30 @@
     "ip": "IP",
     "changes": "Changes",
     "system": "System",
-    "show": "Show"
+    "show": "Show",
+    "filters": {
+      "search": "Search action, subject, changes…",
+      "actor": "Actor (id or email)",
+      "action": "Action prefix",
+      "subjectType": "Subject type",
+      "subjectId": "Subject id",
+      "since": "From",
+      "until": "To"
+    }
   },
   "settings": {
     "description": "Team details.",
     "general": "General",
     "renameHint": "The name everyone in the team sees.",
     "viewerNote": "Only owners and admins can rename the team.",
-    "saved": "Team updated"
+    "saved": "Team updated",
+    "quotasTitle": "Usage & quotas",
+    "quotasHint": "Counts include only apps and data services Hosbah manages — not imported guests.",
+    "quotaServers": "Servers",
+    "quotaApps": "Apps",
+    "quotaDataServices": "Data services",
+    "quotaUnlimited": "Unlimited",
+    "quotaOf": "{used} of {max}"
   },
   "account": {
     "title": "Account",
@@ -1084,7 +1115,14 @@
       "reinstate": "Reinstate team",
       "reinstated": "Team reinstated.",
       "noMembers": "No members.",
-      "noApps": "No apps."
+      "noApps": "No apps.",
+      "quotaTitle": "Quota",
+      "quotaHint": "A platform admin's own guardrail on top of the platform-wide limits. Empty means unlimited.",
+      "quotaServers": "Max servers",
+      "quotaApps": "Max apps",
+      "quotaDataServices": "Max data services",
+      "quotaUnlimited": "Unlimited",
+      "quotaSaved": "Quota saved."
     },
     "servers": {
       "hint": "Every server across every team, with its agent and when it last checked in.",
@@ -1130,6 +1168,15 @@
       "target": "On",
       "details": "Details",
       "when": "When",
+      "filters": {
+        "search": "Search action, target, details…",
+        "actor": "Actor (id or email)",
+        "action": "Action prefix",
+        "targetType": "Target type",
+        "targetId": "Target id",
+        "since": "From",
+        "until": "To"
+      },
       "actions": {
         "user_updated": "Updated a user",
         "user_deleted": "Deleted a user",
@@ -1460,6 +1507,44 @@
       "removing": "Closing…"
     }
   },
+  "sftp": {
+    "title": "SFTP users",
+    "hint": "Chrooted, sftp-only system accounts (no shell) so a team can upload and download files with any SFTP client — FileZilla, WinSCP — without sharing root.",
+    "add": "Add sftp user",
+    "addHint": "Paste a public key, have Hosbah generate a password, or both. The user is chrooted to its root directory and can't see outside it.",
+    "emptyTitle": "No sftp users",
+    "emptyHint": "Add one to hand out upload/download access without sharing root.",
+    "connection": "Connection",
+    "host": "Host",
+    "port": "Port",
+    "username": "Username",
+    "usernameHint": "Lowercase, starts with a letter or underscore, up to 32 characters.",
+    "rootDir": "Root directory",
+    "rootDirHint": "Absolute path on the server. The user is chrooted to it and can't see outside it.",
+    "publicKeys": "Public keys",
+    "publicKeysHint": "One OpenSSH public key per line (ssh-ed25519, ssh-rsa, …). Replaces the existing keys when changed.",
+    "generatePassword": "Generate a password",
+    "rotatePassword": "Rotate password",
+    "passwordShown": "Password (shown once) — copy it now, Hosbah won't show it again.",
+    "readOnly": "Read-only",
+    "readWrite": "Read-write",
+    "access": "Access",
+    "keys": "{n} key(s)",
+    "noKeys": "No keys",
+    "hasPassword": "Password set",
+    "noPassword": "No password",
+    "statusHeader": "Status",
+    "status": {
+      "pending": "Applying…",
+      "active": "Active",
+      "failed": "Failed",
+      "removing": "Removing…"
+    },
+    "editHint": "The username cannot change; remove the user and add another for that.",
+    "remove": "Remove",
+    "removeConfirm": "Remove sftp user {user} from {server}? Its access ends at once.",
+    "save": "Add sftp user"
+  },
   "imported": {
     "badge": "Imported",
     "eyebrowApp": "Imported site",
@@ -1601,6 +1686,7 @@
     "cpuChart": "CPU over the last hour",
     "memChart": "Memory over the last hour",
     "gpuChart": "GPU over the last hour",
+    "metricsLink": "Open the full metrics history",
     "uptimeDays": "up {d}d {h}h",
     "uptimeHours": "up {h}h {m}m",
     "lastSeen": "Last report {when}",
@@ -1716,6 +1802,7 @@
     "searchDatabases": "Search databases by name, kind, endpoint…",
     "searchProxy": "Search by hostname or upstream…",
     "searchTunnels": "Search tunnels…",
+    "searchSftp": "Search by username or root directory…",
     "deleteApp": "Delete {name}?",
     "deleteAppBody": "Its containers, releases and domains are removed from the server. This cannot be undone.",
     "deleteDatabase": "Delete {name}?",
@@ -2340,5 +2427,20 @@
       },
       "fromStack": "Prefilled from the {name} stack."
     }
+  },
+  "resources": {
+    "title": "Resources",
+    "hint": "Memory and CPU caps. Saving here applies live to the running container(s) — no redeploy needed.",
+    "memory": "Memory",
+    "cpu": "CPU",
+    "unlimited": "Unlimited",
+    "custom": "Custom",
+    "base": "Base limit",
+    "baseHint": "Applies to every process unless overridden below.",
+    "processes": "Per-process overrides",
+    "processesHint": "Give a process its own limit instead of the base one.",
+    "usesBase": "Uses the base limit",
+    "saved": "Resource limits saved",
+    "importedHint": "This service was imported; Hosbah does not manage its resources."
   }
 }

@@ -7,6 +7,7 @@ import {
   AppWindowIcon,
   ArrowLeftIcon,
   CableIcon,
+  ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
   ChevronsUpDownIcon,
@@ -14,6 +15,7 @@ import {
   DownloadIcon,
   FolderIcon,
   GithubIcon,
+  KeyRoundIcon,
   LayersIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
@@ -50,6 +52,7 @@ import { useOptionalTeam } from "@/lib/team"
 /** Each server section's icon, and the group it sits in on the server's sidebar. */
 const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads" | "sources" | "manage" }> = {
   "": { icon: LayoutDashboardIcon, group: "" },
+  metrics: { icon: ChartNoAxesColumnIcon, group: "" },
   apps: { icon: AppWindowIcon, group: "workloads" },
   databases: { icon: DatabaseIcon, group: "workloads" },
   guests: { icon: LayersIcon, group: "workloads" },
@@ -59,6 +62,7 @@ const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "workloads
   discovered: { icon: RadarIcon, group: "sources" },
   import: { icon: DownloadIcon, group: "sources" },
   files: { icon: FolderIcon, group: "sources" },
+  sftp: { icon: KeyRoundIcon, group: "sources" },
   terminal: { icon: SquareTerminalIcon, group: "sources" },
   operations: { icon: WorkflowIcon, group: "manage" },
   settings: { icon: SettingsIcon, group: "manage" },

@@ -8,6 +8,7 @@ import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { GitHubAppSection } from "@/components/github-app"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
+import { TeamQuotasCard } from "@/components/team-quotas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { apiFetch, type Team } from "@/lib/api"
@@ -70,6 +71,7 @@ export default function SettingsPage() {
           </div>
         ) : null}
       </form>
+      <TeamQuotasCard team={team.slug} />
       <GitHubAppSection team={team.slug} />
     </PageBody>
   )

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -155,6 +156,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	} {
 		e.handlers[kind] = h
 	}
+	e.handlers[agentproto.KindSFTPUser] = newSFTPHost().apply
 	e.terminals = newTerminalHost(func(f agentproto.Frame) {
 		if e.termSend != nil {
 			e.termSend(f)
@@ -305,6 +307,10 @@ func laneOf(op agentproto.SignedOp) string {
 	case agentproto.KindFSList, agentproto.KindFSRead, agentproto.KindFSWrite, agentproto.KindFSMkdir,
 		agentproto.KindFSDelete, agentproto.KindFSRename:
 		return "" // browsing and editing files never waits behind a build or a provisioning step
+	case agentproto.KindSFTPUser:
+		// Its own lane: two sftp.user ops writing the same sshd_config.d drop-in must never
+		// interleave, but a slow one must never hold up an app's build or a provisioning step.
+		return "sftp"
 	case agentproto.KindTerminalOpen:
 		// One lane per session: it runs for as long as someone is typing, so it must never share a
 		// lane with another session or with a build — but it also must not block one.
@@ -544,6 +550,53 @@ func (o *OpContext) RunEnv(extra []string, name string, args ...string) (int, er
 	o.Info("$ %s", shellQuote(append([]string{name}, args...)))
 	cmd := exec.CommandContext(o.Ctx, name, args...)
 	cmd.Env = append(append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C"), extra...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return 127, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return 127, err
+	}
+	if err := cmd.Start(); err != nil {
+		return 127, fmt.Errorf("%s: %w", name, err)
+	}
+	var wg sync.WaitGroup
+	pump := func(r io.Reader, stream string) {
+		defer wg.Done()
+		sc := bufio.NewScanner(r)
+		sc.Buffer(make([]byte, 64<<10), 1<<20)
+		for sc.Scan() {
+			line := sc.Text()
+			if len(line) > maxLine {
+				line = line[:maxLine] + "…"
+			}
+			o.log(stream, line)
+		}
+	}
+	wg.Add(2)
+	go pump(stdout, "stdout")
+	go pump(stderr, "stderr")
+	wg.Wait()
+	err = cmd.Wait()
+	var exitErr *exec.ExitError
+	switch {
+	case err == nil:
+		return 0, nil
+	case errors.As(err, &exitErr):
+		return exitErr.ExitCode(), fmt.Errorf("%s exited with status %d", name, exitErr.ExitCode())
+	default:
+		return 1, err
+	}
+}
+
+// RunStdin is Run with a fixed string fed to the child's stdin — never logged, and never an argv
+// or an environment variable, for a secret like a login password (chpasswd's own stdin format).
+func (o *OpContext) RunStdin(stdin, name string, args ...string) (int, error) {
+	o.Info("$ %s", shellQuote(append([]string{name}, args...)))
+	cmd := exec.CommandContext(o.Ctx, name, args...)
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C")
+	cmd.Stdin = strings.NewReader(stdin)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return 127, err

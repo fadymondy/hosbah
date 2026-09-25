@@ -266,6 +266,23 @@ export function opKey(k: string): string {
   return k.replace(/\./g, "_")
 }
 
+/** A chrooted, sftp-only system account on a server (GET .../servers/{server}/sftp-users). Never
+ * its password: only a create or password-rotating update returns it, once, in that response. */
+export type SFTPUser = {
+  id: string
+  server_id: string
+  server_name?: string
+  username: string
+  public_keys: string[]
+  has_password: boolean
+  root_dir: string
+  read_only: boolean
+  status: "pending" | "active" | "failed" | "removing"
+  error?: string
+  created_at: string
+  updated_at: string
+}
+
 /** A proxy host of the Caddy proxy manager (GET /api/teams/{team}/proxy-hosts). */
 export type ProxyHost = {
   id: string
