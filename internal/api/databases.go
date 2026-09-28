@@ -356,6 +356,35 @@ func (d *deps) registerDatabases(api huma.API) {
 		return out, err
 	})
 
+	// ---- import an existing Postgres database (blocks migrating a production database into a
+	// managed one): pg_dump | pg_restore run in the background, like a backup or a restore-test —
+	// the request returns once queued and audited. source_url is a secret; it is validated here (and
+	// again by the agent once opened) but never logged or echoed back.
+	huma.Register(api, huma.Operation{OperationID: "import-database", Method: http.MethodPost,
+		Path: "/api/teams/{team}/data-services/{service}/databases/{database}/import", Tags: tags,
+		Summary: "Import an existing Postgres database into one Hosbah manages, via pg_dump | pg_restore (owner or admin)",
+	}, func(ctx context.Context, in *struct {
+		DatabasePath
+		Body struct {
+			SourceURL string `json:"source_url" minLength:"1" maxLength:"2048" doc:"postgres://user:pass@host:port/db — the database to import from."`
+			Replace   bool   `json:"replace,omitempty" doc:"Drop and recreate the target database first, so a final cutover sync can re-run the same import. Without it, refused if the target already has tables."`
+		}
+	}) (*struct{}, error) {
+		return nil, d.inTeam(ctx, in.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, in.Service)
+			if err != nil {
+				return err
+			}
+			dbRow, err := dbsvc.DatabaseInService(ctx, q, m.TeamID, svc, in.Database)
+			if err != nil {
+				return dbErr(err, "could not find that database")
+			}
+			return dbErr(d.dbs().ImportDatabase(ctx, q, m.TeamID, webActor(id), svc, dbRow, dbsvc.ImportInput{
+				SourceURL: in.Body.SourceURL, Replace: in.Body.Replace,
+			}), "could not start the import")
+		})
+	})
+
 	// ---- standalone database users (MH-574 F1): list is on the service detail; create, rotate,
 	// delete, grant and revoke are each a synchronous agent call, so the response either carries the
 	// plaintext password (once, create/rotate) or the settled row (grant/revoke) — never a queued state.

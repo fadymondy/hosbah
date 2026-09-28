@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { DatabaseIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
+import { DatabaseIcon, DownloadIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
@@ -148,6 +148,9 @@ export default function DataServicePage() {
                     <TableRow>
                       <TableHead>{t("databases.dbName")}</TableHead>
                       <TableHead>{t("databases.status")}</TableHead>
+                      {manage && s.kind === "postgres" && s.status === "running" ? (
+                        <TableHead className="text-end">{t("databases.importTitle")}</TableHead>
+                      ) : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -155,6 +158,11 @@ export default function DataServicePage() {
                       <TableRow key={d.id}>
                         <TableCell dir="ltr">{d.name}</TableCell>
                         <TableCell>{d.status}</TableCell>
+                        {manage && s.kind === "postgres" && s.status === "running" ? (
+                          <TableCell className="text-end">
+                            <ImportDatabaseDialog teamSlug={team.slug} serviceRef={s.id} database={d} onDone={load} />
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -382,6 +390,126 @@ function CreateDbDialog({ teamSlug, serviceRef, onDone }: { teamSlug: string; se
             <Button type="submit" disabled={busy || !name}>
               {busy ? t("common.working") : t("databases.createDb")}
             </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ImportDatabaseDialog runs a pg_dump | pg_restore of an existing Postgres database into one Hosbah
+// already manages — the path that unblocks migrating a production database in. The source URL is
+// sent once, sealed to the agent on the way in, and never echoed back or logged; the dialog forgets
+// it as soon as it closes. Replace drops and recreates the target first, so a final cutover sync can
+// re-run the same import; without it, the backend refuses when the target already has tables.
+function ImportDatabaseDialog({
+  teamSlug,
+  serviceRef,
+  database,
+  onDone,
+}: {
+  teamSlug: string
+  serviceRef: string
+  database: DatabaseRow
+  onDone: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [open, setOpen] = useState(false)
+  const [sourceUrl, setSourceUrl] = useState("")
+  const [replace, setReplace] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!sourceUrl) return
+    setBusy(true)
+    setError(null)
+    try {
+      await apiFetch(`/api/teams/${teamSlug}/data-services/${serviceRef}/databases/${database.id}/import`, {
+        method: "POST",
+        body: { source_url: sourceUrl, replace },
+      })
+      setSourceUrl("")
+      setReplace(false)
+      setDone(true)
+      await onDone()
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v)
+        if (!v) {
+          setSourceUrl("")
+          setReplace(false)
+          setError(null)
+          setDone(false)
+        }
+      }}
+    >
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DownloadIcon />
+        {t("databases.importTitle")}
+      </DialogTrigger>
+      <DialogContent>
+        <form onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("databases.importTitle")}</DialogTitle>
+            <DialogDescription>{t("databases.importHint", { name: database.name })}</DialogDescription>
+          </DialogHeader>
+          <FieldGroup className="py-4">
+            {done ? (
+              <Alert>
+                <AlertDescription>{t("databases.importStarted")}</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="import-source-url">{t("databases.importSourceUrl")}</FieldLabel>
+                  <Input
+                    id="import-source-url"
+                    type="password"
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    placeholder={t("databases.importSourceUrlPlaceholder")}
+                    dir="ltr"
+                    autoFocus
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <Checkbox id="import-replace" checked={replace} onCheckedChange={(v) => setReplace(Boolean(v))} />
+                  <FieldLabel htmlFor="import-replace" className="font-normal">
+                    {t("databases.importReplace")}
+                  </FieldLabel>
+                </Field>
+                {replace ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{t("databases.importReplaceWarning", { name: database.name })}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <FormError message={error} />
+              </>
+            )}
+          </FieldGroup>
+          <DialogFooter>
+            {done ? (
+              <Button type="button" onClick={() => setOpen(false)}>
+                {t("common.close")}
+              </Button>
+            ) : (
+              <Button type="submit" disabled={busy || !sourceUrl}>
+                {busy ? t("common.working") : t("databases.importButton")}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

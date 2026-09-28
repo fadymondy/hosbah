@@ -117,8 +117,12 @@ func restorable(svc db.DataService) error {
 		return err
 	}
 	w := deploy.WorkloadOfService(svc)
-	if !agentproto.ValidDBVersion(svc.Version) || w.Origin.Image == "" || agentproto.DBImage(svc.Kind, svc.Version) != w.Origin.Image &&
-		"docker.io/library/"+agentproto.DBImage(svc.Kind, svc.Version) != w.Origin.Image {
+	// Every official engine image (postgres, mysql, redis) is in Docker Hub's unqualified "library"
+	// namespace, so a full reference is "docker.io/library/<image>". pgvector/pgvector is not (it is
+	// "docker.io/pgvector/pgvector"), so a bare "docker.io/" prefix is accepted for it too.
+	pinned := agentproto.DBImage(svc.Kind, svc.Version)
+	if !agentproto.ValidDBVersion(svc.Version) || w.Origin.Image == "" || pinned != w.Origin.Image &&
+		"docker.io/library/"+pinned != w.Origin.Image && "docker.io/"+pinned != w.Origin.Image {
 		return deploy.Coded(http.StatusConflict, deploy.CodeUnsupportedOrigin, "a restore-test needs the engine's official image; "+
 			svc.Name+" runs "+w.Origin.Image+" (backups still work)")
 	}
