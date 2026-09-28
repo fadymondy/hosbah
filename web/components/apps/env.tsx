@@ -6,8 +6,10 @@ import { EyeIcon, InfoIcon, KeyRoundIcon, PencilIcon } from "lucide-react"
 import { ConfirmButton } from "@/components/confirm-button"
 import type { Controlled } from "@/components/dialog-state"
 import { useErrorText } from "@/components/form-error"
+import type { BuildConfig } from "@/components/site/build-config"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -53,6 +55,12 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
   const [value, setValue] = useState("")
   const [busy, setBusy] = useState(false)
   const [revealed, setRevealed] = useState<Record<string, string>>({})
+  // MH-579 gap A: which of these variables are also exposed at build time (as --build-arg), fetched
+  // from the app's build settings (deploy-config/build) so the toggle lives right next to the value
+  // it applies to.
+  const buildConfigPath = `${path}/deploy-config/build`
+  const [buildConfig, setBuildConfig] = useState<BuildConfig | null>(null)
+  const [buildBusy, setBuildBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -65,9 +73,39 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
 
+  const loadBuildConfig = useCallback(async () => {
+    try {
+      setBuildConfig(await apiFetch<BuildConfig>(buildConfigPath))
+    } catch {
+      // Read-only members may not have deploy access to this endpoint's PUT, but GET is any-member;
+      // a failure here just hides the build-time column instead of failing the whole page.
+      setBuildConfig(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildConfigPath])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadBuildConfig()
+  }, [load, loadBuildConfig])
+
+  async function toggleBuildTime(varName: string, on: boolean) {
+    if (!buildConfig) return
+    setBuildBusy(varName)
+    setError(null)
+    try {
+      const build_env = on ? [...buildConfig.build_env, varName] : buildConfig.build_env.filter((n) => n !== varName)
+      const r = await apiFetch<BuildConfig>(buildConfigPath, {
+        method: "PUT",
+        body: { dockerfile_path: buildConfig.dockerfile_path, build_context: buildConfig.build_context, build_env },
+      })
+      setBuildConfig(r)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBuildBusy(null)
+    }
+  }
 
   const nameOK = ENV_NAME.test(name)
 
@@ -104,6 +142,7 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
   return (
     <div data-testid="env">
       <Notice icon={<InfoIcon />}>{t("apps.env.applies")}</Notice>
+      {buildConfig ? <Notice icon={<InfoIcon />}>{t("apps.env.buildTimeHint")}</Notice> : null}
       <ErrorBand message={error} />
       {vars === null ? (
         <LoadingRows />
@@ -124,6 +163,7 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
                 <TableHead>{t("apps.env.name")}</TableHead>
                 <TableHead>{t("apps.env.value")}</TableHead>
                 <TableHead>{t("apps.env.updated")}</TableHead>
+                {buildConfig ? <TableHead title={t("apps.env.buildTimeHint")}>{t("apps.env.buildTime")}</TableHead> : null}
                 {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
               </TableRow>
             </TableHeader>
@@ -139,6 +179,16 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
                   <TableCell dir="ltr" className="text-start text-xs">
                     {fmt(v.updated_at)}
                   </TableCell>
+                  {buildConfig ? (
+                    <TableCell>
+                      <Checkbox
+                        checked={buildConfig.build_env.includes(v.name)}
+                        onCheckedChange={(val) => toggleBuildTime(v.name, !!val)}
+                        disabled={!manage || buildBusy === v.name}
+                        aria-label={t("apps.env.buildTime")}
+                      />
+                    </TableCell>
+                  ) : null}
                   {manage ? (
                     <TableCell>
                       <div className="flex justify-end gap-2">

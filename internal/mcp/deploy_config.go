@@ -128,11 +128,16 @@ func DeployConfigTools() []Tool {
 		if existing.PhpIni != "" {
 			phpIni = existing.PhpIni
 		}
+		dockerfilePath, buildContext, buildEnv := existing.DockerfilePath, existing.BuildContext, existing.BuildEnv
+		if buildEnv == "" {
+			buildEnv = "[]"
+		}
 		userID := env.Caller.UserID
 		row, err := env.Q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
 			AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: string(raw),
 			BuilderImage: builderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
 			PhpVersion: phpVersion, PhpIni: phpIni,
+			DockerfilePath: dockerfilePath, BuildContext: buildContext, BuildEnv: buildEnv,
 			Version: nextVersion, UpdatedBy: &userID,
 		})
 		if err != nil {
@@ -354,10 +359,15 @@ func DeployConfigTools() []Tool {
 				}
 				existing, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID})
 				mode, preset, steps, builderImage, outputs, detectedPreset, cfgVersion := "auto", deploy.DetectPreset(nil), "", "", "[]", "", int32(1)
+				dockerfilePath, buildContext, buildEnv := "", "", "[]"
 				switch {
 				case err == nil:
 					mode, preset, steps, builderImage, outputs, detectedPreset, cfgVersion =
 						existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset, existing.Version
+					dockerfilePath, buildContext = existing.DockerfilePath, existing.BuildContext
+					if existing.BuildEnv != "" {
+						buildEnv = existing.BuildEnv
+					}
 				case errors.Is(err, sql.ErrNoRows):
 					raw, mErr := json.Marshal(deploy.PresetSteps(preset))
 					if mErr != nil {
@@ -372,12 +382,130 @@ func DeployConfigTools() []Tool {
 					AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: steps,
 					BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
 					PhpVersion: version, PhpIni: string(iniRaw),
+					DockerfilePath: dockerfilePath, BuildContext: buildContext, BuildEnv: buildEnv,
 					Version: cfgVersion, UpdatedBy: &userID,
 				})
 				if err != nil {
 					return "", err
 				}
 				return fmt.Sprintf("Saved %s's PHP configuration: version %s, %d php.ini override(s).", a.Name, row.PhpVersion, len(ini)), nil
+			},
+		},
+		{
+			Name: "app_build_config_get", Scope: scopes.Read,
+			Description: "An app's custom Dockerfile path and build context, and which of its env vars are exposed at build time " +
+				"(as --build-arg, ending up in the built image's layers). Not versioned.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				row, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID})
+				if err != nil && !errors.Is(err, sql.ErrNoRows) {
+					return "", err
+				}
+				dockerfilePath, buildContext := row.DockerfilePath, row.BuildContext
+				names := deploy.UnmarshalBuildEnv(row.BuildEnv)
+				df := dockerfilePath
+				if df == "" {
+					df = "Dockerfile (default)"
+				}
+				bc := buildContext
+				if bc == "" {
+					bc = ". (checkout root, default)"
+				}
+				be := "none"
+				if len(names) > 0 {
+					be = strings.Join(names, ", ")
+				}
+				return fmt.Sprintf("%s: dockerfile %s, build context %s, build-time env: %s", a.Name, df, bc, be), nil
+			},
+		},
+		{
+			Name: "app_build_config_set", Scope: scopes.Deploy,
+			Description: "Save an app's Dockerfile path, build context and the env var names exposed at build time (a name with no " +
+				"matching env var is skipped). Empty dockerfile_path/build_context resets to the default. Not versioned. Deployer, " +
+				"admin or owner.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg,
+				"dockerfile_path": str("Path to the Dockerfile, relative to the checkout root. Empty = \"Dockerfile\"."),
+				"build_context":   str("The build context directory, relative to the checkout root. Empty = the checkout root."),
+				"build_env": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string"},
+					"description": "Env var names exposed at build time as --build-arg NAME. A name with no matching env var is skipped.",
+				}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				dockerfilePath, buildContext := args.Str("dockerfile_path"), args.Str("build_context")
+				if !deploy.ValidDockerfilePath(dockerfilePath) {
+					return "", errors.New("bad dockerfile path")
+				}
+				if !deploy.ValidBuildContext(buildContext) {
+					return "", errors.New("bad build context")
+				}
+				var names []string
+				if raw, ok := args["build_env"].([]any); ok {
+					for _, item := range raw {
+						s, ok := item.(string)
+						if !ok {
+							return "", errors.New("build_env must be a list of variable names")
+						}
+						names = append(names, s)
+					}
+				}
+				names = deploy.DedupBuildEnvNames(names)
+				if err := deploy.ValidBuildEnvNames(names); err != nil {
+					return "", err
+				}
+				buildEnvRaw := deploy.MarshalBuildEnv(names)
+
+				existing, err := env.Q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: env.Caller.TeamID})
+				mode, preset, steps, builderImage, outputs, detectedPreset := "auto", deploy.DetectPreset(nil), "", "", "[]", ""
+				phpVersion, phpIni, cfgVersion := "auto", "{}", int32(1)
+				switch {
+				case err == nil:
+					mode, preset, steps, builderImage, outputs, detectedPreset =
+						existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset
+					phpVersion, phpIni, cfgVersion = existing.PhpVersion, existing.PhpIni, existing.Version
+					if phpVersion == "" {
+						phpVersion = "auto"
+					}
+					if phpIni == "" {
+						phpIni = "{}"
+					}
+				case errors.Is(err, sql.ErrNoRows):
+					raw, mErr := json.Marshal(deploy.PresetSteps(preset))
+					if mErr != nil {
+						return "", mErr
+					}
+					steps = string(raw)
+				default:
+					return "", err
+				}
+				userID := env.Caller.UserID
+				row, err := env.Q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
+					AppID: a.ID, TeamID: env.Caller.TeamID, Mode: mode, Preset: preset, Steps: steps,
+					BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
+					PhpVersion: phpVersion, PhpIni: phpIni,
+					DockerfilePath: dockerfilePath, BuildContext: buildContext, BuildEnv: buildEnvRaw,
+					Version: cfgVersion, UpdatedBy: &userID,
+				})
+				if err != nil {
+					return "", err
+				}
+				be := "none"
+				if len(names) > 0 {
+					be = strings.Join(names, ", ")
+				}
+				return fmt.Sprintf("Saved %s's build configuration: dockerfile %q, build context %q, build-time env: %s.",
+					a.Name, row.DockerfilePath, row.BuildContext, be), nil
 			},
 		},
 		{

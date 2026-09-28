@@ -22,6 +22,14 @@
 -- version only from there, not from an env var). php_ini is a jsonb object of
 -- internal/deploy.PHPIniKeys -> value, validated by internal/deploy.ValidatePHPIni before it is
 -- ever saved.
+--
+-- dockerfile_path and build_context (MH-579 build-time settings): '' means the default (Dockerfile
+-- at the checkout root, built with the checkout root as context). Both are relative paths inside
+-- the checkout, validated by agentproto.ValidBuildPath both when saved (internal/api/deploy_config.go)
+-- and again by the agent after it resolves symlinks (internal/agent/apps.go safeJoin) — never trusted
+-- as shell input. build_env is a jsonb array of env var names (internal/deploy.ValidBuildEnvName)
+-- the app's build gets as `docker buildx build --build-arg NAME` (the value travels sealed to the
+-- agent's key, never in the array or a log); a listed name with no matching env_vars row is skipped.
 CREATE TABLE app_deploy_configs (
     app_id text PRIMARY KEY,
     team_id text NOT NULL,
@@ -33,6 +41,9 @@ CREATE TABLE app_deploy_configs (
     detected_preset text NOT NULL DEFAULT '',
     php_version text NOT NULL DEFAULT 'auto',
     php_ini jsonb NOT NULL DEFAULT '{}'::jsonb,
+    dockerfile_path text NOT NULL DEFAULT '',
+    build_context text NOT NULL DEFAULT '',
+    build_env jsonb NOT NULL DEFAULT '[]'::jsonb,
     version integer NOT NULL DEFAULT 1,
     updated_by text,
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -42,6 +53,9 @@ ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_steps_check CHE
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_outputs_check CHECK (jsonb_typeof(outputs) = 'array' AND octet_length(outputs::text) <= 4096);
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_php_version_check CHECK (php_version IN ('auto', '8.2', '8.3', '8.4'));
 ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_php_ini_check CHECK (jsonb_typeof(php_ini) = 'object' AND octet_length(php_ini::text) <= 4096);
+ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_dockerfile_path_check CHECK (dockerfile_path = '' OR (char_length(dockerfile_path) <= 200 AND dockerfile_path ~ '^[A-Za-z0-9._/-]+$' AND dockerfile_path !~ '\.\.' AND dockerfile_path !~ '^/'));
+ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_build_context_check CHECK (build_context = '' OR (char_length(build_context) <= 200 AND build_context ~ '^[A-Za-z0-9._/-]+$' AND build_context !~ '\.\.' AND build_context !~ '^/'));
+ALTER TABLE app_deploy_configs ADD CONSTRAINT app_deploy_configs_build_env_check CHECK (jsonb_typeof(build_env) = 'array' AND octet_length(build_env::text) <= 4096);
 CREATE INDEX app_deploy_configs_team_idx ON app_deploy_configs (team_id);
 
 -- One row per save, so a version can be listed and restored.
