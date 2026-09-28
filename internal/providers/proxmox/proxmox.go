@@ -360,7 +360,14 @@ func (d *Driver) createLXC(ctx context.Context, node string, vmid int, name, tem
 	if d.pool != "" {
 		p.Set("pool", d.pool)
 	}
-	if err := d.c.startTask(ctx, http.MethodPost, "/nodes/"+url.PathEscape(node)+"/lxc", p); err != nil {
+	err := d.c.startTask(ctx, http.MethodPost, "/nodes/"+url.PathEscape(node)+"/lxc", p)
+	if err != nil && features != "nesting=1" && s.Options["features"] == "" && strings.Contains(err.Error(), "only allowed for root@pam") {
+		// An API token (not root@pam) may only set nesting: Proxmox refuses the whole create before
+		// making anything, so asking again with nesting alone is safe. Docker runs without keyctl.
+		p.Set("features", "nesting=1")
+		err = d.c.startTask(ctx, http.MethodPost, "/nodes/"+url.PathEscape(node)+"/lxc", p)
+	}
+	if err != nil {
 		return err
 	}
 	// Tags after the fact: at create time Proxmox checks them against /vms/<id>, which a pool-scoped

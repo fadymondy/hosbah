@@ -49,15 +49,16 @@ type fakeTask struct {
 }
 
 type fakePVE struct {
-	mu        sync.Mutex
-	srv       *httptest.Server
-	nextID    int
-	guests    map[int]*fakeGuest
-	tasks     map[string]*fakeTask
-	taskN     int
-	calls     []call
-	failTasks map[string]string // task type -> exitstatus
-	authSeen  []string
+	mu          sync.Mutex
+	srv         *httptest.Server
+	nextID      int
+	guests      map[int]*fakeGuest
+	tasks       map[string]*fakeTask
+	taskN       int
+	calls       []call
+	failTasks   map[string]string // task type -> exitstatus
+	nestingOnly bool              // refuse LXC feature flags other than nesting, as for a non-root@pam token
+	authSeen    []string
 }
 
 func newFakePVE(t *testing.T) *fakePVE {
@@ -196,6 +197,10 @@ func (f *fakePVE) serve(w http.ResponseWriter, r *http.Request) {
 			fail(w, 500, "storage '"+seg[3]+"' does not exist")
 		}
 	case key == "POST /nodes/"+testNode+"/lxc":
+		if f.nestingOnly && form.Get("features") != "nesting=1" {
+			fail(w, 403, "Permission check failed (changing feature flags (except nesting) is only allowed for root@pam)")
+			return
+		}
 		id, _ := strconv.Atoi(form.Get("vmid"))
 		status := "stopped"
 		if form.Get("start") == "1" {
@@ -561,6 +566,19 @@ func TestCreateLXC(t *testing.T) {
 	}
 	if m.Status != "running" || m.IPv4 != "10.10.10.61" || m.PrivateIP != "10.10.10.61" || m.IPv6 != "" || m.Name != "db-box" {
 		t.Fatalf("machine = %+v", m)
+	}
+}
+
+func TestLXCFallsBackToNestingForANonRootToken(t *testing.T) {
+	f := newFakePVE(t)
+	f.nestingOnly = true
+	d := newTestDriver(t, f, nil)
+	if _, err := d.Create(ctxT(t), providers.CreateSpec{Name: "box", Kind: "lxc"}); err != nil {
+		t.Fatal(err)
+	}
+	cr := f.callsTo("POST", "/nodes/pve1/lxc")
+	if len(cr) != 2 || cr[0].Form.Get("features") != "nesting=1,keyctl=1" || cr[1].Form.Get("features") != "nesting=1" {
+		t.Fatalf("creates = %d, want keyctl refused then nesting alone", len(cr))
 	}
 }
 
