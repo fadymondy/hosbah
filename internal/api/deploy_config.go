@@ -68,6 +68,15 @@ type PHPConfigOut struct {
 	CanSave           bool              `json:"can_save" doc:"Whether the caller may save (deploy)."`
 }
 
+// BuildConfigOut is GET/PUT …/deploy-config/build (MH-579): an app's custom Dockerfile path and
+// build context (gap B), and which of its env vars are exposed at build time (gap A).
+type BuildConfigOut struct {
+	DockerfilePath string   `json:"dockerfile_path"`
+	BuildContext   string   `json:"build_context"`
+	BuildEnv       []string `json:"build_env"`
+	CanSave        bool     `json:"can_save" doc:"Whether the caller may save a configuration (deploy)."`
+}
+
 // DeployConfigVersionOut is one entry of GET …/deploy-config/versions.
 type DeployConfigVersionOut struct {
 	Version   int            `json:"version"`
@@ -103,6 +112,19 @@ func existingPHPIni(existing db.AppDeployConfig) string {
 		return "{}"
 	}
 	return existing.PhpIni
+}
+
+// existingDockerfilePath/existingBuildContext/existingBuildEnv (MH-579) preserve an
+// app_deploy_config row's build settings through a save of the pipeline steps or the PHP
+// configuration, which use the same upsert but must never clear a build setting saved through the
+// dedicated …/deploy-config/build endpoint.
+func existingDockerfilePath(existing db.AppDeployConfig) string { return existing.DockerfilePath }
+func existingBuildContext(existing db.AppDeployConfig) string   { return existing.BuildContext }
+func existingBuildEnv(existing db.AppDeployConfig) string {
+	if existing.BuildEnv == "" {
+		return "[]"
+	}
+	return existing.BuildEnv
 }
 
 func outputsOrEmpty(raw string) []string {
@@ -281,6 +303,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				AppID: a.ID, TeamID: m.TeamID, Mode: in.Body.Mode, Preset: in.Body.Preset, Steps: string(raw),
 				BuilderImage: in.Body.BuilderImage, Outputs: string(outputsRaw), DetectedPreset: existing.DetectedPreset,
 				PhpVersion: existingPHPVersion(existing), PhpIni: existingPHPIni(existing),
+				DockerfilePath: existingDockerfilePath(existing), BuildContext: existingBuildContext(existing), BuildEnv: existingBuildEnv(existing),
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -385,6 +408,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				AppID: a.ID, TeamID: m.TeamID, Mode: target.Mode, Preset: target.Preset, Steps: target.Steps,
 				BuilderImage: existing.BuilderImage, Outputs: existing.Outputs, DetectedPreset: existing.DetectedPreset,
 				PhpVersion: existingPHPVersion(existing), PhpIni: existingPHPIni(existing),
+				DockerfilePath: existingDockerfilePath(existing), BuildContext: existingBuildContext(existing), BuildEnv: existingBuildEnv(existing),
 				Version: nextVersion, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -512,10 +536,12 @@ func (d *deps) registerDeployConfig(api huma.API) {
 
 			existing, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
 			mode, preset, steps, builderImage, outputs, detectedPreset, version := "auto", deploy.DetectPreset(nil), "", "", "[]", "", int32(1)
+			dockerfilePath, buildContext, buildEnv := "", "", "[]"
 			switch {
 			case err == nil:
 				mode, preset, steps, builderImage, outputs, detectedPreset, version =
 					existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset, existing.Version
+				dockerfilePath, buildContext, buildEnv = existingDockerfilePath(existing), existingBuildContext(existing), existingBuildEnv(existing)
 			case errors.Is(err, sql.ErrNoRows):
 				raw, mErr := json.Marshal(deploy.PresetSteps(preset))
 				if mErr != nil {
@@ -531,6 +557,7 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				AppID: a.ID, TeamID: m.TeamID, Mode: mode, Preset: preset, Steps: steps,
 				BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
 				PhpVersion: in.Body.Version, PhpIni: string(iniRaw),
+				DockerfilePath: dockerfilePath, BuildContext: buildContext, BuildEnv: buildEnv,
 				Version: version, UpdatedBy: &userID,
 			})
 			if err != nil {
@@ -568,6 +595,110 @@ func (d *deps) registerDeployConfig(api huma.API) {
 				outputs = []string{}
 			}
 			out.Body = DeployPresetOut{Preset: preset, Steps: toDeployStepsOut(deploy.PresetSteps(preset)), BuilderImage: deploy.PresetBuilderImage(preset), Outputs: outputs}
+			return nil
+		})
+		return out, err
+	})
+
+	// ---- Dockerfile path, build context and build-time env (MH-579) -------------------------
+
+	type buildOut struct{ Body BuildConfigOut }
+	huma.Register(api, huma.Operation{OperationID: "get-app-build-config", Method: http.MethodGet, Path: basePath + "/build", Tags: tags,
+		Summary: "An app's custom Dockerfile path and build context, and which of its env vars are exposed at build time (as " +
+			"`--build-arg`, ending up in the built image's layers — never assume a build-time value stays secret). Not versioned " +
+			"(like builder_image/outputs). Any member.",
+	}, func(ctx context.Context, in *AppPath) (*buildOut, error) {
+		out := &buildOut{}
+		out.Body.BuildEnv = []string{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			out.Body.CanSave = tenancy.Can(ctx, m, tenancy.AbilityDeploy)
+			row, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
+			if err == nil {
+				out.Body.DockerfilePath = row.DockerfilePath
+				out.Body.BuildContext = row.BuildContext
+				if names := deploy.UnmarshalBuildEnv(row.BuildEnv); names != nil {
+					out.Body.BuildEnv = names
+				}
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return huma.Error500InternalServerError("could not read the deploy configuration")
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "put-app-build-config", Method: http.MethodPut, Path: basePath + "/build", Tags: tags,
+		Summary: "Save an app's Dockerfile path, build context and the env var names exposed at build time. Not versioned " +
+			"(like builder_image/outputs). Deployer, admin or owner.",
+	}, func(ctx context.Context, in *struct {
+		AppPath
+		Body struct {
+			DockerfilePath string   `json:"dockerfile_path,omitempty" maxLength:"200"`
+			BuildContext   string   `json:"build_context,omitempty" maxLength:"200"`
+			BuildEnv       []string `json:"build_env,omitempty" maxItems:"64"`
+		}
+	}) (*buildOut, error) {
+		out := &buildOut{}
+		out.Body.BuildEnv = []string{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			if err := need(ctx, m, tenancy.AbilityDeploy); err != nil {
+				return err
+			}
+			if !deploy.ValidDockerfilePath(in.Body.DockerfilePath) {
+				return huma.Error422UnprocessableEntity("bad dockerfile path")
+			}
+			if !deploy.ValidBuildContext(in.Body.BuildContext) {
+				return huma.Error422UnprocessableEntity("bad build context")
+			}
+			names := deploy.DedupBuildEnvNames(in.Body.BuildEnv)
+			if err := deploy.ValidBuildEnvNames(names); err != nil {
+				return huma.Error422UnprocessableEntity(err.Error())
+			}
+			buildEnvRaw := deploy.MarshalBuildEnv(names)
+
+			existing, err := q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: a.ID, TeamID: m.TeamID})
+			mode, preset, steps, builderImage, outputs, detectedPreset, phpVersion, phpIni, version :=
+				"auto", deploy.DetectPreset(nil), "", "", "[]", "", "", "{}", int32(1)
+			switch {
+			case err == nil:
+				mode, preset, steps, builderImage, outputs, detectedPreset, phpVersion, phpIni, version =
+					existing.Mode, existing.Preset, existing.Steps, existing.BuilderImage, existing.Outputs, existing.DetectedPreset,
+					existingPHPVersion(existing), existingPHPIni(existing), existing.Version
+			case errors.Is(err, sql.ErrNoRows):
+				raw, mErr := json.Marshal(deploy.PresetSteps(preset))
+				if mErr != nil {
+					return huma.Error500InternalServerError("could not build a default deploy configuration")
+				}
+				steps = string(raw)
+			default:
+				return huma.Error500InternalServerError("could not read the deploy configuration")
+			}
+
+			userID := id.ID
+			row, err := q.UpsertAppDeployConfig(ctx, db.UpsertAppDeployConfigParams{
+				AppID: a.ID, TeamID: m.TeamID, Mode: mode, Preset: preset, Steps: steps,
+				BuilderImage: builderImage, Outputs: outputs, DetectedPreset: detectedPreset,
+				PhpVersion: phpVersion, PhpIni: phpIni,
+				DockerfilePath: in.Body.DockerfilePath, BuildContext: in.Body.BuildContext, BuildEnv: buildEnvRaw,
+				Version: version, UpdatedBy: &userID,
+			})
+			if err != nil {
+				return huma.Error500InternalServerError("could not save the build configuration")
+			}
+			out.Body.DockerfilePath = row.DockerfilePath
+			out.Body.BuildContext = row.BuildContext
+			if names := deploy.UnmarshalBuildEnv(row.BuildEnv); names != nil {
+				out.Body.BuildEnv = names
+			}
+			out.Body.CanSave = true
 			return nil
 		})
 		return out, err

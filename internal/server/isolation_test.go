@@ -523,6 +523,7 @@ func TestIsolationSweep(t *testing.T) {
 		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},
 		"app_deploy_config_versions": {"app": appA.App.ID}, "app_deploy_config_restore": {"app": appA.App.ID, "version": "1"},
 		"app_php_config_get": {"app": appA.App.ID}, "app_php_config_set": {"app": appA.App.ID, "php_version": "8.2"},
+		"app_build_config_get": {"app": appA.App.ID}, "app_build_config_set": {"app": appA.App.ID, "dockerfile_path": "docker/Dockerfile", "build_env": []string{"STOLEN"}},
 		"app_service_links": {"app": appA.App.ID}, "app_service_links_detect": {"app": appA.App.ID},
 		"app_resources_get": {"app": appA.App.ID}, "app_resources_set": {"app": appA.App.ID, "memory_mb": 512, "cpus": 1},
 		"app_web_vitals": {"app": appA.App.ID}, "app_rum_settings": {"app": appA.App.ID, "enabled": true},

@@ -582,6 +582,62 @@ func (r *runner) phpConfig(ctx context.Context) (version string, ini map[string]
 	return cfg.PhpVersion, ini
 }
 
+// buildConfig (MH-579 gap B) reads the app's saved dockerfile_path/build_context/build_env,
+// best-effort like phpConfig: a config read failure just means the defaults apply (checkout-root
+// Dockerfile, checkout root as context, no build-time env).
+func (r *runner) buildConfig(ctx context.Context) (dockerfilePath, buildContext string, buildEnvNames []string) {
+	var cfg db.AppDeployConfig
+	err := r.tx(ctx, func(q *db.Queries) error {
+		var err error
+		cfg, err = q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
+		return err
+	})
+	if err != nil {
+		return "", "", nil
+	}
+	return cfg.DockerfilePath, cfg.BuildContext, UnmarshalBuildEnv(cfg.BuildEnv)
+}
+
+// buildEnvBox (MH-579 gap A) opens the app's env values with the team key and reseals exactly the
+// ones named in names — a build-time subset of the app's env, sealed to the target agent's own key
+// for this deployment's build step. A name with no matching env var is silently skipped. ""
+// when names is empty or none of them are set.
+func (r *runner) buildEnvBox(ctx context.Context, names []string) (string, error) {
+	if len(names) == 0 {
+		return "", nil
+	}
+	want := map[string]bool{}
+	for _, n := range names {
+		want[n] = true
+	}
+	env := map[string]string{}
+	err := r.tx(ctx, func(q *db.Queries) error {
+		rows, err := q.ListEnvVarsOfApp(ctx, db.ListEnvVarsOfAppParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
+		if err != nil {
+			return err
+		}
+		for _, v := range rows {
+			if !want[v.Name] {
+				continue
+			}
+			pt, err := crypto.Open(r.dek, r.dep.TeamID, EnvSealContext(r.app.ID, v.Name), v.ValueSealed)
+			if err != nil {
+				return fmt.Errorf("env %s could not be opened", v.Name)
+			}
+			env[v.Name] = string(pt)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(env) == 0 {
+		return "", nil
+	}
+	raw, _ := json.Marshal(env)
+	return agentproto.SealBox(r.agentKey, agentproto.EnvContext(r.app.ID, r.dep.ID, "build"), raw)
+}
+
 // injectPHPEnv (MH-576 D2) exposes the app's PHP version and ini overrides to the running
 // container as HOSBAH_PHP_VERSION / HOSBAH_PHP_INI — informational for a Dockerfile app (it owns
 // its image and build; Hosbah cannot write a php.ini into it), redundant but harmless for a
@@ -619,6 +675,13 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 		return err
 	})
 	mode := FastBuildMode(cfg.Preset, cfg.BuilderImage)
+	if mode == agentproto.FastModeDockerfile && (cfg.DockerfilePath != "" || cfg.BuildContext != "") {
+		// The dockerfile fast-build mode always builds "<checkout>/Dockerfile" with the checkout
+		// root as context (MH-573 A7b) — it has no notion of a custom path or context, so a full
+		// build (which does) is the only way to honor either setting.
+		r.downgradeTrack(ctx, "custom Dockerfile path or build context configured")
+		return false, nil
+	}
 	var fbSteps []agentproto.FastBuildStep
 	if mode != agentproto.FastModeDockerfile {
 		// The dockerfile mode needs no install/build/migrate steps at all — it builds the
@@ -785,12 +848,18 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	}
 	if !fast {
 		phpVersion, phpIni := r.phpConfig(ctx)
+		dockerfilePath, buildContext, buildEnvNames := r.buildConfig(ctx)
+		buildEnvBox, err := r.buildEnvBox(ctx, buildEnvNames)
+		if err != nil {
+			return nil, err
+		}
 		if err := r.op(ctx, buildStep, agentproto.KindAppBuild, agentproto.BuildParams{
 			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
 			GitSource: src,
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
-			NoCache:    r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
-			PHPVersion: phpVersion, PHPIni: phpIni,
+			NoCache:        r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
+			PHPVersion:     phpVersion, PHPIni: phpIni,
+			DockerfilePath: dockerfilePath, BuildContext: buildContext, Env: buildEnvBox,
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
 		}

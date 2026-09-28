@@ -82,6 +82,11 @@ func GitTokenContext(repoURL string) string { return "git-token:" + NormalizeRep
 type DetectParams struct {
 	GitSource
 	RailpackFrontend string `json:"railpack_frontend,omitempty"`
+	// DockerfilePath (MH-579 gap B), when set, is a path relative to the checkout the app's
+	// Dockerfile lives at instead of the default "Dockerfile" at the checkout root — validated by
+	// ValidBuildPath, and again by the agent once it resolves the checkout's real path (no ".."
+	// component and no symlink escape). Empty means the default.
+	DockerfilePath string `json:"dockerfile_path,omitempty"`
 }
 
 type DetectResult struct {
@@ -121,6 +126,19 @@ type BuildParams struct {
 	// checkout root before `railpack prepare` runs, unless the repository already has one of its
 	// own (never overwritten). Ignored for a Dockerfile app.
 	PHPIni map[string]string `json:"php_ini,omitempty"`
+	// DockerfilePath / BuildContext (MH-579 gap B): "" means the defaults ("Dockerfile" at the
+	// checkout root, built with the checkout root as context). Both are validated with
+	// ValidBuildPath by the control plane before they ever reach a signed op, and again by the
+	// agent once it can resolve the checkout's real path (internal/agent's safeJoin): relative,
+	// no "..", no absolute, a restricted charset, and — after resolving symlinks — still inside
+	// the checkout. Ignored by the Railpack path (its plan already encodes root-relative paths).
+	DockerfilePath string `json:"dockerfile_path,omitempty"`
+	BuildContext   string `json:"build_context,omitempty"`
+	// Env (MH-579 gap A) is an EnvBox sealed to this agent, context EnvContext(app, deployment,
+	// "build"), of the values of the app's build_env-listed variable names: the agent opens it and
+	// passes each name as `--build-arg NAME`, the value only ever reaching docker through its own
+	// process environment — never an argv, never a log. "" when the app exposes none at build time.
+	Env string `json:"env,omitempty"`
 }
 
 type BuildResult struct {
@@ -458,12 +476,23 @@ const (
 )
 
 var (
-	appNameRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
-	processRE = regexp.MustCompile(`^(web|worker:[a-z0-9_-]{1,32})$`)
-	refRE     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$`)
-	uuidRE    = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	hostRE    = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+	appNameRE   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
+	processRE   = regexp.MustCompile(`^(web|worker:[a-z0-9_-]{1,32})$`)
+	refRE       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$`)
+	uuidRE      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	hostRE      = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+	buildPathRE = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
 )
+
+// ValidBuildPath (MH-579 gap B) checks a dockerfile_path or build_context before it is saved
+// (internal/deploy) and again before the agent joins it to the checkout (internal/agent's
+// safeJoin, which also resolves symlinks — this only checks the string itself): relative (no
+// leading "/"), no ".." component, a restricted charset, and no longer than 200 bytes. An empty
+// string is not itself valid here — callers treat "" as "not set" (the default) before calling
+// this, exactly like BuilderImage.
+func ValidBuildPath(s string) bool {
+	return buildPathRE.MatchString(s) && !strings.Contains(s, "..") && !strings.HasPrefix(s, "/")
+}
 
 // ValidAppName: the app slug (image repository, container prefix).
 func ValidAppName(s string) bool { return appNameRE.MatchString(s) }

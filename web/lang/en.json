@@ -914,7 +914,9 @@
       "removeHint": "The variable is removed on the next deploy or restart.",
       "setTitle": "Add or replace a variable",
       "nameHint": "Letters, digits and underscores; not starting with a digit.",
-      "overwrite": "This replaces the current value."
+      "overwrite": "This replaces the current value.",
+      "buildTime": "Build time",
+      "buildTimeHint": "Available while the image builds, as a build argument. Build-time values end up baked into the built image's layers — never mark a secret that should stay off disk."
     },
     "releases": {
       "hint": "Each successful deploy is a release. Standby releases are kept on the server for instant rollback.",
@@ -2671,6 +2673,23 @@
       "addSetting": "Add setting",
       "removeSetting": "Remove setting",
       "invalidValue": "That value isn't allowed: no \";\", \"[\", \"]\" or line breaks."
+    },
+    "build": {
+      "title": "Build",
+      "hint": "A custom Dockerfile path and build context, and which env vars are available while the image builds.",
+      "saved": "Build settings saved",
+      "dockerfilePath": "Dockerfile path",
+      "dockerfilePathHint": "Relative to the repository root. Leave empty for the default, \"Dockerfile\".",
+      "buildContext": "Build context",
+      "buildContextHint": "The directory Docker builds from, relative to the repository root. Leave empty for the repository root. Ignored for a Railpack build.",
+      "invalidPath": "That path isn't allowed: relative, no \"..\", letters, digits, \".\", \"_\", \"-\" and \"/\" only.",
+      "buildEnv": "Available at build time",
+      "buildEnvHint": "These variables (from the site's environment) are passed to the build as build arguments. Their values end up baked into the built image's layers — never mark a secret that should stay off disk.",
+      "buildEnvEmpty": "No variables exposed at build time.",
+      "varName": "Variable name",
+      "addVar": "Add variable",
+      "removeVar": "Remove variable",
+      "invalidVarName": "That name isn't allowed: letters, digits and \"_\" only, not starting with a digit."
     },
     "deployScript": {
       "hint": "How this site builds and releases on every deploy: the mode, the preset it started from, and each pipeline step.",

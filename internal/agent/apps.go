@@ -184,10 +184,41 @@ func readConfigToml(src string) (toml, name string, err error) {
 	return "", "", nil
 }
 
-// detect decides how dir builds: its own Dockerfile first, else Railpack (whose `prepare` writes
-// the build plan and says what it found). hosbah.toml — or, when a repository has none, the
-// pre-rename cloudy.toml — is returned raw for the control plane to parse.
-func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, error) {
+// safeJoin resolves rel (a dockerfile_path or build_context, already charset/".."-checked by
+// agentproto.ValidBuildPath at the control plane) against root and reports whether the result is
+// both real (root and the target both exist, symlinks resolved with filepath.EvalSymlinks) and
+// still inside root (filepath.Rel has no ".." component) — refusing a symlink planted inside the
+// checkout that would otherwise let a build step reach outside it. rel == "" means root itself.
+// ok is false for any problem; callers treat that as "does not apply" (detect) or a hard failure
+// (build) as appropriate — never a path used as-is.
+func safeJoin(root, rel string) (string, bool) {
+	if rel != "" && !agentproto.ValidBuildPath(rel) {
+		return "", false
+	}
+	joined := root
+	if rel != "" {
+		joined = filepath.Join(root, rel)
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	resolvedJoined, err := filepath.EvalSymlinks(joined)
+	if err != nil {
+		return "", false
+	}
+	relCheck, err := filepath.Rel(resolvedRoot, resolvedJoined)
+	if err != nil || relCheck == ".." || strings.HasPrefix(relCheck, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return resolvedJoined, true
+}
+
+// detect decides how dir builds: its own Dockerfile first (at dockerfilePath, relative to src,
+// default "Dockerfile" when empty), else Railpack (whose `prepare` writes the build plan and says
+// what it found). hosbah.toml — or, when a repository has none, the pre-rename cloudy.toml — is
+// returned raw for the control plane to parse.
+func detect(oc *OpContext, src, workdir, dockerfilePath string) (agentproto.DetectResult, int, error) {
 	var r agentproto.DetectResult
 	r.Files = topLevelFiles(src)
 	toml, name, err := readConfigToml(src)
@@ -199,10 +230,16 @@ func detect(oc *OpContext, src, workdir string) (agentproto.DetectResult, int, e
 		r.HosbahToml, r.LegacyToml, r.TomlFile = toml, toml, name
 		oc.Info("found %s", name)
 	}
-	if st, err := os.Stat(filepath.Join(src, "Dockerfile")); err == nil && st.Mode().IsRegular() {
-		r.Runtime = "dockerfile"
-		oc.Info("build: the repository's Dockerfile")
-		return r, 0, nil
+	df := dockerfilePath
+	if df == "" {
+		df = "Dockerfile"
+	}
+	if dfPath, ok := safeJoin(src, df); ok {
+		if st, err := os.Stat(dfPath); err == nil && st.Mode().IsRegular() {
+			r.Runtime = "dockerfile"
+			oc.Info("build: the repository's Dockerfile (%s)", df)
+			return r, 0, nil
+		}
 	}
 	if _, err := os.Stat(railpackBin); err != nil {
 		return r, 1, errors.New("no Dockerfile, and Railpack is not installed — run the railpack.install provisioning step")
@@ -381,7 +418,7 @@ func appDetect(oc *OpContext) (any, int, error) {
 	if err != nil {
 		return nil, code, err
 	}
-	r, code, err := detect(oc, src, work)
+	r, code, err := detect(oc, src, work, p.DockerfilePath)
 	r.Commit, r.Message = commit, msg
 	if err != nil {
 		return r, code, err
@@ -399,6 +436,12 @@ func appBuild(oc *OpContext) (any, int, error) {
 	if !agentproto.ValidID(p.AppID) || !agentproto.ValidAppName(p.App) || !agentproto.ValidID(p.DeploymentID) ||
 		(p.Image != agentproto.ImageRepo(p.App)+":"+p.DeploymentID && p.Image != agentproto.LegacyImageRepo(p.App)+":"+p.DeploymentID) {
 		return nil, 2, errors.New("bad app, deployment or image")
+	}
+	if p.DockerfilePath != "" && !agentproto.ValidBuildPath(p.DockerfilePath) {
+		return nil, 2, errors.New("bad dockerfile path")
+	}
+	if p.BuildContext != "" && !agentproto.ValidBuildPath(p.BuildContext) {
+		return nil, 2, errors.New("bad build context")
 	}
 	if code, err := dockerReady(oc); err != nil {
 		return nil, code, err
@@ -423,11 +466,21 @@ func appBuild(oc *OpContext) (any, int, error) {
 	if err := writePHPIniOverrides(src, p.PHPIni); err != nil {
 		oc.Info("php.ini overrides: %v — continuing without them", err)
 	}
-	d, code, err := detect(oc, src, work)
+	d, code, err := detect(oc, src, work, p.DockerfilePath)
 	if err != nil {
 		return nil, code, err
 	}
 	d.Commit, d.Message = commit, msg
+
+	// MH-579 gap A: build-time env — an EnvBox of the values of the app's build_env-listed
+	// variable names, opened here and passed as `--build-arg NAME` with the VALUE only ever
+	// reaching docker through its own process environment (buildEnvArgs/envPairs), never an argv
+	// and never logged. A name with no value in the box (the control plane skips one with no
+	// matching env var) is simply not passed.
+	buildEnv, err := oc.OpenEnv(agentproto.EnvContext(p.AppID, p.DeploymentID, "build"), p.Env)
+	if err != nil {
+		return nil, 1, err
+	}
 
 	oc.Progress(3, 4)
 	labels := []string{"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID}
@@ -436,16 +489,28 @@ func appBuild(oc *OpContext) (any, int, error) {
 		args = append(args, "--no-cache")
 	}
 	args = append(args, labels...)
+	args = append(args, buildArgArgs(buildEnv)...)
 	if d.Runtime == "dockerfile" {
-		args = append(args, "-f", filepath.Join(src, "Dockerfile"), src)
+		dfPath, ok := safeJoin(src, orDefault(p.DockerfilePath, "Dockerfile"))
+		if !ok {
+			return nil, 2, errors.New("the dockerfile path does not resolve inside the checkout")
+		}
+		ctxPath, ok := safeJoin(src, p.BuildContext)
+		if !ok {
+			return nil, 2, errors.New("the build context does not resolve inside the checkout")
+		}
+		args = append(args, "-f", dfPath, ctxPath)
 	} else {
 		if p.RailpackFrontend == "" {
 			return nil, 2, errors.New("no Railpack frontend image in the params")
 		}
+		// Railpack's generated plan encodes paths relative to the checkout root, so a custom
+		// build_context does not apply here — only to a Dockerfile build.
 		args = append(args, "--build-arg", "BUILDKIT_SYNTAX="+p.RailpackFrontend,
 			"-f", filepath.Join(work, "railpack-plan.json"), src)
 	}
-	if code, err := oc.RunEnv([]string{"DOCKER_BUILDKIT=1"}, "docker", args...); err != nil {
+	runEnv := append([]string{"DOCKER_BUILDKIT=1"}, envPairs(buildEnv)...)
+	if code, err := oc.RunEnv(runEnv, "docker", args...); err != nil {
 		return nil, code, errors.New("the build failed — see the log above; the live release is untouched")
 	}
 	id, _ := execOutput(oc, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image)
@@ -557,6 +622,31 @@ func envPairs(env map[string]string) []string {
 		out = append(out, k+"="+v)
 	}
 	return out
+}
+
+// buildArgArgs is `--build-arg NAME` for each build-time variable — docker reads the value from
+// its own process environment (envPairs, passed to oc.RunEnv), so no value is ever on a command
+// line or in a log. Same idea as envArgs/-e for a container's runtime environment.
+func buildArgArgs(env map[string]string) []string {
+	names := make([]string, 0, len(env))
+	for k := range env {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	var out []string
+	for _, k := range names {
+		out = append(out, "--build-arg", k)
+	}
+	return out
+}
+
+// orDefault returns s, or def when s is empty — dockerfile_path/build_context's "" means "the
+// default", never a literal empty path.
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 // ---- app.start -----------------------------------------------------------------------------------
