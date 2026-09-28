@@ -90,7 +90,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus,
 	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename, KindTerminalOpen, KindSFTPUser,
 	KindAppLogsSearch, KindLogDrainSet, KindLogDrainStatus, KindLogDrainTest,
-	KindDBUser, KindDBQuery, KindDBLimits, KindAppLimits, KindDBInsights, KindDBCancelQuery,
+	KindDBUser, KindDBQuery, KindDBLimits, KindAppLimits, KindDBInsights, KindDBCancelQuery, KindDBImport,
 	KindScriptRun, KindServiceList, KindServiceAction, KindCacheSet, KindCachePurge, KindHTTPRulesSet,
 	KindFirewallApply, KindFirewallStatus, KindFail2banInstall, KindFail2banBanned, KindFail2banUnban,
 	KindMailInstall, KindMailDomain, KindMailbox, KindMailAlias,

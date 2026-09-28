@@ -99,7 +99,9 @@ func TestDestructiveToolInventory(t *testing.T) {
 		"permanently_destroy_app": true, "permanently_destroy_data_service": true, "delete_snapshot": true,
 		"sftp_user_delete": true,
 		// DB metrics and slow queries (MH-575 F6): cancelling a running query/backend.
-		"db_cancel_query":             true,
+		"db_cancel_query": true,
+		// Importing an existing Postgres database (pg_dump | pg_restore) can overwrite the target.
+		"db_import":                   true,
 		"notification_channel_delete": true, "status_page_delete": true,
 		"log_drain_delete": true,
 		// MH-576 D4/D5/D3: deleting a script, running one, and a systemd service action.

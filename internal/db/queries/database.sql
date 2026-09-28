@@ -30,3 +30,6 @@ UPDATE databases SET status = $3, error = $4, updated_at = now() WHERE id = $1 A
 
 -- name: DeleteDatabaseInTeam :execrows
 DELETE FROM databases WHERE id = $1 AND team_id = $2;
+
+-- name: DatabaseByNameOfService :one
+SELECT * FROM databases WHERE data_service_id = $1 AND team_id = $2 AND name = $3;

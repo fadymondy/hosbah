@@ -17,6 +17,62 @@ func TestDBImageAndPort(t *testing.T) {
 	}
 }
 
+func TestDBImagePgvector(t *testing.T) {
+	if DBImage("postgres", "pgvector-pg17") != "pgvector/pgvector:pg17" {
+		t.Fatalf("pgvector-pg17 -> %q", DBImage("postgres", "pgvector-pg17"))
+	}
+	if DBImage("postgres", "pgvector-0.8.0-pg17") != "pgvector/pgvector:0.8.0-pg17" {
+		t.Fatalf("pgvector-0.8.0-pg17 -> %q", DBImage("postgres", "pgvector-0.8.0-pg17"))
+	}
+	if !ValidDBVersion("pgvector-pg17") || !ValidDBVersion("pgvector-0.8.0-pg17") {
+		t.Fatal("pgvector versions should be valid")
+	}
+	if !IsPgvectorVersion("pgvector-pg17") || IsPgvectorVersion("17") {
+		t.Fatal("IsPgvectorVersion")
+	}
+	if ValidDBVersion("pgvector-") || ValidDBVersion("pgvector") {
+		t.Fatal("a bare pgvector- prefix with no tag must be invalid")
+	}
+}
+
+func TestPGMajorVersion(t *testing.T) {
+	cases := []struct {
+		version string
+		want    int
+		ok      bool
+	}{
+		{"16", 16, true},
+		{"16.4", 16, true},
+		{"17", 17, true},
+		{"pgvector-pg17", 17, true},
+		{"pgvector-0.8.0-pg17", 17, true},
+		{"", 0, false},
+		{"latest", 0, false},
+	}
+	for _, c := range cases {
+		got, ok := PGMajorVersion(c.version)
+		if got != c.want || ok != c.ok {
+			t.Errorf("PGMajorVersion(%q) = %d, %v; want %d, %v", c.version, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestProvisionValidatePgvector(t *testing.T) {
+	p := DBProvisionParams{
+		ServiceID: testSvcID, Name: "pg1", Kind: "postgres", Version: "pgvector-pg17",
+		Image: "pgvector/pgvector:pg17", Container: "hosbah-db-pg1", Volume: "hosbah-dbdata-pg1",
+		Bind: "10.0.0.5", Port: 5432, RootSecret: "cab1:abc",
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("valid pgvector provision rejected: %v", err)
+	}
+	wrongImage := p
+	wrongImage.Image = "postgres:17"
+	if wrongImage.Validate() == nil {
+		t.Fatal("the plain postgres image must not satisfy a pgvector version")
+	}
+}
+
 func TestValidDBName(t *testing.T) {
 	for _, ok := range []string{"app", "my_db", "_x", "a1_2"} {
 		if !ValidDBName(ok) {

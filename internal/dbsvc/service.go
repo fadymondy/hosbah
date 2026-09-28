@@ -591,9 +591,14 @@ func (s *Service) withServer(ctx context.Context, teamID, serverID string, build
 	return nil
 }
 
-func (s *Service) spawn(fn func(context.Context)) {
+func (s *Service) spawn(fn func(context.Context)) { s.spawnFor(40*time.Minute, fn) }
+
+// spawnFor is spawn with its own background timeout, for an action whose agent op timeout
+// (internal/ops.Timeout) is longer than spawn's default 40 minutes — its budget must exceed the
+// op's own so withServer's Await is never cut short by this context instead of the op's real result.
+func (s *Service) spawnFor(d time.Duration, fn func(context.Context)) {
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), d)
 		defer cancel()
 		fn(ctx)
 	}()

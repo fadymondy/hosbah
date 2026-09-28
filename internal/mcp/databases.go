@@ -127,7 +127,7 @@ func DatabaseTools() []Tool {
 			InputSchema: schema([]string{"name", "server", "kind"}, map[string]any{
 				"name": str("Lowercase letters, digits, dashes"), "server": str("Server name or id"),
 				"kind":    map[string]any{"type": "string", "enum": []string{"postgres", "mysql", "redis", "minio"}, "description": "minio = S3-compatible object storage (buckets)"},
-				"version": str("Image tag (optional; a current version by default)")}),
+				"version": str("Image tag (optional; a current version by default). For postgres, pgvector-<tag> (e.g. pgvector-pg17, pgvector-0.8.0-pg17) provisions pgvector/pgvector:<tag> instead of the plain postgres image, so vector and other pgvector extensions are available.")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -667,6 +667,42 @@ func DatabaseTools() []Tool {
 					return "", err
 				}
 				return renderQueryResult(res), nil
+			},
+		},
+
+		{
+			Name: "db_import", Scope: scopes.Destructive, Destructive: true, ResourceType: "data_service",
+			Description: "Import an existing Postgres database into one Hosbah already manages (pg_dump | pg_restore, run inside the managed service's own container — this is how a production database is migrated in). target_database must be a database Hosbah manages on that service. source_url is a postgres:// connection string to the database being imported from; it is a secret and never echoed back or logged. Without replace, refused if target_database already has tables; with replace, it is dropped and recreated first (same owner) so a final cutover sync can re-run the same import. Runs in the background; poll get_database for the resulting status (ready/failed). confirm must equal the data service's name.",
+			InputSchema: schema([]string{"database", "target_database", "source_url", "confirm"}, map[string]any{"database": dbArg,
+				"target_database": str("The database to import into — must already exist on this service (create_db makes it)"),
+				"source_url":      str("postgres://user:pass@host:port/db — the database to import from"),
+				"replace":         map[string]any{"type": "boolean", "default": false, "description": "Drop and recreate target_database first (same owner), instead of refusing when it already has tables"},
+				"confirm":         str("The data service's name, exactly")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
+					return "", err
+				}
+				svc, err := findService(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				if err := RequireConfirm(args, svc.Name); err != nil {
+					return "", err
+				}
+				dbRow, err := dbsvc.DatabaseInService(ctx, env.Q, env.Caller.TeamID, svc, args.Str("target_database"))
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				if err := s.ImportDatabase(ctx, env.Q, env.Caller.TeamID, mcpActor(env), svc, dbRow, dbsvc.ImportInput{
+					SourceURL: args.Str("source_url"), Replace: args.Bool("replace"),
+				}); err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("Importing into %s on %s. It runs pg_dump | pg_restore in the background — poll get_database for 'ready' or 'failed'.", dbRow.Name, svc.Name), nil
 			},
 		},
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,7 @@ const (
 	KindDBQuery       = "db.query"        // table browser and SQL console: tables/columns/rows/sql (MH-574 F2)
 	KindDBInsights    = "db.insights"     // metrics and slow queries for postgres/mysql (MH-575 F6)
 	KindDBCancelQuery = "db.cancel_query" // pg_cancel_backend / KILL QUERY (MH-575 F6)
+	KindDBImport      = "db.import"       // pg_dump | pg_restore an external Postgres database into a managed one
 )
 
 // StepRestic is the provisioning step that installs the pinned restic release (checksum-verified),
@@ -35,7 +37,16 @@ func DBSecretContext(serviceID, purpose string) string { return "db:" + serviceI
 var (
 	dbNameRE    = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
 	dbVersionRE = regexp.MustCompile(`^[0-9][0-9A-Za-z._-]{0,31}$`)
-	snapshotRE  = regexp.MustCompile(`^[0-9a-f]{8,64}$`)
+	// pgvectorVersionRE is a Postgres version of the form "pgvector-<tag>", e.g. "pgvector-pg17" or
+	// "pgvector-0.8.0-pg17" — <tag> is the tag on Docker Hub's official pgvector/pgvector image,
+	// which is Postgres plus the vector extension built in (same entrypoint, env and data dir as the
+	// postgres image), so every other postgres feature (create, users, backups, restore-test,
+	// insights, query) keeps working unchanged.
+	pgvectorVersionRE = regexp.MustCompile(`^pgvector-[0-9A-Za-z][0-9A-Za-z._-]{0,40}$`)
+	// pgMajorRE picks the Postgres major version out of a pgvector tag ("pg17" in "pgvector-pg17" or
+	// "pgvector-0.8.0-pg17").
+	pgMajorRE  = regexp.MustCompile(`pg(\d{1,3})`)
+	snapshotRE = regexp.MustCompile(`^[0-9a-f]{8,64}$`)
 )
 
 // ValidDBKind: the managed engines. minio is S3-compatible object storage (buckets).
@@ -57,8 +68,37 @@ const MinIORootUser = "cloudy-root"
 // through: the same class the schema's CHECK constraints enforce.
 func ValidDBName(s string) bool { return dbNameRE.MatchString(s) }
 
-// ValidDBVersion: a container image tag like "16", "8.4", "7.2-alpine".
-func ValidDBVersion(s string) bool { return dbVersionRE.MatchString(s) }
+// ValidDBVersion: a container image tag like "16", "8.4", "7.2-alpine", or (postgres only, checked
+// by DBImage/Validate against the kind) a pgvector form like "pgvector-pg17".
+func ValidDBVersion(s string) bool { return dbVersionRE.MatchString(s) || pgvectorVersionRE.MatchString(s) }
+
+// IsPgvectorVersion reports whether a postgres Version names the pgvector image (Docker Hub's
+// pgvector/pgvector, Postgres plus the vector extension built in) rather than the plain postgres one.
+func IsPgvectorVersion(s string) bool { return pgvectorVersionRE.MatchString(s) }
+
+// PGMajorVersion reads the Postgres major version out of a postgres Version string, plain
+// ("16" -> 16, "16.4" -> 16) or pgvector ("pgvector-pg17" -> 17, "pgvector-0.8.0-pg17" -> 17).
+// Used wherever a major version decides something (a restore-test's throwaway image, a future
+// upgrade path, a version badge) so the pgvector form does not need its own parsing at each site.
+func PGMajorVersion(version string) (int, bool) {
+	if IsPgvectorVersion(version) {
+		m := pgMajorRE.FindStringSubmatch(version)
+		if m == nil {
+			return 0, false
+		}
+		n, err := strconv.Atoi(m[1])
+		return n, err == nil
+	}
+	i := 0
+	for i < len(version) && version[i] >= '0' && version[i] <= '9' {
+		i++
+	}
+	if i == 0 {
+		return 0, false
+	}
+	n, err := strconv.Atoi(version[:i])
+	return n, err == nil
+}
 
 // ValidGrants: the grant level a user gets on its database.
 func ValidGrants(s string) bool { return s == "all" || s == "readwrite" || s == "readonly" }
@@ -99,6 +139,9 @@ func DBInternalPort(kind string) int {
 func DBImage(kind, version string) string {
 	switch kind {
 	case "postgres":
+		if IsPgvectorVersion(version) {
+			return "pgvector/pgvector:" + strings.TrimPrefix(version, "pgvector-")
+		}
 		return "postgres:" + version
 	case "mysql":
 		return "mysql:" + version
@@ -764,4 +807,81 @@ func (p DBCancelQueryParams) Validate() error {
 type DBCancelQueryResult struct {
 	OK     bool   `json:"ok"`
 	Detail string `json:"detail,omitempty"`
+}
+
+// ---- db.import (import an existing Postgres database into a managed one) -----------------------
+//
+// The source connection URL is a secret exactly like a backup repo's or a root credential's: it
+// never rides in plaintext params, never appears in the operation log, and never reaches the
+// container's argv — pg_dump reads it from PGPASSFILE-style stdin/env only, same discipline as
+// every other secret in this package. SourceSecret is a box for DBSecretContext(ServiceID,
+// "import:<Database>"), carrying {"source_url": "postgres://user:pass@host:port/db"}.
+
+var sourceURLSchemeRE = regexp.MustCompile(`^postgres(ql)?://`)
+
+// ValidDBSourceURL is a light sanity check both sides run on the plaintext before it is sealed
+// (control plane) or used (agent) — scheme postgres/postgresql and a host present. It is
+// deliberately not a full parse: net/url parses it for real once opened.
+func ValidDBSourceURL(s string) bool {
+	if !sourceURLSchemeRE.MatchString(s) {
+		return false
+	}
+	rest := s[strings.Index(s, "://")+3:]
+	if i := strings.IndexAny(rest, "@"); i >= 0 {
+		rest = rest[i+1:]
+	}
+	rest = strings.TrimSuffix(rest, "/")
+	if idx := strings.IndexAny(rest, "/?"); idx >= 0 {
+		rest = rest[:idx]
+	}
+	return rest != ""
+}
+
+// DBImportParams: db.import — pg_dump the source (run inside the managed service's own container,
+// which carries client binaries of its own major version) piped into pg_restore against Database,
+// which db.import already owns (created by db.create/CreateDatabaseAndUser). Replace drops and
+// recreates Database (owned by its current owner) first, so a final cutover sync can re-run the
+// same import; without it, db.import refuses when Database already has user tables. RootSecret
+// authenticates as the container's own superuser (CREATE EXTENSION during restore needs it);
+// Owner is the role pg_restore --role= runs as, so restored objects still belong to it.
+type DBImportParams struct {
+	ServiceID    string `json:"service_id"`
+	Container    string `json:"container"`
+	Target       string `json:"target,omitempty"`     // container | guest ("" = container, back-compat)
+	VMID         string `json:"vmid,omitempty"`       // guest
+	GuestType    string `json:"guest_type,omitempty"` // guest: lxc only
+	Database     string `json:"database"`
+	Owner        string `json:"owner"`
+	Replace      bool   `json:"replace,omitempty"`
+	SourceSecret string `json:"source_secret"`
+	RootSecret   string `json:"root_secret"`
+}
+
+func (p DBImportParams) Validate() error {
+	switch {
+	case !ValidID(p.ServiceID):
+		return errors.New("bad service id")
+	case !ValidDBName(p.Database):
+		return fmt.Errorf("bad database name %q", p.Database)
+	case !ValidDBName(p.Owner):
+		return fmt.Errorf("bad owner name %q", p.Owner)
+	case validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container) != nil:
+		return validDBExecTarget(p.Target, p.VMID, p.GuestType, p.Container)
+	case p.Target == TargetGuest:
+		return errors.New("importing into a Proxmox guest's native postgres is not supported yet")
+	case p.SourceSecret == "":
+		return errors.New("db.import needs the source secret")
+	case rootSecretRequired(p.Target, p.Container) && p.RootSecret == "":
+		return errors.New("db.import needs the root secret")
+	}
+	return nil
+}
+
+// DBImportResult: db.import's answer. WarningCount counts pg_restore's non-fatal stderr warnings
+// (e.g. an extension already present); BytesRestored/TablesRestored are best-effort figures parsed
+// from pg_restore's verbose/list output.
+type DBImportResult struct {
+	BytesRestored  int64 `json:"bytes_restored,omitempty"`
+	TablesRestored int   `json:"tables_restored,omitempty"`
+	WarningCount   int   `json:"warning_count,omitempty"`
 }

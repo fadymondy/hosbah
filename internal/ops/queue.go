@@ -65,6 +65,8 @@ func Timeout(kind string) time.Duration {
 		return 15 * time.Minute // a first pull of the Trivy image and its vulnerability database can take minutes
 	case agentproto.KindDBBackup:
 		return 30 * time.Minute
+	case agentproto.KindDBImport:
+		return 2 * time.Hour // pg_dump | pg_restore of an existing database, size unbounded
 	case agentproto.KindBrowserCreate:
 		return 20 * time.Minute // a first pull of the Chromium image can take minutes
 	case agentproto.KindRecipeInstall:

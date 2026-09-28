@@ -250,6 +250,21 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
                 </SelectContent>
               </Select>
             </Field>
+            {kind === "postgres" ? (
+              <Field>
+                <FieldLabel>{t("databases.pgvectorLabel")}</FieldLabel>
+                <Select value={version === "pgvector-pg17" ? "pgvector-pg17" : "default"} onValueChange={(v) => v && setVersion(v === "pgvector-pg17" ? "pgvector-pg17" : "")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">{t("databases.pgvectorDefault")}</SelectItem>
+                    <SelectItem value="pgvector-pg17">{t("databases.pgvectorOption")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{t("databases.pgvectorHint")}</FieldDescription>
+              </Field>
+            ) : null}
             <Field>
               <FieldLabel htmlFor="db-version">{t("databases.version")}</FieldLabel>
               <Input id="db-version" value={version} onChange={(e) => setVersion(e.target.value)} placeholder={t("databases.versionOptional")} dir="ltr" />
