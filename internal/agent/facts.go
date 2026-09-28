@@ -148,3 +148,10 @@ func primaryIP() string {
 	}
 	return ""
 }
+
+// dockerCLIPresent reports whether the docker command is on PATH (the engine may be installed
+// without it: see stepDockerInstall).
+func dockerCLIPresent() bool {
+	_, err := exec.LookPath("docker")
+	return err == nil
+}

@@ -13,6 +13,7 @@ type pkgManager struct{ rpm bool }
 var rpmNames = map[string]string{
 	"gnupg":         "gnupg2",
 	"docker.io":     "docker-ce",
+	"docker-cli":    "docker-ce-cli",
 	"docker-buildx": "docker-buildx-plugin",
 }
 

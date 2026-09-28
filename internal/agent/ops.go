@@ -155,7 +155,16 @@ func stepDockerInstall(oc *OpContext) (any, int, error) {
 		if code, err := hostPkgManager().install(oc, []string{"docker.io"}); err != nil {
 			return nil, code, err
 		}
-	} else {
+	}
+	if !dockerCLIPresent() {
+		// Debian 13 split the client out of docker.io into docker-cli, which docker.io only
+		// recommends — so the engine installs without the docker command everything here runs.
+		oc.Info("the docker command is missing; installing docker-cli")
+		if code, err := hostPkgManager().install(oc, []string{"docker-cli"}); err != nil {
+			return nil, code, err
+		}
+	}
+	if d.Installed {
 		oc.Info("Docker is installed but the engine is not answering; starting it")
 	}
 	oc.Progress(3, 3)
