@@ -287,9 +287,9 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 		if err != nil {
 			return nil, err
 		}
-		user, cmd := providers.GuestUser, inst.Command
+		user, cmd := providers.GuestUser, sshInstallCommand(inst.URL, "sudo ")
 		if spec.Kind == providers.KindLXC {
-			user, cmd = "root", inst.CommandRoot // LXC keys go to root
+			user, cmd = "root", sshInstallCommand(inst.URL, "") // LXC keys go to root
 		}
 		info("connecting over SSH as %s to install the agent", user)
 		sctx, scancel := context.WithTimeout(ctx, SSHWait)

@@ -226,9 +226,9 @@ func connect(ctx context.Context, a *app.App, svc *ops.Service, op db.Operation,
 	}); err != nil {
 		return nil, err
 	}
-	cmd := inst.CommandRoot
+	cmd := sshInstallCommand(inst.URL, "")
 	if sudo != "" {
-		cmd = "curl -fsSL " + inst.URL + " | sudo -n sh"
+		cmd = sshInstallCommand(inst.URL, "sudo -n ")
 	}
 	info("installing the agent")
 	if err := client.Stream(ctx, cmd, &lineLogger{log: func(l string) { logf("stdout", l) }}); err != nil {
