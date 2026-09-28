@@ -97,6 +97,36 @@ func InfraTools() []Tool {
 			},
 		},
 		{
+			Name: "server_install_command", Scope: scopes.Write,
+			Description: "A new one-time agent install command for an existing server (owner or admin), replacing an unused one: " +
+				"to finish a server whose provisioning failed before its agent enrolled, or to reinstall the agent. " +
+				"Whoever runs it enrols as this server, so treat it like a password.",
+			InputSchema: schema([]string{"server"}, map[string]any{"server": str("Server name or id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
+					return "", err
+				}
+				s, err := findServer(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				svc, err := opsOf(env)
+				if err != nil {
+					return "", err
+				}
+				inst, err := svc.NewEnrollment(ctx, env.Q, env.Caller.TeamID, s.ID, actor(env))
+				if err != nil {
+					return "", errors.New("could not create the install command")
+				}
+				if err := tenancy.Record(ctx, env.Q, env.Caller.TeamID, actor(env), "server.enrollment_created", "server", s.ID,
+					map[string]any{"expires_at": inst.ExpiresAt, "via": "mcp"}); err != nil {
+					return "", errors.New("audit failed")
+				}
+				return fmt.Sprintf("Install command for %s — works once, expires %s:\n  %s\nAlready root:\n  %s\n",
+					s.Name, inst.ExpiresAt.UTC().Format(time.RFC3339), inst.Command, inst.CommandRoot), nil
+			},
+		},
+		{
 			Name: "list_credentials", Scope: scopes.Read,
 			Description: "The team's provider credentials (Proxmox, Cloudflare): name, provider, non-secret settings, last validated. Never the secret.",
 			InputSchema: schema(nil, map[string]any{}),

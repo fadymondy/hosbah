@@ -542,6 +542,7 @@ func TestIsolationSweep(t *testing.T) {
 		"destroy_instance": {"product": prodA.ID, "instance": instA.ID, "confirm": instA.Name},
 		// MH-578 C8: package updates on A's server.
 		"server_updates_list":     {"server": srvA},
+		"server_install_command":  {"server": srvA},
 		"server_updates_run":      {"server": srvA, "confirm": "alpha-" + suffix},
 		"server_updates_auto_set": {"server": srvA, "enabled": true},
 		// MH-578 C10: A's SSH key, and installing/uninstalling it on A's server.
