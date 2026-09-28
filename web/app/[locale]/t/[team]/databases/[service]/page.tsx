@@ -410,7 +410,7 @@ function ImportDatabaseDialog({
 }: {
   teamSlug: string
   serviceRef: string
-  database: DatabaseRow
+  database: DataServiceDetail["databases"][number]
   onDone: () => void | Promise<void>
 }) {
   const { t } = useI18n()
