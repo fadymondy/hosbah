@@ -40,6 +40,9 @@ func InfraTools() []Tool {
 				"size":             map[string]any{"type": "string", "enum": []string{"small", "medium", "large"}},
 				"ipconfig":         str("proxmox: static address for networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1"),
 				"nameserver":       str("proxmox LXC: resolver for a static address, e.g. 1.1.1.1"),
+				"cores":            map[string]any{"type": "integer", "description": "proxmox: vCPUs, overriding the size preset"},
+				"memory_mb":        map[string]any{"type": "integer", "description": "proxmox: memory in MiB, overriding the size preset (e.g. 10240)"},
+				"disk_gb":          map[string]any{"type": "integer", "description": "proxmox: root disk in GiB, overriding the size preset"},
 			}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
@@ -74,6 +77,7 @@ func InfraTools() []Tool {
 					}
 					in.Provider, in.CredentialID, in.Kind, in.Size = "proxmox", cred.ID, args.Str("kind"), args.Str("size")
 					in.IPConfig, in.Nameserver = args.Str("ipconfig"), args.Str("nameserver")
+					in.Cores, in.MemoryMB, in.DiskGB = args.Int("cores", 0, 0, provisioning.MaxCores), args.Int("memory_mb", 0, 0, provisioning.MaxMemoryMB), args.Int("disk_gb", 0, 0, provisioning.MaxDiskGB)
 				default:
 					return "", errors.New("method must be install, connect or proxmox")
 				}

@@ -66,6 +66,10 @@ export default function NewServerPage() {
   const [size, setSize] = useState<(typeof SIZES)[number]>("small");
   const [ipconfig, setIpconfig] = useState("");
   const [nameserver, setNameserver] = useState("");
+  // Custom size: each overrides the preset when filled in (memory and disk in GiB here, MiB/GiB on the wire).
+  const [cores, setCores] = useState("");
+  const [memoryGB, setMemoryGB] = useState("");
+  const [diskGB, setDiskGB] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ server: Server; install: Install } | null>(null);
@@ -138,6 +142,9 @@ export default function NewServerPage() {
             size,
             ...(ipconfig.trim() ? { ipconfig: ipconfig.trim() } : {}),
             ...(nameserver.trim() ? { nameserver: nameserver.trim() } : {}),
+            ...(Number(cores) > 0 ? { cores: Math.round(Number(cores)) } : {}),
+            ...(Number(memoryGB) > 0 ? { memory_mb: Math.round(Number(memoryGB) * 1024) } : {}),
+            ...(Number(diskGB) > 0 ? { disk_gb: Math.round(Number(diskGB)) } : {}),
           },
         });
         router.push(`${base}/servers/${res.server.id}`);
@@ -347,6 +354,35 @@ export default function NewServerPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel>{t("servers.new.customSize")}</FieldLabel>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          ["px-cores", "servers.new.cores", cores, setCores, "6"],
+                          ["px-mem", "servers.new.memoryGB", memoryGB, setMemoryGB, "10"],
+                          ["px-disk", "servers.new.diskGB", diskGB, setDiskGB, "60"],
+                        ] as const
+                      ).map(([id, label, value, set, ph]) => (
+                        <div key={id} className="flex flex-col gap-1">
+                          <label htmlFor={id} className="text-xs text-muted-foreground">
+                            {t(label)}
+                          </label>
+                          <Input
+                            id={id}
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            dir="ltr"
+                            placeholder={ph}
+                            value={value}
+                            onChange={(e) => set(e.target.value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <FieldDescription>{t("servers.new.customSizeHint")}</FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="px-ip">{t("servers.new.ipconfig")}</FieldLabel>

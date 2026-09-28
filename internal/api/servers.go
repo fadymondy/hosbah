@@ -243,6 +243,9 @@ func (d *deps) registerServers(api huma.API) {
 			Size         string     `json:"size,omitempty" enum:"small,medium,large"`
 			IPConfig     string     `json:"ipconfig,omitempty" maxLength:"200" doc:"Proxmox: static address for networks without DHCP, e.g. ip=10.10.10.121/24,gw=10.10.10.1 (empty: DHCP)."`
 			Nameserver   string     `json:"nameserver,omitempty" maxLength:"45" doc:"Proxmox LXC: resolver for a static address, e.g. 1.1.1.1."`
+			Cores        int        `json:"cores,omitempty" minimum:"0" maximum:"64" doc:"Proxmox: vCPUs, overriding the size preset (0: the preset's)."`
+			MemoryMB     int        `json:"memory_mb,omitempty" minimum:"0" maximum:"262144" doc:"Proxmox: memory in MiB, overriding the size preset."`
+			DiskGB       int        `json:"disk_gb,omitempty" minimum:"0" maximum:"4096" doc:"Proxmox: root disk in GiB, overriding the size preset."`
 			Connect      *ConnectIn `json:"connect,omitempty" doc:"Bring-your-own only: log in over SSH and set the server up now, instead of returning an install command."`
 		}
 	}) (*serverCreatedOut, error) {
@@ -255,7 +258,8 @@ func (d *deps) registerServers(api huma.API) {
 					Password: c.Password, PrivateKey: c.PrivateKey, RegisterProxmox: c.RegisterProxmox}
 			}
 			row, inst, err := provisioning.AddServer(ctx, d.ops, q, m.TeamID, id.ID, provisioning.AddInput{Name: b.Name, Provider: b.Provider,
-				CredentialID: b.CredentialID, Kind: b.Kind, Size: b.Size, IPConfig: b.IPConfig, Nameserver: b.Nameserver, Connect: conn})
+				CredentialID: b.CredentialID, Kind: b.Kind, Size: b.Size, IPConfig: b.IPConfig, Nameserver: b.Nameserver,
+				Cores: b.Cores, MemoryMB: b.MemoryMB, DiskGB: b.DiskGB, Connect: conn})
 			if err != nil {
 				return provisioningErr(err)
 			}

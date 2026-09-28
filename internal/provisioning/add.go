@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -34,8 +35,18 @@ type AddInput struct {
 	IPConfig string
 	// Nameserver, proxmox LXC: the resolver for a static address (e.g. 1.1.1.1). Empty: the node's.
 	Nameserver string
-	Connect    *ConnectInput
+	// Cores, MemoryMB, DiskGB, proxmox: override the size preset (0: the preset's). Bounded by
+	// MaxCores/MaxMemoryMB/MaxDiskGB — a typo must not ask the node for a terabyte.
+	Cores, MemoryMB, DiskGB int
+	Connect                 *ConnectInput
 }
+
+// Bounds on a Proxmox size override.
+const (
+	MaxCores    = 64
+	MaxMemoryMB = 262144
+	MaxDiskGB   = 4096
+)
 
 // ConnectInput is how to log in to a server the user already has.
 type ConnectInput struct {
@@ -100,6 +111,19 @@ func AddServer(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, act
 				return db.Server{}, nil, refuse("nameserver must be an IP address, e.g. 1.1.1.1")
 			}
 			settings["nameserver"] = ns
+		}
+		for _, o := range []struct {
+			key       string
+			v, lo, hi int
+			what      string
+		}{{"cores", in.Cores, 1, MaxCores, "cores"}, {"memory_mb", in.MemoryMB, 256, MaxMemoryMB, "memory_mb"}, {"disk_gb", in.DiskGB, 4, MaxDiskGB, "disk_gb"}} {
+			if o.v == 0 {
+				continue
+			}
+			if o.v < o.lo || o.v > o.hi {
+				return db.Server{}, nil, refuse(fmt.Sprintf("%s must be between %d and %d", o.what, o.lo, o.hi))
+			}
+			settings[o.key] = strconv.Itoa(o.v)
 		}
 		raw, _ := json.Marshal(settings)
 		s := string(raw)

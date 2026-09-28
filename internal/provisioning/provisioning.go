@@ -197,6 +197,9 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 		Kind, Size string
 		IPConfig   string `json:"ipconfig"`
 		Nameserver string `json:"nameserver"`
+		Cores      string `json:"cores"`
+		MemoryMB   string `json:"memory_mb"`
+		DiskGB     string `json:"disk_gb"`
 	}
 	if srv.Spec != nil {
 		_ = json.Unmarshal([]byte(*srv.Spec), &spec)
@@ -226,6 +229,11 @@ func provision(ctx context.Context, a *app.App, svc *ops.Service, op db.Operatio
 	}
 	if spec.Nameserver != "" {
 		cs.Options["nameserver"] = spec.Nameserver
+	}
+	for k, v := range map[string]string{"cores": spec.Cores, "memory_mb": spec.MemoryMB, "disk_gb": spec.DiskGB} {
+		if v != "" {
+			cs.Options[k] = v // the driver's resolveSize applies these over the preset
+		}
 	}
 	if delivers {
 		inst, err := newInstall()
