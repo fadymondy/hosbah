@@ -11,9 +11,10 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: CreateBrowserProxyHost :one
--- A desktop browser's own hostname: not user-chosen upstream/tls, and always forward_auth'd.
+-- A desktop browser's own hostname: not user-chosen upstream, and always forward_auth'd. tls is auto, or off on a server
+-- with a private address (it sits behind an edge that terminates TLS and dials it over :80).
 INSERT INTO proxy_hosts (team_id, server_id, hostname, upstream, tls, enabled, websockets, verify_token, created_by, browser_id, forward_auth)
-VALUES (sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('hostname'), sqlc.arg('upstream'), 'auto', true, true,
+VALUES (sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('hostname'), sqlc.arg('upstream'), sqlc.arg('tls'), true, true,
     sqlc.arg('verify_token'), sqlc.arg('created_by'), sqlc.arg('browser_id'), sqlc.arg('forward_auth'))
 RETURNING *;
 

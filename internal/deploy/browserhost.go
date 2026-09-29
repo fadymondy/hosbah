@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"crypto/rand"
+	"net"
 	"strings"
 	"time"
 
@@ -160,7 +161,7 @@ func (s *Service) CreateDesktopBrowserProxyHost(ctx context.Context, q *db.Queri
 	tok := make([]byte, 16)
 	_, _ = rand.Read(tok)
 	p, err := q.CreateBrowserProxyHost(ctx, db.CreateBrowserProxyHostParams{
-		TeamID: teamID, ServerID: srv.ID, Hostname: hostname, Upstream: upstream,
+		TeamID: teamID, ServerID: srv.ID, Hostname: hostname, Upstream: upstream, Tls: desktopBrowserTLS(srv),
 		VerifyToken: newVerifyToken(tok), CreatedBy: actor.UserID,
 		BrowserID: &browserID, ForwardAuth: strptr(s.BrowsersAuthURL()),
 	})
@@ -181,6 +182,18 @@ func (s *Service) CreateDesktopBrowserProxyHost(ctx context.Context, q *db.Queri
 		}
 	}
 	return p, s.applyProxyHost(ctx, q, teamID, actor, p, false)
+}
+
+// desktopBrowserTLS: "off" on a server with a private address — no ACME challenge can reach it, and
+// the edge in front of it (NPM, or the apps edge) terminates TLS and dials its Caddy on :80, where an
+// "auto" route would only answer with a redirect back to https (a 308 loop). "auto" otherwise.
+func desktopBrowserTLS(srv db.Server) string {
+	if srv.IpAddress != nil {
+		if ip := net.ParseIP(*srv.IpAddress); ip != nil && (ip.IsPrivate() || ip.IsLoopback()) {
+			return "off"
+		}
+	}
+	return "auto"
 }
 
 // DeleteDesktopBrowserProxyHost removes a desktop browser's proxy host and its DNS record — the

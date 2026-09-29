@@ -1,6 +1,10 @@
 package deploy
 
-import "testing"
+import (
+	"testing"
+
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+)
 
 func TestZoneOf(t *testing.T) {
 	zones := []string{"3x1.io", "moharrik.com", "sub.moharrik.com"}
@@ -17,3 +21,16 @@ func TestZoneOf(t *testing.T) {
 		}
 	}
 }
+
+func TestDesktopBrowserTLS(t *testing.T) {
+	ip := func(s string) db.Server { return db.Server{IpAddress: &s} }
+	for srv, want := range map[*db.Server]string{
+		ptr(ip("10.10.10.121")): "off", ptr(ip("127.0.0.1")): "off",
+		ptr(ip("45.129.183.99")): "auto", {}: "auto",
+	} {
+		if got := desktopBrowserTLS(*srv); got != want {
+			t.Errorf("desktopBrowserTLS(%v) = %q, want %q", srv.IpAddress, got, want)
+		}
+	}
+}
+
