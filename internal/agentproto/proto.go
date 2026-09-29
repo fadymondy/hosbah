@@ -95,7 +95,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindFirewallApply, KindFirewallStatus, KindFail2banInstall, KindFail2banBanned, KindFail2banUnban,
 	KindMailInstall, KindMailDomain, KindMailbox, KindMailAlias,
 	KindPkgList, KindPkgUpgrade, KindPkgAutoupdateSet, KindSSHKeyInstall, KindSSHKeyUninstall,
-	KindPasswdSet, KindDeployKeyGenerate, KindAppScan}
+	KindPasswdSet, KindDeployKeyGenerate, KindAppScan, KindGuestEnrol}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.

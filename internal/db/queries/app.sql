@@ -134,6 +134,18 @@ RETURNING *;
 UPDATE apps SET origin_kind = NULL, origin_key = NULL, origin = NULL, imported_state = NULL, updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
 
+-- name: ImportedAppsOfTeam :many
+-- Every imported app of the team (any origin_kind), for the duplicate guard on creating a git app:
+-- a name or repo that matches one of these should be offered connect/adopt instead of a fresh build.
+SELECT * FROM apps WHERE team_id = sqlc.arg('team_id')::text AND source = 'imported';
+
+-- name: SetAppConnectedServer :one
+-- Links an imported guest app to the server created for it once that guest's own agent has an
+-- install command queued (connect-guest); idempotent — called again returns the same row.
+UPDATE apps SET connected_server_id = sqlc.arg('connected_server_id')::text, updated_at = now()
+WHERE id = sqlc.arg('id')::text AND team_id = sqlc.arg('team_id')::text AND source = 'imported' AND origin_kind = 'guest'
+RETURNING *;
+
 -- name: AppsForRepoInTeam :many
 -- A GitHub App push: the git apps of the installation's team on that repository and branch, except
 -- those whose automatic deploys are paused.

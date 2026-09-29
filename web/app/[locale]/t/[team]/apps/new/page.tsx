@@ -17,7 +17,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { apiFetch } from "@/lib/api"
+import { ApiError, apiFetch } from "@/lib/api"
 import { APP_NAME, runtimeLabel, shortSha, type App, type Deployment, type DetectResult } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useEventStream, type Operation, type Server } from "@/lib/servers"
@@ -42,6 +42,9 @@ export default function NewAppPage() {
   const [healthTimeout, setHealthTimeout] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set when create-app is refused because an imported app already answers to this name or
+  // repository (duplicate_imported): offer to build a separate one anyway.
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null)
   const [detectOp, setDetectOp] = useState<Operation | null>(null)
   const [detectErr, setDetectErr] = useState<string | null>(null)
   const [detecting, setDetecting] = useState(false)
@@ -109,9 +112,14 @@ export default function NewAppPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    await createApp(false)
+  }
+
+  async function createApp(allowDuplicate: boolean) {
     if (!nameOK || !repoOK || !server) return
     setBusy(true)
     setError(null)
+    if (!allowDuplicate) setDuplicateNotice(null)
     try {
       const body: Record<string, unknown> = {
         name,
@@ -123,9 +131,14 @@ export default function NewAppPage() {
       if (port) body.port = Number(port)
       if (healthPath.trim()) body.healthcheck_path = healthPath.trim()
       if (healthTimeout) body.healthcheck_timeout = Number(healthTimeout)
+      if (allowDuplicate) body.allow_duplicate = true
       setCreated(await apiFetch<Created>(`/api/teams/${team.slug}/apps`, { method: "POST", body }))
     } catch (err) {
-      setError(errorText(err))
+      if (err instanceof ApiError && err.reason === "duplicate_imported") {
+        setDuplicateNotice(err.message)
+      } else {
+        setError(errorText(err))
+      }
     } finally {
       setBusy(false)
     }
@@ -401,6 +414,24 @@ export default function NewAppPage() {
               </CollapsibleContent>
             </Collapsible>
 
+            {duplicateNotice ? (
+              <Alert data-testid="duplicate-imported">
+                <InfoIcon />
+                <AlertTitle>{duplicateNotice}</AlertTitle>
+                <AlertDescription className="flex flex-col items-start gap-3">
+                  <span>{t("apps.new.duplicateImportedHint")}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => createApp(true)}
+                  >
+                    {busy ? t("common.working") : t("apps.new.duplicateImportedOverride")}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <FormError message={error} />
             <div>
               <Button type="submit" disabled={busy || !nameOK || !repoOK || !server}>

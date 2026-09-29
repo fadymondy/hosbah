@@ -542,6 +542,36 @@ func AppTools() []Tool {
 			},
 		},
 
+		{
+			Name: "connect_guest", Scope: scopes.Write,
+			Description: "Put a Hosbah agent inside an imported Proxmox guest, instead of creating a git app on the hypervisor node (which would fail). " +
+				"Creates a server for the guest nested under its node and asks the node to install the agent inside the guest with pct exec. Idempotent — " +
+				"calling it again on an already-connected app returns the same server. Once that server's agent enrols, its own containers import on their own.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityManageServers); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				row, inst, err := s.ConnectGuest(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a)
+				if err != nil {
+					return "", err
+				}
+				if inst == nil {
+					return fmt.Sprintf("%s is already connected as server %s (%s).", a.Name, row.Name, row.ID), nil
+				}
+				return fmt.Sprintf("Connecting %s: server %s (%s) created, nested under its Proxmox node; the install command is running inside the "+
+					"guest now (guest.enrol). It shows up once its own agent enrols.", a.Name, row.Name, row.ID), nil
+			},
+		},
+
 		// ---- write ----
 		{
 			Name: "create_app", Scope: scopes.Write,
@@ -549,7 +579,9 @@ func AppTools() []Tool {
 			InputSchema: schema([]string{"name", "server", "repo_url"}, map[string]any{
 				"name": str("Lowercase letters, digits, dashes"), "server": str("Server name or id"), "repo_url": str("Public https/http/git URL"),
 				"branch": str("Branch (default main)"), "port": map[string]any{"type": "integer", "description": "Port the app listens on (default 8080)"},
-				"healthcheck_path": str("Health-check path (default /)"), "deploy": map[string]any{"type": "boolean", "default": false}}),
+				"healthcheck_path": str("Health-check path (default /)"), "deploy": map[string]any{"type": "boolean", "default": false},
+				"allow_duplicate": map[string]any{"type": "boolean", "default": false,
+					"description": "Build this anyway, even if the team already has an imported app by this name or repo (otherwise refused — connect_guest or adopt_app instead)"}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -559,7 +591,8 @@ func AppTools() []Tool {
 					return "", err
 				}
 				a, hook, err := s.CreateApp(ctx, env.Q, env.Caller.TeamID, mcpActor(env), deploy.CreateAppInput{Name: args.Str("name"), Server: args.Str("server"),
-					RepoURL: args.Str("repo_url"), Branch: args.Str("branch"), Port: args.Int("port", 0, 0, 65535), HealthPath: args.Str("healthcheck_path")})
+					RepoURL: args.Str("repo_url"), Branch: args.Str("branch"), Port: args.Int("port", 0, 0, 65535), HealthPath: args.Str("healthcheck_path"),
+					AllowDuplicate: args.Bool("allow_duplicate")})
 				if err != nil {
 					return "", err
 				}

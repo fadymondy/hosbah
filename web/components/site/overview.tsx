@@ -44,6 +44,11 @@ export function SiteOverview() {
   // An adopted guest or unit whose old workload has not been confirmed stopped yet: still git-sourced,
   // but origin_kind survives adoption for exactly this (a container clears it itself once retired).
   const awaitingStopConfirm = !imported && !!app.origin_kind && app.origin_kind !== "container"
+  // An imported Proxmox guest, not yet connected: offer to put a Hosbah agent inside it, instead of
+  // the user mistakenly building a git app on the hypervisor node.
+  const unconnectedGuest = imported && app.origin_kind === "guest" && !app.connected_server_id
+  const [connecting, setConnecting] = useState(false)
+  const [connectError, setConnectError] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.get("adopt") === "1") {
@@ -56,6 +61,48 @@ export function SiteOverview() {
   return (
     <>
       {imported ? <ImportedNotice kind="app" /> : null}
+      {imported && operate && unconnectedGuest ? (
+        <Notice title={t("connectGuest.noticeTitle")}>
+          {t("connectGuest.noticeBody")}
+          <div className="pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={connecting}
+              onClick={async () => {
+                setConnecting(true)
+                setConnectError(null)
+                try {
+                  await apiFetch(`${path}/connect-guest`, { method: "POST" })
+                  await reload()
+                } catch (err) {
+                  setConnectError(errorText(err))
+                } finally {
+                  setConnecting(false)
+                }
+              }}
+            >
+              {connecting ? t("common.working") : t("connectGuest.trigger")}
+            </Button>
+          </div>
+          {connectError ? (
+            <p role="alert" className="pt-2 text-sm text-destructive" dir="auto">
+              {connectError}
+            </p>
+          ) : null}
+        </Notice>
+      ) : null}
+      {imported && app.connected_server_id ? (
+        <Notice title={t("connectGuest.connectedTitle")}>
+          {t("connectGuest.connectedBody", { server: app.connected_server_name || app.connected_server_id })}
+          <div className="pt-2">
+            <Button type="button" size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/servers/${app.connected_server_id}`} />}>
+              {t("connectGuest.viewServer")}
+            </Button>
+          </div>
+        </Notice>
+      ) : null}
       {imported && operate ? (
         <>
           <Notice title={t("adopt.noticeTitle")}>

@@ -93,6 +93,64 @@ type CreateAppInput struct {
 	Port          int
 	HealthPath    string
 	HealthTimeout int
+	// AllowDuplicate skips the "this already runs as an imported app" guard (CodeDuplicateImported).
+	AllowDuplicate bool
+}
+
+// CodeDuplicateImported is the duplicate-guard refusal's machine-readable code (409): the team
+// already has an imported app by this name (or from this repo) — connect or adopt it instead of
+// building a second copy that fights the first one for the name and the port.
+const CodeDuplicateImported = "duplicate_imported"
+
+// normalizeDupName lowercases and drops a trailing "-2"-style numeric suffix, so "myapp" and
+// "myapp-2" (a second import discovery gave it a unique name) compare equal.
+func normalizeDupName(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimSuffix(s, ".git")
+	if i := strings.LastIndexByte(s, '-'); i > 0 {
+		if _, err := strconv.Atoi(s[i+1:]); err == nil {
+			s = s[:i]
+		}
+	}
+	return s
+}
+
+// repoNameOf is the last path segment of a repository URL, the name a git app would otherwise be
+// named after (e.g. "git@github.com:acme/widgets.git" -> "widgets").
+func repoNameOf(repoURL string) string {
+	repoURL = strings.TrimSuffix(strings.TrimRight(strings.TrimSpace(repoURL), "/"), ".git")
+	if i := strings.LastIndexAny(repoURL, "/:"); i >= 0 {
+		return repoURL[i+1:]
+	}
+	return repoURL
+}
+
+// checkDuplicateImported refuses creating a git app whose name, or whose repo's name, matches an
+// imported app already in the team — the one-click connect-guest / adopt-app path is what the team
+// almost always wants instead of a second, competing build.
+func checkDuplicateImported(ctx context.Context, q *db.Queries, teamID, name, repoURL string) error {
+	imported, err := q.ImportedAppsOfTeam(ctx, teamID)
+	if err != nil {
+		return err
+	}
+	want := []string{normalizeDupName(name)}
+	if repo := repoNameOf(repoURL); repo != "" {
+		want = append(want, normalizeDupName(repo))
+	}
+	for _, im := range imported {
+		n := normalizeDupName(im.Name)
+		for _, w := range want {
+			if w != "" && w == n {
+				action := "adopt it"
+				if im.OriginKind != nil && *im.OriginKind == "guest" {
+					action = "connect it"
+				}
+				return &ActionError{Status: 409, Code: CodeDuplicateImported, Msg: im.Name +
+					" already runs as an imported app — " + action + " instead, or pass allow_duplicate to build a separate one"}
+			}
+		}
+	}
+	return nil
 }
 
 // CreateApp adds an app and returns it with its deploy-hook URL (shown once; only the hash is kept).
@@ -129,6 +187,14 @@ func (s *Service) CreateApp(ctx context.Context, q *db.Queries, teamID string, a
 	}
 	if srv.Status != "enrolled" {
 		return db.App{}, "", conflict("that server's agent has not enrolled yet")
+	}
+	if isNode, err := q.ServerIsProxmoxNode(ctx, db.ServerIsProxmoxNodeParams{TeamID: teamID, ServerID: srv.ID}); err == nil && isNode.Valid && isNode.Bool {
+		return db.App{}, "", invalid("this server is a Proxmox node — pick the LXC's own server or a Docker server")
+	}
+	if !in.AllowDuplicate {
+		if err := checkDuplicateImported(ctx, q, teamID, in.Name, in.RepoURL); err != nil {
+			return db.App{}, "", err
+		}
 	}
 	if err := quota.CheckApps(ctx, q, teamID); err != nil {
 		return db.App{}, "", asActionError(err)
