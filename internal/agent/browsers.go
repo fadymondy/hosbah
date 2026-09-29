@@ -90,7 +90,7 @@ func cdpReady(ctx context.Context, port int) error {
 // container itself came up).
 func desktopReady(ctx context.Context, bind string, port int) error {
 	client := &http.Client{Timeout: 2 * time.Second}
-	deadline := time.Now().Add(60 * time.Second) // a full desktop boots slower than headless
+	deadline := time.Now().Add(120 * time.Second) // a full desktop boots slower than headless (~45 s on a first start)
 	url := fmt.Sprintf("http://%s:%d/", bind, port)
 	for {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -101,7 +101,7 @@ func desktopReady(ctx context.Context, bind string, port int) error {
 			}
 		}
 		if ctx.Err() != nil || time.Now().After(deadline) {
-			return errors.New("the desktop did not answer within 60 s")
+			return errors.New("the desktop did not answer within 120 s")
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -131,8 +131,9 @@ func browserRunArgs(p agentproto.BrowserCreateParams) []string {
 // /config to and the container's timezone. The port maps to a FIXED host port (Bind:Port, chosen by
 // the control plane from the same pool as headless, not an ephemeral one docker picks) because
 // there is no gateway process in front of a desktop browser to re-read a moving upstream from —
-// Caddy dials Bind:Port directly, behind forward_auth. --cap-drop ALL is kept, same as headless:
-// the image runs Chromium with no sandbox privileges it would need a dropped capability for.
+// Caddy dials Bind:Port directly, behind forward_auth. --cap-drop ALL, then exactly the five
+// capabilities the image's s6 init needs to chown /config, /run/dbus and nginx's dirs to PUID and
+// drop to it (without them its nginx loops on "chown ... Operation not permitted" and never answers).
 func desktopRunArgs(p agentproto.BrowserCreateParams, common []string) []string {
 	tz := p.TZ
 	if tz == "" {
@@ -142,6 +143,7 @@ func desktopRunArgs(p agentproto.BrowserCreateParams, common []string) []string 
 		"-e", "PUID="+strconv.Itoa(agentproto.DesktopPUID), "-e", "PGID="+strconv.Itoa(agentproto.DesktopPGID), "-e", "TZ="+tz,
 		"--pids-limit", strconv.Itoa(agentproto.DesktopPidsLimit), "--shm-size", strconv.Itoa(agentproto.DesktopShmMB)+"m",
 		"--security-opt", "no-new-privileges", "--cap-drop", "ALL",
+		"--cap-add", "CHOWN", "--cap-add", "SETUID", "--cap-add", "SETGID", "--cap-add", "DAC_OVERRIDE", "--cap-add", "FOWNER",
 		"-v", agentproto.DesktopVolumeName(p.BrowserID)+":/config",
 		"-p", net.JoinHostPort(p.Bind, strconv.Itoa(p.Port))+":"+strconv.Itoa(agentproto.DesktopHTTPPort))
 	return append(args, p.Image)
