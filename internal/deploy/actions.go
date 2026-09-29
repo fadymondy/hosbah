@@ -541,8 +541,8 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if !agentproto.ValidTLS(tls) {
 		return db.Domain{}, invalid("tls must be auto, internal or off")
 	}
-	if s.apps.Owns(hostname) {
-		return db.Domain{}, invalid("hostnames under " + s.apps.Domain + " are given to apps automatically")
+	if err := s.checkPlatformName(ctx, q, actor, hostname); err != nil {
+		return db.Domain{}, err
 	}
 	if upstream != "" && s.hostnameTaken(ctx, hostname) {
 		return db.Domain{}, conflict("that hostname is already routed in Hosbah")

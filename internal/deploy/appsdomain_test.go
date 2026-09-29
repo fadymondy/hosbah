@@ -47,6 +47,12 @@ func TestAppsDomainFromEnvAndHostname(t *testing.T) {
 	if d.Hostname("shop") != "shop.apps.example.dev" || d.Hostname("www") != "" || d.DNS == nil || d.LegacyPrefix != "" {
 		t.Fatalf("d = %+v", d)
 	}
+	// The platform's own names are never an app's: reserved (a platform admin routes them), not owned,
+	// so deleting the app that holds www does not delete its DNS.
+	if !d.Reserved("www.apps.example.dev") || d.Owns("www.apps.example.dev") || !d.Owns("shop.apps.example.dev") ||
+		d.Reserved("shop.apps.example.dev") || d.Reserved("www.example.dev") || d.Reserved("x.www.apps.example.dev") {
+		t.Fatal("Reserved")
+	}
 
 	t.Setenv("HOSBAH_APPS_DOMAIN", "")
 	if d := AppsDomainFromEnv(); d.Enabled() || d.Hostname("api") != "" || d.Owns("api.example.com") {

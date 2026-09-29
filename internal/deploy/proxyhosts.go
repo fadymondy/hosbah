@@ -36,8 +36,8 @@ func (s *Service) CreateProxyHost(ctx context.Context, q *db.Queries, teamID str
 	if !agentproto.ValidHostname(host) {
 		return db.ProxyHost{}, invalid("that is not a valid hostname (for example nas.example.com)")
 	}
-	if s.apps.Owns(host) {
-		return db.ProxyHost{}, invalid("hostnames under " + s.apps.Domain + " are given to apps automatically")
+	if err := s.checkPlatformName(ctx, q, actor, host); err != nil {
+		return db.ProxyHost{}, err
 	}
 	tls := orDefault(in.TLS, "auto")
 	if !agentproto.ValidTLS(tls) {

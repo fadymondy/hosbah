@@ -94,7 +94,41 @@ var reservedLabels = map[string]bool{"www": true, "api": true, "app": true, "adm
 func (d AppsDomain) Owns(hostname string) bool {
 	prefixed := strings.HasPrefix(hostname, d.Prefix) || (d.LegacyPrefix != "" && strings.HasPrefix(hostname, d.LegacyPrefix))
 	return d.Enabled() && strings.HasSuffix(hostname, "."+d.Domain) && prefixed &&
-		!strings.Contains(strings.TrimSuffix(hostname, "."+d.Domain), ".")
+		!strings.Contains(strings.TrimSuffix(hostname, "."+d.Domain), ".") && !d.Reserved(hostname)
+}
+
+// Reserved reports whether hostname is one of the platform's own names under the apps domain
+// (www.<domain>, app.<domain>, ...): no app is given one, and only a platform admin may route it,
+// e.g. the marketing site on www. Other teams must not squat on them.
+func (d AppsDomain) Reserved(hostname string) bool {
+	if !d.Enabled() || !strings.HasSuffix(hostname, "."+d.Domain) {
+		return false
+	}
+	return reservedLabels[strings.TrimSuffix(hostname, "."+d.Domain)]
+}
+
+// checkPlatformName refuses a hostname the apps domain keeps: platform hostnames always, reserved
+// names unless the actor is a platform admin.
+func (s *Service) checkPlatformName(ctx context.Context, q *db.Queries, actor Actor, hostname string) error {
+	if s.apps.Reserved(hostname) {
+		if u, err := q.UserByID(ctx, actor.UserID); err == nil && u.DisabledAt == nil && hasRoleCSV(u.Roles, "admin") {
+			return nil
+		}
+		return invalid(hostname + " is reserved for the platform (a platform admin can route it)")
+	}
+	if s.apps.Owns(hostname) {
+		return invalid("hostnames under " + s.apps.Domain + " are given to apps automatically")
+	}
+	return nil
+}
+
+func hasRoleCSV(csv, role string) bool {
+	for _, r := range strings.Split(csv, ",") {
+		if strings.TrimSpace(r) == role {
+			return true
+		}
+	}
+	return false
 }
 
 // dnsTimeout bounds a Cloudflare call made on the request path.
