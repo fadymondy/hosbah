@@ -107,6 +107,15 @@ func Boot() *app.App {
 	deploys.MountBrowsersAuth(k.Router) // /api/browsers/auth — Caddy's forward_auth target for a desktop browser's hostname
 	deploys.Start()
 	a.Deploy = deploys
+	// Apps edge (HOSBAH_APPS_EDGE): once, in the background, so a platform domain created before the
+	// edge existed (or before it was configured) gets fixed without a manual DB edit. Also exposed as
+	// the apps_edge_sync admin MCP tool for an on-demand re-run.
+	go func() {
+		if res := deploys.SyncAppsEdge(context.Background()); res.EdgeConfigured {
+			a.Log.Info("apps edge: reconciled", "domains", res.Domains, "tls_fixed", res.TLSFixed,
+				"routed", res.Routed, "skipped", res.Skipped, "errors", res.Errors)
+		}
+	}()
 
 	if _, err := catalog.Builtin(); err != nil { // a bad embedded recipe never starts (and never passes the tests)
 		panic("hosbah: recipe catalog: " + err.Error())

@@ -9,7 +9,7 @@ import (
 // either).
 func clearAppsEnv(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"APPS_DOMAIN", "APPS_TLS", "APPS_PROXIED", "CLOUDFLARE_TOKEN"} {
+	for _, k := range []string{"APPS_DOMAIN", "APPS_TLS", "APPS_PROXIED", "CLOUDFLARE_TOKEN", "APPS_EDGE"} {
 		t.Setenv("HOSBAH_"+k, "")
 		t.Setenv("CLOUDY_"+k, "")
 	}

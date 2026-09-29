@@ -176,6 +176,22 @@ func PlatformTools() []Tool {
 			},
 		},
 		{
+			Name: "apps_edge_sync",
+			Description: "Reconcile every app's platform hostname (<app>.<the apps domain>) with HOSBAH_APPS_EDGE: sets its tls to \"off\" and " +
+				"(re-)applies its route on the apps-edge server. Idempotent — safe to re-run any time; also runs once in the background at API " +
+				"startup. Returns {edge_configured, domains, tls_fixed, routed, skipped, errors}; edge_configured is false (a no-op) when " +
+				"HOSBAH_APPS_EDGE is unset.",
+			Scope:       ScopeAdmin,
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				d, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				return asJSON(d.SyncAppsEdge(ctx), nil)
+			},
+		},
+		{
 			Name:        "list_platform_audit",
 			Description: "The platform audit log (user, team and settings changes by platform admins), newest first, with the actor's email. Filter by actor, action prefix, target type/id, a date range (since/until, ISO-8601) or free-text search.",
 			Scope:       ScopeAdmin,

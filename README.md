@@ -124,6 +124,15 @@ HOSBAH_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='hosbah@pve!ctl' PVE
   already verified. With `HOSBAH_CLOUDFLARE_TOKEN` Hosbah also creates and
   deletes its A/AAAA record (only records it made, marked "managed by Hosbah"). Unset = off. Moving to a dedicated
   domain later is only an `.env` change.
+- **Apps edge**: for a fleet of private-network servers behind one public edge, set `HOSBAH_APPS_EDGE` to the id of a
+  Hosbah server whose Caddy is that edge (a Cloudflare wildcard on the apps domain, and an operator-run reverse proxy,
+  point at this server's `:80`). Every platform hostname then gets `tls "off"` (the edge terminates TLS) and, unless
+  the app is on the edge server itself, a route on the edge's own Caddy (agent `proxy.set`) to `<app's server
+  IP>:80` — a request for `shop.hosbah.com` reaches the edge and is forwarded over the private network to the app's
+  own server. Unset = off, every app's own Caddy answers its platform hostname directly. The reconcile
+  (`internal/deploy/appsedge.go`, `SyncAppsEdge`) runs once in the background at API startup and is also the
+  `apps_edge_sync` platform-admin MCP tool, so turning the edge on (or moving it) fixes existing platform domains
+  without a manual DB edit.
 - **Caddy proxy manager** (`internal/deploy/proxyhosts.go`, agent `proxy.set`): a *proxy host* puts any upstream a server
   can reach (`host:port`, `http://…`, `https://…` with optional skip-verify) behind a hostname on that server's Caddy.
   Like Nginx Proxy Manager, but on the Caddy Hosbah already runs. Hostnames share one namespace with app domains, use

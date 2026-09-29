@@ -47,3 +47,11 @@ SELECT ((SELECT count(*) FROM domains d WHERE d.hostname = $1) + (SELECT count(*
 
 -- name: SetDomainUpstream :exec
 UPDATE domains SET upstream = sqlc.narg('upstream'), updated_at = now() WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: SetDomainTLS :exec
+-- Team scope: flips a platform domain's tls mode, e.g. the apps-edge reconcile.
+UPDATE domains SET tls = sqlc.arg('tls'), updated_at = now() WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: ListPlatformDomains :many
+-- System scope: every app's platform hostname across every team, for the apps-edge reconcile.
+SELECT * FROM domains WHERE verify_token = 'platform' ORDER BY hostname;

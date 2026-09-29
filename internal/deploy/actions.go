@@ -222,7 +222,7 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 			return conflict("a deployment is running — cancel it first")
 		}
 	}
-	host := platformHost(ctx, q, teamID, a)
+	host, domainID := platformDomain(ctx, q, teamID, a)
 	raw, _ := json.Marshal(agentproto.RemoveParams{AppID: a.ID, App: a.Name})
 	if _, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: a.ServerID, Kind: agentproto.KindAppRemove,
 		Params: raw, CreatedBy: actor.UserID}); err != nil {
@@ -235,6 +235,9 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 		return err
 	}
 	s.removeAppsDNS(ctx, host)
+	if domainID != "" {
+		s.enqueueEdgeProxySet(ctx, teamID, host, domainID, db.Server{ID: a.ServerID}, true)
+	}
 	return nil
 }
 

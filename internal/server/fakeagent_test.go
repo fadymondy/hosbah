@@ -168,6 +168,14 @@ func (fa *fakeAgent) rejectedList() []string {
 	return append([]string(nil), fa.rejected...)
 }
 
+// opsSnapshot is a copy of every operation the agent has received so far (safe to range over while
+// more may still arrive).
+func (fa *fakeAgent) opsSnapshot() []agentproto.SignedOp {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	return append([]agentproto.SignedOp(nil), fa.ops...)
+}
+
 func (fa *fakeAgent) kinds() []string {
 	fa.mu.Lock()
 	defer fa.mu.Unlock()
