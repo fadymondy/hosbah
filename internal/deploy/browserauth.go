@@ -191,11 +191,11 @@ func (s *Service) checkBrowserAuth(w http.ResponseWriter, r *http.Request, host 
 		if err != nil {
 			return nil
 		}
-		allowed = tenancy.Can(ctx, &tenancy.Membership{TeamID: sess.TeamID, UserID: sess.UserID, Role: m.Role}, tenancy.AbilityView)
+		allowed = tenancy.Can(ctx, &tenancy.Membership{TeamID: sess.TeamID, UserID: sess.UserID, Role: m.Role}, tenancy.AbilityDeploy)
 		return nil
 	})
 	if !allowed {
-		deny("you are no longer a member of that team")
+		deny("a desktop browser needs the deployer role or higher in its team")
 		return
 	}
 	w.WriteHeader(http.StatusOK)

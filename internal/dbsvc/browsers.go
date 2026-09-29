@@ -276,7 +276,7 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 		if hostname == "" {
 			return Browser{}, none, conflict("connect a domain (team Cloudflare, or wait for the apps domain) before creating a desktop browser")
 		}
-		return s.createDesktopBrowser(ctx, q, teamID, actor, a, srv, in, name, kind, image, bind, port, hostname, teamOwned)
+		return s.createDesktopBrowser(ctx, q, teamID, actor, a, srv, in, name, kind, image, agentproto.DesktopBind, port, hostname, teamOwned)
 	}
 
 	dek, err := s.ops.TeamDEK(ctx, q, teamID)

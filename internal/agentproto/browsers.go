@@ -52,6 +52,10 @@ const (
 	// HTTP; Caddy terminates TLS at the edge, so the loopback hop does not need KasmVNC's own
 	// self-signed :3001).
 	DesktopHTTPPort = 3000
+	// DesktopBind is the ONLY address a desktop browser publishes on. KasmVNC has no auth of its own,
+	// and the Docker bridge address (the headless gateway's) is reachable from every container on the
+	// server, so only the host's Caddy — through forward_auth to Hosbah — may reach it.
+	DesktopBind = "127.0.0.1"
 	// DesktopShmMB is the container's /dev/shm: a full GiB, fixed (a real desktop's compositor and
 	// Chromium both need more than the memory-scaled BrowserShmMB headless gets by with).
 	DesktopShmMB = 1024
@@ -167,6 +171,8 @@ func (p BrowserCreateParams) Validate() error {
 		return fmt.Errorf("image %q is not the desktop browser image", p.Image)
 	case !ValidBrowserBind(p.Bind):
 		return errors.New("a browser listens on a loopback or private IPv4 address only")
+	case kind == BrowserKindDesktop && p.Bind != DesktopBind:
+		return errors.New("a desktop browser listens on the loopback only (its only door is Caddy's forward_auth)")
 	case p.Port < 1024 || p.Port > 65535:
 		return errors.New("bad port")
 	case kind == BrowserKindHeadless && (p.MemoryMB < BrowserMinMemoryMB || p.MemoryMB > BrowserMaxMemoryMB):
