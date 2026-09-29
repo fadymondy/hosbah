@@ -500,11 +500,41 @@ func caddyUp(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
+// caddyOwned refuses a Caddy on localhost:2019 that serves someone else's sites. /load replaces the
+// whole config, so on a guest that already runs its own Caddy (a Caddyfile, servers srv0, srv1 …) the
+// first route change would have dropped every site it served. Hosbah's servers are hosbah_* (cloudy_*
+// before the rename); a Caddy with no HTTP servers yet has nothing to lose.
+func caddyOwned(ctx context.Context) error {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, caddyAdmin+"/config/apps/http/servers", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Caddy's admin API is not answering (run the caddy.install provisioning step): %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil // no http app configured: an empty Caddy
+	}
+	var servers map[string]json.RawMessage
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&servers); err != nil || len(servers) == 0 {
+		return nil
+	}
+	for name := range servers {
+		if strings.HasPrefix(name, "hosbah_") || strings.HasPrefix(name, "cloudy_") {
+			return nil
+		}
+	}
+	return errors.New("the Caddy on localhost:2019 serves this server's own sites, not Hosbah's — " +
+		"Hosbah will not replace its config; move those sites to Hosbah proxy hosts and stop that Caddy first")
+}
+
 // caddyLoad hands Caddy a whole config. Caddy validates it and keeps the old one on any error.
 func caddyLoad(ctx context.Context, cfg map[string]any) error {
 	b, _ := json.Marshal(cfg)
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	if err := caddyOwned(cctx); err != nil {
+		return err
+	}
 	req, _ := http.NewRequestWithContext(cctx, http.MethodPost, caddyAdmin+"/load", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
