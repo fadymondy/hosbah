@@ -193,6 +193,13 @@ func BrowserTools() []Tool {
 					if failure != "" {
 						return "", dbsvc.BrowserRemovalRefused(failure)
 					}
+					if b.Kind == agentproto.BrowserKindDesktop {
+						hostname := ""
+						if b.Hostname != nil {
+							hostname = " and " + *b.Hostname + " no longer routes anywhere"
+						}
+						return "Removed desktop browser " + b.Name + " from " + a.Name + ": its container is gone" + hostname + ".", nil
+					}
 					return "Removed browser " + b.Name + " from " + a.Name + ": its container is gone and " +
 						strings.Join(dbsvc.BrowserEnvNames(b.EnvPrefix), ", ") + " are unset (next deploy or restart).", nil
 				}
