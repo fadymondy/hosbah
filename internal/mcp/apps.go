@@ -663,8 +663,8 @@ func AppTools() []Tool {
 		},
 		{
 			Name: "add_domain", Scope: scopes.Write,
-			Description: "Route a hostname to the app (re-routed at once if a release is live). tls: auto (public certificate once verified), internal (Caddy's CA) or off (plain HTTP).",
-			InputSchema: schema([]string{"app", "hostname"}, map[string]any{"app": appArg, "hostname": str("e.g. app.example.com"),
+			Description: "Route a hostname to the app (re-routed at once if a release is live). tls: auto (public certificate once verified), internal (Caddy's CA) or off (plain HTTP). A wildcard (*.example.com) routes every subdomain without a domain of its own, over tls off or internal only; its DNS is yours to point.",
+			InputSchema: schema([]string{"app", "hostname"}, map[string]any{"app": appArg, "hostname": str("e.g. app.example.com, or *.example.com for every subdomain"),
 				"tls":  map[string]any{"type": "string", "enum": []string{"auto", "internal", "off"}, "default": "auto"},
 				"port": map[string]any{"type": "integer", "minimum": 0, "maximum": 65535, "description": "Imported apps: a container's published port (default the first) or the port a Proxmox guest's site listens on (required)"}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {

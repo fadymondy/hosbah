@@ -604,13 +604,20 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if tls == "" {
 		tls = "auto"
 	}
-	if !agentproto.ValidHostname(hostname) {
-		return db.Domain{}, invalid("that is not a valid hostname (for example app.example.com)")
+	if !agentproto.ValidRouteHostname(hostname) {
+		return db.Domain{}, invalid("that is not a valid hostname (for example app.example.com, or *.example.com for every subdomain)")
 	}
 	if !agentproto.ValidTLS(tls) {
 		return db.Domain{}, invalid("tls must be auto, internal or off")
 	}
-	if err := s.checkPlatformName(ctx, q, actor, hostname); err != nil {
+	wildcard := agentproto.IsWildcardHost(hostname)
+	if wildcard && tls == "auto" {
+		return db.Domain{}, invalid("a wildcard hostname needs tls off or internal: its public certificate needs a DNS challenge, so terminate TLS in front of Hosbah (Cloudflare, a proxy) instead")
+	}
+	if wildcard && upstream != "" {
+		return db.Domain{}, invalid("wildcard hostnames route apps Hosbah builds; an imported app takes exact hostnames")
+	}
+	if err := s.checkPlatformName(ctx, q, actor, strings.TrimPrefix(hostname, "*.")); err != nil {
 		return db.Domain{}, err
 	}
 	if upstream != "" && s.hostnameTaken(ctx, hostname) {
@@ -638,7 +645,8 @@ func (s *Service) AddDomain(ctx context.Context, q *db.Queries, teamID string, a
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.added", "app", a.ID, actor.audit(extra)); err != nil {
 		return db.Domain{}, err
 	}
-	if s.publishTunnelled(ctx, q, teamID, a.ServerID, hostname) || s.wireTeamDNS(ctx, q, teamID, a, hostname) {
+	// A wildcard's DNS (and its TLS) is the operator's: Hosbah never writes a wildcard record.
+	if !wildcard && (s.publishTunnelled(ctx, q, teamID, a.ServerID, hostname) || s.wireTeamDNS(ctx, q, teamID, a, hostname)) {
 		if err := q.MarkDomainVerified(ctx, db.MarkDomainVerifiedParams{ID: d.ID, TeamID: teamID}); err == nil {
 			now := time.Now()
 			d.VerifiedAt = &now
@@ -672,8 +680,10 @@ func (s *Service) RemoveDomain(ctx context.Context, q *db.Queries, teamID string
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "domain.removed", "app", a.ID, actor.audit(map[string]any{"hostname": d.Hostname})); err != nil {
 		return err
 	}
-	s.unwireTeamDNS(ctx, q, teamID, d.Hostname)
-	s.unpublishHost(ctx, q, teamID, d.Hostname)
+	if !agentproto.IsWildcardHost(d.Hostname) { // never wired: see AddDomain
+		s.unwireTeamDNS(ctx, q, teamID, d.Hostname)
+		s.unpublishHost(ctx, q, teamID, d.Hostname)
+	}
 	if d.Upstream != nil {
 		return s.routeImported(ctx, q, teamID, actor, a, d, true)
 	}

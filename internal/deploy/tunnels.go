@@ -254,6 +254,9 @@ func (s *Service) edgeOf(ctx context.Context, q *db.Queries, teamID, serverID st
 // the frps public IP (team Cloudflare credential) and an NPM proxy host to the tunnel port (team
 // npm credential). Reports whether DNS was handled (so the caller need not point it elsewhere).
 func (s *Service) publishHost(ctx context.Context, q *db.Queries, teamID, serverID, hostname string) bool {
+	if agentproto.IsWildcardHost(hostname) {
+		return false // a wildcard's DNS is the operator's (AddDomain)
+	}
 	e, ok := s.edgeOf(ctx, q, teamID, serverID)
 	if !ok {
 		return false

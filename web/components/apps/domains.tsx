@@ -66,9 +66,19 @@ const TLS: TLSMode[] = ["auto", "internal", "off"]
 /** How an imported workload's hostname reaches it (see DomainsPanel). */
 export type DomainPort = { required: boolean; suggested?: number }
 
-/** A hostname Hosbah accepts (the API checks again). */
+/** A hostname Hosbah accepts (the API checks again): exact, or "*.example.com" for every subdomain. */
 export function hostnameOK(h: string) {
-  return /^(?=.{3,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(h.trim())
+  return /^(?=.{3,253}$)(\*\.)?([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i.test(h.trim())
+}
+
+/** A wildcard is served over tls off or internal only (a public certificate for it needs a DNS
+ * challenge): typing one moves the form off auto. */
+function useWildcardTLS(hostname: string, tls: TLSMode, setTls: (m: TLSMode) => void) {
+  const wildcard = hostname.trim().startsWith("*.")
+  useEffect(() => {
+    if (wildcard && tls === "auto") setTls("off")
+  }, [wildcard, tls, setTls])
+  return wildcard
 }
 
 /** Route a hostname to the app. */
@@ -118,6 +128,7 @@ export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: 
     setError(null)
   })
   const ok = hostnameOK(hostname)
+  const wildcard = useWildcardTLS(hostname, tls, setTls)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -182,13 +193,14 @@ export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: 
                 </SelectTrigger>
                 <SelectContent>
                   {TLS.map((m) => (
-                    <SelectItem key={m} value={m}>
+                    <SelectItem key={m} value={m} disabled={wildcard && m === "auto"}>
                       {t(`apps.domains.tls.${m}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FieldDescription>{t(`apps.domains.tlsHint.${tls}`)}</FieldDescription>
+              {wildcard ? <FieldDescription>{t("apps.domains.wildcardHint")}</FieldDescription> : null}
             </Field>
           </FieldGroup>
           <FormError message={error} />
@@ -252,6 +264,7 @@ export function DomainsPanel({
   }, [load, team])
 
   const hostOK = hostnameOK(hostname)
+  const wildcard = useWildcardTLS(hostname, tls, setTls)
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -409,12 +422,13 @@ export function DomainsPanel({
               </SelectTrigger>
               <SelectContent>
                 {TLS.map((m) => (
-                  <SelectItem key={m} value={m}>
+                  <SelectItem key={m} value={m} disabled={wildcard && m === "auto"}>
                     {t(`apps.domains.tls.${m}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {wildcard ? <p className="mt-2 text-sm text-grid-muted">{t("apps.domains.wildcardHint")}</p> : null}
           </SettingsRow>
           <div className="flex justify-end border-b border-line px-6 py-4">
             <Button type="submit" disabled={busy || !hostOK || (!!port?.required && !portValue)}>

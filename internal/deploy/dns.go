@@ -381,7 +381,8 @@ func (s *Service) AppCertificates(ctx context.Context, q *db.Queries, teamID str
 	}
 	hosts := []string{}
 	for _, d := range domains {
-		if len(hosts) < agentproto.MaxCertHostnames {
+		// A wildcard (tls off or internal) has no certificate of its own to report.
+		if len(hosts) < agentproto.MaxCertHostnames && !agentproto.IsWildcardHost(d.Hostname) {
 			hosts = append(hosts, d.Hostname)
 		}
 	}

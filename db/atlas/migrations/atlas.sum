@@ -1,4 +1,4 @@
-h1:psCgNGMz07bEqk6XdMh239/abz/8klDq13yY5OHXlL0=
+h1:zLUzAvVUqe+PdTD96st4+taG0/K9ZbiQT1kGNDkZ6Aw=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -113,3 +113,4 @@ h1:psCgNGMz07bEqk6XdMh239/abz/8klDq13yY5OHXlL0=
 20260929044958_add_desktop_browsers.sql h1:F/xtBpsB6Hon+vAn+80pK1yMj4aUIoVAq0qEwIrCDlM=
 20260929045023_add_desktop_browsers_row_level_security.sql h1:NeOsySOXbY3lmf8iBq4hlCNGAG4Ka14BEjW8iyEMtno=
 20260929090613_add_apps_connected_server.sql h1:QTa6zCKBmFeH8C5InVxSbwOOOu4us4YQMlkia9LmcCc=
+20260929220015_add_wildcard_domains.sql h1:APFcwYhLgqWkXN+Udg7oywOlvXgN7CbWCQ/wkRO1pkk=

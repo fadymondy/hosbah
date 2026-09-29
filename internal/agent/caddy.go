@@ -294,7 +294,11 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	}
 	sort.Strings(ids)
 
+	// Caddy tries routes in order and the first match wins, so every wildcard route ("*.example.com")
+	// is collected apart and placed after all exact ones: another app's (or proxy host's)
+	// "shop.example.com" is always served by its own route, whatever the app ids sort as.
 	var httpRoutes, httpsRoutes, originRoutes []any
+	var httpWild, httpsWild, originWild []any
 	var internalHosts, autoHosts []string
 	route := func(id, suffix string, hosts []string, upstream string) map[string]any {
 		return map[string]any{
@@ -341,8 +345,13 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		// taken, Caddy's whole config load would fail, breaking routing for every app on the box).
 		cacheOn := e.Cache != nil && e.Cache.Enabled
 		if cacheOn && len(e.Hosts) > 0 {
-			originHosts := append(append([]string{}, plain...), secure...)
-			originRoutes = append(originRoutes, route(id, "-origin", originHosts, e.Upstream))
+			exact, wild := splitWildcards(append(append([]string{}, plain...), secure...))
+			if len(exact) > 0 {
+				originRoutes = append(originRoutes, route(id, "-origin", exact, e.Upstream))
+			}
+			if len(wild) > 0 {
+				originWild = append(originWild, route(id, "-origin-wild", wild, e.Upstream))
+			}
 		}
 		// The public route dials Varnish instead of the app directly once its edge cache is on
 		// (MH-576 D8); Varnish's own backend is always the origin mirror above.
@@ -351,18 +360,21 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			dial = cacheVarnishAddr
 		}
 		mainHandler := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": dial}}, "flush_interval": -1}
-		if len(plain) > 0 {
-			if rt != nil {
-				httpRoutes = append(httpRoutes, realtimeCaddyRoute(id, "-http", plain, *rt))
+		emit := func(dst *[]any, suffix string, hosts []string) {
+			if len(hosts) == 0 {
+				return
 			}
-			httpRoutes = append(httpRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-http", plain, []any{mainHandler}, e.Rules)...)
-		}
-		if len(secure) > 0 {
 			if rt != nil {
-				httpsRoutes = append(httpsRoutes, realtimeCaddyRoute(id, "-https", secure, *rt))
+				*dst = append(*dst, realtimeCaddyRoute(id, suffix, hosts, *rt))
 			}
-			httpsRoutes = append(httpsRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-https", secure, []any{mainHandler}, e.Rules)...)
+			*dst = append(*dst, renderTargetRoutes(agentproto.RouteID(id)+suffix, hosts, []any{mainHandler}, e.Rules)...)
 		}
+		exact, wild := splitWildcards(plain)
+		emit(&httpRoutes, "-http", exact)
+		emit(&httpWild, "-http-wild", wild)
+		exact, wild = splitWildcards(secure)
+		emit(&httpsRoutes, "-https", exact)
+		emit(&httpsWild, "-https-wild", wild)
 	}
 	pids := make([]string, 0, len(t.Proxies))
 	for id := range t.Proxies {
@@ -396,6 +408,9 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			autoHosts = append(autoHosts, p.Host.Hostname)
 		}
 	}
+	httpRoutes = append(httpRoutes, httpWild...)
+	httpsRoutes = append(httpsRoutes, httpsWild...)
+	originRoutes = append(originRoutes, originWild...)
 	httpRoutes = append(httpRoutes, map[string]any{
 		"@id": agentproto.NamePrefix + "fallback",
 		"handle": []any{map[string]any{
@@ -486,6 +501,18 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		}
 	}
 	return cfg
+}
+
+// splitWildcards separates exact hostnames from wildcard ones, keeping each group's order.
+func splitWildcards(hosts []string) (exact, wild []string) {
+	for _, h := range hosts {
+		if agentproto.IsWildcardHost(h) {
+			wild = append(wild, h)
+		} else {
+			exact = append(exact, h)
+		}
+	}
+	return exact, wild
 }
 
 func caddyUp(ctx context.Context) bool {

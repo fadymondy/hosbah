@@ -236,3 +236,26 @@ func TestRenderCaddyOmitsLoggingWhenDisabled(t *testing.T) {
 		t.Errorf("accessLog=false must not mention the logger or its path at all: %s", db)
 	}
 }
+
+// A wildcard never shadows an exact hostname: Caddy's first matching route wins, so every wildcard
+// route sits after all exact ones (and before the 404 fallback), whatever the app ids sort as.
+func TestRenderCaddyPutsWildcardsAfterExactHosts(t *testing.T) {
+	cfg := renderCaddy(routeTable{Apps: map[string]routeEntry{
+		"a": {Upstream: "127.0.0.1:40001", Hosts: []agentproto.Route{{Hostname: "*.example.com", TLS: "off"}, {Hostname: "example.com", TLS: "off"}}},
+		"b": {Upstream: "127.0.0.1:40002", Hosts: []agentproto.Route{{Hostname: "shop.example.com", TLS: "off"}}},
+	}}, false)
+	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	routes := servers["hosbah_http"].(map[string]any)["routes"].([]any)
+	var ids []string
+	for _, r := range routes {
+		ids = append(ids, r.(map[string]any)["@id"].(string))
+	}
+	want := []string{"hosbah-app-a-http", "hosbah-app-b-http", "hosbah-app-a-http-wild", "hosbah-fallback"}
+	if strings.Join(ids, " ") != strings.Join(want, " ") {
+		t.Fatalf("route order %v, want %v", ids, want)
+	}
+	b, _ := json.Marshal(routes[2])
+	if !strings.Contains(string(b), `"host":["*.example.com"]`) {
+		t.Errorf("wildcard route: %s", b)
+	}
+}

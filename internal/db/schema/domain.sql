@@ -15,10 +15,14 @@ CREATE TABLE domains (
 -- Hosbah: a hostname routes to exactly one app anywhere in Hosbah (unique across teams), because
 -- Caddy's on-demand TLS asks /internal/tls/allow by hostname alone. tls: auto = a public
 -- certificate once verified (_hosbah-verify TXT, or a pre-rename _cloudy-verify one), internal = Caddy's local CA, off = plain HTTP.
+-- A hostname may be one wildcard label over a name of two labels or more ("*.example.com": every
+-- single-label subdomain, e.g. a tenant per subdomain), served over tls off or internal only — a
+-- public wildcard certificate needs a DNS challenge. Exact hostnames always win over a wildcard.
 ALTER TABLE domains ADD CONSTRAINT domains_tls_check CHECK (tls IN ('auto', 'internal', 'off'));
 ALTER TABLE domains ADD CONSTRAINT domains_hostname_check CHECK (
     hostname = lower(hostname) AND length(hostname) <= 253
-    AND hostname ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
+    AND hostname ~ '^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
+    AND (hostname NOT LIKE '*.%' OR tls <> 'auto'));
 CREATE UNIQUE INDEX domains_hostname_key ON domains (hostname);
 CREATE INDEX domains_app_idx ON domains (app_id);
 

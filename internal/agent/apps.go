@@ -942,8 +942,8 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 		return 2, errors.New("bad app id")
 	}
 	for _, h := range p.Hosts {
-		if !agentproto.ValidHostname(h.Hostname) || !agentproto.ValidTLS(h.TLS) {
-			return 2, fmt.Errorf("bad host %q", h.Hostname)
+		if !agentproto.ValidRouteHost(h) {
+			return 2, fmt.Errorf("bad host %q (tls %s)", h.Hostname, h.TLS)
 		}
 	}
 	if p.Upstream != "" && !strings.HasPrefix(p.Upstream, "127.0.0.1:") {
@@ -1002,6 +1002,11 @@ func probe(oc *OpContext, h agentproto.Route, path string) error {
 	scheme, addr := "http", "127.0.0.1:80"
 	if h.TLS == "internal" {
 		scheme, addr = "https", "127.0.0.1:443"
+	}
+	if rest, ok := strings.CutPrefix(h.Hostname, "*."); ok {
+		// A wildcard is probed through one name it covers: any answer below 500 (the app's own 404
+		// for an unknown tenant included) shows the route reaches the app.
+		h.Hostname = "hosbah-probe." + rest
 	}
 	tr := &http.Transport{
 		// Dial Caddy on this host whatever the name resolves to; for internal TLS the certificate is

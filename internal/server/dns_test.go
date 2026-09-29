@@ -238,6 +238,14 @@ func TestAppDNSAndCertificates(t *testing.T) {
 		owner.mustJSON("POST", base+"/domains", map[string]any{"hostname": h, "tls": "off"}, 201, nil)
 	}
 	owner.mustJSON("POST", appBase(otherApp.App.ID)+"/domains", map[string]any{"hostname": host("sibling"), "tls": "off"}, 201, nil)
+	// A wildcard routes every subdomain (tenant-per-subdomain apps), over tls off or internal only,
+	// and Hosbah never writes a wildcard DNS record: that, like its TLS, is the operator's.
+	owner.mustJSON("POST", appBase(otherApp.App.ID)+"/domains", map[string]any{"hostname": "*." + zone, "tls": "auto"}, 422, nil)
+	owner.mustJSON("POST", appBase(otherApp.App.ID)+"/domains", map[string]any{"hostname": "*.com", "tls": "off"}, 422, nil)
+	owner.mustJSON("POST", appBase(otherApp.App.ID)+"/domains", map[string]any{"hostname": "*." + zone, "tls": "off"}, 201, nil)
+	if recs := cf.at("*." + zone); len(recs) != 0 {
+		t.Fatalf("a wildcard domain wrote DNS: %+v", recs)
+	}
 	owner.mustJSON("POST", appBase(lanApp.App.ID)+"/domains", map[string]any{"hostname": host("lan"), "tls": "off"}, 201, nil)
 
 	// Adding a domain in a zone the team's Cloudflare holds already created its record (teamdns).

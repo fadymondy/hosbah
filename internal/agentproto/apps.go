@@ -509,6 +509,28 @@ func ValidID(s string) bool { return uuidRE.MatchString(s) }
 // ValidHostname: a lowercase DNS name with at least one dot.
 func ValidHostname(s string) bool { return len(s) <= 253 && hostRE.MatchString(s) }
 
+// IsWildcardHost: "*.<name>", a route for every single-label subdomain of name.
+func IsWildcardHost(s string) bool { return strings.HasPrefix(s, "*.") }
+
+// ValidRouteHostname: what an app's route may carry — a ValidHostname, or one leading wildcard
+// label over a name with at least two labels ("*.example.com"; never "*.com"). A wildcard is
+// served over tls off or internal only: a public certificate for it needs a DNS challenge, which
+// on-demand TLS cannot do (ValidRouteHost checks the pair).
+func ValidRouteHostname(s string) bool {
+	if rest, ok := strings.CutPrefix(s, "*."); ok {
+		return strings.Contains(rest, ".") && ValidHostname(rest)
+	}
+	return ValidHostname(s)
+}
+
+// ValidRouteHost checks a route's hostname and TLS mode together.
+func ValidRouteHost(h Route) bool {
+	if !ValidRouteHostname(h.Hostname) || !ValidTLS(h.TLS) {
+		return false
+	}
+	return !IsWildcardHost(h.Hostname) || h.TLS != "auto"
+}
+
 // ValidTLS: auto | internal | off.
 func ValidTLS(s string) bool { return s == "auto" || s == "internal" || s == "off" }
 
