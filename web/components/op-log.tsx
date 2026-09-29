@@ -80,9 +80,19 @@ export function render(l: LogLine): string {
   return l.line ?? ""
 }
 
+// Docker, git, npm and most build tools write their ordinary progress to stderr, so stderr alone is
+// not an error: only a line that reads like one ("error:", "FATAL", "npm ERR!", a panic) is red.
+const errorLine =
+  /(^|[\s[(:])(error|err!|fatal|panic|failed|failure|exception|traceback|denied|cannot|could not)([\s:\])!,.]|$)/i
+const notAnError = /\b(0|no) (errors?|failures?|vulnerabilities)\b|--no-error|error_page|\berrors?\.(go|ts|js|py)\b/i
+
 export function lineTone(l: LogLine): string {
   if (l.event === "status") return l.status === "ok" || l.status === "running" ? "font-medium" : "font-medium text-destructive"
-  if (l.stream === "stderr" || l.stream === "error") return "text-destructive"
+  if (l.stream === "error") return "text-destructive"
+  if (l.stream === "stderr") {
+    const text = l.line ?? ""
+    return errorLine.test(text) && !notAnError.test(text) ? "text-destructive" : "text-muted-foreground"
+  }
   if (l.stream === "info" || l.event === "progress") return "text-muted-foreground"
   return ""
 }
