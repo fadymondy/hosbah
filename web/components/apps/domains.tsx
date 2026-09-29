@@ -327,7 +327,9 @@ export function DomainsPanel({
                     → {d.upstream}
                   </span>
                 ) : null}
-                {d.verified ? (
+                {d.hostname.startsWith("*.") ? (
+                  <Badge variant="secondary">{t("apps.domains.wildcard")}</Badge>
+                ) : d.verified ? (
                   <Badge>
                     <CheckCircle2Icon />
                     {t("apps.domains.verified")}
@@ -337,7 +339,7 @@ export function DomainsPanel({
                 )}
                 {manage ? (
                   <span className="ms-auto flex gap-2">
-                    {!d.verified ? (
+                    {!d.verified && !d.hostname.startsWith("*.") ? (
                       <Button size="sm" variant="outline" onClick={() => verify(d)}>
                         <ShieldCheckIcon />
                         {t("apps.domains.verify")}
@@ -347,7 +349,9 @@ export function DomainsPanel({
                   </span>
                 ) : null}
               </div>
-              {d.verified ? (
+              {d.hostname.startsWith("*.") ? (
+                <p className="text-xs text-muted-foreground">{t("apps.domains.wildcardHint")}</p>
+              ) : d.verified ? (
                 <p className="text-xs text-muted-foreground">
                   {t("apps.domains.verifiedAt")} <span dir="ltr">{fmt(d.verified_at)}</span>
                 </p>

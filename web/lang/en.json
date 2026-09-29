@@ -753,6 +753,7 @@
       "txtValue": "TXT value",
       "addTitle": "Add a domain",
       "dialogHint": "Caddy serves it from now on; verify it on the Proxy page to get a public certificate.",
+      "wildcard": "Wildcard",
       "wildcardHint": "A wildcard routes every subdomain that has no domain of its own. Its DNS and public TLS stay yours (Cloudflare or a proxy in front), so it is served over plain HTTP or Caddy's local CA.",
       "add": "Add domain",
       "remove": "Remove",

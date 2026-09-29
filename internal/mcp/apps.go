@@ -686,6 +686,9 @@ func AppTools() []Tool {
 				if d.VerifiedAt != nil {
 					return fmt.Sprintf("%s now routes to %s (tls %s), verified through the team's Cloudflare (DNS created).", d.Hostname, a.Name, d.Tls), nil
 				}
+				if agentproto.IsWildcardHost(d.Hostname) {
+					return fmt.Sprintf("%s now routes every subdomain without a domain of its own to %s (tls %s). Its DNS and public TLS are yours: point the wildcard record at the server, or at the proxy in front of it.", d.Hostname, a.Name, d.Tls), nil
+				}
 				return fmt.Sprintf("%s now routes to %s (tls %s). To verify it, add a TXT record %s = %s and call verify_domain.",
 					d.Hostname, a.Name, d.Tls, deploy.VerifyName(d.Hostname), deploy.VerifyValue(d.VerifyToken)), nil
 			},
