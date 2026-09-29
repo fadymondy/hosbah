@@ -7,43 +7,90 @@ import (
 	"regexp"
 )
 
-// A site's browsers: headless Chromium containers the site drives over CDP/WebSocket. Typed like
-// everything else: the container name is DERIVED from the browser id, the image is a constant both
-// sides compare against, and the token travels in a box sealed to the agent — never in the params.
+// A site's browsers, in two kinds. KindHeadless (the default, unchanged): chromedp/headless-shell
+// containers the site drives over CDP/WebSocket. Typed like everything else: the container name is
+// DERIVED from the browser id, the image is a constant both sides compare against, and the token
+// travels in a box sealed to the agent — never in the params.
 //
-// The image is chromedp/headless-shell (MIT; Chromium itself is BSD). It was chosen over
+// The headless image is chromedp/headless-shell (MIT; Chromium itself is BSD). It was chosen over
 // browserless's Chromium image because browserless is "SSPL-1.0 OR Browserless Commercial License":
 // running it for the closed-source sites of a hosting product needs a purchased licence.
 // headless-shell speaks bare CDP with no authentication, so the container publishes its port on
 // 127.0.0.1 ONLY and the agent's gateway — which listens on the server's private address, the one a
 // site's containers reach data services on — checks the token, caps concurrent sessions and drops
 // idle ones before anything reaches Chromium.
+//
+// KindDesktop is a FULL interactive desktop: lscr.io/linuxserver/chromium, which wraps the same
+// Chromium in a KasmVNC web desktop (a whole X session over noVNC-style HTTP/WebSocket, not just
+// CDP). The linuxserver image is GPL-licensed and run here unmodified (only pulled and run, never
+// changed or redistributed), which is exactly the unmodified-use the licence needs no purchase for
+// — the same reasoning as headless-shell's MIT/BSD, just a different licence family. KasmVNC has no
+// authentication of its own, so the same rule as headless applies: the container's port is published
+// on 127.0.0.1 ONLY, and it is never reachable except through a hostname Caddy protects with
+// forward_auth to Hosbah (internal/deploy's desktop-browser hostname wiring, internal/api's
+// /api/browsers/auth). There is no token gateway for a desktop browser: the whole point is a human
+// driving a real browser window, so the access control is the session-derived forward_auth check,
+// not a bearer token in a WebSocket URL.
 const (
-	KindBrowserCreate = "browser.create" // pull the image, docker run, wait for CDP, open the token gateway
-	KindBrowserRemove = "browser.remove" // close the gateway, stop and remove the container; idempotent
+	KindBrowserCreate = "browser.create" // pull the image, docker run, wait ready, open the token gateway (headless only)
+	KindBrowserRemove = "browser.remove" // stop and remove the container (and the gateway, for headless); idempotent
 	KindBrowserStatus = "browser.status" // read-only: running?, restart count, memory, open sessions
 
-	// BrowserImage is THE image of a browser, pinned by tag. Never user input.
+	// BrowserKindHeadless and BrowserKindDesktop are the two browser kinds a create may ask for.
+	BrowserKindHeadless = "headless"
+	BrowserKindDesktop  = "desktop"
+
+	// BrowserImage is THE image of a headless browser, pinned by tag. Never user input.
 	BrowserImage = "chromedp/headless-shell:151.0.7922.109"
 	// BrowserCDPPort is the port headless-shell serves CDP on inside the container.
 	BrowserCDPPort = 9222
-	// BrowserPidsLimit bounds a browser's processes and threads (Chromium is thread-hungry).
+
+	// DesktopImage is THE image of a desktop browser, pinned by tag. Never user input. Check
+	// https://github.com/linuxserver/docker-chromium for the current tag before bumping it.
+	DesktopImage = "lscr.io/linuxserver/chromium:132.0.6834.83-r0-ls119"
+	// DesktopHTTPPort is the port KasmVNC serves its web desktop on inside the container (plain
+	// HTTP; Caddy terminates TLS at the edge, so the loopback hop does not need KasmVNC's own
+	// self-signed :3001).
+	DesktopHTTPPort = 3000
+	// DesktopShmMB is the container's /dev/shm: a full GiB, fixed (a real desktop's compositor and
+	// Chromium both need more than the memory-scaled BrowserShmMB headless gets by with).
+	DesktopShmMB = 1024
+	// DesktopPUID, DesktopPGID: the linuxserver image's own convention (s6-overlay chowns
+	// /config to this uid/gid before dropping root). Fixed, not user input.
+	DesktopPUID, DesktopPGID = 1000, 1000
+	// DesktopDefaultTZ is used when the server's own TZ cannot be read.
+	DesktopDefaultTZ = "UTC"
+
+	// BrowserPidsLimit bounds a headless browser's processes and threads (Chromium is thread-hungry).
 	BrowserPidsLimit = 1024
+	// DesktopPidsLimit is higher: a full desktop session runs a window manager, PulseAudio and more.
+	DesktopPidsLimit = 2048
 
 	// Names (cloudy-browser- and cloudy.* before the rename; the agent still finds those).
 	BrowserContainerPrefix = NamePrefix + "browser-"
+	// DesktopVolumePrefix names a desktop browser's persistent profile volume.
+	DesktopVolumePrefix = NamePrefix + "browser-profile-"
 	// Labels. NOT hosbah.app: a deploy's drain and a rollback stop every container with that label.
 	BrowserLabel    = LabelPrefix + "browser"
 	BrowserAppLabel = LabelPrefix + "browser-app"
 
 	MaxAppBrowsers  = 3
-	BrowserPortBase = 19222 // the first gateway port the control plane hands out on a server
+	BrowserPortBase = 19222 // the first port the control plane hands out on a server for either kind
 
 	BrowserMinMemoryMB, BrowserMaxMemoryMB, BrowserDefaultMemoryMB = 256, 4096, 1024
 	BrowserMinCPUs, BrowserMaxCPUs, BrowserDefaultCPUs             = 0.25, 4.0, 1.0
 	BrowserMinSessions, BrowserMaxSessions, BrowserDefaultSessions = 1, 20, 5
 	BrowserMinIdle, BrowserMaxIdle, BrowserDefaultIdle             = 30, 3600, 300
+
+	// A desktop browser is a whole interactive session, not a headless worker: it gets a wider
+	// memory range and a higher default.
+	DesktopMinMemoryMB, DesktopMaxMemoryMB, DesktopDefaultMemoryMB = 512, 8192, 2048
 )
+
+// ValidBrowserKind reports whether kind is one of the two a create may ask for.
+func ValidBrowserKind(kind string) bool {
+	return kind == BrowserKindHeadless || kind == BrowserKindDesktop
+}
 
 var (
 	browserNameRE  = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
@@ -73,10 +120,20 @@ func ValidBrowserBind(s string) bool {
 // crashes on heavy pages with Docker's default of 64 MiB.
 func BrowserShmMB(memoryMB int) int { return min(max(memoryMB/4, 64), 1024) }
 
-// BrowserCreateParams: browser.create. Token is a box for BrowserTokenContext(BrowserID).
+// DesktopVolumeName is a desktop browser's persistent profile volume (its KasmVNC/Chromium
+// /config), named after the browser so it survives a recreate and goes with a remove. Derived,
+// never user-supplied.
+func DesktopVolumeName(browserID string) string { return DesktopVolumePrefix + browserID }
+
+// BrowserCreateParams: browser.create. Token is a box for BrowserTokenContext(BrowserID); required
+// for KindHeadless, ignored (must be "") for KindDesktop — a desktop browser has no CDP token
+// gateway, its access control is the forward_auth hostname Caddy puts in front of it.
 type BrowserCreateParams struct {
-	BrowserID          string  `json:"browser_id"`
-	AppID              string  `json:"app_id"`
+	BrowserID string `json:"browser_id"`
+	AppID     string `json:"app_id"`
+	// Kind: BrowserKindHeadless (default, "" reads as headless for pre-kind operations already on
+	// the wire) or BrowserKindDesktop.
+	Kind               string  `json:"kind,omitempty"`
 	Image              string  `json:"image"`
 	Bind               string  `json:"bind"`
 	Port               int     `json:"port"`
@@ -85,35 +142,54 @@ type BrowserCreateParams struct {
 	MaxSessions        int     `json:"max_sessions"`
 	IdleTimeoutSeconds int     `json:"idle_timeout_seconds"`
 	Token              string  `json:"token"`
+	// TZ (KindDesktop only): the container's timezone, e.g. "Africa/Cairo". "" reads as DesktopDefaultTZ.
+	TZ string `json:"tz,omitempty"`
+}
+
+// EffectiveKind is Kind, or BrowserKindHeadless when Kind is "" (pre-kind operations).
+func (p BrowserCreateParams) EffectiveKind() string {
+	if p.Kind == "" {
+		return BrowserKindHeadless
+	}
+	return p.Kind
 }
 
 func (p BrowserCreateParams) Validate() error {
+	kind := p.EffectiveKind()
 	switch {
 	case !ValidID(p.BrowserID) || !ValidID(p.AppID):
 		return errors.New("bad browser or app id")
-	case p.Image != BrowserImage:
-		return fmt.Errorf("image %q is not the browser image", p.Image)
+	case !ValidBrowserKind(kind):
+		return errors.New("kind must be headless or desktop")
+	case kind == BrowserKindHeadless && p.Image != BrowserImage:
+		return fmt.Errorf("image %q is not the headless browser image", p.Image)
+	case kind == BrowserKindDesktop && p.Image != DesktopImage:
+		return fmt.Errorf("image %q is not the desktop browser image", p.Image)
 	case !ValidBrowserBind(p.Bind):
 		return errors.New("a browser listens on a loopback or private IPv4 address only")
 	case p.Port < 1024 || p.Port > 65535:
 		return errors.New("bad port")
-	case p.MemoryMB < BrowserMinMemoryMB || p.MemoryMB > BrowserMaxMemoryMB:
+	case kind == BrowserKindHeadless && (p.MemoryMB < BrowserMinMemoryMB || p.MemoryMB > BrowserMaxMemoryMB):
 		return fmt.Errorf("memory_mb is %d to %d", BrowserMinMemoryMB, BrowserMaxMemoryMB)
+	case kind == BrowserKindDesktop && (p.MemoryMB < DesktopMinMemoryMB || p.MemoryMB > DesktopMaxMemoryMB):
+		return fmt.Errorf("memory_mb is %d to %d", DesktopMinMemoryMB, DesktopMaxMemoryMB)
 	case !(p.CPUs >= BrowserMinCPUs && p.CPUs <= BrowserMaxCPUs):
 		return fmt.Errorf("cpus is %g to %g", BrowserMinCPUs, BrowserMaxCPUs)
 	case p.MaxSessions < BrowserMinSessions || p.MaxSessions > BrowserMaxSessions:
 		return fmt.Errorf("max_sessions is %d to %d", BrowserMinSessions, BrowserMaxSessions)
 	case p.IdleTimeoutSeconds < BrowserMinIdle || p.IdleTimeoutSeconds > BrowserMaxIdle:
 		return fmt.Errorf("idle_timeout_seconds is %d to %d", BrowserMinIdle, BrowserMaxIdle)
-	case p.Token == "":
+	case kind == BrowserKindHeadless && p.Token == "":
 		return errors.New("browser.create needs the token")
+	case kind == BrowserKindDesktop && p.Token != "":
+		return errors.New("a desktop browser has no token")
 	}
 	return nil
 }
 
 type BrowserCreateResult struct {
 	Container string `json:"container"`
-	HostPort  int    `json:"host_port"` // the gateway's port on Bind — what the site connects to
+	HostPort  int    `json:"host_port"` // what the site (headless) or Caddy (desktop) connects to
 }
 
 // BrowserRemoveParams: browser.remove.

@@ -25,7 +25,15 @@ type ProxyParams struct {
 	Upstream string `json:"upstream,omitempty"`
 	// SkipVerify accepts an upstream's self-signed certificate (https upstreams only).
 	SkipVerify bool `json:"skip_verify,omitempty"`
-	Remove     bool `json:"remove,omitempty"`
+	// ForwardAuth: when set, every request to this hostname is first sent to this URL (a GET, the
+	// original method/URI carried in X-Forwarded-Method/-Uri, like Caddy's own forward_auth
+	// directive) before the upstream is dialed at all. A 2xx response lets the request through; any
+	// other response (a redirect to a login page, a 403, ...) is returned to the client as-is and
+	// the upstream is never reached. Used for a desktop browser's hostname: Hosbah's own
+	// /api/browsers/auth is the ForwardAuth URL, so nobody reaches the browser without a valid
+	// Hosbah session.
+	ForwardAuth string `json:"forward_auth,omitempty"`
+	Remove      bool   `json:"remove,omitempty"`
 }
 
 // ProxyRouteID is the @id of a proxy host's route in Caddy's config.
@@ -99,6 +107,9 @@ func (p ProxyParams) Validate() error {
 	}
 	if !ValidTLS(p.TLS) {
 		return errors.New("tls must be auto, internal or off")
+	}
+	if p.ForwardAuth != "" && !strings.HasPrefix(p.ForwardAuth, "https://") {
+		return errors.New("forward_auth must be an https:// URL")
 	}
 	_, err := ParseUpstream(p.Upstream)
 	return err
