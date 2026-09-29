@@ -237,6 +237,9 @@ func forwardAuthHandler(authURL string) map[string]any {
 				"set": map[string]any{
 					"X-Forwarded-Method": []string{"{http.request.method}"},
 					"X-Forwarded-Uri":    []string{"{http.request.uri}"},
+					// Survives the proxies between here and the control plane (Cloudflare, NPM, its own
+					// Caddy), which each rewrite X-Forwarded-Host to the hostname they were asked for.
+					"X-Hosbah-Browser-Host": []string{"{http.request.host}"},
 				},
 			},
 		},

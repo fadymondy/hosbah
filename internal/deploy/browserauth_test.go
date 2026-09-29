@@ -262,3 +262,17 @@ func tokenHashForTest(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
+
+// The proxies in front of the control plane rewrite X-Forwarded-Host (to app.<domain>), so the
+// agent's own X-Hosbah-Browser-Host wins; Host is the last resort.
+func TestBrowserAuthHost(t *testing.T) {
+	r := httptest.NewRequest("GET", "https://app.hosbah.com/api/browsers/auth", nil)
+	if got := browserAuthHost(r); got != "app.hosbah.com" {
+		t.Fatalf("Host only: %q", got)
+	}
+	r.Header.Set("X-Forwarded-Host", "app.hosbah.com")
+	r.Header.Set("X-Hosbah-Browser-Host", "Browser.Moharrik.com:443")
+	if got := browserAuthHost(r); got != "browser.moharrik.com" {
+		t.Fatalf("X-Hosbah-Browser-Host should win: %q", got)
+	}
+}

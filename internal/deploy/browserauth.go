@@ -91,8 +91,15 @@ func (s *Service) handleBrowsersAuth(w http.ResponseWriter, r *http.Request) {
 	s.checkBrowserAuth(w, r, host)
 }
 
+// browserAuthHost is the desktop browser's own hostname: X-Hosbah-Browser-Host, set by the agent's
+// Caddy on every forward_auth subrequest, first — X-Forwarded-Host alone does not survive the proxies
+// in front of the control plane (each rewrites it to app.<domain>). Neither can widen access: a token
+// or cookie is only honoured for the browser it was minted for.
 func browserAuthHost(r *http.Request) string {
-	h := r.Header.Get("X-Forwarded-Host")
+	h := r.Header.Get("X-Hosbah-Browser-Host")
+	if h == "" {
+		h = r.Header.Get("X-Forwarded-Host")
+	}
 	if h == "" {
 		h = r.Host
 	}
