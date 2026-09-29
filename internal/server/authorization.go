@@ -148,6 +148,12 @@ func isPublic(r *http.Request) bool {
 	if strings.HasPrefix(p, "/api/products/") {
 		return true
 	}
+	// A desktop browser's own forward_auth target (internal/deploy/browserauth.go): dialled by Caddy
+	// as a subrequest, never carrying a Hosbah session — it authenticates the one-time handoff token
+	// or its own session cookie itself, and re-checks live team membership on every call.
+	if p == "/api/browsers/auth" {
+		return true
+	}
 	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
 	// a single-use state bound to this browser) and the callback (accepts only that state). The
 	// start with ?link=1 attaches the provider to the signed-in account: member tier.

@@ -13,15 +13,15 @@ import (
 // nil and when it is a non-nil but empty value (e.g. every list emptied by an update).
 func TestRenderTargetRoutesNoRulesIsByteIdentical(t *testing.T) {
 	handler := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": "127.0.0.1:4000"}}}
-	want := []any{simpleRoute("hosbah-app-a-http", []string{"go.localhost"}, handler)}
+	want := []any{simpleRoute("hosbah-app-a-http", []string{"go.localhost"}, []any{handler})}
 
-	got := renderTargetRoutes("hosbah-app-a-http", []string{"go.localhost"}, handler, nil)
+	got := renderTargetRoutes("hosbah-app-a-http", []string{"go.localhost"}, []any{handler}, nil)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("nil rules: got %#v, want %#v", got, want)
 	}
 
 	empty := &agentproto.HTTPRules{}
-	got = renderTargetRoutes("hosbah-app-a-http", []string{"go.localhost"}, handler, empty)
+	got = renderTargetRoutes("hosbah-app-a-http", []string{"go.localhost"}, []any{handler}, empty)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("empty rules: got %#v, want %#v", got, want)
 	}
@@ -156,7 +156,7 @@ func TestServingRoutesBasicAuthWholeSite(t *testing.T) {
 		Enabled: true,
 		Users:   []agentproto.BasicAuthUser{{Username: "alice", BcryptHash: "$2a$10$" + strings.Repeat("a", 53)}},
 	}}
-	routes := servingRoutes("hosbah-app-a-http", []string{"go.localhost"}, handler, rules)
+	routes := servingRoutes("hosbah-app-a-http", []string{"go.localhost"}, []any{handler}, rules)
 	if len(routes) != 1 {
 		t.Fatalf("whole-site auth should be a single route, got %d", len(routes))
 	}
@@ -174,7 +174,7 @@ func TestServingRoutesBasicAuthExemptPaths(t *testing.T) {
 		ExemptPaths: []string{"/api/health"},
 		Users:       []agentproto.BasicAuthUser{{Username: "alice", BcryptHash: "$2a$10$" + strings.Repeat("a", 53)}},
 	}}
-	routes := servingRoutes("id", []string{"h"}, handler, rules)
+	routes := servingRoutes("id", []string{"h"}, []any{handler}, rules)
 	if len(routes) != 2 {
 		t.Fatalf("exempt path + auth-gated route, got %d: %#v", len(routes), routes)
 	}
@@ -194,7 +194,7 @@ func TestServingRoutesBasicAuthPathPrefix(t *testing.T) {
 		PathPrefix: "/admin",
 		Users:      []agentproto.BasicAuthUser{{Username: "alice", BcryptHash: "$2a$10$" + strings.Repeat("a", 53)}},
 	}}
-	routes := servingRoutes("hosbah-app-a-http", []string{"h"}, handler, rules)
+	routes := servingRoutes("hosbah-app-a-http", []string{"h"}, []any{handler}, rules)
 	if len(routes) != 2 {
 		t.Fatalf("prefix-scoped auth route + plain catch-all, got %d", len(routes))
 	}
@@ -211,7 +211,7 @@ func TestServingRoutesBasicAuthPathPrefix(t *testing.T) {
 func TestServingRoutesNoAuth(t *testing.T) {
 	handler := map[string]any{"handler": "reverse_proxy"}
 	rules := &agentproto.HTTPRules{Headers: []agentproto.HeaderRule{{Action: "set", Name: "X-Test", Value: "1"}}}
-	routes := servingRoutes("id", []string{"h"}, handler, rules)
+	routes := servingRoutes("id", []string{"h"}, []any{handler}, rules)
 	if len(routes) != 1 {
 		t.Fatalf("no basic auth should be a single route, got %d", len(routes))
 	}

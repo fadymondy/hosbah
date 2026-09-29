@@ -162,6 +162,9 @@ func (s *Service) applyProxyHost(ctx context.Context, q *db.Queries, teamID stri
 		}
 	}
 	params := agentproto.ProxyParams{ProxyID: p.ID, Hostname: p.Hostname, TLS: p.Tls, Upstream: p.Upstream, SkipVerify: skipVerify}
+	if p.ForwardAuth != nil {
+		params.ForwardAuth = *p.ForwardAuth
+	}
 	if !p.Enabled {
 		params = agentproto.ProxyParams{ProxyID: p.ID, Remove: true}
 	}

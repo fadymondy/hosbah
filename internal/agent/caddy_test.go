@@ -104,6 +104,108 @@ func TestRenderCaddyProxyHosts(t *testing.T) {
 	}
 }
 
+// A proxy host with ForwardAuth set (a desktop browser's own hostname) must never route straight
+// to its upstream: the rendered route's handle chain starts with a reverse_proxy to the auth URL,
+// gated by a handle_response that only lets a 2xx answer fall through to the real upstream, and
+// returns anything else (a redirect to Hosbah's login) to the client as-is.
+func TestRenderCaddyForwardAuth(t *testing.T) {
+	cfg := renderCaddy(routeTable{
+		Apps: map[string]routeEntry{},
+		Proxies: map[string]proxyEntry{
+			"b1": {
+				Host:        agentproto.Route{Hostname: "browser-jane.example.com", TLS: "auto"},
+				Dial:        "127.0.0.1:9222",
+				ForwardAuth: "https://cp.example.com/api/browsers/auth",
+			},
+		},
+	}, true)
+	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	secure := servers["hosbah_https"].(map[string]any)
+	routes := secure["routes"].([]any)
+
+	var target map[string]any
+	for _, r := range routes {
+		rm := r.(map[string]any)
+		if rm["@id"] == "hosbah-proxy-b1" {
+			target = rm
+		}
+	}
+	if target == nil {
+		t.Fatalf("no route for hosbah-proxy-b1: %v", routes)
+	}
+	handle := target["handle"].([]any)
+	if len(handle) != 2 {
+		t.Fatalf("forward_auth route must have 2 handlers (auth check, then upstream); got %d: %v", len(handle), handle)
+	}
+	auth := handle[0].(map[string]any)
+	if auth["handler"] != "reverse_proxy" {
+		t.Fatalf("first handler must be reverse_proxy to the auth URL: %v", auth)
+	}
+	ups := auth["upstreams"].([]any)[0].(map[string]any)
+	if ups["dial"] != "cp.example.com:443" {
+		t.Errorf("auth upstream dial = %v, want cp.example.com:443", ups["dial"])
+	}
+	rewrite := auth["rewrite"].(map[string]any)
+	if rewrite["method"] != "GET" || rewrite["uri"] != "/api/browsers/auth" {
+		t.Errorf("auth subrequest rewrite = %v", rewrite)
+	}
+	hj, _ := json.Marshal(auth)
+	if !strings.Contains(string(hj), "X-Forwarded-Method") || !strings.Contains(string(hj), "X-Forwarded-Uri") {
+		t.Errorf("auth handler must carry the real method/uri: %s", hj)
+	}
+	hr := auth["handle_response"].([]any)
+	if len(hr) != 2 {
+		t.Fatalf("handle_response must have exactly two entries (2xx, else); got %d", len(hr))
+	}
+	okEntry := hr[0].(map[string]any)
+	if okEntry["match"].(map[string]any)["status_code"].([]any)[0] != 2 {
+		t.Errorf("first handle_response entry must match status class 2xx: %v", okEntry)
+	}
+	okHandler := okEntry["routes"].([]any)[0].(map[string]any)["handle"].([]any)[0].(map[string]any)
+	if okHandler["handler"] != "copy_response_headers" {
+		t.Errorf("2xx must copy headers through (and fall through to the upstream): %v", okHandler)
+	}
+	elseEntry := hr[1].(map[string]any)
+	if _, hasMatch := elseEntry["match"]; hasMatch {
+		t.Errorf("the else entry must be unconditional (catch-all): %v", elseEntry)
+	}
+	elseHandler := elseEntry["routes"].([]any)[0].(map[string]any)["handle"].([]any)[0].(map[string]any)
+	if elseHandler["handler"] != "copy_response" {
+		t.Errorf("anything but 2xx must return the auth response verbatim: %v", elseHandler)
+	}
+	upstream := handle[1].(map[string]any)
+	if upstream["handler"] != "reverse_proxy" || upstream["upstreams"].([]any)[0].(map[string]any)["dial"] != "127.0.0.1:9222" {
+		t.Errorf("second handler must be the real upstream: %v", upstream)
+	}
+}
+
+// A proxy host with no ForwardAuth renders exactly as before — a single reverse_proxy handler.
+func TestRenderCaddyNoForwardAuthIsUnchanged(t *testing.T) {
+	cfg := renderCaddy(routeTable{
+		Apps: map[string]routeEntry{},
+		Proxies: map[string]proxyEntry{
+			"p1": {Host: agentproto.Route{Hostname: "nas.example.com", TLS: "auto"}, Dial: "10.0.0.5:5000"},
+		},
+	}, true)
+	servers := cfg["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)
+	secure := servers["hosbah_https"].(map[string]any)
+	routes := secure["routes"].([]any)
+	var target map[string]any
+	for _, r := range routes {
+		rm := r.(map[string]any)
+		if rm["@id"] == "hosbah-proxy-p1" {
+			target = rm
+		}
+	}
+	if target == nil {
+		t.Fatalf("no route for hosbah-proxy-p1")
+	}
+	handle := target["handle"].([]any)
+	if len(handle) != 1 {
+		t.Fatalf("no forward_auth: expected exactly 1 handler, got %d: %v", len(handle), handle)
+	}
+}
+
 // A Caddy that cannot write its access log must still load: renderCaddy(accessLog=false) omits the
 // top-level logging block and both servers' "logs" keys entirely, rather than reference a directory
 // Caddy cannot create — the bug that broke every route.set/proxy.set when /var/lib/hosbah (root-only)

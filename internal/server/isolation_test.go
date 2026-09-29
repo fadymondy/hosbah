@@ -518,6 +518,7 @@ func TestIsolationSweep(t *testing.T) {
 		"set_app_realtime":  {"app": appA.App.ID, "kind": "ws", "process": "stolen", "port": 6001, "path": "/stolen"},
 		"list_app_browsers": {"app": appA.App.ID}, "create_app_browser": {"app": appA.App.ID, "name": "stolen"},
 		"remove_app_browser": {"app": appA.App.Name, "browser": "a-env-browser", "confirm": "a-env-browser"},
+		"open_app_browser":   {"app": appA.App.ID, "browser": "a-env-browser"},
 		"list_app_installs":  {"app": appA.App.ID}, "install_recipe": {"app": appA.App.ID, "recipe": "mailpit", "name": "stolen", "confirm": "stolen"},
 		"remove_install":        {"app": appA.App.Name, "install": "a-env-install", "confirm": "a-env-install"},
 		"app_deploy_config_get": {"app": appA.App.ID}, "app_deploy_config_set": {"app": appA.App.ID, "mode": "auto", "steps": []map[string]any{{"key": "install", "run": "npm ci", "enabled": true}}},

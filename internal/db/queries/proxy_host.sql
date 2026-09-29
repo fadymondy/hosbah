@@ -10,6 +10,13 @@ INSERT INTO proxy_hosts (team_id, server_id, hostname, upstream, tls, enabled, w
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
+-- name: CreateBrowserProxyHost :one
+-- A desktop browser's own hostname: not user-chosen upstream/tls, and always forward_auth'd.
+INSERT INTO proxy_hosts (team_id, server_id, hostname, upstream, tls, enabled, websockets, verify_token, created_by, browser_id, forward_auth)
+VALUES (sqlc.arg('team_id'), sqlc.arg('server_id'), sqlc.arg('hostname'), sqlc.arg('upstream'), 'auto', true, true,
+    sqlc.arg('verify_token'), sqlc.arg('created_by'), sqlc.arg('browser_id'), sqlc.arg('forward_auth'))
+RETURNING *;
+
 -- name: DeleteProxyHost :exec
 DELETE FROM proxy_hosts WHERE id = $1;
 
@@ -33,3 +40,12 @@ UPDATE proxy_hosts SET verified_at = now(), updated_at = now() WHERE id = $1 AND
 
 -- name: DeleteProxyHostInTeam :execrows
 DELETE FROM proxy_hosts WHERE id = $1 AND team_id = $2;
+
+-- name: ProxyHostByHostname :one
+-- System scope only: forward_auth looks a hostname up before it knows the team (proxy_hosts has a
+-- system SELECT policy for exactly this).
+SELECT * FROM proxy_hosts WHERE hostname = sqlc.arg('hostname');
+
+-- name: ProxyHostOfBrowser :one
+-- Team scope: the proxy host a desktop browser owns, if any.
+SELECT * FROM proxy_hosts WHERE browser_id = sqlc.arg('browser_id') AND team_id = sqlc.arg('team_id');

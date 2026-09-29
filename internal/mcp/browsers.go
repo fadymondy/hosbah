@@ -77,17 +77,19 @@ func BrowserTools() []Tool {
 		},
 		{
 			Name: "create_app_browser", Scope: scopes.Write,
-			Description: "Add a headless Chromium to an app, on the app's server, and set <PREFIX>_WS_ENDPOINT and <PREFIX>_TOKEN on the app as " +
-				"sealed variables (next deploy or restart). The image is fixed by Hosbah; the browser is reachable from the app's containers " +
-				"only, and only with the token. Refused when one of those names is already set, or the app has 3. The token is never shown. " +
-				"Owner or admin.",
+			Description: "Add a browser to an app, on the app's server. kind headless (default) is a bare Chromium the app drives over " +
+				"CDP/WebSocket, setting <PREFIX>_WS_ENDPOINT and <PREFIX>_TOKEN on the app as sealed variables (next deploy or restart; " +
+				"refused when one of those names is already set). kind desktop is a full interactive desktop at its own hostname, opened by " +
+				"open_app_browser — no env vars, no token; access is Hosbah's own forward_auth on that hostname, refused if the team has no " +
+				"domain to put it under yet. Either way the image is fixed by Hosbah and the app has at most 3 browsers total. Owner or admin.",
 			InputSchema: schema([]string{"app", "name"}, map[string]any{"app": appArg,
 				"name":                 str("Lowercase letter, then up to 30 lowercase letters, digits and dashes; unique in the app"),
-				"memory_mb":            num("256 to 4096 (default 1024)"),
+				"kind":                 str("headless (default) or desktop"),
+				"memory_mb":            num("Headless 256-4096 (default 1024); desktop 512-8192 (default 2048)"),
 				"cpus":                 num("0.25 to 4 (default 1)"),
-				"max_sessions":         num("Concurrent sessions, 1 to 20 (default 5)"),
-				"idle_timeout_seconds": num("A session silent this long is closed, 30 to 3600 (default 300)"),
-				"env_prefix":           str("Prefix of the variables (default BROWSER): an upper-case letter, then upper-case letters, digits and _")}),
+				"max_sessions":         num("Headless only: concurrent sessions, 1 to 20 (default 5)"),
+				"idle_timeout_seconds": num("Headless only: a session silent this long is closed, 30 to 3600 (default 300)"),
+				"env_prefix":           str("Headless only: prefix of the variables (default BROWSER): an upper-case letter, then upper-case letters, digits and _")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -102,7 +104,7 @@ func BrowserTools() []Tool {
 				}
 				cpus, _ := args["cpus"].(float64)
 				b, op, err := s.CreateBrowser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, dbsvc.BrowserSpec{Name: args.Str("name"),
-					MemoryMB: n64(args, "memory_mb"), CPUs: cpus, MaxSessions: n64(args, "max_sessions"),
+					Kind: args.Str("kind"), MemoryMB: n64(args, "memory_mb"), CPUs: cpus, MaxSessions: n64(args, "max_sessions"),
 					IdleTimeoutSeconds: n64(args, "idle_timeout_seconds"), EnvPrefix: args.Str("env_prefix")})
 				if err != nil {
 					return "", err
@@ -112,8 +114,38 @@ func BrowserTools() []Tool {
 					s.FollowBrowser(teamID, b.ID, op)
 					return "", nil
 				}
+				if b.Kind == agentproto.BrowserKindDesktop {
+					return fmt.Sprintf("Creating desktop browser %s at %s (operation %s; a first image pull takes minutes). open_app_browser opens it once it is ready.",
+						b.Name, deref(b.Hostname), op.ID), nil
+				}
 				return fmt.Sprintf("Creating browser %s (operation %s; a first image pull takes minutes). %s gets %s on its next deploy or restart; list_app_browsers shows when it is ready.",
 					b.Name, op.ID, a.Name, strings.Join(b.Env, ", ")), nil
+			},
+		},
+		{
+			Name: "open_app_browser", Scope: scopes.Write,
+			Description: "Mint a one-time link that opens a desktop browser: valid briefly, usable once, then exchanged automatically for a " +
+				"session on the browser's own hostname (Hosbah's forward_auth re-checks team membership and role on every request after " +
+				"that). Refused for a headless browser, one with no hostname yet, or one that is not ready. Any member.",
+			InputSchema: schema([]string{"app", "browser"}, map[string]any{"app": appArg, "browser": str("Browser name or id")}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				b, err := dbsvc.FindBrowser(ctx, env.Q, env.Caller.TeamID, a, args.Str("browser"))
+				if err != nil {
+					return "", err
+				}
+				s, err := dbsOf(env)
+				if err != nil {
+					return "", err
+				}
+				url, err := s.OpenDesktopBrowser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), b)
+				if err != nil {
+					return "", err
+				}
+				return "Open " + url + " now — it is one-time and expires shortly.", nil
 			},
 		},
 		{
