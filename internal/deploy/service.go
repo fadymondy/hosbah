@@ -674,7 +674,7 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 		cfg, err = q.GetAppDeployConfig(ctx, db.GetAppDeployConfigParams{AppID: r.app.ID, TeamID: r.dep.TeamID})
 		return err
 	})
-	mode := FastBuildMode(cfg.Preset, cfg.BuilderImage)
+	mode := FastBuildMode(effectivePreset(cfg), cfg.BuilderImage)
 	if mode == agentproto.FastModeDockerfile && (cfg.DockerfilePath != "" || cfg.BuildContext != "") {
 		// The dockerfile fast-build mode always builds "<checkout>/Dockerfile" with the checkout
 		// root as context (MH-573 A7b) — it has no notion of a custom path or context, so a full
@@ -744,6 +744,16 @@ func (r *runner) notePreset(ctx context.Context, files []string) {
 			AppID: r.app.ID, TeamID: r.dep.TeamID, DetectedPreset: preset,
 		})
 	})
+}
+
+// effectivePreset is the preset the app's builds follow: the chosen one, else the one the last
+// build detected from the repository (an app created from a repo with a Dockerfile never had to
+// choose "dockerfile", and must not fast-build as if it had no Dockerfile).
+func effectivePreset(cfg db.AppDeployConfig) string {
+	if cfg.Preset != "" {
+		return cfg.Preset
+	}
+	return cfg.DetectedPreset
 }
 
 // fastBuildBlockedByRelease reports whether the fast track cannot apply because there is no

@@ -207,13 +207,19 @@ func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string)
 	cache := fastCacheVolume(p.App)
 	_, _ = dockerStep(oc, "rm", "-f", ctr) // best-effort: a stale container from a previous failed attempt
 
-	createArgs := []string{"create", "--name", ctr, "-v", cache + ":/cache",
-		"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
+	// The container is committed as the new image, so its own config must stay the base image's:
+	// the env (the app's secrets) and the cache variables go to each exec instead of to create, and
+	// the keep-alive entrypoint is swapped back for the base's ENTRYPOINT/CMD at commit.
+	restore, err := imageEntrypointChanges(oc, p.BaseImage)
+	if err != nil {
+		return "", "", 1, err
+	}
+	execEnv := []string{"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
 		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer"}
 	for k, v := range env {
-		createArgs = append(createArgs, "-e", k+"="+v)
+		execEnv = append(execEnv, "-e", k+"="+v)
 	}
-	createArgs = append(createArgs, p.BaseImage, "tail", "-f", "/dev/null")
+	createArgs := []string{"create", "--name", ctr, "-v", cache + ":/cache", "--entrypoint", "tail", p.BaseImage, "-f", "/dev/null"}
 	if code, err := dockerStep(oc, createArgs...); err != nil {
 		return "", "", code, fmt.Errorf("could not create the build container from %s", p.BaseImage)
 	}
@@ -230,7 +236,8 @@ func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string)
 	oc.Progress(3, 5)
 
 	stepErr, code := runFastSteps(p.Steps, func(args ...string) (int, error) {
-		return oc.Run("docker", append([]string{"exec", "-w", "/app", ctr}, args...)...)
+		full := append(append([]string{"exec", "-w", "/app"}, execEnv...), ctr)
+		return oc.Run("docker", append(full, args...)...)
 	}, oc.Info)
 	if stepErr != nil {
 		return "", "", code, stepErr
@@ -240,11 +247,37 @@ func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string)
 	if code, err := dockerStep(oc, "stop", ctr); err != nil {
 		return "", "", code, errors.New("could not stop the build container")
 	}
-	if code, err := dockerStep(oc, "commit", ctr, p.Image); err != nil {
+	if code, err := dockerStep(oc, append(append([]string{"commit"}, restore...), ctr, p.Image)...); err != nil {
 		return "", "", code, errors.New("could not commit the new image")
 	}
 	id, _ := execOutput(oc, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image)
 	return p.Image, strings.TrimSpace(id), 0, nil
+}
+
+// imageEntrypointChanges reads image's ENTRYPOINT and CMD as `docker commit --change` arguments,
+// so a committed build container starts the way its base image did, not with its keep-alive.
+func imageEntrypointChanges(oc *OpContext, image string) ([]string, error) {
+	out, err := execOutput(oc, "docker", "image", "inspect", "--format", "{{json .Config.Entrypoint}}\n{{json .Config.Cmd}}", image)
+	if err != nil {
+		return nil, fmt.Errorf("could not read the entrypoint of %s", image)
+	}
+	return entrypointChanges(out), nil
+}
+
+// entrypointChanges turns inspect's two JSON lines (entrypoint, cmd; null when unset) into
+// --change arguments. Pure so it is testable without Docker.
+func entrypointChanges(inspect string) []string {
+	lines := strings.SplitN(strings.TrimSpace(inspect), "\n", 2)
+	for len(lines) < 2 {
+		lines = append(lines, "null")
+	}
+	form := func(v string) string {
+		if v = strings.TrimSpace(v); v == "" || v == "null" {
+			return "[]"
+		}
+		return v
+	}
+	return []string{"--change", "ENTRYPOINT " + form(lines[0]), "--change", "CMD " + form(lines[1])}
 }
 
 // runFastSteps runs an app's enabled install/build/migrate steps in order (each `sh -c <run>`,

@@ -10,6 +10,17 @@ import (
 
 // TestFastBuildMode (MH-573 A7b): the fast track's mode picks dockerfile for a Dockerfile app,
 // builder for an app with a configured builder image, and falls back to runtime otherwise.
+func TestFastBuildModeFollowsTheDetectedPreset(t *testing.T) {
+	cfg := db.AppDeployConfig{DetectedPreset: PresetDockerfile}
+	if got := FastBuildMode(effectivePreset(cfg), cfg.BuilderImage); got != agentproto.FastModeDockerfile {
+		t.Fatalf("a detected Dockerfile app fast-builds in %q mode", got)
+	}
+	cfg.Preset = PresetStatic
+	if got := effectivePreset(cfg); got != PresetStatic {
+		t.Fatalf("the chosen preset must win: %q", got)
+	}
+}
+
 func TestFastBuildMode(t *testing.T) {
 	cases := []struct {
 		name, preset, builderImage, want string

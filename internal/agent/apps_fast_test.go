@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
@@ -79,5 +80,18 @@ func TestFastCopyArgs(t *testing.T) {
 		if got := fastCopyArgs(c.in); got != c.want {
 			t.Errorf("fastCopyArgs(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// A committed runtime-mode build must start like its base image, not with the build container's
+// keep-alive (an image with CMD `tail -f /dev/null` passes every step and never answers).
+func TestEntrypointChangesRestoreTheBaseImage(t *testing.T) {
+	got := strings.Join(entrypointChanges("[\"/sbin/tini\",\"--\"]\n[\"/app/start.sh\"]\n"), " ")
+	if got != `--change ENTRYPOINT ["/sbin/tini","--"] --change CMD ["/app/start.sh"]` {
+		t.Fatalf("changes = %s", got)
+	}
+	got = strings.Join(entrypointChanges("null\n[\"node\",\"server.js\"]"), " ")
+	if got != `--change ENTRYPOINT [] --change CMD ["node","server.js"]` {
+		t.Fatalf("changes = %s", got)
 	}
 }
