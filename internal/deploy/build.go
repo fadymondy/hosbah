@@ -21,8 +21,10 @@ only the agent, which has the checkout on disk, can catch.
 build_env is a list of variable names (not values): at build time the control plane looks up the
 app's current env values for exactly those names, seals the ones that are actually set to the
 target agent's key (buildEnvBox, mirroring envBox) and the agent opens the box and passes each as
-`--build-arg NAME`, the value only ever reaching docker through its own process environment. A name
-with no matching env var is silently skipped, both here and by the agent.
+`--build-arg NAME` and as a BuildKit secret (`--secret id=NAME,env=NAME`), the value only ever
+reaching docker through its own process environment. A Dockerfile that reads a token through
+`RUN --mount=type=secret,id=NAME` instead of an ARG keeps it out of the image. A name with no
+matching env var is silently skipped, both here and by the agent.
 */
 
 // MaxBuildEnvNames caps how many variable names one app may expose at build time.

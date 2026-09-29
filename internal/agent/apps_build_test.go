@@ -109,6 +109,22 @@ func TestBuildArgArgsCarriesNoSecretValue(t *testing.T) {
 	}
 }
 
+// buildSecretArgs names each build-time variable as a BuildKit secret read from docker's own
+// environment, so RUN --mount=type=secret can use a token — and, like buildArgArgs, never carries
+// the value.
+func TestBuildSecretArgsCarriesNoSecretValue(t *testing.T) {
+	env := map[string]string{"GITHUB_TOKEN": "ghp_not-a-real-token", "A_NAME": "another-secret"}
+	args := strings.Join(buildSecretArgs(env), " ")
+	if want := "--secret id=A_NAME,env=A_NAME --secret id=GITHUB_TOKEN,env=GITHUB_TOKEN"; args != want {
+		t.Fatalf("argv = %q, want %q", args, want)
+	}
+	for _, secret := range env {
+		if strings.Contains(args, secret) {
+			t.Fatalf("a secret value leaked into the argv: %v", args)
+		}
+	}
+}
+
 func TestOrDefault(t *testing.T) {
 	if orDefault("", "Dockerfile") != "Dockerfile" {
 		t.Fatal("empty should default")

@@ -605,7 +605,8 @@ func (d *deps) registerDeployConfig(api huma.API) {
 	type buildOut struct{ Body BuildConfigOut }
 	huma.Register(api, huma.Operation{OperationID: "get-app-build-config", Method: http.MethodGet, Path: basePath + "/build", Tags: tags,
 		Summary: "An app's custom Dockerfile path and build context, and which of its env vars are exposed at build time (as " +
-			"`--build-arg`, ending up in the built image's layers — never assume a build-time value stays secret). Not versioned " +
+			"`--build-arg`, which a Dockerfile ARG leaves in the image's layers, and as a BuildKit secret, which " +
+			"`RUN --mount=type=secret,id=NAME` reads without leaving a trace). Not versioned " +
 			"(like builder_image/outputs). Any member.",
 	}, func(ctx context.Context, in *AppPath) (*buildOut, error) {
 		out := &buildOut{}

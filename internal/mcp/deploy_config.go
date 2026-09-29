@@ -394,7 +394,8 @@ func DeployConfigTools() []Tool {
 		{
 			Name: "app_build_config_get", Scope: scopes.Read,
 			Description: "An app's custom Dockerfile path and build context, and which of its env vars are exposed at build time " +
-				"(as --build-arg, ending up in the built image's layers). Not versioned.",
+				"(as --build-arg, which an ARG leaves in the image's layers, and as a BuildKit secret that " +
+				"RUN --mount=type=secret,id=NAME reads without a trace). Not versioned.",
 			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				a, err := findApp(ctx, env, args)
@@ -433,7 +434,7 @@ func DeployConfigTools() []Tool {
 				"build_env": map[string]any{
 					"type":        "array",
 					"items":       map[string]any{"type": "string"},
-					"description": "Env var names exposed at build time as --build-arg NAME. A name with no matching env var is skipped.",
+					"description": "Env var names exposed at build time as --build-arg NAME and as the BuildKit secret id NAME. A name with no matching env var is skipped.",
 				}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {

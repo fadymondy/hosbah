@@ -495,6 +495,7 @@ func appBuild(oc *OpContext) (any, int, error) {
 	}
 	args = append(args, labels...)
 	args = append(args, buildArgArgs(buildEnv)...)
+	args = append(args, buildSecretArgs(buildEnv)...)
 	if d.Runtime == "dockerfile" {
 		dfPath, ok := safeJoin(src, orDefault(p.DockerfilePath, "Dockerfile"))
 		if !ok {
@@ -667,6 +668,23 @@ func buildArgArgs(env map[string]string) []string {
 	var out []string
 	for _, k := range names {
 		out = append(out, "--build-arg", k)
+	}
+	return out
+}
+
+// buildSecretArgs is `--secret id=NAME,env=NAME` for each build-time variable, so a Dockerfile can
+// read a token with `RUN --mount=type=secret,id=NAME` (a private Go module or npm package) without
+// declaring it as an ARG, which would leave it in the image's history. The value comes from the
+// same process environment as buildArgArgs.
+func buildSecretArgs(env map[string]string) []string {
+	names := make([]string, 0, len(env))
+	for k := range env {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	var out []string
+	for _, k := range names {
+		out = append(out, "--secret", "id="+k+",env="+k)
 	}
 	return out
 }
