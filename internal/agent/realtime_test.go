@@ -250,3 +250,18 @@ func TestRealtimeRouteParamsValidate(t *testing.T) {
 		t.Error("realtime.route runs in its app's lane, behind a deploy's switch")
 	}
 }
+
+// Every process joins the shared app network; only web carries the app's name, so other apps on
+// the server reach it at http://<app>:<port> and never a worker by accident.
+func TestStartArgsJoinAppNetwork(t *testing.T) {
+	for _, proc := range []string{"web", "worker:jobs"} {
+		p := rtStart(proc, nil)
+		argv := " " + strings.Join(func() []string { a, _ := startArgs(p, "c1", nil); return a }(), " ") + " "
+		if !strings.Contains(argv, " --network "+appNetwork+" ") {
+			t.Errorf("%s does not join %s: %s", proc, appNetwork, argv)
+		}
+		if got := strings.Contains(argv, " --network-alias "+p.App+" "); got != (proc == "web") {
+			t.Errorf("%s: alias %s present=%v", proc, p.App, got)
+		}
+	}
+}

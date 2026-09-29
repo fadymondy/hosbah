@@ -591,7 +591,11 @@ func appRelease(oc *OpContext) (any, int, error) {
 	}
 	name := agentproto.ContainerName(p.App, "release", p.DeploymentID)
 	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", name).Run() //#nosec G204 -- a retry after a crash
-	args := []string{"run", "--rm", "--name", name, "--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelProcess + "=release"}
+	if err := ensureAppNetwork(oc); err != nil {
+		return nil, 1, err
+	}
+	args := []string{"run", "--rm", "--name", name, "--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelProcess + "=release",
+		"--network", appNetwork}
 	args = append(args, envArgs(env)...)
 	args = append(args, "--entrypoint", "/bin/sh", p.Image, "-c", p.Command)
 	oc.Info("release command: %s", p.Command)
@@ -679,6 +683,9 @@ func startProcess(oc *OpContext, p agentproto.StartParams) (agentproto.StartResu
 	_ = exec.CommandContext(oc.Ctx, "docker", "rm", "-f", name).Run() //#nosec G204 -- idempotent re-run
 	// A volume made before the rename keeps its name (and its data): cloudy-vol-… when that exists.
 	p.Mounts = resolveMounts(oc.Ctx, appDocker, p.Mounts)
+	if err := ensureAppNetwork(oc); err != nil {
+		return res, 1, err
+	}
 	args, pairs := startArgs(p, name, env)
 	oc.Info("starting %s (%s)", p.Process, name)
 	for _, m := range p.Mounts {
@@ -766,7 +773,11 @@ func publishArg(containerPort int) []string {
 func startArgs(p agentproto.StartParams, name string, env map[string]string) (args, pairs []string) {
 	args = []string{"run", "-d", "--name", name, "--restart", "unless-stopped",
 		"--label", agentproto.LabelApp + "=" + p.AppID, "--label", agentproto.LabelProcess + "=" + p.Process, "--label", agentproto.LabelDeployment + "=" + p.DeploymentID,
-		"--log-opt", "max-size=10m", "--log-opt", "max-file=3"}
+		"--log-opt", "max-size=10m", "--log-opt", "max-file=3", "--network", appNetwork}
+	if p.Process == "web" {
+		// Other apps on this server reach it by name: API_ORIGIN=http://<app>:<port>.
+		args = append(args, "--network-alias", p.App)
+	}
 	pairs = envPairs(env)
 	if p.Process == "web" {
 		args = append(append(args, publishArg(p.Port)...), "-e", "PORT")
@@ -787,6 +798,22 @@ func startArgs(p agentproto.StartParams, name string, env map[string]string) (ar
 		args = append(args, p.Image)
 	}
 	return args, pairs
+}
+
+// appNetwork is the bridge network every app container joins, so the apps on one server reach each
+// other by name (web carries the app's name as an alias) without publishing beyond 127.0.0.1.
+const appNetwork = "hosbah"
+
+// ensureAppNetwork creates appNetwork unless it exists.
+func ensureAppNetwork(oc *OpContext) error {
+	if exec.CommandContext(oc.Ctx, "docker", "network", "inspect", appNetwork).Run() == nil { //#nosec G204 -- constant args
+		return nil
+	}
+	if out, err := exec.CommandContext(oc.Ctx, "docker", "network", "create", appNetwork).CombinedOutput(); err != nil && //#nosec G204 -- constant args
+		!strings.Contains(string(out), "already exists") {
+		return fmt.Errorf("could not create the %s network: %s", appNetwork, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // healthGate: GET the path until it answers 2xx, the container dies, or the time is up.
