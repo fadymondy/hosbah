@@ -221,7 +221,7 @@ type proxyEntry struct {
 // directive: a reverse_proxy to authURL, whose outgoing subrequest is rewritten to a fixed GET at
 // authURL's own path — the real request's method and URI are carried instead in
 // X-Forwarded-Method/X-Forwarded-Uri, exactly as Caddy's forward_auth sets them — with a
-// handle_response that, on a 2xx answer, copies the auth response's headers through and then falls
+// handle_response that, on a 2xx answer, falls (with none of the auth response's headers)
 // through to the next handler in this route (the real upstream — never reached until the auth
 // check has passed), and on anything else, copies the auth response verbatim back to the client
 // (its redirect to Hosbah's login, a 403, ...); the real upstream is never dialed in that case.
@@ -245,10 +245,11 @@ func forwardAuthHandler(authURL string) map[string]any {
 		},
 		"handle_response": []any{
 			map[string]any{
-				"match": map[string]any{"status_code": []any{2}},
-				"routes": []any{
-					map[string]any{"handle": []any{map[string]any{"handler": "copy_response_headers"}}},
-				},
+				// No routes: fall straight through to the real upstream, as Caddy's own forward_auth does
+				// without copy_headers. Copying the auth answer's headers (copy_response_headers) put its
+				// Content-Length on the upstream's response, and Caddy aborted every page with a 502.
+				"match":  map[string]any{"status_code": []any{2}},
+				"routes": []any{},
 			},
 			map[string]any{
 				"routes": []any{

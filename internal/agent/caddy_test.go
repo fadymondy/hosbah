@@ -161,9 +161,10 @@ func TestRenderCaddyForwardAuth(t *testing.T) {
 	if okEntry["match"].(map[string]any)["status_code"].([]any)[0] != 2 {
 		t.Errorf("first handle_response entry must match status class 2xx: %v", okEntry)
 	}
-	okHandler := okEntry["routes"].([]any)[0].(map[string]any)["handle"].([]any)[0].(map[string]any)
-	if okHandler["handler"] != "copy_response_headers" {
-		t.Errorf("2xx must copy headers through (and fall through to the upstream): %v", okHandler)
+	// 2xx falls straight through to the upstream with none of the auth answer's headers: copying them
+	// put its Content-Length on the upstream's response and Caddy aborted every page with a 502.
+	if routes := okEntry["routes"].([]any); len(routes) != 0 {
+		t.Errorf("2xx must fall through with no routes: %v", routes)
 	}
 	elseEntry := hr[1].(map[string]any)
 	if _, hasMatch := elseEntry["match"]; hasMatch {
