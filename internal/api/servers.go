@@ -487,6 +487,37 @@ func attachGuestServerIDs(ctx context.Context, q *db.Queries, teamID string, ser
 	}
 }
 
+// appendPendingGuests adds the node's linked guest servers it has not reported yet (a guest that is
+// still provisioning, or failed before it existed on the node), so the node's Guests shows every
+// guest of it and none of them is left as a top-level server that looks broken.
+func appendPendingGuests(guests []GuestOut, nodeID string, team []db.Server) []GuestOut {
+	shown := map[string]bool{}
+	for _, g := range guests {
+		if g.ServerID != nil {
+			shown[*g.ServerID] = true
+		}
+	}
+	for _, r := range team {
+		if r.ParentServerID == nil || *r.ParentServerID != nodeID || shown[r.ID] {
+			continue
+		}
+		g := GuestOut{Name: r.Name, Type: "lxc", Status: r.Status, ServerID: &r.ID}
+		if r.GuestType != nil {
+			g.Type = *r.GuestType
+		} else if r.Kind == "vm" {
+			g.Type = "qemu"
+		}
+		if r.GuestVmid.Valid {
+			g.VMID = fmt.Sprint(r.GuestVmid.Int32)
+		}
+		if r.IpAddress != nil {
+			g.Address = *r.IpAddress
+		}
+		guests = append(guests, g)
+	}
+	return guests
+}
+
 func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membership, s db.Server) ServerOut {
 	out := toServerOut(s, time.Now(), true)
 	out.Guests = guestsOf(s)
@@ -504,6 +535,7 @@ func (d *deps) serverDetail(ctx context.Context, q *db.Queries, m *tenancy.Membe
 		outs = append(outs, out)
 		attachGuestServerIDs(ctx, q, m.TeamID, outs)
 		out = outs[len(outs)-1]
+		out.Guests = appendPendingGuests(out.Guests, s.ID, all)
 	}
 	if etag, err := q.ServerLogoVersion(ctx, db.ServerLogoVersionParams{ServerID: s.ID, TeamID: m.TeamID}); err == nil {
 		out.LogoURL = serverLogoURL(m.TeamID, s.ID, etag) // an uploaded logo wins over the external logo_url

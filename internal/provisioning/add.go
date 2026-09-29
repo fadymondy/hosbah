@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -145,6 +146,20 @@ func AddServer(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, act
 		}
 		return db.Server{}, nil, fmt.Errorf("could not add the server: %w", err)
 	}
+	if in.Provider == "proxmox" && credID != nil {
+		// A new guest belongs to its node from the start, so a guest that is still provisioning (or
+		// failed) shows under the node's Guests, never as a top-level server of the team.
+		if node := proxmoxNodeServer(ctx, q, teamID, serverID, *credID); node != "" {
+			gt := "lxc"
+			if kind == "vm" {
+				gt = "qemu"
+			}
+			if linked, err := q.SetServerParent(ctx, db.SetServerParentParams{ParentServerID: &node, GuestType: &gt,
+				ID: serverID, TeamID: teamID}); err == nil {
+				row = linked
+			}
+		}
+	}
 
 	var install *ops.Install
 	enqueue := func(k string) error {
@@ -236,4 +251,57 @@ func sealConnect(ctx context.Context, svc *ops.Service, q *db.Queries, teamID, s
 	raw, _ := json.Marshal(map[string]ConnectSpec{"connect": {Host: host, Port: c.Port, User: user,
 		Auth: c.Auth, RegisterProxmox: register, SecretSealed: sealed}})
 	return string(raw), nil
+}
+
+// proxmoxNodeServer finds the team server that is the credential's Proxmox node: its hostname or
+// name equals the credential's node, or its address is the API host. "" when none is.
+func proxmoxNodeServer(ctx context.Context, q *db.Queries, teamID, serverID, credID string) string {
+	cred, err := q.CredentialInTeam(ctx, db.CredentialInTeamParams{ID: credID, TeamID: teamID})
+	if err != nil {
+		return ""
+	}
+	rows, err := q.ServersOfTeamForAutoLink(ctx, db.ServersOfTeamForAutoLinkParams{TeamID: teamID, ExcludeID: serverID})
+	if err != nil {
+		return ""
+	}
+	return matchProxmoxNode(cred.Config, rows)
+}
+
+// matchProxmoxNode is proxmoxNodeServer's pure half: a server that is itself a guest is never a node.
+func matchProxmoxNode(config string, servers []db.ServersOfTeamForAutoLinkRow) string {
+	var cfg struct {
+		Node   string `json:"node"`
+		APIURL string `json:"api_url"`
+	}
+	if json.Unmarshal([]byte(config), &cfg) != nil {
+		return ""
+	}
+	node := strings.ToLower(strings.TrimSpace(cfg.Node))
+	apiHost := ""
+	if u, err := url.Parse(cfg.APIURL); err == nil {
+		apiHost = u.Hostname()
+	}
+	short := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		h := strings.ToLower(strings.TrimSpace(*s))
+		if i := strings.IndexByte(h, '.'); i > 0 {
+			h = h[:i]
+		}
+		return h
+	}
+	for _, s := range servers {
+		if s.ParentServerID != nil {
+			continue
+		}
+		name := strings.ToLower(s.Name)
+		if node != "" && (short(s.Hostname) == node || name == node) {
+			return s.ID
+		}
+		if apiHost != "" && s.IpAddress != nil && *s.IpAddress == apiHost {
+			return s.ID
+		}
+	}
+	return ""
 }

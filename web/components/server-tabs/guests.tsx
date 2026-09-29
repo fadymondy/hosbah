@@ -13,8 +13,9 @@ const running = (s: string) => /^(running|active|up)/i.test(s)
 
 /**
  * Every Proxmox guest a node discovered (facts.services, kind "guest"), whether or not it is also
- * enrolled as a server of the team: status, type, vmid, address and resources, and either "Open"
- * (enrolled) or the bare address (not enrolled; there is no prefill add-server flow yet).
+ * enrolled as a server of the team, plus the guests Hosbah is still creating on it (or failed to):
+ * status, type, vmid, address and resources, and either "Open" (a server of the team) or "Not
+ * enrolled". Guests live here, not as top-level servers on the home page.
  */
 export function Guests({ guests }: { guests: Guest[] }) {
   const { t, locale } = useI18n()
@@ -35,7 +36,7 @@ export function Guests({ guests }: { guests: Guest[] }) {
       <SectionTitle title={t("servers.guests.title")} hint={t("servers.guests.description")} />
       <div className="grid gap-3 py-4 sm:grid-cols-2 lg:grid-cols-3">
         {guests.map((g) => (
-          <article key={g.vmid} className="flex flex-col gap-2 border border-line bg-grid-card p-4" data-testid="guest-card">
+          <article key={g.server_id ?? g.vmid} className="flex flex-col gap-2 border border-line bg-grid-card p-4" data-testid="guest-card">
             <div className="flex items-center gap-2">
               <MonitorIcon className="size-4 text-grid-muted" />
               <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-grid-fg">
@@ -49,8 +50,10 @@ export function Guests({ guests }: { guests: Guest[] }) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
               <span className="inline-flex items-center gap-1">
                 <BoxIcon className="size-3.5" />
-                {t(`servers.guests.types.${g.type}`, undefined, g.type)} · {t("servers.guests.vmid")} {g.vmid}
+                {t(`servers.guests.types.${g.type}`, undefined, g.type)}
+                {g.vmid ? ` · ${t("servers.guests.vmid")} ${g.vmid}` : null}
               </span>
+              {!running(g.status) ? <span>{t(`servers.presence.${g.status}`, undefined, g.status)}</span> : null}
               {g.address ? (
                 <span dir="ltr" className="font-mono">
                   {g.address}

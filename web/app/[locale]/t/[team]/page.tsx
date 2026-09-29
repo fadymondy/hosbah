@@ -136,7 +136,6 @@ export default function HomePage() {
       .sort((x, y) => (x.created_at < y.created_at ? 1 : -1))
   }, [feed, apps])
 
-  const online = servers?.filter((s) => s.online).length ?? 0
 
   // Nodes and their enrolled guest servers (MH-574 A1): a guest with a parent that is also one of
   // the team's servers nests under its node instead of appearing as an unrelated row.
@@ -155,6 +154,17 @@ export default function HomePage() {
     return m
   }, [servers, byId])
   const isNestedGuest = (s: Server) => Boolean(s.parent_server_id && byId[s.parent_server_id])
+  // A node's guests (the ones it reports, plus any Hosbah is still creating on it) are a count on
+  // its card that opens its Guests tab: they are never servers of their own on the home page.
+  const guestsOf = (s: Server) => {
+    const reported = s.guests ?? []
+    const ids = new Set(reported.map((g) => g.server_id).filter(Boolean))
+    const pending = (childrenOf[s.id] ?? []).filter((c) => !ids.has(c.id))
+    const total = reported.length + pending.length
+    if (!total) return null
+    const running = reported.filter((g) => /^(running|active|up)/i.test(g.status)).length + pending.filter((c) => c.online).length
+    return { total, running }
+  }
 
   // Search and filters over the servers; the list grows as you scroll (PAGE at a time).
   const [q, setQ] = useState("")
@@ -197,7 +207,11 @@ export default function HomePage() {
       title={team.name}
       description={
         servers
-          ? t("home.summary", { servers: servers.length, online, apps: apps.length })
+          ? t("home.summary", {
+              servers: servers.filter((s) => !isNestedGuest(s)).length,
+              online: servers.filter((s) => !isNestedGuest(s) && s.online).length,
+              apps: apps.length,
+            })
           : undefined
       }
       actions={
@@ -277,33 +291,18 @@ export default function HomePage() {
             <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p>
           ) : (
             <div className="flex flex-col gap-4 px-6 pt-6 pb-6">
-              {filtered.slice(0, shown).flatMap((s) => {
-                const kids = (childrenOf[s.id] ?? []).filter(matches)
-                return [
-                  <ServerCard
-                    key={s.id}
-                    server={s}
-                    base={base}
-                    tunnel={s.tunnel ?? tunnelOf[s.id] ?? null}
-                    spark={spark[s.id] ?? null}
-                    lastDeploy={lastDeployOf[s.id] ?? null}
-                    streamUrl={`${api}/servers/${s.id}/stream`}
-                  />,
-                  ...kids.map((g) => (
-                    <ServerCard
-                      key={g.id}
-                      server={g}
-                      base={base}
-                      tunnel={g.tunnel ?? tunnelOf[g.id] ?? null}
-                      spark={spark[g.id] ?? null}
-                      lastDeploy={lastDeployOf[g.id] ?? null}
-                      streamUrl={`${api}/servers/${g.id}/stream`}
-                      guestOf={{ nodeName: s.name, vmid: g.guest_vmid, type: g.guest_type }}
-                      indent
-                    />
-                  )),
-                ]
-              })}
+              {filtered.slice(0, shown).map((s) => (
+                <ServerCard
+                  key={s.id}
+                  server={s}
+                  base={base}
+                  tunnel={s.tunnel ?? tunnelOf[s.id] ?? null}
+                  spark={spark[s.id] ?? null}
+                  lastDeploy={lastDeployOf[s.id] ?? null}
+                  streamUrl={`${api}/servers/${s.id}/stream`}
+                  guests={guestsOf(s)}
+                />
+              ))}
             </div>
           )}
           {shown < filtered.length ? <div ref={sentinel} className="h-8" aria-hidden /> : null}

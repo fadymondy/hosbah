@@ -2536,7 +2536,9 @@
     "anyProvider": "Any",
     "ownServers": "Own servers",
     "withTunnel": "With a tunnel",
-    "noMatch": "No server matches."
+    "noMatch": "No server matches.",
+    "guests": "Guests: {n}",
+    "guestsRunning": "{n} running"
   },
   "github": {
     "title": "GitHub",

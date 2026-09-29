@@ -2536,7 +2536,9 @@
     "anyProvider": "أي مزوّد",
     "ownServers": "خوادمي",
     "withTunnel": "عبر نفق",
-    "noMatch": "لا يوجد خادم مطابق."
+    "noMatch": "لا يوجد خادم مطابق.",
+    "guests": "الضيوف: {n}",
+    "guestsRunning": "قيد التشغيل: {n}"
   },
   "github": {
     "title": "GitHub",
