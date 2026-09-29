@@ -175,6 +175,11 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 		"name": a.Name, "repo_url": in.RepoURL, "branch": in.Branch, "build": in.Build, "origin_kind": w.OriginKind})); err != nil {
 		return db.App{}, nil, err
 	}
+	// Now a Hosbah-built app, it gets its platform hostname like a new one, so its first build can be
+	// checked there before any of the old workload's traffic moves.
+	if srv, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: a.ServerID, TeamID: teamID}); err == nil && !s.hasAppsHostname(ctx, q, teamID, a.ID) {
+		s.addAppsHostname(ctx, q, teamID, a, srv)
+	}
 	final, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: a.ID, TeamID: teamID})
 	if err != nil {
 		return db.App{}, nil, err

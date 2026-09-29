@@ -218,6 +218,20 @@ func (s *Service) addAppsHostname(ctx context.Context, q *db.Queries, teamID str
 	s.enqueueEdgeProxySet(ctx, teamID, host, d.ID, srv, false)
 }
 
+// hasAppsHostname: the app already has a hostname under the apps domain.
+func (s *Service) hasAppsHostname(ctx context.Context, q *db.Queries, teamID, appID string) bool {
+	ds, err := q.ListDomainsOfApp(ctx, db.ListDomainsOfAppParams{AppID: appID, TeamID: teamID})
+	if err != nil {
+		return true // unknown: never risk a second, suffixed hostname
+	}
+	for _, d := range ds {
+		if s.apps.Owns(d.Hostname) {
+			return true
+		}
+	}
+	return false
+}
+
 // pointAppsHostname points the hostname at the server's public address in Cloudflare.
 func (s *Service) pointAppsHostname(ctx context.Context, host string, srv db.Server) {
 	if s.apps.DNS == nil || srv.IpAddress == nil {

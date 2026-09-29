@@ -27,9 +27,11 @@ release #0. No old workload is ever stopped automatically; the team confirms it 
 only once a real deploy is live.
 */
 func TestAdoptImportedApp(t *testing.T) {
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	appsDomain := "adopt-" + suffix[len(suffix)-6:] + ".test"
+	t.Setenv("HOSBAH_APPS_DOMAIN", appsDomain)
 	ts, stop := bootTestServer(t)
 	defer stop()
-	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	owner := newClient(t, ts.URL)
 	owner.register("adopt-owner-" + suffix + "@example.test")
@@ -151,6 +153,15 @@ func TestAdoptImportedApp(t *testing.T) {
 		}
 		if out.Release == nil || out.Release.Version != 0 || out.Release.Image != "ghcr.io/acme/shop-web:1.2.3" || out.Release.Status != "live" {
 			t.Fatalf("release #0: %+v", out.Release)
+		}
+		// Now a Hosbah-built app, it gets its platform hostname like a new one, to check its first
+		// build on before any traffic moves.
+		var domains struct {
+			Domains []struct{ Hostname string } `json:"domains"`
+		}
+		owner.mustJSON("GET", appPath(web)+"/domains", nil, 200, &domains)
+		if len(domains.Domains) != 1 || !strings.HasSuffix(domains.Domains[0].Hostname, "."+appsDomain) {
+			t.Fatalf("an adopted app gets one platform hostname: %+v", domains.Domains)
 		}
 
 		var env struct {
