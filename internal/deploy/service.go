@@ -764,6 +764,11 @@ func fastBuildBlockedByRelease(live *db.Release) (reason string, blocked bool) {
 	if live == nil || live.Image == "" {
 		return "no previous successful release", true
 	}
+	if live.Version < 1 {
+		// v0 is an adopted app's old workload image, built outside Hosbah: laying the checkout over
+		// it would ship the old code (or a Go binary next to its own source). Build it once in full.
+		return "the live release is the adopted workload's own image — the first deploy from git is a full build", true
+	}
 	return "", false
 }
 

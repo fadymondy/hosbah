@@ -77,8 +77,12 @@ func TestFastBuildBlockedByRelease(t *testing.T) {
 	if reason, blocked := fastBuildBlockedByRelease(&db.Release{Image: ""}); !blocked || reason != "no previous successful release" {
 		t.Fatalf("an empty image must block fast: %q, %v", reason, blocked)
 	}
-	if _, blocked := fastBuildBlockedByRelease(&db.Release{Image: "hosbah/demo:v1"}); blocked {
+	if _, blocked := fastBuildBlockedByRelease(&db.Release{Image: "hosbah/demo:v1", Version: 1}); blocked {
 		t.Fatal("a live release with an image must not block fast")
+	}
+	// An adopted app's v0 is its old workload image: its first deploy from git must build in full.
+	if _, blocked := fastBuildBlockedByRelease(&db.Release{Image: "mahaam-api", Version: 0}); !blocked {
+		t.Fatal("the adopted v0 release must block fast")
 	}
 }
 
