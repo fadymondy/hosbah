@@ -301,11 +301,13 @@ func TestContainerStatsParsesDocker(t *testing.T) {
 
 func TestContainerInspectParsesDockerAndNeverLogsEnv(t *testing.T) {
 	answers := map[string]string{
-		"docker inspect --type container shop-web": `[{"Config":{"Image":"ghcr.io/acme/shop:1.2.3","Env":["SECRET_TOKEN=s3cret!","PORT=3000"],` +
+		"docker inspect --type container shop-web": `[{"Config":{"Image":"ghcr.io/acme/shop:1.2.3","Env":["SECRET_TOKEN=s3cret!","PORT=3000","PATH=/usr/local/bin:/usr/bin","NODE_ENV=production"],` +
 			`"Labels":{"org.opencontainers.image.source":"https://github.com/acme/shop","org.opencontainers.image.revision":"main"}},` +
 			`"Image":"sha256:abc123","State":{"Status":"running"},` +
 			`"HostConfig":{"RestartPolicy":{"Name":"unless-stopped"},"PortBindings":{"3000/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}]}},` +
 			`"Mounts":[{"Source":"/data/shop","Destination":"/app/data"}]}]`,
+		// The image sets PATH (left as is: the old image's, dropped) and NODE_ENV (changed: the app's, kept).
+		"docker image inspect --format {{json .Config.Env}} sha256:abc123": `["PATH=/usr/local/bin:/usr/bin","NODE_ENV=development"]`,
 	}
 	cpPub, cpPriv, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -333,8 +335,11 @@ func TestContainerInspectParsesDockerAndNeverLogsEnv(t *testing.T) {
 	if err := json.Unmarshal(pt, &env); err != nil {
 		t.Fatal(err)
 	}
-	if env["SECRET_TOKEN"] != "s3cret!" || env["PORT"] != "3000" {
+	if env["SECRET_TOKEN"] != "s3cret!" || env["PORT"] != "3000" || env["NODE_ENV"] != "production" {
 		t.Fatalf("env not parsed: %+v", env)
+	}
+	if _, ok := env["PATH"]; ok {
+		t.Fatalf("an env entry the image itself sets, unchanged, is not the app's: %+v", env)
 	}
 	// The full result, exactly as it would be persisted to operations.result, must never contain the
 	// plaintext env values.

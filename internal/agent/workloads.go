@@ -378,10 +378,21 @@ func (w *workloads) inspect(oc *OpContext) (any, int, error) {
 	}
 	envCount := 0
 	if len(c.Config.Env) > 0 {
+		// An entry the image itself sets, unchanged (PATH, NODE_VERSION, …), is the old image's, not
+		// the app's: carried into the app's env it would pin that value onto every image Hosbah builds.
+		baked := map[string]bool{}
+		if iout, err := w.quiet(oc, "docker", "image", "inspect", "--format", "{{json .Config.Env}}", c.Image); err == nil {
+			var imageEnv []string
+			if json.Unmarshal([]byte(strings.TrimSpace(iout)), &imageEnv) == nil {
+				for _, kv := range imageEnv {
+					baked[kv] = true
+				}
+			}
+		}
 		env := make(map[string]string, len(c.Config.Env))
 		for _, kv := range c.Config.Env {
 			k, v, ok := strings.Cut(kv, "=")
-			if ok {
+			if ok && !baked[kv] {
 				env[k] = v
 			}
 		}
