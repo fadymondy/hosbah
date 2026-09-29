@@ -224,10 +224,14 @@ func TestAdoptImportedApp(t *testing.T) {
 		var out struct {
 			App struct {
 				ID, Source, OriginKind string
+				RepoURL                string `json:"repo_url"`
 			} `json:"app"`
 			Release *struct{ Version int64 } `json:"release"`
 		}
-		owner.mustJSON("POST", appPath(wp)+"/adopt", map[string]any{"repo_url": "https://github.com/acme/wordpress-site", "branch": "main"}, 200, &out)
+		owner.mustJSON("POST", appPath(wp)+"/adopt", map[string]any{"repo_url": "github.com/acme/wordpress-site.git", "branch": "main"}, 200, &out)
+		if out.App.RepoURL != "https://github.com/acme/wordpress-site" {
+			t.Fatalf("a bare github.com/owner/repo is stored as its https URL: %q", out.App.RepoURL)
+		}
 		if out.App.Source != "git" {
 			t.Fatalf("source: %q", out.App.Source)
 		}

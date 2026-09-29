@@ -61,10 +61,15 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 	if !IsImported(a) {
 		return db.App{}, nil, coded(http.StatusConflict, CodeNotImported, a.Name+" is already built by Hosbah")
 	}
+	// "github.com/owner/repo", as the adopt dialog and adopt_app both invite, means https.
 	in.RepoURL = strings.TrimSpace(in.RepoURL)
+	if in.RepoURL != "" && !strings.Contains(in.RepoURL, "://") {
+		in.RepoURL = "https://" + in.RepoURL
+	}
 	if err := agentproto.CheckRepoURL(in.RepoURL); err != nil {
 		return db.App{}, nil, invalid(err.Error())
 	}
+	in.RepoURL = agentproto.NormalizeRepoURL(in.RepoURL)
 	in.Branch = strings.TrimSpace(in.Branch)
 	if in.Branch == "" {
 		in.Branch = "main"
