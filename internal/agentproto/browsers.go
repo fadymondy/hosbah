@@ -47,7 +47,7 @@ const (
 
 	// DesktopImage is THE image of a desktop browser, pinned by tag. Never user input. Check
 	// https://github.com/linuxserver/docker-chromium for the current tag before bumping it.
-	DesktopImage = "lscr.io/linuxserver/chromium:132.0.6834.83-r0-ls119"
+	DesktopImage = "lscr.io/linuxserver/chromium:7ac003b2-ls53"
 	// DesktopHTTPPort is the port KasmVNC serves its web desktop on inside the container (plain
 	// HTTP; Caddy terminates TLS at the edge, so the loopback hop does not need KasmVNC's own
 	// self-signed :3001).
