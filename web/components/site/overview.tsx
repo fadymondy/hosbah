@@ -43,7 +43,7 @@ export function SiteOverview() {
   const [adoptOpen, setAdoptOpen] = useState(false)
   // An adopted guest or unit whose old workload has not been confirmed stopped yet: still git-sourced,
   // but origin_kind survives adoption for exactly this (a container clears it itself once retired).
-  const awaitingStopConfirm = !imported && !!app.origin_kind && app.origin_kind !== "container"
+  const awaitingStopConfirm = !imported && !!app.origin_kind
   // An imported Proxmox guest, not yet connected: offer to put a Hosbah agent inside it, instead of
   // the user mistakenly building a git app on the hypervisor node.
   const unconnectedGuest = imported && app.origin_kind === "guest" && !app.connected_server_id

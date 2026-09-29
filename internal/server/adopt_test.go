@@ -21,9 +21,9 @@ information never blocks it — GET .../adopt/proposal guesses what it can from 
 configuration (container.inspect, never logged) and a connected GitHub repo's name, each field
 carrying a confidence and where it came from; the confirm dialog opens pre-filled with that. A
 container gets release #0 pointing at the image already running, so a rollback has somewhere to go,
-and its old container is retired automatically once the first real deploy goes live — never before,
-and never announced here beyond checking no destroy was queued. A guest or systemd unit gets no
-release #0 and its old workload is never stopped automatically; the team must confirm it by hand, and
+and its old container keeps running after the first real deploy too (whatever still routes to it
+directly moves only when the team says so). A guest or systemd unit gets no
+release #0. No old workload is ever stopped automatically; the team confirms it with one click, and
 only once a real deploy is live.
 */
 func TestAdoptImportedApp(t *testing.T) {
@@ -216,7 +216,7 @@ func TestAdoptImportedApp(t *testing.T) {
 		owner.expectCode("POST", appPath(web)+"/adopt", map[string]any{"repo_url": "https://github.com/acme/shop-web"}, 409, "not_imported")
 	})
 
-	t.Run("confirming a container's old workload stopped is refused: it retires itself", func(t *testing.T) {
+	t.Run("confirming a container's old workload stopped is refused before a real deploy is live", func(t *testing.T) {
 		owner.expect("POST", appPath(web)+"/adopt/confirm-stop", nil, 409)
 	})
 

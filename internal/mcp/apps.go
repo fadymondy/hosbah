@@ -489,7 +489,8 @@ func AppTools() []Tool {
 		{
 			Name: "adopt_app", Scope: scopes.Deploy,
 			Description: "Turn an imported app into a Hosbah-built git app in place — no rebuild is required to take it over. The running workload keeps " +
-				"serving until the first real deploy (build → health gate → switch); for a container, that deploy then automatically retires the old one.",
+				"serving anything routed to it directly, even after the first real deploy (build → health gate → switch): move that traffic, then " +
+				"confirm_adopted_workload_stopped stops it. Hosbah never stops it on its own.",
 			InputSchema: schema([]string{"app", "repo_url"}, map[string]any{"app": appArg, "repo_url": str("github.com/owner/repo, or a full URL"),
 				"branch": str("Default: main"), "build": map[string]any{"type": "string", "enum": []string{"auto", "dockerfile", "railpack"}, "default": "auto"},
 				"port": map[string]any{"type": "integer", "description": "Default: the app's current port"}}),
@@ -511,7 +512,8 @@ func AppTools() []Tool {
 					return "", err
 				}
 				if rel != nil {
-					return fmt.Sprintf("%s is now a Hosbah git app (release v0 points at its running image). Deploy it to build from git.", updated.Name), nil
+					return fmt.Sprintf("%s is now a Hosbah git app (release v0 points at its running image). Deploy it to build from git; the old container "+
+						"keeps running until you move its traffic and call confirm_adopted_workload_stopped.", updated.Name), nil
 				}
 				return fmt.Sprintf("%s is now a Hosbah git app. Deploy it to build from git; once that deploy is live, confirm_adopted_workload_stopped "+
 					"can stop the old workload.", updated.Name), nil
@@ -519,8 +521,9 @@ func AppTools() []Tool {
 		},
 		{
 			Name: "confirm_adopted_workload_stopped", Scope: scopes.Deploy,
-			Description: "Confirm the old workload of an adopted guest or systemd unit has stopped. Hosbah never stops one on its own — a guest is powered " +
-				"off here, a unit cannot be controlled so this only clears the record. Requires the first real deploy to already be live.",
+			Description: "Stop the old workload of an adopted app, once its traffic has moved. Hosbah never stops one on its own — a container is " +
+				"stopped and removed here (volumes kept), a guest powered off, and a unit cannot be controlled so this only clears the record. " +
+				"Requires the first real deploy to already be live.",
 			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {

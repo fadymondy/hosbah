@@ -2432,10 +2432,10 @@
       "low": "A best guess — please check"
     },
     "stopNoticeTitle": "Old workload still running",
-    "stopNoticeBody": "This app is now a Hosbah build, but the guest or service it replaced is still running and was never stopped automatically. Confirm it has stopped once you have checked yourself — this is only a record, Hosbah does not stop it for you.",
-    "confirmStop": "Confirm it has stopped",
-    "confirmStopTitle": "Confirm the old workload has stopped?",
-    "confirmStopHint": "This only records that you have checked and stopped it yourself. Hosbah never stops it automatically."
+    "stopNoticeBody": "This app is now a Hosbah build, but the container, guest or service it replaced is still running, and still serves anything routed to it directly. Hosbah never stops it on its own: move that traffic first, then stop it here.",
+    "confirmStop": "Stop the old workload",
+    "confirmStopTitle": "Stop the old workload?",
+    "confirmStopHint": "Only once its traffic has moved to this app. A container is stopped and removed (its volumes kept) and a guest is shut down; a systemd service cannot be controlled, so for one this only records that you stopped it yourself."
   },
   "connectGuest": {
     "noticeTitle": "Put a Hosbah agent inside this guest",

@@ -921,7 +921,7 @@ func (d *deps) registerApps(api huma.API) {
 	type confirmStopOut struct{ Body AppOut }
 	huma.Register(api, huma.Operation{OperationID: "confirm-adopted-workload-stopped", Method: http.MethodPost,
 		Path: "/api/teams/{team}/apps/{app}/adopt/confirm-stop", DefaultStatus: http.StatusOK, Tags: tags,
-		Summary: "Confirm the old workload of an adopted guest or systemd unit has stopped — Hosbah never stops one on its own; a container is retired automatically by its first deploy instead (owner, admin or deployer)",
+		Summary: "Stop the old workload of an adopted app once its traffic has moved: a container is stopped and removed (volumes kept), a guest powered off, a systemd unit acknowledged as stopped by hand. Hosbah never stops one on its own; refused until the first deploy from git is live (owner, admin or deployer)",
 	}, func(ctx context.Context, in *AppPath) (*confirmStopOut, error) {
 		out := &confirmStopOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityDeploy, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {

@@ -1030,7 +1030,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	if err := r.op(ctx, "drain", agentproto.KindAppDrain, agentproto.DrainParams{AppID: r.app.ID, Keep: created, GraceSeconds: 10}, nil); err != nil {
 		r.logf("error", "the new release is live, but draining the old containers failed: %v", err)
 	}
-	r.retireAdoptedContainer(ctx)
+	r.noteAdoptedWorkloadStillRunning()
 	return &rel, nil
 }
 

@@ -28,9 +28,10 @@ workloads.go) into a normal, Hosbah-built git app IN PLACE — no rebuild is req
     never stops it on its own.
   - Either way the app's source becomes "git" immediately: the workload keeps serving under whatever
     routed it there until the first real deploy goes through the normal pipeline (build → web on an
-    ephemeral port → health gate → Caddy switch → drain) and, for a container only, automatically
-    retires the old one (retireAdoptedContainer, hooked into service.go's deploy()). Domains are
-    untouched throughout.
+    ephemeral port → health gate → Caddy switch → drain). The old workload — a container too — keeps
+    running after that, because whatever still routes to it directly (an NPM host, a published port)
+    is only moved when the team says so, one domain at a time; it is stopped by the explicit one-click
+    ConfirmAdoptedWorkloadStopped, never on its own. Domains are untouched throughout.
 
 Missing information never blocks adoption: AdoptProposal guesses what it can (a source label, a
 connected GitHub repository whose name matches, a published port) and reports a confidence and a
@@ -177,44 +178,29 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 	return final, rel, nil
 }
 
-// retireAdoptedContainer runs after the first real deploy of an adopted app goes live: the old
-// imported container (still running under its original name) is stopped and removed, and the app's
-// origin is cleared so this never runs again. A guest or systemd unit is never touched here — only a
-// container, and only automatically; see ConfirmAdoptedWorkloadStopped for the other two.
-func (r *runner) retireAdoptedContainer(ctx context.Context) {
-	if r.app.OriginKind == nil || *r.app.OriginKind != "container" || r.app.OriginKey == nil || *r.app.OriginKey == "" {
+// noteAdoptedWorkloadStillRunning runs after each real deploy of an adopted app that still has its
+// old workload: it says so in the deploy log. It never stops anything — traffic still routed straight
+// at the old container or guest (an NPM host, a published port) would go down before the team moved
+// it; ConfirmAdoptedWorkloadStopped is the one-click stop, once it has.
+func (r *runner) noteAdoptedWorkloadStillRunning() {
+	if r.app.OriginKind == nil || *r.app.OriginKind == "" {
 		return
 	}
-	key, name := *r.app.OriginKey, r.app.Name
-	if err := r.op(ctx, "adopt-cleanup", agentproto.KindWorkloadDestroy,
-		agentproto.DestroyParams{WorkloadRef: agentproto.Container(key, name), Purge: false}, nil); err != nil {
-		r.logf("error", "the new release is live, but stopping the imported container %s failed: %v — stop it by hand when convenient", key, err)
-		return
-	}
-	if err := r.tx(ctx, func(q *db.Queries) error {
-		return q.ClearAppOrigin(ctx, db.ClearAppOriginParams{ID: r.app.ID, TeamID: r.dep.TeamID})
-	}); err != nil {
-		r.logf("error", "the imported container %s was retired, but its record could not be cleared: %v", key, err)
-		return
-	}
-	r.logf("info", "the imported container %s has been retired — %s is now fully a Hosbah build", key, name)
+	r.logf("info", "the old %s behind %s is still running for whatever routes to it directly — move that traffic, "+
+		"then confirm it stopped (Hosbah never stops it on its own)", *r.app.OriginKind, r.app.Name)
 }
 
-// ConfirmAdoptedWorkloadStopped is the explicit, one-click action for an adopted guest or systemd
-// unit's old workload: Hosbah never stops one on its own (a container is the only origin retired
-// automatically, by the first real deploy). Requires the first real deploy to have already gone live
-// (a release beyond #0 exists) so nothing is stopped before the app can serve traffic another way. A
-// guest is actually powered off; a unit cannot be controlled at all, so this only acknowledges a
-// manual stop and clears the record.
+// ConfirmAdoptedWorkloadStopped is the explicit, one-click action for an adopted app's old workload:
+// Hosbah never stops one on its own. Requires the first real deploy to have already gone live (a
+// release beyond #0 exists) so nothing is stopped before the app can serve traffic another way. A
+// container is stopped and removed (its volumes kept), a guest is powered off, and a unit cannot be
+// controlled at all, so for one this only acknowledges a manual stop and clears the record.
 func (s *Service) ConfirmAdoptedWorkloadStopped(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App) (db.App, error) {
 	if IsImported(a) {
 		return db.App{}, coded(http.StatusConflict, CodeNotImported, a.Name+" has not been adopted")
 	}
 	if a.OriginKind == nil || *a.OriginKind == "" {
 		return db.App{}, conflict(a.Name + " has no old workload left to confirm — it was already cleared")
-	}
-	if *a.OriginKind == "container" {
-		return db.App{}, conflict(a.Name + "'s old container is retired automatically by its first deploy; there is nothing to confirm")
 	}
 	live, err := q.LiveReleaseOfApp(ctx, a.ID)
 	if err != nil || live.TeamID != teamID || live.Version < 1 {
@@ -234,6 +220,16 @@ func (s *Service) ConfirmAdoptedWorkloadStopped(ctx context.Context, q *db.Queri
 			return db.App{}, err
 		}
 		if _, err := s.AwaitResult(ctx, op, 30*time.Second, nil); err != nil && err != ErrStillRunning {
+			return db.App{}, err
+		}
+	}
+	if *a.OriginKind == "container" && deref(a.OriginKey) != "" {
+		op, err := s.enqueueCommitted(ctx, teamID, actor, w, agentproto.KindWorkloadDestroy,
+			agentproto.DestroyParams{WorkloadRef: w.Ref(), Purge: false}, "workload.destroy", map[string]any{"adopted": true})
+		if err != nil {
+			return db.App{}, err
+		}
+		if _, err := s.AwaitResult(ctx, op, 60*time.Second, nil); err != nil && err != ErrStillRunning {
 			return db.App{}, err
 		}
 	}
