@@ -41,8 +41,9 @@ func TestAppsDomainEdgeReadsThePreRenameVariable(t *testing.T) {
 }
 
 func TestEdgeProxyID(t *testing.T) {
-	if got, want := EdgeProxyID("dom_123"), "edge-dom_123"; got != want {
-		t.Fatalf("EdgeProxyID() = %q, want %q", got, want)
+	// The agent's proxy.set accepts only a UUID (it refused "edge-<id>" live with "bad proxy id").
+	if id := EdgeProxyID("dom_123"); !agentproto.ValidID(id) || (agentproto.ProxyParams{ProxyID: id, Remove: true}).Validate() != nil {
+		t.Fatalf("EdgeProxyID() = %q is not a proxy id the agent accepts", id)
 	}
 	// Distinct domains never collide, and it is stable (the reconcile re-applies it every run).
 	if EdgeProxyID("dom_1") == EdgeProxyID("dom_2") {

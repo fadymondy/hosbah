@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -104,13 +105,20 @@ func (d AppsDomain) PlatformTLS() string {
 	return d.TLS
 }
 
-// edgeProxyIDPrefix marks a proxy.set applied on the apps-edge server for a platform hostname, kept
-// distinct from a team's own proxy_hosts ids (which are plain UUIDs never starting with this).
-const edgeProxyIDPrefix = "edge-"
+// edgeProxyIDSeed namespaces a platform hostname's route on the apps-edge server's Caddy.
+const edgeProxyIDSeed = "hosbah/apps-edge/"
 
 // EdgeProxyID is the deterministic proxy_id of a platform domain's route on the apps-edge server's
-// Caddy: re-applying it (e.g. from the reconcile job) always targets the same Caddy route.
-func EdgeProxyID(domainID string) string { return edgeProxyIDPrefix + domainID }
+// Caddy: re-applying it (e.g. from the reconcile job) always targets the same Caddy route. It is a
+// UUID because the agent's proxy.set accepts nothing else (agentproto.ValidID); name-based (version
+// 5 bits over a SHA-256 of the seed), so it never equals a team's own random (v4) proxy_hosts id.
+func EdgeProxyID(domainID string) string {
+	sum := sha256.Sum256([]byte(edgeProxyIDSeed + domainID))
+	b := sum[:16]
+	b[6] = b[6]&0x0f | 0x50
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 // edgeUpstream is what the apps-edge Caddy dials for an app on srv: the app's own Caddy on :80,
 // reached over the private network. "" when srv has no address to route to.

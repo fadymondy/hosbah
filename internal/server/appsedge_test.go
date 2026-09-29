@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	"github.com/fadymondy/hosbah/internal/deploy"
 )
 
 /*
@@ -86,7 +87,7 @@ func TestAppsEdgeRoutesAPlatformHostnameThroughTheEdgeServer(t *testing.T) {
 		for _, op := range edge.opsSnapshot() {
 			if op.Kind == agentproto.KindProxySet {
 				var p agentproto.ProxyParams
-				if json.Unmarshal(op.Params, &p) == nil && !p.Remove && p.ProxyID == "edge-"+d.ID {
+				if json.Unmarshal(op.Params, &p) == nil && !p.Remove && p.ProxyID == deploy.EdgeProxyID(d.ID) {
 					setOp = op
 				}
 			}
@@ -117,7 +118,7 @@ func TestAppsEdgeRoutesAPlatformHostnameThroughTheEdgeServer(t *testing.T) {
 				continue
 			}
 			var rp agentproto.ProxyParams
-			if json.Unmarshal(op.Params, &rp) == nil && rp.Remove && rp.ProxyID == "edge-"+d.ID {
+			if json.Unmarshal(op.Params, &rp) == nil && rp.Remove && rp.ProxyID == deploy.EdgeProxyID(d.ID) {
 				removeOp = op
 			}
 		}
