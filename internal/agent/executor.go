@@ -626,6 +626,10 @@ func (o *OpContext) Run(name string, args ...string) (int, error) {
 func (o *OpContext) RunEnv(extra []string, name string, args ...string) (int, error) {
 	o.Info("$ %s", shellQuote(append([]string{name}, args...)))
 	cmd := exec.CommandContext(o.Ctx, name, args...)
+	// Its own process group, killed whole at the op's timeout: `docker buildx build` is the docker
+	// CLI exec'ing the docker-buildx plugin, and killing only the CLI left the plugin (and the
+	// BuildKit solve it holds open) running long after the op had timed out.
+	configureGroup(cmd)
 	cmd.Env = append(append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C"), extra...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -672,6 +676,7 @@ func (o *OpContext) RunEnv(extra []string, name string, args ...string) (int, er
 func (o *OpContext) RunStdin(stdin, name string, args ...string) (int, error) {
 	o.Info("$ %s", shellQuote(append([]string{name}, args...)))
 	cmd := exec.CommandContext(o.Ctx, name, args...)
+	configureGroup(cmd)
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive", "LC_ALL=C")
 	cmd.Stdin = strings.NewReader(stdin)
 	stdout, err := cmd.StdoutPipe()

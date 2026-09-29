@@ -446,6 +446,11 @@ func appBuild(oc *OpContext) (any, int, error) {
 	if code, err := dockerReady(oc); err != nil {
 		return nil, code, err
 	}
+	release, err := acquireBuildSlot(oc)
+	if err != nil {
+		return nil, 1, err
+	}
+	defer release()
 	work := filepath.Join(workRoot, "builds", p.DeploymentID)
 	defer os.RemoveAll(work)
 	src := filepath.Join(work, "src")
@@ -522,6 +527,28 @@ func appBuild(oc *OpContext) (any, int, error) {
 	}
 	pruned := pruneImages(oc, p.App, keep, append(p.Protect, p.Image))
 	return agentproto.BuildResult{DetectResult: d, Image: p.Image, ImageID: strings.TrimSpace(id), Pruned: pruned}, 0, nil
+}
+
+// buildSlot lets one image build run on a server at a time. Ops run in a lane per app, so two apps
+// deploying together used to build in parallel — on a 3 GB guest, two no-cache Vite builds pushed
+// the load past 90 and neither finished before its timeout.
+var buildSlot = make(chan struct{}, 1)
+
+// acquireBuildSlot waits for the server's build slot (logging once that it is waiting) and returns
+// its release; it gives up when the op's context ends.
+func acquireBuildSlot(oc *OpContext) (func(), error) {
+	select {
+	case buildSlot <- struct{}{}:
+		return func() { <-buildSlot }, nil
+	default:
+	}
+	oc.Info("another app is building on this server — waiting for it to finish")
+	select {
+	case buildSlot <- struct{}{}:
+		return func() { <-buildSlot }, nil
+	case <-oc.Ctx.Done():
+		return nil, errors.New("timed out waiting for another build on this server to finish")
+	}
 }
 
 func dockerReady(oc *OpContext) (int, error) {

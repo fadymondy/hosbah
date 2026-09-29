@@ -58,6 +58,11 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 	if d := DockerInfo(oc.Ctx); !d.Running {
 		return nil, 1, errors.New("Docker is not running on this server — run the docker.install provisioning step")
 	}
+	release, err := acquireBuildSlot(oc)
+	if err != nil {
+		return nil, 1, err
+	}
+	defer release()
 
 	dir := fastCheckoutDir(p.App)
 	oc.Progress(1, 5)
