@@ -203,6 +203,7 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
   const [sessions, setSessions] = useState("5")
   const [idle, setIdle] = useState("300")
   const [prefix, setPrefix] = useState("BROWSER")
+  const [hostname, setHostname] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -220,7 +221,7 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
         method: "POST",
         body:
           kind === "desktop"
-            ? { name: name.trim(), kind, memory_mb: Number(memory) || 0, cpus: Number(cpus) || 0 }
+            ? { name: name.trim(), kind, memory_mb: Number(memory) || 0, cpus: Number(cpus) || 0, hostname: hostname.trim().toLowerCase() || undefined }
             : {
                 name: name.trim(),
                 kind,
@@ -312,7 +313,13 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
                 <Input id="br-prefix" dir="ltr" pattern="[A-Z][A-Z0-9_]{0,20}" value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} className="font-mono" />
                 <FieldDescription dir="ltr">{`${prefix || "BROWSER"}_WS_ENDPOINT, ${prefix || "BROWSER"}_TOKEN`}</FieldDescription>
               </Field>
-            ) : null}
+            ) : (
+              <Field>
+                <FieldLabel htmlFor="br-hostname">{t("site.browsers.hostname")}</FieldLabel>
+                <Input id="br-hostname" dir="ltr" placeholder="browser.example.com" value={hostname} onChange={(e) => setHostname(e.target.value)} className="font-mono" />
+                <FieldDescription>{t("site.browsers.hostnameHint")}</FieldDescription>
+              </Field>
+            )}
           </FieldGroup>
           <FormError message={error} />
           <DialogFooter>

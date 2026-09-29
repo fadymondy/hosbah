@@ -102,6 +102,8 @@ type BrowserSpec struct {
 	MaxSessions        int64
 	IdleTimeoutSeconds int64
 	EnvPrefix          string
+	// Hostname is a desktop browser's own hostname; "" picks one (see deploy.DesktopBrowserHostname).
+	Hostname string
 }
 
 // ListBrowsers is the app's browsers (team scope).
@@ -270,9 +272,10 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	image := agentproto.BrowserImage
 	if desktop {
 		bind, image = "127.0.0.1", agentproto.DesktopImage
-		var hostname string
-		var teamOwned bool
-		hostname, teamOwned = s.deploy.DesktopBrowserHostname(ctx, q, teamID, name)
+		hostname, teamOwned, err := s.deploy.DesktopBrowserHostname(ctx, q, teamID, a.ID, name, strings.TrimSpace(in.Hostname))
+		if err != nil {
+			return Browser{}, none, err
+		}
 		if hostname == "" {
 			return Browser{}, none, conflict("connect a domain (team Cloudflare, or wait for the apps domain) before creating a desktop browser")
 		}

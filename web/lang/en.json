@@ -3517,6 +3517,8 @@
       "kindHeadless": "Headless (CDP)",
       "kindDesktop": "Desktop (interactive)",
       "kindHeadlessHint": "A bare Chromium your app drives over CDP/WebSocket; no browser window, nothing to look at.",
+      "hostname": "Hostname",
+      "hostnameHint": "Optional. Empty uses browser.<your app's domain> (e.g. browser.example.com). It must be inside one of the team's Cloudflare zones.",
       "kindDesktopHint": "A full interactive desktop at its own address, opened from this list by a team member.",
       "dialogHint": "The first one on a server downloads the browser image, which can take a few minutes.",
       "dialogHintDesktop": "Opens at its own hostname once ready; the first one on a server downloads the desktop image, which can take a few minutes.",

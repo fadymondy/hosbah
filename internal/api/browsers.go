@@ -98,6 +98,7 @@ func (d *deps) registerBrowsers(api huma.API) {
 			MaxSessions        int64   `json:"max_sessions,omitempty" doc:"Headless only: concurrent WebSocket sessions, 1 to 20 (default 5)."`
 			IdleTimeoutSeconds int64   `json:"idle_timeout_seconds,omitempty" doc:"Headless only: a session silent this long is closed, 30 to 3600 (default 300)."`
 			EnvPrefix          string  `json:"env_prefix,omitempty" maxLength:"21" doc:"Headless only: ^[A-Z][A-Z0-9_]{0,20}$ (default BROWSER)."`
+			Hostname           string  `json:"hostname,omitempty" maxLength:"253" doc:"Desktop only: its own hostname, a subdomain of one of the team's Cloudflare zones (default browser.<zone of the app's domain>)."`
 		}
 	}) (*browserCreatedOut, error) {
 		out := &browserCreatedOut{}
@@ -113,7 +114,7 @@ func (d *deps) registerBrowsers(api huma.API) {
 			teamID = m.TeamID
 			out.Body.Browser, op, err = d.dbs().CreateBrowser(ctx, q, m.TeamID, webActor(id), a, dbsvc.BrowserSpec{Name: in.Body.Name,
 				Kind: in.Body.Kind, MemoryMB: in.Body.MemoryMB, CPUs: in.Body.CPUs, MaxSessions: in.Body.MaxSessions,
-				IdleTimeoutSeconds: in.Body.IdleTimeoutSeconds, EnvPrefix: in.Body.EnvPrefix})
+				IdleTimeoutSeconds: in.Body.IdleTimeoutSeconds, EnvPrefix: in.Body.EnvPrefix, Hostname: in.Body.Hostname})
 			return storageErr(err, "could not create the browser")
 		})
 		if err != nil {

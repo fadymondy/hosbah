@@ -14,10 +14,12 @@ import (
 )
 
 /*
-A desktop browser's own hostname: never published directly, always a subdomain of a domain the
-team already controls — its own Cloudflare zone if it has one connected, the platform's apps
-domain otherwise. The label is fixed (browser-<name>), so there is nothing for the caller to choose
-and nothing that could collide with an app's own hostname rules.
+A desktop browser's own hostname: never published directly, always inside a domain the team already
+controls. By default it follows the app's own domain — browser.<zone of the app's first verified
+custom domain> (app.moharrik.com → browser.moharrik.com), browser-<name>.<that zone> when that is
+taken — then browser-<name> under the team's first Cloudflare zone, then under the platform's apps
+domain. A caller may ask for a hostname of its own; it must be a subdomain (never the apex) of one of
+the team's Cloudflare zones, or under the apps domain, and not already routed in Hosbah.
 */
 
 // BrowsersAuthURL is Hosbah's own forward_auth target: every request to a desktop browser's
@@ -25,41 +27,88 @@ and nothing that could collide with an app's own hostname rules.
 // dials the browser's container. See internal/api/browsers.go.
 func (s *Service) BrowsersAuthURL() string { return s.ops.PublicURL() + "/api/browsers/auth" }
 
-// DesktopBrowserHostname picks a hostname for a new desktop browser: browser-<name> under the
-// team's own Cloudflare zone (first zone any of its saved credentials can see), or under the
-// platform apps domain when the team has none. "" means neither is available — the caller must
-// refuse to create a desktop browser until the team connects one.
-func (s *Service) DesktopBrowserHostname(ctx context.Context, q *db.Queries, teamID, name string) (hostname string, teamOwned bool) {
+// DesktopBrowserHostname picks (requested "") or checks (requested set) the hostname of a new
+// desktop browser of app. teamOwned is true for a hostname in one of the team's Cloudflare zones,
+// false for one under the platform apps domain. A requested hostname Hosbah may not route is an
+// error; "" with no error means nothing is available — the caller refuses until the team connects a
+// domain.
+func (s *Service) DesktopBrowserHostname(ctx context.Context, q *db.Queries, teamID, appID, name, requested string) (hostname string, teamOwned bool, err error) {
+	zones := s.teamZones(ctx, q, teamID)
+	if requested != "" {
+		h := NormalizeHostname(requested)
+		if !agentproto.ValidHostname(h) {
+			return "", false, invalid("that is not a valid hostname")
+		}
+		zone := zoneOf(zones, h)
+		switch {
+		case zone != "" && zone == h:
+			return "", false, invalid("a browser takes a subdomain of " + zone + ", never the domain itself")
+		case zone != "":
+			teamOwned = true
+		case s.apps.Enabled() && s.apps.Owns(h) && !s.apps.Reserved(h):
+		default:
+			return "", false, invalid(h + " is not in any of the team's Cloudflare zones — connect its zone first")
+		}
+		if s.hostnameTaken(ctx, h) {
+			return "", false, conflict(h + " is already routed in Hosbah")
+		}
+		return h, teamOwned, nil
+	}
 	label := "browser-" + name
-	if domain := s.teamPrimaryDomain(ctx, q, teamID); domain != "" {
-		if h := label + "." + domain; agentproto.ValidHostname(h) && !s.hostnameTaken(ctx, h) {
-			return h, true
+	if domains, err := q.ListDomainsOfApp(ctx, db.ListDomainsOfAppParams{AppID: appID, TeamID: teamID}); err == nil {
+		for _, d := range domains {
+			zone := zoneOf(zones, d.Hostname)
+			if d.VerifiedAt == nil || zone == "" {
+				continue
+			}
+			for _, h := range []string{"browser." + zone, label + "." + zone} {
+				if agentproto.ValidHostname(h) && !s.hostnameTaken(ctx, h) {
+					return h, true, nil
+				}
+			}
+		}
+	}
+	if len(zones) > 0 {
+		if h := label + "." + zones[0]; agentproto.ValidHostname(h) && !s.hostnameTaken(ctx, h) {
+			return h, true, nil
 		}
 	}
 	if s.apps.Enabled() {
 		if h := label + "." + s.apps.Domain; agentproto.ValidHostname(h) && !s.apps.Reserved(h) && !s.hostnameTaken(ctx, h) {
-			return h, false
+			return h, false, nil
 		}
 	}
-	return "", false
+	return "", false, nil
 }
 
-// teamPrimaryDomain is the first zone name any of the team's saved Cloudflare credentials can see,
-// "" when the team has none connected or none answered. Best effort: a Cloudflare hiccup here just
-// means the caller falls back to the apps domain rather than fail the whole request.
-func (s *Service) teamPrimaryDomain(ctx context.Context, q *db.Queries, teamID string) string {
+// zoneOf is the longest of zones that host is, or is a subdomain of; "" when none.
+func zoneOf(zones []string, host string) string {
+	best := ""
+	for _, z := range zones {
+		if (host == z || strings.HasSuffix(host, "."+z)) && len(z) > len(best) {
+			best = z
+		}
+	}
+	return best
+}
+
+// teamZones is every zone name the team's saved Cloudflare credentials can see, in credential then
+// zone order; empty when none is connected or none answered. Best effort: a Cloudflare hiccup here
+// just means the caller falls back to the apps domain rather than fail the whole request.
+func (s *Service) teamZones(ctx context.Context, q *db.Queries, teamID string) []string {
 	creds, err := q.ListCredentialsOfTeam(ctx, teamID)
 	if err != nil {
-		return ""
+		return nil
 	}
 	var dek []byte
+	var out []string
 	for _, c := range creds {
 		if c.Provider != "cloudflare" {
 			continue
 		}
 		if dek == nil {
 			if dek, err = s.ops.TeamDEK(ctx, q, teamID); err != nil {
-				return ""
+				return nil
 			}
 		}
 		tok, err := crypto.Open(dek, teamID, provisioning.CredentialContext(c.ID), c.SecretSealed)
@@ -70,12 +119,14 @@ func (s *Service) teamPrimaryDomain(ctx context.Context, q *db.Queries, teamID s
 		cctx, cancel := context.WithTimeout(ctx, dnsTimeout)
 		zones, err := cf.Zones(cctx)
 		cancel()
-		if err != nil || len(zones) == 0 {
+		if err != nil {
 			continue
 		}
-		return strings.ToLower(strings.TrimSuffix(zones[0].Name, "."))
+		for _, z := range zones {
+			out = append(out, strings.ToLower(strings.TrimSuffix(z.Name, ".")))
+		}
 	}
-	return ""
+	return out
 }
 
 // wireDesktopBrowserDNS points a desktop browser's hostname at its server, through the team's

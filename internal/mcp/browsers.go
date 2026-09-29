@@ -80,8 +80,8 @@ func BrowserTools() []Tool {
 			Description: "Add a browser to an app, on the app's server. kind headless (default) is a bare Chromium the app drives over " +
 				"CDP/WebSocket, setting <PREFIX>_WS_ENDPOINT and <PREFIX>_TOKEN on the app as sealed variables (next deploy or restart; " +
 				"refused when one of those names is already set). kind desktop is a full interactive desktop at its own hostname, opened by " +
-				"open_app_browser — no env vars, no token; access is Hosbah's own forward_auth on that hostname, refused if the team has no " +
-				"domain to put it under yet. Either way the image is fixed by Hosbah and the app has at most 3 browsers total. Owner or admin.",
+				"open_app_browser — no env vars, no token; access is Hosbah's own forward_auth on that hostname (browser.<the app's own " +
+				"domain zone> unless hostname is given), refused if the team has no domain to put it under yet. Either way the image is fixed by Hosbah and the app has at most 3 browsers total. Owner or admin.",
 			InputSchema: schema([]string{"app", "name"}, map[string]any{"app": appArg,
 				"name":                 str("Lowercase letter, then up to 30 lowercase letters, digits and dashes; unique in the app"),
 				"kind":                 str("headless (default) or desktop"),
@@ -89,7 +89,8 @@ func BrowserTools() []Tool {
 				"cpus":                 num("0.25 to 4 (default 1)"),
 				"max_sessions":         num("Headless only: concurrent sessions, 1 to 20 (default 5)"),
 				"idle_timeout_seconds": num("Headless only: a session silent this long is closed, 30 to 3600 (default 300)"),
-				"env_prefix":           str("Headless only: prefix of the variables (default BROWSER): an upper-case letter, then upper-case letters, digits and _")}),
+				"env_prefix":           str("Headless only: prefix of the variables (default BROWSER): an upper-case letter, then upper-case letters, digits and _"),
+				"hostname":             str("Desktop only: its own hostname, a subdomain of one of the team's Cloudflare zones (default browser.<zone of the app's domain>, e.g. browser.example.com)")}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {
 					return "", err
@@ -105,7 +106,7 @@ func BrowserTools() []Tool {
 				cpus, _ := args["cpus"].(float64)
 				b, op, err := s.CreateBrowser(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, dbsvc.BrowserSpec{Name: args.Str("name"),
 					Kind: args.Str("kind"), MemoryMB: n64(args, "memory_mb"), CPUs: cpus, MaxSessions: n64(args, "max_sessions"),
-					IdleTimeoutSeconds: n64(args, "idle_timeout_seconds"), EnvPrefix: args.Str("env_prefix")})
+					IdleTimeoutSeconds: n64(args, "idle_timeout_seconds"), EnvPrefix: args.Str("env_prefix"), Hostname: args.Str("hostname")})
 				if err != nil {
 					return "", err
 				}
