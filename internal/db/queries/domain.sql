@@ -55,3 +55,10 @@ UPDATE domains SET tls = sqlc.arg('tls'), updated_at = now() WHERE id = sqlc.arg
 -- name: ListPlatformDomains :many
 -- System scope: every app's platform hostname across every team, for the apps-edge reconcile.
 SELECT * FROM domains WHERE verify_token = 'platform' ORDER BY hostname;
+
+-- name: ListAdoptedAppsWithoutPlatformDomain :many
+-- System scope: adopted git apps with no platform hostname (adopted before adoption gave one).
+SELECT a.* FROM apps a
+WHERE a.source = 'git' AND a.origin_kind IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM domains d WHERE d.app_id = a.id AND d.verify_token = 'platform')
+ORDER BY a.created_at;

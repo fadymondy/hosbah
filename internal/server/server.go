@@ -111,6 +111,9 @@ func Boot() *app.App {
 	// edge existed (or before it was configured) gets fixed without a manual DB edit. Also exposed as
 	// the apps_edge_sync admin MCP tool for an on-demand re-run.
 	go func() {
+		if n := deploys.BackfillAdoptedAppsHostnames(context.Background()); n > 0 {
+			a.Log.Info("apps domain: gave adopted apps their platform hostname", "apps", n)
+		}
 		if res := deploys.SyncAppsEdge(context.Background()); res.EdgeConfigured {
 			a.Log.Info("apps edge: reconciled", "domains", res.Domains, "tls_fixed", res.TLSFixed,
 				"routed", res.Routed, "skipped", res.Skipped, "errors", res.Errors)

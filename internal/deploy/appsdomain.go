@@ -218,6 +218,43 @@ func (s *Service) addAppsHostname(ctx context.Context, q *db.Queries, teamID str
 	s.enqueueEdgeProxySet(ctx, teamID, host, d.ID, srv, false)
 }
 
+// BackfillAdoptedAppsHostnames gives every adopted app its platform hostname if it has none: apps
+// adopted before adoption gave one (a platform hostname cannot be removed, so a missing one was never
+// there). Best effort, at boot; returns how many were added.
+func (s *Service) BackfillAdoptedAppsHostnames(ctx context.Context) int {
+	if !s.apps.Enabled() {
+		return 0
+	}
+	var apps []db.App
+	if err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
+		var err error
+		apps, err = q.ListAdoptedAppsWithoutPlatformDomain(ctx)
+		return err
+	}); err != nil {
+		s.log.Warn("apps domain: could not list adopted apps", "err", err)
+		return 0
+	}
+	added := 0
+	for _, a := range apps {
+		teamID := a.TeamID
+		err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
+			srv, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: a.ServerID, TeamID: teamID})
+			if err != nil {
+				return err
+			}
+			s.addAppsHostname(ctx, q, teamID, a, srv)
+			if s.hasAppsHostname(ctx, q, teamID, a.ID) {
+				added++
+			}
+			return nil
+		})
+		if err != nil {
+			s.log.Warn("apps domain: could not backfill an adopted app's hostname", "app", a.ID, "err", err)
+		}
+	}
+	return added
+}
+
 // hasAppsHostname: the app already has a hostname under the apps domain.
 func (s *Service) hasAppsHostname(ctx context.Context, q *db.Queries, teamID, appID string) bool {
 	ds, err := q.ListDomainsOfApp(ctx, db.ListDomainsOfAppParams{AppID: appID, TeamID: teamID})

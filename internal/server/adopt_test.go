@@ -164,6 +164,20 @@ func TestAdoptImportedApp(t *testing.T) {
 			t.Fatalf("an adopted app gets one platform hostname: %+v", domains.Domains)
 		}
 
+		// Adopted before adoption gave one (the row is simply not there, no removal recorded): the
+		// boot backfill adds it.
+		if _, err := testDB(t).Exec(`DELETE FROM domains WHERE app_id = $1`, out.App.ID); err != nil {
+			t.Fatal(err)
+		}
+		lastDeploy.BackfillAdoptedAppsHostnames(context.Background())
+		var backfilled struct {
+			Domains []struct{ Hostname string } `json:"domains"`
+		}
+		owner.mustJSON("GET", appPath(web)+"/domains", nil, 200, &backfilled)
+		if len(backfilled.Domains) != 1 || backfilled.Domains[0].Hostname != domains.Domains[0].Hostname {
+			t.Fatalf("the boot backfill gives an adopted app its platform hostname back: %+v", backfilled.Domains)
+		}
+
 		var env struct {
 			Variables []struct{ Name string } `json:"variables"`
 		}
