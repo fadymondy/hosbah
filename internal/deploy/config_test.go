@@ -164,3 +164,18 @@ func TestPinnedTools(t *testing.T) {
 		t.Error("an unpinned arch was accepted")
 	}
 }
+
+// A fast build with no hosbah.toml keeps the live release's processes and release command, but the
+// app's current port and health check: changing the health path must apply on the next deploy.
+func TestKeepLiveProcessesKeepsCurrentHealth(t *testing.T) {
+	eff := Resolve(AppConfig{}, Defaults{Port: 5190, HealthPath: "/en", HealthTimeout: 90})
+	live := Effective{Port: 3000, HealthPath: "/", HealthTimeout: 30, Release: "migrate",
+		Processes: map[string]string{"web": "node server.js", "worker:jobs": "node jobs.js"}}
+	got := keepLiveProcesses(eff, live)
+	if got.Port != 5190 || got.HealthPath != "/en" || got.HealthTimeout != 90 {
+		t.Fatalf("port/health = %d %q %d, want the app's 5190 /en 90", got.Port, got.HealthPath, got.HealthTimeout)
+	}
+	if got.Release != "migrate" || got.Processes["worker:jobs"] != "node jobs.js" || got.Processes["web"] != "node server.js" {
+		t.Fatalf("processes/release not kept: %+v", got)
+	}
+}

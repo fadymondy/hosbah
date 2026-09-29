@@ -201,6 +201,17 @@ type Effective struct {
 	ProcessResources map[string]agentproto.ResourceLimits `json:"process_resources,omitempty"`
 }
 
+// keepLiveProcesses is eff with the live release's processes and release command, for a fast build
+// that returned no hosbah.toml. Only those: the port, health check and resources stay the app's
+// current settings, so changing the health path takes effect on the very next deploy.
+func keepLiveProcesses(eff, live Effective) Effective {
+	if len(live.Processes) > 0 {
+		eff.Processes = live.Processes
+	}
+	eff.Release = live.Release
+	return eff
+}
+
 // ResourcesFor is the limits StartParams uses for one process: its own override if any, else the
 // app's base resources.
 func (e Effective) ResourcesFor(process string) agentproto.ResourceLimits {

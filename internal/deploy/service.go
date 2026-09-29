@@ -910,7 +910,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 		// live release's processes and release command rather than silently dropping them.
 		var prev Effective
 		if err := json.Unmarshal([]byte(r.live.Config), &prev); err == nil && prev.Port != 0 {
-			eff = prev
+			eff = keepLiveProcesses(eff, prev)
 			r.logf("info", "fast track: keeping the processes and release command of release v%d", r.live.Version)
 		}
 	}
