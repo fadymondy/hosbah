@@ -69,14 +69,16 @@ func httpRulesSet(oc *OpContext) (any, int, error) {
 	return map[string]any{"applied": true}, 0, nil
 }
 
-// renderTargetRoutes builds every Caddy route needed to serve hosts through mainHandler (a
-// reverse_proxy handler, already fully built by the caller), honouring rules. baseID is the @id the
-// single route would have had before this feature existed (RouteID(id)+suffix for an app,
-// ProxyRouteID(id) for a proxy host) — when rules is nil/Empty, the return is exactly that one route,
-// byte-identical to the old behaviour.
-func renderTargetRoutes(baseID string, hosts []string, mainHandler map[string]any, rules *agentproto.HTTPRules) []any {
+// renderTargetRoutes builds every Caddy route needed to serve hosts through mainHandlers (already
+// fully built by the caller — the real reverse_proxy handler, optionally preceded by a
+// forwardAuthHandler that gates it), honouring rules. baseID is the @id the single route would have
+// had before this feature existed (RouteID(id)+suffix for an app, ProxyRouteID(id) for a proxy
+// host) — when rules is nil/Empty, the return is exactly that one route, byte-identical to the old
+// behaviour (mainHandlers is almost always a single-element slice; a forward_auth'd proxy host is
+// the only caller that passes two).
+func renderTargetRoutes(baseID string, hosts []string, mainHandlers []any, rules *agentproto.HTTPRules) []any {
 	if rules == nil || rules.Empty() {
-		return []any{simpleRoute(baseID, hosts, mainHandler)}
+		return []any{simpleRoute(baseID, hosts, mainHandlers)}
 	}
 
 	var routes []any
@@ -95,18 +97,18 @@ func renderTargetRoutes(baseID string, hosts []string, mainHandler map[string]an
 		routes = append(routes, redirectRoute(fmt.Sprintf("%s-redirect-%d", baseID, i), hosts, r))
 	}
 
-	// 3) Everything else finally reaches mainHandler, wrapped with response headers and, unless the
+	// 3) Everything else finally reaches mainHandlers, wrapped with response headers and, unless the
 	// path is exempt, basic auth.
-	routes = append(routes, servingRoutes(baseID, hosts, mainHandler, rules)...)
+	routes = append(routes, servingRoutes(baseID, hosts, mainHandlers, rules)...)
 	return routes
 }
 
-func simpleRoute(id string, hosts []string, handler map[string]any) map[string]any {
+func simpleRoute(id string, hosts []string, handlers []any) map[string]any {
 	return map[string]any{
 		"@id":      id,
 		"match":    []any{map[string]any{"host": hosts}},
 		"terminal": true,
-		"handle":   []any{handler},
+		"handle":   handlers,
 	}
 }
 
@@ -184,10 +186,10 @@ func redirectRoute(id string, hosts []string, r agentproto.RedirectRule) map[str
 	}
 }
 
-// servingRoutes builds the route(s) that end in mainHandler: an always-open exempt route (if basic
+// servingRoutes builds the route(s) that end in mainHandlers: an always-open exempt route (if basic
 // auth is on and has exempt paths), then either a path-scoped auth route plus a plain catch-all, or
 // a single route (auth-gated whole-site, or no auth at all).
-func servingRoutes(baseID string, hosts []string, mainHandler map[string]any, rules *agentproto.HTTPRules) []any {
+func servingRoutes(baseID string, hosts []string, mainHandlers []any, rules *agentproto.HTTPRules) []any {
 	ba := rules.BasicAuth
 	chain := func(withAuth bool) []any {
 		var h []any
@@ -195,7 +197,7 @@ func servingRoutes(baseID string, hosts []string, mainHandler map[string]any, ru
 			h = append(h, basicAuthHandler(ba))
 		}
 		h = append(h, headerHandlers(rules.Headers)...)
-		h = append(h, mainHandler)
+		h = append(h, mainHandlers...)
 		return h
 	}
 

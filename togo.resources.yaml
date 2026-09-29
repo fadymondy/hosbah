@@ -451,6 +451,50 @@ resources:
           gql: String!
           pg: text
           "null": false
+        - name: kind
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: hostname
+          go: string
+          gql: String
+          pg: text
+          "null": true
+      controller: true
+    - name: BrowserAuthToken
+      table: browser_auth_tokens
+      fields:
+        - name: team_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: browser_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: user_id
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: token_hash
+          go: string
+          gql: String!
+          pg: text
+          "null": false
+        - name: expires_at
+          go: time.Time
+          gql: String!
+          pg: timestamptz
+          "null": false
+        - name: used_at
+          go: time.Time
+          gql: String
+          pg: timestamptz
+          "null": true
       controller: true
     - name: AppBucket
       table: app_buckets
@@ -2630,6 +2674,16 @@ resources:
           gql: String!
           pg: text
           "null": false
+        - name: browser_id
+          go: string
+          gql: String
+          pg: text
+          "null": true
+        - name: forward_auth
+          go: string
+          gql: String
+          pg: text
+          "null": true
       controller: true
     - name: ProxyHostHTTPRule
       table: proxy_host_httprules

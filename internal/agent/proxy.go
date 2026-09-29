@@ -26,7 +26,7 @@ func proxySet(oc *OpContext) (any, int, error) {
 			delete(t.Proxies, p.ProxyID)
 			return
 		}
-		t.Proxies[p.ProxyID] = proxyEntry{Host: agentproto.Route{Hostname: p.Hostname, TLS: p.TLS}, Dial: up.Dial, TLS: up.TLS, SkipVerify: p.SkipVerify}
+		t.Proxies[p.ProxyID] = proxyEntry{Host: agentproto.Route{Hostname: p.Hostname, TLS: p.TLS}, Dial: up.Dial, TLS: up.TLS, SkipVerify: p.SkipVerify, ForwardAuth: p.ForwardAuth}
 	})
 	if err != nil {
 		return nil, 1, err

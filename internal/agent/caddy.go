@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -208,6 +210,73 @@ type proxyEntry struct {
 	SkipVerify bool             `json:"skip_verify,omitempty"`
 	// Rules (MH-578 E4-E6): same as routeEntry.Rules, for a proxy host.
 	Rules *agentproto.HTTPRules `json:"rules,omitempty"`
+	// ForwardAuth (agentproto.ProxyParams.ForwardAuth): when set, renderCaddy gates every request to
+	// this host on that URL before the real upstream (Dial) is ever reached — see
+	// forwardAuthHandler. Used for a desktop browser's own hostname.
+	ForwardAuth string `json:"forward_auth,omitempty"`
+}
+
+// forwardAuthHandler builds the reverse_proxy handler that gates a route on an auth URL (Hosbah's
+// own GET /api/browsers/auth for a desktop browser's hostname). It mirrors Caddy's own forward_auth
+// directive: a reverse_proxy to authURL, whose outgoing subrequest is rewritten to a fixed GET at
+// authURL's own path — the real request's method and URI are carried instead in
+// X-Forwarded-Method/X-Forwarded-Uri, exactly as Caddy's forward_auth sets them — with a
+// handle_response that, on a 2xx answer, copies the auth response's headers through and then falls
+// through to the next handler in this route (the real upstream — never reached until the auth
+// check has passed), and on anything else, copies the auth response verbatim back to the client
+// (its redirect to Hosbah's login, a 403, ...); the real upstream is never dialed in that case.
+func forwardAuthHandler(authURL string) map[string]any {
+	dial, path := forwardAuthTarget(authURL)
+	return map[string]any{
+		"handler":   "reverse_proxy",
+		"upstreams": []any{map[string]any{"dial": dial}},
+		"transport": map[string]any{"protocol": "http", "tls": map[string]any{}},
+		"rewrite":   map[string]any{"method": "GET", "uri": path},
+		"headers": map[string]any{
+			"request": map[string]any{
+				"set": map[string]any{
+					"X-Forwarded-Method": []string{"{http.request.method}"},
+					"X-Forwarded-Uri":    []string{"{http.request.uri}"},
+				},
+			},
+		},
+		"handle_response": []any{
+			map[string]any{
+				"match": map[string]any{"status_code": []any{2}},
+				"routes": []any{
+					map[string]any{"handle": []any{map[string]any{"handler": "copy_response_headers"}}},
+				},
+			},
+			map[string]any{
+				"routes": []any{
+					map[string]any{"handle": []any{map[string]any{"handler": "copy_response"}}},
+				},
+			},
+		},
+	}
+}
+
+// forwardAuthTarget splits a forward_auth URL into what to dial and the fixed path/query Caddy asks
+// on every request. agentproto.ProxyParams.Validate already refused anything but an https:// URL;
+// a malformed one here (a corrupt routes.json) dials nothing reachable rather than risk an auth
+// check that always passes.
+func forwardAuthTarget(authURL string) (dial, path string) {
+	u, err := url.Parse(authURL)
+	if err != nil || u.Host == "" {
+		return "127.0.0.1:0", "/"
+	}
+	dial = u.Host
+	if !strings.Contains(dial, ":") {
+		dial += ":443"
+	}
+	path = u.Path
+	if path == "" {
+		path = "/"
+	}
+	if u.RawQuery != "" {
+		path += "?" + u.RawQuery
+	}
+	return dial, path
 }
 
 // renderCaddy turns the route table into Caddy's JSON config. accessLog wires the access-log
@@ -282,13 +351,13 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			if rt != nil {
 				httpRoutes = append(httpRoutes, realtimeCaddyRoute(id, "-http", plain, *rt))
 			}
-			httpRoutes = append(httpRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-http", plain, mainHandler, e.Rules)...)
+			httpRoutes = append(httpRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-http", plain, []any{mainHandler}, e.Rules)...)
 		}
 		if len(secure) > 0 {
 			if rt != nil {
 				httpsRoutes = append(httpsRoutes, realtimeCaddyRoute(id, "-https", secure, *rt))
 			}
-			httpsRoutes = append(httpsRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-https", secure, mainHandler, e.Rules)...)
+			httpsRoutes = append(httpsRoutes, renderTargetRoutes(agentproto.RouteID(id)+"-https", secure, []any{mainHandler}, e.Rules)...)
 		}
 	}
 	pids := make([]string, 0, len(t.Proxies))
@@ -306,7 +375,12 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 			}
 			proxy["transport"] = tr
 		}
-		rs := renderTargetRoutes(agentproto.ProxyRouteID(id), []string{p.Host.Hostname}, proxy, p.Rules)
+		var handlers []any
+		if p.ForwardAuth != "" {
+			handlers = append(handlers, forwardAuthHandler(p.ForwardAuth))
+		}
+		handlers = append(handlers, proxy)
+		rs := renderTargetRoutes(agentproto.ProxyRouteID(id), []string{p.Host.Hostname}, handlers, p.Rules)
 		switch p.Host.TLS {
 		case "off":
 			httpRoutes = append(httpRoutes, rs...)

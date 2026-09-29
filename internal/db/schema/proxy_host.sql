@@ -11,6 +11,8 @@ CREATE TABLE proxy_hosts (
     verify_token text NOT NULL,
     verified_at timestamptz,
     created_by text NOT NULL,
+    browser_id text,
+    forward_auth text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -18,11 +20,17 @@ CREATE TABLE proxy_hosts (
 -- Hosbah: the Caddy proxy manager. A proxy host routes a hostname on one of the team's servers to
 -- any upstream (host:port or http(s)://host:port), like an Nginx Proxy Manager "proxy host". The
 -- hostname is unique across Hosbah together with domains (checked on insert in system scope), and
--- gets a public certificate only once verified, exactly like an app domain.
+-- gets a public certificate only once verified, exactly like an app domain. browser_id and
+-- forward_auth are set only for a desktop browser's own hostname: browser_id ties the row back to
+-- app_browsers (for cleanup when the browser goes), and forward_auth is Hosbah's own
+-- /api/browsers/auth URL, applied to the agent's proxy.set so Caddy gates every request behind a
+-- valid session and team membership before it ever dials the desktop's upstream.
 ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_tls_check CHECK (tls IN ('auto', 'internal', 'off'));
 ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_hostname_check CHECK (
     hostname = lower(hostname) AND length(hostname) <= 253
     AND hostname ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
 ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_upstream_check CHECK (length(upstream) BETWEEN 3 AND 300);
+ALTER TABLE proxy_hosts ADD CONSTRAINT proxy_hosts_forward_auth_check CHECK (forward_auth IS NULL OR forward_auth LIKE 'https://%');
 CREATE UNIQUE INDEX proxy_hosts_hostname_key ON proxy_hosts (hostname);
 CREATE INDEX proxy_hosts_server_idx ON proxy_hosts (server_id);
+CREATE INDEX proxy_hosts_browser_idx ON proxy_hosts (browser_id) WHERE browser_id IS NOT NULL;

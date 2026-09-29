@@ -31,15 +31,25 @@ SELECT b.host_port FROM app_browsers b JOIN apps a ON a.id = b.app_id AND a.team
 WHERE a.server_id = sqlc.arg('server_id') AND b.team_id = sqlc.arg('team_id') AND b.host_port IS NOT NULL;
 
 -- name: InsertAppBrowser :one
-INSERT INTO app_browsers (id, team_id, app_id, name, image, memory_mb, cpus, max_sessions, idle_timeout_seconds, env_prefix, token_sealed, host_port, status)
+INSERT INTO app_browsers (id, team_id, app_id, name, image, memory_mb, cpus, max_sessions, idle_timeout_seconds, env_prefix, token_sealed, host_port, status, kind)
 VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('name'), sqlc.arg('image'), sqlc.arg('memory_mb'), sqlc.arg('cpus'),
-    sqlc.arg('max_sessions'), sqlc.arg('idle_timeout_seconds'), sqlc.arg('env_prefix'), sqlc.arg('token_sealed'), sqlc.arg('host_port'), 'creating')
+    sqlc.arg('max_sessions'), sqlc.arg('idle_timeout_seconds'), sqlc.arg('env_prefix'), sqlc.arg('token_sealed'), sqlc.arg('host_port'), 'creating', sqlc.arg('kind'))
 RETURNING *;
 
 -- name: SetAppBrowserStatus :execrows
 -- Team scope, or the background worker (system + team). from guards the transition.
 UPDATE app_browsers SET status = sqlc.arg('status'), error = sqlc.narg('error'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND status = sqlc.arg('from')::text;
+
+-- name: SetAppBrowserHostname :execrows
+-- Team scope: records the hostname Hosbah wired for a desktop browser.
+UPDATE app_browsers SET hostname = sqlc.arg('hostname'), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: BrowserByHostname :one
+-- System scope only: forward_auth looks a browser up by the hostname Caddy is asking about, before
+-- it knows the team. proxy_hosts has the same system-SELECT policy for the same reason.
+SELECT * FROM app_browsers WHERE hostname = sqlc.arg('hostname');
 
 -- name: DeleteAppBrowserInTeam :execrows
 DELETE FROM app_browsers WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');

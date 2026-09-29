@@ -2,6 +2,8 @@ package dbsvc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -58,17 +60,20 @@ func BrowserEnvNames(prefix string) []string {
 }
 
 // Browser is an app browser as the API shows it. The token is never part of it, and neither is the
-// endpoint (it carries the token).
+// endpoint (it carries the token). Kind is "headless" (the default, driven over CDP by the app) or
+// "desktop" (a full interactive KasmVNC/Chromium session at Hostname, opened by a team member).
 type Browser struct {
 	ID                 string    `json:"id"`
 	Name               string    `json:"name"`
-	Image              string    `json:"image" doc:"The headless Chromium image, fixed by Hosbah."`
+	Kind               string    `json:"kind" enum:"headless,desktop"`
+	Image              string    `json:"image" doc:"The browser image, fixed by Hosbah for the chosen kind."`
 	MemoryMB           int64     `json:"memory_mb"`
 	CPUs               float64   `json:"cpus"`
-	MaxSessions        int64     `json:"max_sessions"`
-	IdleTimeoutSeconds int64     `json:"idle_timeout_seconds"`
-	EnvPrefix          string    `json:"env_prefix"`
-	Env                []string  `json:"env" doc:"The variables this browser set on the app."`
+	MaxSessions        int64     `json:"max_sessions" doc:"Headless only."`
+	IdleTimeoutSeconds int64     `json:"idle_timeout_seconds" doc:"Headless only."`
+	EnvPrefix          string    `json:"env_prefix" doc:"Headless only."`
+	Env                []string  `json:"env" doc:"The variables this browser set on the app. Empty for a desktop browser."`
+	Hostname           *string   `json:"hostname" doc:"Desktop only: where a team member opens it."`
 	Status             string    `json:"status" enum:"creating,ready,failed,removing"`
 	Error              *string   `json:"error"`
 	Running            *bool     `json:"running" doc:"Whether its container runs; null when the server did not answer."`
@@ -78,14 +83,20 @@ type Browser struct {
 }
 
 func browserView(b db.AppBrowser) Browser {
-	return Browser{ID: b.ID, Name: b.Name, Image: b.Image, MemoryMB: b.MemoryMb, CPUs: b.Cpus, MaxSessions: b.MaxSessions,
-		IdleTimeoutSeconds: b.IdleTimeoutSeconds, EnvPrefix: b.EnvPrefix, Env: BrowserEnvNames(b.EnvPrefix), Status: b.Status,
+	env := []string{}
+	if b.Kind != agentproto.BrowserKindDesktop {
+		env = BrowserEnvNames(b.EnvPrefix)
+	}
+	return Browser{ID: b.ID, Name: b.Name, Kind: b.Kind, Image: b.Image, MemoryMB: b.MemoryMb, CPUs: b.Cpus, MaxSessions: b.MaxSessions,
+		IdleTimeoutSeconds: b.IdleTimeoutSeconds, EnvPrefix: b.EnvPrefix, Env: env, Hostname: b.Hostname, Status: b.Status,
 		Error: b.Error, CreatedAt: b.CreatedAt}
 }
 
 // BrowserSpec is what a caller may choose. Zero values take the defaults. The image is not in it.
+// Kind "" reads as headless. A desktop browser ignores EnvPrefix (it sets no app env vars).
 type BrowserSpec struct {
 	Name               string
+	Kind               string
 	MemoryMB           int64
 	CPUs               float64
 	MaxSessions        int64
@@ -184,6 +195,14 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	if deploy.IsImported(a) {
 		return Browser{}, none, invalid("browsers belong to a site Hosbah deploys — " + a.Name + " is an imported app")
 	}
+	kind := strings.TrimSpace(in.Kind)
+	if kind == "" {
+		kind = agentproto.BrowserKindHeadless
+	}
+	if !agentproto.ValidBrowserKind(kind) {
+		return Browser{}, none, invalid("kind must be headless or desktop")
+	}
+	desktop := kind == agentproto.BrowserKindDesktop
 	name := strings.TrimSpace(in.Name)
 	if !agentproto.ValidBrowserName(name) {
 		return Browser{}, none, invalid("a browser name is a lowercase letter, then up to 30 lowercase letters, digits and dashes")
@@ -192,11 +211,15 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	if prefix == "" {
 		prefix = DefaultBrowserPrefix
 	}
-	if !bucketPrefixRE.MatchString(prefix) {
+	if !desktop && !bucketPrefixRE.MatchString(prefix) {
 		return Browser{}, none, invalid("env_prefix is an upper-case letter, then up to 20 upper-case letters, digits and _")
 	}
 	var err error
-	if in.MemoryMB, err = between(in.MemoryMB, agentproto.BrowserDefaultMemoryMB, agentproto.BrowserMinMemoryMB, agentproto.BrowserMaxMemoryMB, "memory_mb"); err != nil {
+	defMemory, minMemory, maxMemory := agentproto.BrowserDefaultMemoryMB, agentproto.BrowserMinMemoryMB, agentproto.BrowserMaxMemoryMB
+	if desktop {
+		defMemory, minMemory, maxMemory = agentproto.DesktopDefaultMemoryMB, agentproto.DesktopMinMemoryMB, agentproto.DesktopMaxMemoryMB
+	}
+	if in.MemoryMB, err = between(in.MemoryMB, int64(defMemory), int64(minMemory), int64(maxMemory), "memory_mb"); err != nil {
 		return Browser{}, none, err
 	}
 	if in.CPUs, err = between(in.CPUs, agentproto.BrowserDefaultCPUs, agentproto.BrowserMinCPUs, agentproto.BrowserMaxCPUs, "cpus"); err != nil {
@@ -225,9 +248,11 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 		}
 	}
 	names := BrowserEnvNames(prefix)
-	for _, n := range names {
-		if _, err := q.EnvVarInApp(ctx, db.EnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: n}); err == nil {
-			return Browser{}, none, conflict(n + " is already set on " + a.Name + " — choose another env_prefix (a browser never overwrites a variable)")
+	if !desktop {
+		for _, n := range names {
+			if _, err := q.EnvVarInApp(ctx, db.EnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: n}); err == nil {
+				return Browser{}, none, conflict(n + " is already set on " + a.Name + " — choose another env_prefix (a browser never overwrites a variable)")
+			}
 		}
 	}
 	taken, err := q.BrowserPortsOfServer(ctx, db.BrowserPortsOfServerParams{ServerID: srv.ID, TeamID: teamID})
@@ -238,7 +263,21 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	for _, p := range taken {
 		used[int(derefInt(p))] = true
 	}
+	// A headless gateway listens on the server's private address (reached by a release container,
+	// the way a data service is). A desktop browser is dialed by Caddy on the SAME host, so it
+	// listens on loopback only — never reachable except through the forward_auth'd hostname.
 	bind, port := privateBind(srv.ID), nextFreePort(agentproto.BrowserPortBase, used)
+	image := agentproto.BrowserImage
+	if desktop {
+		bind, image = "127.0.0.1", agentproto.DesktopImage
+		var hostname string
+		var teamOwned bool
+		hostname, teamOwned = s.deploy.DesktopBrowserHostname(ctx, q, teamID, name)
+		if hostname == "" {
+			return Browser{}, none, conflict("connect a domain (team Cloudflare, or wait for the apps domain) before creating a desktop browser")
+		}
+		return s.createDesktopBrowser(ctx, q, teamID, actor, a, srv, in, name, kind, image, agentproto.DesktopBind, port, hostname, teamOwned)
+	}
 
 	dek, err := s.ops.TeamDEK(ctx, q, teamID)
 	if err != nil {
@@ -249,9 +288,9 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	if err != nil {
 		return Browser{}, none, err
 	}
-	row, err := q.InsertAppBrowser(ctx, db.InsertAppBrowserParams{ID: id, TeamID: teamID, AppID: a.ID, Name: name, Image: agentproto.BrowserImage,
+	row, err := q.InsertAppBrowser(ctx, db.InsertAppBrowserParams{ID: id, TeamID: teamID, AppID: a.ID, Name: name, Image: image,
 		MemoryMb: in.MemoryMB, Cpus: in.CPUs, MaxSessions: in.MaxSessions, IdleTimeoutSeconds: in.IdleTimeoutSeconds, EnvPrefix: prefix,
-		TokenSealed: sealed, HostPort: int64ptr(int64(port))})
+		TokenSealed: sealed, HostPort: int64ptr(int64(port)), Kind: kind})
 	if err != nil {
 		return Browser{}, none, conflict("browser " + name + " or env_prefix " + prefix + " is already in use")
 	}
@@ -265,7 +304,7 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 	if err != nil {
 		return Browser{}, none, err
 	}
-	p := agentproto.BrowserCreateParams{BrowserID: id, AppID: a.ID, Image: agentproto.BrowserImage, Bind: bind, Port: port,
+	p := agentproto.BrowserCreateParams{BrowserID: id, AppID: a.ID, Image: image, Bind: bind, Port: port,
 		MemoryMB: int(in.MemoryMB), CPUs: in.CPUs, MaxSessions: int(in.MaxSessions), IdleTimeoutSeconds: int(in.IdleTimeoutSeconds), Token: box}
 	if err := p.Validate(); err != nil {
 		return Browser{}, none, invalid(err.Error())
@@ -275,11 +314,94 @@ func (s *Service) CreateBrowser(ctx context.Context, q *db.Queries, teamID strin
 		return Browser{}, none, err
 	}
 	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "browser.created", "app", a.ID, auditExtra(actor, map[string]any{
-		"browser": id, "name": name, "image": agentproto.BrowserImage, "env_prefix": prefix, "memory_mb": in.MemoryMB, "cpus": in.CPUs,
+		"browser": id, "name": name, "image": image, "env_prefix": prefix, "memory_mb": in.MemoryMB, "cpus": in.CPUs,
 		"max_sessions": in.MaxSessions, "idle_timeout_seconds": in.IdleTimeoutSeconds, "operation": op.ID})); err != nil {
 		return Browser{}, none, err
 	}
 	return browserView(row), op, nil
+}
+
+// desktopEnvPrefixPlaceholder turns a browser id (a UUID: hex digits and dashes) into a value that
+// satisfies app_browsers_env_prefix_check and the (app_id, env_prefix) unique index, for a desktop
+// browser, which has no real env prefix. Never surfaced to a user or an app.
+func desktopEnvPrefixPlaceholder(id string) string {
+	p := "D" + strings.ToUpper(strings.ReplaceAll(id, "-", ""))
+	if len(p) > 21 {
+		p = p[:21]
+	}
+	return p
+}
+
+// createDesktopBrowser is CreateBrowser's desktop-kind branch: no CDP token, no app env vars, its
+// own hostname behind forward_auth instead. Called with the caller's basic validation already done.
+func (s *Service) createDesktopBrowser(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, srv db.Server,
+	in BrowserSpec, name, kind, image, bind string, port int, hostname string, teamOwned bool) (Browser, db.Operation, error) {
+	none := db.Operation{}
+	id := newUUID()
+	// token_sealed is NOT NULL; a desktop browser has no token, so an empty seal is its placeholder.
+	dek, err := s.ops.TeamDEK(ctx, q, teamID)
+	if err != nil {
+		return Browser{}, none, err
+	}
+	sealed, err := crypto.Seal(dek, teamID, browserSealContext(id), []byte{})
+	if err != nil {
+		return Browser{}, none, err
+	}
+	// env_prefix is NOT NULL, matches ^[A-Z][A-Z0-9_]{0,20}$ and is unique per app — a desktop browser
+	// sets no env vars, so this is never read by an app, only a placeholder derived from the browser's
+	// own id so two desktop browsers on the same app never collide.
+	row, err := q.InsertAppBrowser(ctx, db.InsertAppBrowserParams{ID: id, TeamID: teamID, AppID: a.ID, Name: name, Image: image,
+		MemoryMb: in.MemoryMB, Cpus: in.CPUs, MaxSessions: in.MaxSessions, IdleTimeoutSeconds: in.IdleTimeoutSeconds, EnvPrefix: desktopEnvPrefixPlaceholder(id),
+		TokenSealed: sealed, HostPort: int64ptr(int64(port)), Kind: kind})
+	if err != nil {
+		return Browser{}, none, conflict("browser " + name + " is already in use")
+	}
+	if n, err := q.SetAppBrowserHostname(ctx, db.SetAppBrowserHostnameParams{Hostname: &hostname, ID: id, TeamID: teamID}); err != nil || n == 0 {
+		return Browser{}, none, conflict("could not record the browser's hostname — try again")
+	}
+	row.Hostname = &hostname
+	p := agentproto.BrowserCreateParams{BrowserID: id, AppID: a.ID, Kind: kind, Image: image, Bind: bind, Port: port,
+		MemoryMB: int(in.MemoryMB), CPUs: in.CPUs, MaxSessions: int(in.MaxSessions), IdleTimeoutSeconds: int(in.IdleTimeoutSeconds)}
+	if err := p.Validate(); err != nil {
+		return Browser{}, none, invalid(err.Error())
+	}
+	op, _, err := s.ops.Enqueue(ctx, q, opsSpecWithID(opID(id, "browser-create"), teamID, srv.ID, agentproto.KindBrowserCreate, mustJSON(p), actor))
+	if err != nil {
+		return Browser{}, none, err
+	}
+	upstream := fmt.Sprintf("%s:%d", bind, port)
+	if _, err := s.deploy.CreateDesktopBrowserProxyHost(ctx, q, teamID, actor, srv, id, hostname, upstream, teamOwned); err != nil {
+		return Browser{}, none, err
+	}
+	if err := tenancy.Record(ctx, q, teamID, actor.UserID, "browser.created", "app", a.ID, auditExtra(actor, map[string]any{
+		"browser": id, "name": name, "kind": kind, "image": image, "hostname": hostname, "memory_mb": in.MemoryMB, "cpus": in.CPUs,
+		"operation": op.ID})); err != nil {
+		return Browser{}, none, err
+	}
+	return browserView(row), op, nil
+}
+
+// OpenDesktopBrowser mints "Open browser"'s one-time handoff: a token bound to this browser and the
+// caller, exchanged at the browser's own hostname (<hostname>/.hosbah/auth?token=...) for a session
+// cookie — see internal/deploy/browserauth.go. Headless or not-yet-hostnamed browsers have nothing to
+// open. Not team-audited: no data moved, and a browser's own forward_auth check is the real gate.
+func (s *Service) OpenDesktopBrowser(ctx context.Context, q *db.Queries, teamID string, actor Actor, b db.AppBrowser) (string, error) {
+	if b.Kind != agentproto.BrowserKindDesktop || b.Hostname == nil || *b.Hostname == "" {
+		return "", invalid("this is not a desktop browser with a hostname yet")
+	}
+	if b.Status != BrowserReady {
+		return "", conflict("the browser is " + b.Status + " — try again once it is ready")
+	}
+	token := randPassword(40)
+	sum := sha256.Sum256([]byte(token))
+	hash := hex.EncodeToString(sum[:])
+	if _, err := q.InsertBrowserAuthToken(ctx, db.InsertBrowserAuthTokenParams{
+		ID: newUUID(), TeamID: teamID, BrowserID: b.ID, UserID: actor.UserID, TokenHash: hash,
+		ExpiresAt: time.Now().Add(deploy.BrowserAuthTokenTTL),
+	}); err != nil {
+		return "", err
+	}
+	return "https://" + *b.Hostname + "/.hosbah/auth?token=" + token, nil
 }
 
 // FollowBrowser waits, in the background, for a browser.create queued by CreateBrowser and records
@@ -370,9 +492,20 @@ func (s *Service) FinishBrowserRemoval(ctx context.Context, q *db.Queries, teamI
 		_, err := q.SetAppBrowserStatus(ctx, db.SetAppBrowserStatusParams{ID: b.ID, TeamID: teamID, Status: back, Error: strptr(failure), From: BrowserRemoving})
 		return err // the caller answers with BrowserRemovalRefused AFTER this transaction committed
 	}
-	for _, n := range BrowserEnvNames(b.EnvPrefix) {
-		if _, err := q.DeleteEnvVarInApp(ctx, db.DeleteEnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: n}); err != nil {
+	if b.Kind == agentproto.BrowserKindDesktop {
+		if p, err := q.ProxyHostOfBrowser(ctx, db.ProxyHostOfBrowserParams{BrowserID: &b.ID, TeamID: teamID}); err == nil {
+			if err := s.deploy.DeleteDesktopBrowserProxyHost(ctx, q, teamID, actor, p); err != nil {
+				return err
+			}
+		}
+		if err := q.DeleteBrowserAuthTokensOfBrowser(ctx, db.DeleteBrowserAuthTokensOfBrowserParams{BrowserID: b.ID, TeamID: teamID}); err != nil {
 			return err
+		}
+	} else {
+		for _, n := range BrowserEnvNames(b.EnvPrefix) {
+			if _, err := q.DeleteEnvVarInApp(ctx, db.DeleteEnvVarInAppParams{AppID: a.ID, TeamID: teamID, Name: n}); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := q.DeleteAppBrowserInTeam(ctx, db.DeleteAppBrowserInTeamParams{ID: b.ID, TeamID: teamID}); err != nil {

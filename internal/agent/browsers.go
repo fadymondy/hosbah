@@ -50,15 +50,21 @@ func newBrowserHost() *browserHost {
 }
 
 // browserState is what survives an agent restart. TokenSHA256 is a hash: the token is not on disk.
+// A desktop browser (Kind == desktop) has no token and no gateway: TokenSHA256, MaxSessions and
+// IdleSeconds are zero and Restore skips it.
 type browserState struct {
 	BrowserID   string `json:"browser_id"`
 	AppID       string `json:"app_id"`
+	Kind        string `json:"kind,omitempty"` // "" reads as headless (state saved before desktop existed)
 	Bind        string `json:"bind"`
 	Port        int    `json:"port"`
 	TokenSHA256 string `json:"token_sha256"`
 	MaxSessions int    `json:"max_sessions"`
 	IdleSeconds int    `json:"idle_seconds"`
 }
+
+// isDesktop reports whether the state is a desktop browser.
+func (st browserState) isDesktop() bool { return st.Kind == agentproto.BrowserKindDesktop }
 
 // cdpReady waits until Chromium answers /json/version on its loopback port.
 func cdpReady(ctx context.Context, port int) error {
@@ -79,16 +85,65 @@ func cdpReady(ctx context.Context, port int) error {
 	}
 }
 
+// desktopReady waits until KasmVNC answers something on its own loopback port (the desktop's own
+// hostname, behind Caddy's forward_auth, is what a human actually opens — this only confirms the
+// container itself came up).
+func desktopReady(ctx context.Context, bind string, port int) error {
+	client := &http.Client{Timeout: 2 * time.Second}
+	deadline := time.Now().Add(60 * time.Second) // a full desktop boots slower than headless
+	url := fmt.Sprintf("http://%s:%d/", bind, port)
+	for {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if resp, err := client.Do(req); err == nil {
+			resp.Body.Close()
+			if resp.StatusCode < 500 {
+				return nil
+			}
+		}
+		if ctx.Err() != nil || time.Now().After(deadline) {
+			return errors.New("the desktop did not answer within 60 s")
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
 // browserRunArgs is THE place a browser's `docker run` argv is built. p has passed Validate.
 func browserRunArgs(p agentproto.BrowserCreateParams) []string {
 	name := agentproto.BrowserContainerName(p.BrowserID)
-	args := []string{"run", "-d", "--restart", "unless-stopped", "--name", name,
+	common := []string{"run", "-d", "--restart", "unless-stopped", "--name", name,
 		"--label", agentproto.BrowserLabel + "=" + p.BrowserID, "--label", agentproto.BrowserAppLabel + "=" + p.AppID,
 		"--log-opt", "max-size=10m", "--log-opt", "max-file=3",
-		"--memory", strconv.Itoa(p.MemoryMB) + "m", "--cpus", strconv.FormatFloat(p.CPUs, 'f', -1, 64),
-		"--pids-limit", strconv.Itoa(agentproto.BrowserPidsLimit), "--shm-size", strconv.Itoa(agentproto.BrowserShmMB(p.MemoryMB)) + "m",
-		"--security-opt", "no-new-privileges", "--cap-drop", "ALL"}
+		"--memory", strconv.Itoa(p.MemoryMB) + "m", "--cpus", strconv.FormatFloat(p.CPUs, 'f', -1, 64)}
+	if p.EffectiveKind() == agentproto.BrowserKindDesktop {
+		return desktopRunArgs(p, common)
+	}
+	args := append(common, "--pids-limit", strconv.Itoa(agentproto.BrowserPidsLimit),
+		"--shm-size", strconv.Itoa(agentproto.BrowserShmMB(p.MemoryMB))+"m",
+		"--security-opt", "no-new-privileges", "--cap-drop", "ALL")
 	args = append(args, publishArg(agentproto.BrowserCDPPort)...)
+	return append(args, p.Image)
+}
+
+// desktopRunArgs: lscr.io/linuxserver/chromium (GPL; run here unmodified — only pulled and run,
+// never changed or redistributed — the same unmodified-use headless-shell's MIT/BSD needs no
+// purchase for). --shm-size is fixed at DesktopShmMB (a real desktop needs more than headless's
+// memory-scaled share). PUID/PGID/TZ are the image's own convention for the uid/gid it chowns
+// /config to and the container's timezone. The port maps to a FIXED host port (Bind:Port, chosen by
+// the control plane from the same pool as headless, not an ephemeral one docker picks) because
+// there is no gateway process in front of a desktop browser to re-read a moving upstream from —
+// Caddy dials Bind:Port directly, behind forward_auth. --cap-drop ALL is kept, same as headless:
+// the image runs Chromium with no sandbox privileges it would need a dropped capability for.
+func desktopRunArgs(p agentproto.BrowserCreateParams, common []string) []string {
+	tz := p.TZ
+	if tz == "" {
+		tz = agentproto.DesktopDefaultTZ
+	}
+	args := append(common,
+		"-e", "PUID="+strconv.Itoa(agentproto.DesktopPUID), "-e", "PGID="+strconv.Itoa(agentproto.DesktopPGID), "-e", "TZ="+tz,
+		"--pids-limit", strconv.Itoa(agentproto.DesktopPidsLimit), "--shm-size", strconv.Itoa(agentproto.DesktopShmMB)+"m",
+		"--security-opt", "no-new-privileges", "--cap-drop", "ALL",
+		"-v", agentproto.DesktopVolumeName(p.BrowserID)+":/config",
+		"-p", net.JoinHostPort(p.Bind, strconv.Itoa(p.Port))+":"+strconv.Itoa(agentproto.DesktopHTTPPort))
 	return append(args, p.Image)
 }
 
@@ -107,6 +162,9 @@ func (h *browserHost) create(oc *OpContext) (any, int, error) {
 	}
 	if err := p.Validate(); err != nil {
 		return nil, 2, err
+	}
+	if p.EffectiveKind() == agentproto.BrowserKindDesktop {
+		return h.createDesktop(oc, p)
 	}
 	pt, err := agentproto.OpenBox(oc.priv, agentproto.BrowserTokenContext(p.BrowserID), p.Token)
 	if err != nil {
@@ -157,8 +215,8 @@ func (h *browserHost) create(oc *OpContext) (any, int, error) {
 		return fail(err.Error(), nil)
 	}
 	oc.Progress(4, 4)
-	st := browserState{BrowserID: p.BrowserID, AppID: p.AppID, Bind: p.Bind, Port: p.Port, TokenSHA256: hex.EncodeToString(hash[:]),
-		MaxSessions: p.MaxSessions, IdleSeconds: p.IdleTimeoutSeconds}
+	st := browserState{BrowserID: p.BrowserID, AppID: p.AppID, Kind: agentproto.BrowserKindHeadless, Bind: p.Bind, Port: p.Port,
+		TokenSHA256: hex.EncodeToString(hash[:]), MaxSessions: p.MaxSessions, IdleSeconds: p.IdleTimeoutSeconds}
 	if err := h.open(st, upstream); err != nil {
 		return fail(fmt.Sprintf("could not listen on %s:%d — is the port taken?", p.Bind, p.Port), err)
 	}
@@ -166,6 +224,50 @@ func (h *browserHost) create(oc *OpContext) (any, int, error) {
 		return fail("could not record the browser on this server", err)
 	}
 	oc.Info("the browser is ready on %s:%d (token required; at most %d sessions, idle ones close after %d s)", p.Bind, p.Port, p.MaxSessions, p.IdleTimeoutSeconds)
+	return agentproto.BrowserCreateResult{Container: name, HostPort: p.Port}, 0, nil
+}
+
+// createDesktop starts a full interactive desktop (KasmVNC + Chromium, linuxserver/chromium). There
+// is no token and no gateway: the container's fixed port is dialed directly by Caddy, gated by
+// forward_auth to Hosbah (proxy.set on the browser's hostname is applied separately, by the control
+// plane, once this op reports the container is up).
+func (h *browserHost) createDesktop(oc *OpContext, p agentproto.BrowserCreateParams) (any, int, error) {
+	name := agentproto.BrowserContainerName(p.BrowserID)
+	volume := agentproto.DesktopVolumeName(p.BrowserID)
+	fail := func(msg string, detail error) (any, int, error) {
+		if detail != nil {
+			oc.Info("%s", clip(detail.Error(), 600))
+		}
+		_, _ = h.run(context.WithoutCancel(oc.Ctx), nil, "docker", "rm", "-f", name)
+		_ = os.Remove(h.statePath(p.BrowserID))
+		return nil, 1, errors.New(msg)
+	}
+
+	oc.Progress(1, 3)
+	if _, err := h.run(oc.Ctx, nil, "docker", "image", "inspect", "--format", "{{.Id}}", p.Image); err != nil {
+		oc.Info("pulling %s — a first pull can take a few minutes", p.Image)
+		if _, err := h.stream(oc, "docker", "pull", p.Image); err != nil {
+			return nil, 1, errors.New("could not pull the desktop image")
+		}
+	}
+	oc.Progress(2, 3)
+	for _, n := range agentproto.NameCandidates(name) {
+		_, _ = h.run(oc.Ctx, nil, "docker", "rm", "-f", n)
+	}
+	oc.Info("starting %s (%d MiB, %g CPU, desktop on %s:%d)", name, p.MemoryMB, p.CPUs, p.Bind, p.Port)
+	if _, err := h.run(oc.Ctx, nil, "docker", browserRunArgs(p)...); err != nil {
+		return fail("could not start the desktop", err)
+	}
+	oc.Progress(3, 3)
+	if err := desktopReady(oc.Ctx, p.Bind, p.Port); err != nil {
+		return fail(err.Error(), nil)
+	}
+	st := browserState{BrowserID: p.BrowserID, AppID: p.AppID, Kind: agentproto.BrowserKindDesktop, Bind: p.Bind, Port: p.Port}
+	if err := h.save(st); err != nil {
+		return fail("could not record the browser on this server", err)
+	}
+	_ = volume // named on the docker run argv; kept here only for readability of what removeOne must clean up
+	oc.Info("the desktop is up on %s:%d — a hostname and forward_auth get it exposed", p.Bind, p.Port)
 	return agentproto.BrowserCreateResult{Container: name, HostPort: p.Port}, 0, nil
 }
 
@@ -233,6 +335,9 @@ func (h *browserHost) states() []browserState {
 func (h *browserHost) Restore(ctx context.Context) []error {
 	var errs []error
 	for _, st := range h.states() {
+		if st.isDesktop() {
+			continue // no gateway: Caddy dials the fixed port directly, nothing to reopen here
+		}
 		upstream, _ := h.upstreamPort(ctx, st.BrowserID)
 		if err := h.open(st, upstream); err != nil {
 			errs = append(errs, fmt.Errorf("browser %s: %w", st.BrowserID, err))
@@ -265,19 +370,32 @@ func (h *browserHost) containerOf(ctx context.Context, browserID string) string 
 
 func (h *browserHost) removeOne(oc *OpContext, id string) (bool, error) {
 	name := h.containerOf(oc.Ctx, id)
+	var wasDesktop bool
+	for _, st := range h.states() {
+		if st.BrowserID == id && st.isDesktop() {
+			wasDesktop = true
+		}
+	}
 	h.closeGateway(id)
 	_ = os.Remove(h.statePath(id))
 	_, _ = h.run(oc.Ctx, nil, "docker", "stop", "-t", "5", name)
+	removed := true
 	if _, err := h.run(oc.Ctx, nil, "docker", "rm", "-f", name); err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "no such container") {
 			oc.Info("%s was already gone", name)
-			return false, nil
+			removed = false
+		} else {
+			oc.Info("%v", err)
+			return false, errors.New("could not remove the browser's container")
 		}
-		oc.Info("%v", err)
-		return false, errors.New("could not remove the browser's container")
+	} else {
+		oc.Info("removed %s", name)
 	}
-	oc.Info("removed %s", name)
-	return true, nil
+	if wasDesktop {
+		// best effort: the profile volume outlives the container and is only useful to this browser
+		_, _ = h.run(oc.Ctx, nil, "docker", "volume", "rm", "-f", agentproto.DesktopVolumeName(id))
+	}
+	return removed, nil
 }
 
 // withAppRemove wraps app.remove: a deleted app's browsers go with it.

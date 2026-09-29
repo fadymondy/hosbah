@@ -14,26 +14,37 @@ CREATE TABLE app_browsers (
     host_port bigint,
     status text NOT NULL DEFAULT 'creating',
     error text,
+    kind text NOT NULL DEFAULT 'headless',
+    hostname text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Hosbah: a headless Chromium of a git-deployed site (app), on the app's server, that the site
--- drives over CDP/WebSocket. image is a constant of the control plane (never user input). The
--- container publishes CDP on 127.0.0.1 only; the agent's token-checking gateway listens on
--- host_port of the server's private address (the one data services publish on), which is where the
--- site's containers reach it. token_sealed is the gateway's token, sealed with the team DEK and
--- bound to the browser — no route returns it; the app receives it as the sealed env vars
--- <env_prefix>_WS_ENDPOINT and <env_prefix>_TOKEN. status: creating (the agent's browser.create is
--- going) → ready | failed; removing while browser.remove runs. Rows go with their app.
+-- Hosbah: a browser of a git-deployed site (app), on the app's server. Two kinds: headless (a bare
+-- CDP endpoint the site drives over WebSocket — the original browser) and desktop (a full
+-- interactive KasmVNC + Chromium desktop, opened directly by a team member — see hostname below).
+-- image is a constant of the control plane (never user input). A headless browser's container
+-- publishes CDP on 127.0.0.1 only; the agent's token-checking gateway listens on host_port of the
+-- server's private address (the one data services publish on), which is where the site's containers
+-- reach it. token_sealed is the gateway's token, sealed with the team DEK and bound to the browser —
+-- no route returns it; the app receives it as the sealed env vars <env_prefix>_WS_ENDPOINT and
+-- <env_prefix>_TOKEN. A desktop browser has no token (token_sealed is an empty sealed box) and no
+-- app env vars; instead hostname is its own subdomain (browser-<name>.<team or apps domain>),
+-- routed by Caddy straight to host_port on the server's loopback address, gated by forward_auth to
+-- Hosbah — nobody reaches it without a valid session and team membership. status: creating (the
+-- agent's browser.create is going) → ready | failed; removing while browser.remove runs. Rows go
+-- with their app.
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_name_check CHECK (name ~ '^[a-z][a-z0-9-]{0,30}$');
-ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_memory_check CHECK (memory_mb BETWEEN 256 AND 4096);
+ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_memory_check CHECK (memory_mb BETWEEN 256 AND 8192);
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_cpus_check CHECK (cpus >= 0.25 AND cpus <= 4);
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_max_sessions_check CHECK (max_sessions BETWEEN 1 AND 20);
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_idle_timeout_check CHECK (idle_timeout_seconds BETWEEN 30 AND 3600);
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_env_prefix_check CHECK (env_prefix ~ '^[A-Z][A-Z0-9_]{0,20}$');
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_host_port_check CHECK (host_port IS NULL OR host_port BETWEEN 1024 AND 65535);
 ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_status_check CHECK (status IN ('creating', 'ready', 'failed', 'removing'));
+ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_kind_check CHECK (kind IN ('headless', 'desktop'));
+ALTER TABLE app_browsers ADD CONSTRAINT app_browsers_hostname_check CHECK (hostname IS NULL OR hostname ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$');
+CREATE UNIQUE INDEX app_browsers_hostname_key ON app_browsers (hostname) WHERE hostname IS NOT NULL;
 CREATE UNIQUE INDEX app_browsers_app_name_key ON app_browsers (app_id, name);
 CREATE UNIQUE INDEX app_browsers_app_prefix_key ON app_browsers (app_id, env_prefix);
 CREATE UNIQUE INDEX app_browsers_id_team_key ON app_browsers (id, team_id);

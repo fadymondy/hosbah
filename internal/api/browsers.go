@@ -80,21 +80,24 @@ func (d *deps) registerBrowsers(api huma.API) {
 	}
 	huma.Register(api, huma.Operation{OperationID: "create-app-browser", Method: http.MethodPost, Path: base,
 		DefaultStatus: http.StatusCreated, Tags: tags,
-		Summary: "Add a headless Chromium to the app, on the app's server, and set <PREFIX>_WS_ENDPOINT (ws://…?token=…) and <PREFIX>_TOKEN on " +
-			"the app as sealed variables (env lists the names; the token is never returned). The image is fixed by Hosbah. Reachable from the " +
-			"app's containers only with the token; never published to the internet. 201 with status creating — it turns ready or failed when " +
-			"the server has answered (a first image pull takes minutes). 422: a bad name, limit or env_prefix; an imported app. 409: the name " +
-			"is taken, the app has 3, its server has no agent, or one of the variable names is already set on the app (nothing is ever " +
-			"overwritten). Owner or admin. Audited.",
+		Summary: "Add a browser to the app, on the app's server: kind headless (default) is a bare Chromium the app drives over CDP/WebSocket, " +
+			"setting <PREFIX>_WS_ENDPOINT (ws://…?token=…) and <PREFIX>_TOKEN on the app as sealed variables (env lists the names; the token " +
+			"is never returned) — reachable from the app's containers only, never published. Kind desktop is a full interactive KasmVNC " +
+			"desktop at its own hostname (see hostname in the response), opened by a team member (POST .../open) — no env vars, no token; " +
+			"access is Hosbah's own forward_auth on that hostname. The image is fixed by Hosbah for the kind. 201 with status creating — it " +
+			"turns ready or failed when the server has answered (a first image pull takes minutes). 422: a bad name, limit or env_prefix; an " +
+			"imported app; no domain available for a desktop browser's hostname yet. 409: the name is taken, the app has 3, its server has no " +
+			"agent, or (headless) one of the variable names is already set on the app (nothing is ever overwritten). Owner or admin. Audited.",
 	}, func(ctx context.Context, in *struct {
 		AppPath
 		Body struct {
 			Name               string  `json:"name" minLength:"1" maxLength:"31" doc:"^[a-z][a-z0-9-]{0,30}$, unique in the app."`
-			MemoryMB           int64   `json:"memory_mb,omitempty" doc:"256 to 4096 (default 1024)."`
+			Kind               string  `json:"kind,omitempty" enum:"headless,desktop" doc:"Default headless."`
+			MemoryMB           int64   `json:"memory_mb,omitempty" doc:"Headless 256-4096 (default 1024); desktop 512-8192 (default 2048)."`
 			CPUs               float64 `json:"cpus,omitempty" doc:"0.25 to 4 (default 1)."`
-			MaxSessions        int64   `json:"max_sessions,omitempty" doc:"Concurrent WebSocket sessions, 1 to 20 (default 5)."`
-			IdleTimeoutSeconds int64   `json:"idle_timeout_seconds,omitempty" doc:"A session silent this long is closed, 30 to 3600 (default 300)."`
-			EnvPrefix          string  `json:"env_prefix,omitempty" maxLength:"21" doc:"^[A-Z][A-Z0-9_]{0,20}$ (default BROWSER)."`
+			MaxSessions        int64   `json:"max_sessions,omitempty" doc:"Headless only: concurrent WebSocket sessions, 1 to 20 (default 5)."`
+			IdleTimeoutSeconds int64   `json:"idle_timeout_seconds,omitempty" doc:"Headless only: a session silent this long is closed, 30 to 3600 (default 300)."`
+			EnvPrefix          string  `json:"env_prefix,omitempty" maxLength:"21" doc:"Headless only: ^[A-Z][A-Z0-9_]{0,20}$ (default BROWSER)."`
 		}
 	}) (*browserCreatedOut, error) {
 		out := &browserCreatedOut{}
@@ -109,7 +112,7 @@ func (d *deps) registerBrowsers(api huma.API) {
 			}
 			teamID = m.TeamID
 			out.Body.Browser, op, err = d.dbs().CreateBrowser(ctx, q, m.TeamID, webActor(id), a, dbsvc.BrowserSpec{Name: in.Body.Name,
-				MemoryMB: in.Body.MemoryMB, CPUs: in.Body.CPUs, MaxSessions: in.Body.MaxSessions,
+				Kind: in.Body.Kind, MemoryMB: in.Body.MemoryMB, CPUs: in.Body.CPUs, MaxSessions: in.Body.MaxSessions,
 				IdleTimeoutSeconds: in.Body.IdleTimeoutSeconds, EnvPrefix: in.Body.EnvPrefix})
 			return storageErr(err, "could not create the browser")
 		})
@@ -118,6 +121,35 @@ func (d *deps) registerBrowsers(api huma.API) {
 		}
 		d.dbs().FollowBrowser(teamID, out.Body.ID, op) // after the commit
 		out.Body.Applies, out.Body.Operation = storage.AppliesNextDeploy, op.ID
+		return out, nil
+	})
+
+	type browserOpenedOut struct {
+		Body struct {
+			URL string `json:"url" doc:"One-time; open it right away. Exchanged automatically for a session on the browser's own hostname."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "open-app-browser", Method: http.MethodPost, Path: base + "/{browser}/open", Tags: tags,
+		Summary: "Mint a one-time link that opens a desktop browser: valid briefly, usable once, then exchanged automatically for a session " +
+			"cookie on the browser's own hostname (Hosbah's forward_auth re-checks team membership and role on every request after that). " +
+			"422: not a desktop browser, or it has no hostname yet. 409: the browser is not ready. Any member.",
+	}, func(ctx context.Context, in *BrowserPath) (*browserOpenedOut, error) {
+		out := &browserOpenedOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			b, err := dbsvc.FindBrowser(ctx, q, m.TeamID, a, in.Browser)
+			if err != nil {
+				return errNotFound
+			}
+			out.Body.URL, err = d.dbs().OpenDesktopBrowser(ctx, q, m.TeamID, webActor(id), b)
+			return storageErr(err, "could not open the browser")
+		})
+		if err != nil {
+			return nil, err
+		}
 		return out, nil
 	})
 

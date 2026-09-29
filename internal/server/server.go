@@ -20,6 +20,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/apm"
 	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/certcheck"
 	"github.com/fadymondy/hosbah/internal/config"
 	"github.com/fadymondy/hosbah/internal/crypto"
 	"github.com/fadymondy/hosbah/internal/dbsvc"
@@ -34,7 +35,6 @@ import (
 	"github.com/fadymondy/hosbah/internal/provisioning"
 	"github.com/fadymondy/hosbah/internal/rum"
 	"github.com/fadymondy/hosbah/internal/schedules"
-	"github.com/fadymondy/hosbah/internal/certcheck"
 	"github.com/fadymondy/hosbah/internal/scripts"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -103,7 +103,8 @@ func Boot() *app.App {
 	a.Ops = svc
 
 	deploys := deploy.New(a, svc)
-	deploys.MountPublic(k.Router) // /hooks/*, /internal/tls/allow — outside /api, token / HMAC / yes-no
+	deploys.MountPublic(k.Router)       // /hooks/*, /internal/tls/allow — outside /api, token / HMAC / yes-no
+	deploys.MountBrowsersAuth(k.Router) // /api/browsers/auth — Caddy's forward_auth target for a desktop browser's hostname
 	deploys.Start()
 	a.Deploy = deploys
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { apiFetch } from "@/lib/api"
 import { humanBytes } from "@/lib/databases"
@@ -24,6 +25,7 @@ import { useTeam } from "@/lib/team"
 export type Browser = {
   id: string
   name: string
+  kind: "headless" | "desktop"
   image: string
   memory_mb: number
   cpus: number
@@ -31,6 +33,7 @@ export type Browser = {
   idle_timeout_seconds: number
   env_prefix: string
   env: string[]
+  hostname: string | null
   status: "creating" | "ready" | "failed" | "removing"
   error: string | null
   running: boolean | null
@@ -39,9 +42,10 @@ export type Browser = {
 }
 
 /**
- * Browsers: headless Chromium on the site's server, driven over CDP. Its port is open only on
- * the server's private address, behind an access token; the address and token reach the site as
- * sealed variables, from the next deploy.
+ * Browsers: a headless Chromium the site drives over CDP (its port is open only on the server's
+ * private address, behind an access token that reaches the site as sealed variables, from the
+ * next deploy), or a full interactive desktop at its own hostname, opened by a team member —
+ * Hosbah's own forward_auth guards it, re-checking team membership on every request.
  */
 export function SiteBrowsers() {
   const { t } = useI18n()
@@ -105,16 +109,19 @@ export function SiteBrowsers() {
                   <TableHead>{t("site.monitors.name")}</TableHead>
                   <TableHead>{t("lists.status")}</TableHead>
                   <TableHead>{t("site.browsers.limits")}</TableHead>
-                  <TableHead>{t("site.storage.variables")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
+                  <TableHead>{t("site.browsers.access")}</TableHead>
+                  <TableHead className="text-end">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {shown.map((b) => (
                   <TableRow key={b.id}>
                     <TableCell>
-                      <span dir="ltr" className="font-medium">
-                        {b.name}
+                      <span className="flex items-center gap-1.5">
+                        {b.kind === "desktop" ? <MonitorIcon className="size-3.5 shrink-0 text-grid-muted" /> : null}
+                        <span dir="ltr" className="font-medium">
+                          {b.name}
+                        </span>
                       </span>
                       <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-grid-muted" title={b.image}>
                         {b.image}
@@ -139,18 +146,31 @@ export function SiteBrowsers() {
                         {b.memory_bytes != null ? `${humanBytes(b.memory_bytes)} / ` : ""}
                         {b.memory_mb} MB · {b.cpus} CPU
                       </span>
-                      <div className="text-grid-muted">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
+                      {b.kind === "headless" ? (
+                        <div className="text-grid-muted">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
+                      ) : null}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
-                      {b.env.join(" ")}
+                    <TableCell className="max-w-64 text-xs">
+                      {b.kind === "desktop" ? (
+                        b.hostname ? (
+                          <span dir="ltr" className="truncate font-mono text-grid-muted" title={b.hostname}>
+                            {b.hostname}
+                          </span>
+                        ) : (
+                          <span className="text-grid-muted">{t("site.browsers.noHostname")}</span>
+                        )
+                      ) : (
+                        <span dir="ltr" className="truncate text-start font-mono text-grid-muted">
+                          {b.env.join(" ")}
+                        </span>
+                      )}
                     </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <RemoveBrowser path={path} browser={b} onRemoved={load} />
-                        </div>
-                      </TableCell>
-                    ) : null}
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        {b.kind === "desktop" ? <OpenBrowser path={path} browser={b} /> : null}
+                        {manage ? <RemoveBrowser path={path} browser={b} onRemoved={load} /> : null}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -161,17 +181,22 @@ export function SiteBrowsers() {
       <ul className="flex flex-col gap-1.5 border-b border-line px-6 py-4 text-xs text-grid-muted">
         <li>{t("site.browsers.noteConnect")}</li>
         <li>{t("site.browsers.notePrivate")}</li>
-        <li>{t("site.browsers.noteViewer")}</li>
+        <li>{t("site.browsers.noteDesktop")}</li>
       </ul>
     </section>
   )
 }
 
-/** Add a browser (headless Chromium next to the site). Also opened from the overview canvas. */
+/**
+ * Add a browser: kind headless (a bare Chromium the app drives over CDP/WebSocket, default) or
+ * desktop (a full interactive desktop at its own hostname, opened later from the list). Also
+ * opened from the overview canvas.
+ */
 export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
   const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
+  const [kind, setKind] = useState<"headless" | "desktop">("headless")
   const [name, setName] = useState("")
   const [memory, setMemory] = useState("1024")
   const [cpus, setCpus] = useState("1")
@@ -181,6 +206,11 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  function onKindChange(k: "headless" | "desktop") {
+    setKind(k)
+    setMemory(k === "desktop" ? "2048" : "1024")
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -188,16 +218,20 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
     try {
       await apiFetch(`${path}/browsers`, {
         method: "POST",
-        body: {
-          name: name.trim(),
-          memory_mb: Number(memory) || 0,
-          cpus: Number(cpus) || 0,
-          max_sessions: Number(sessions) || 0,
-          idle_timeout_seconds: Number(idle) || 0,
-          env_prefix: prefix.trim() || "BROWSER",
-        },
+        body:
+          kind === "desktop"
+            ? { name: name.trim(), kind, memory_mb: Number(memory) || 0, cpus: Number(cpus) || 0 }
+            : {
+                name: name.trim(),
+                kind,
+                memory_mb: Number(memory) || 0,
+                cpus: Number(cpus) || 0,
+                max_sessions: Number(sessions) || 0,
+                idle_timeout_seconds: Number(idle) || 0,
+                env_prefix: prefix.trim() || "BROWSER",
+              },
       })
-      toast.success(t("site.storage.appliesNext"))
+      toast.success(kind === "desktop" ? t("site.browsers.desktopCreating") : t("site.storage.appliesNext"))
       setOpen(false)
       setName("")
       await onSaved()
@@ -220,9 +254,22 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{t("site.browsers.add")}</DialogTitle>
-            <DialogDescription>{t("site.browsers.dialogHint")}</DialogDescription>
+            <DialogDescription>{kind === "desktop" ? t("site.browsers.dialogHintDesktop") : t("site.browsers.dialogHint")}</DialogDescription>
           </DialogHeader>
           <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="br-kind">{t("site.browsers.kind")}</FieldLabel>
+              <Select value={kind} onValueChange={(v) => v && onKindChange(v as "headless" | "desktop")}>
+                <SelectTrigger id="br-kind">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="headless">{t("site.browsers.kindHeadless")}</SelectItem>
+                  <SelectItem value="desktop">{t("site.browsers.kindDesktop")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{kind === "desktop" ? t("site.browsers.kindDesktopHint") : t("site.browsers.kindHeadlessHint")}</FieldDescription>
+            </Field>
             <Field>
               <FieldLabel htmlFor="br-name">{t("site.monitors.name")}</FieldLabel>
               <Input id="br-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" placeholder="crawler" value={name} onChange={(e) => setName(e.target.value)} />
@@ -231,26 +278,41 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="br-mem">{t("site.browsers.memory")}</FieldLabel>
-                <Input id="br-mem" dir="ltr" type="number" min={256} max={4096} step={64} value={memory} onChange={(e) => setMemory(e.target.value)} />
+                <Input
+                  id="br-mem"
+                  dir="ltr"
+                  type="number"
+                  min={kind === "desktop" ? 512 : 256}
+                  max={kind === "desktop" ? 8192 : 4096}
+                  step={64}
+                  value={memory}
+                  onChange={(e) => setMemory(e.target.value)}
+                />
               </Field>
               <Field>
                 <FieldLabel htmlFor="br-cpu">{t("site.browsers.cpus")}</FieldLabel>
                 <Input id="br-cpu" dir="ltr" type="number" min={0.25} max={4} step={0.25} value={cpus} onChange={(e) => setCpus(e.target.value)} />
               </Field>
-              <Field>
-                <FieldLabel htmlFor="br-ses">{t("site.browsers.maxSessions")}</FieldLabel>
-                <Input id="br-ses" dir="ltr" type="number" min={1} max={20} value={sessions} onChange={(e) => setSessions(e.target.value)} />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="br-idle">{t("site.browsers.idle")}</FieldLabel>
-                <Input id="br-idle" dir="ltr" type="number" min={30} max={3600} value={idle} onChange={(e) => setIdle(e.target.value)} />
-              </Field>
+              {kind === "headless" ? (
+                <>
+                  <Field>
+                    <FieldLabel htmlFor="br-ses">{t("site.browsers.maxSessions")}</FieldLabel>
+                    <Input id="br-ses" dir="ltr" type="number" min={1} max={20} value={sessions} onChange={(e) => setSessions(e.target.value)} />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="br-idle">{t("site.browsers.idle")}</FieldLabel>
+                    <Input id="br-idle" dir="ltr" type="number" min={30} max={3600} value={idle} onChange={(e) => setIdle(e.target.value)} />
+                  </Field>
+                </>
+              ) : null}
             </div>
-            <Field>
-              <FieldLabel htmlFor="br-prefix">{t("site.storage.prefix")}</FieldLabel>
-              <Input id="br-prefix" dir="ltr" pattern="[A-Z][A-Z0-9_]{0,20}" value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} className="font-mono" />
-              <FieldDescription dir="ltr">{`${prefix || "BROWSER"}_WS_ENDPOINT, ${prefix || "BROWSER"}_TOKEN`}</FieldDescription>
-            </Field>
+            {kind === "headless" ? (
+              <Field>
+                <FieldLabel htmlFor="br-prefix">{t("site.storage.prefix")}</FieldLabel>
+                <Input id="br-prefix" dir="ltr" pattern="[A-Z][A-Z0-9_]{0,20}" value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} className="font-mono" />
+                <FieldDescription dir="ltr">{`${prefix || "BROWSER"}_WS_ENDPOINT, ${prefix || "BROWSER"}_TOKEN`}</FieldDescription>
+              </Field>
+            ) : null}
           </FieldGroup>
           <FormError message={error} />
           <DialogFooter>
@@ -264,6 +326,37 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Open a desktop browser: mints a one-time link and navigates a new tab to it right away — the
+ * link is exchanged automatically for a session on the browser's own hostname, so it must be used
+ * immediately, not stored or shared.
+ */
+export function OpenBrowser({ path, browser }: { path: string; browser: Browser }) {
+  const { t } = useI18n()
+  const errorText = useErrorText()
+  const [busy, setBusy] = useState(false)
+  const ready = browser.status === "ready" && !!browser.hostname
+
+  async function open() {
+    setBusy(true)
+    try {
+      const r = await apiFetch<{ url: string }>(`${path}/browsers/${browser.id}/open`, { method: "POST" })
+      window.open(r.url, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast.error(errorText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={!ready || busy} onClick={open}>
+      <ExternalLinkIcon />
+      {busy ? t("common.working") : t("site.browsers.open")}
+    </Button>
   )
 }
 
