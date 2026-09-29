@@ -322,6 +322,86 @@ func (w *workloads) stats(oc *OpContext) (any, int, error) {
 	return res, 0, nil
 }
 
+// ---- container.inspect -----------------------------------------------------------------------
+
+// inspect reads a running container's configuration for adoption into a Hosbah app: image,
+// env, published ports, labels, mounts and restart policy. Read-only — it never starts, stops or
+// changes anything. The docker inspect call goes through w.quiet, never w.cmd, so env values (or
+// anything else about the container) are never written to the operation's log.
+func (w *workloads) inspect(oc *OpContext) (any, int, error) {
+	p, err := decode[agentproto.ContainerInspectParams](oc)
+	if err != nil {
+		return nil, 2, err
+	}
+	if err := p.Validate(); err != nil {
+		return nil, 2, err
+	}
+	oc.Info("inspecting %s", p.Name)
+	out, err := w.quiet(oc, "docker", "inspect", "--type", "container", p.Name)
+	if err != nil {
+		return nil, 1, fmt.Errorf("container %s not found on this server", p.Name)
+	}
+	var ins []struct {
+		Config struct {
+			Image  string            `json:"Image"`
+			Env    []string          `json:"Env"`
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+		Image string `json:"Image"` // resolved image ID/digest
+		State struct {
+			Status string `json:"Status"`
+		} `json:"State"`
+		HostConfig struct {
+			RestartPolicy struct {
+				Name string `json:"Name"`
+			} `json:"RestartPolicy"`
+			PortBindings map[string][]struct {
+				HostIP   string `json:"HostIp"`
+				HostPort string `json:"HostPort"`
+			} `json:"PortBindings"`
+		} `json:"HostConfig"`
+		Mounts []struct {
+			Source      string `json:"Source"`
+			Destination string `json:"Destination"`
+		} `json:"Mounts"`
+	}
+	if json.Unmarshal([]byte(out), &ins) != nil || len(ins) == 0 {
+		return nil, 1, errors.New("docker inspect returned nothing usable")
+	}
+	c := ins[0]
+	res := agentproto.ContainerInspectResult{
+		Status:        c.State.Status,
+		Image:         c.Config.Image,
+		ImageDigest:   c.Image,
+		Labels:        c.Config.Labels,
+		RestartPolicy: c.HostConfig.RestartPolicy.Name,
+	}
+	if len(c.Config.Env) > 0 {
+		res.Env = make(map[string]string, len(c.Config.Env))
+		for _, kv := range c.Config.Env {
+			k, v, ok := strings.Cut(kv, "=")
+			if ok {
+				res.Env[k] = v
+			}
+		}
+	}
+	for containerPort, bindings := range c.HostConfig.PortBindings {
+		for _, b := range bindings {
+			hostIP := b.HostIP
+			if hostIP == "" {
+				hostIP = "0.0.0.0"
+			}
+			res.Ports = append(res.Ports, fmt.Sprintf("%s -> %s:%s", containerPort, hostIP, b.HostPort))
+		}
+	}
+	sort.Strings(res.Ports)
+	for _, m := range c.Mounts {
+		res.Mounts = append(res.Mounts, fmt.Sprintf("%s -> %s", m.Source, m.Destination))
+	}
+	oc.Info("inspected %s: image %s, %d env var(s), %d port(s)", p.Name, res.Image, len(res.Env), len(res.Ports))
+	return res, 0, nil
+}
+
 func round2(f float64) float64 { return float64(int64(f*100+0.5)) / 100 }
 
 func parsePercent(s string) float64 {

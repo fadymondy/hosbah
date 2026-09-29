@@ -22,6 +22,15 @@ VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('deplo
     sqlc.arg('config'), 'live', now())
 RETURNING *;
 
+-- name: InsertAdoptRelease :one
+-- Adopting a container: release #0 points at the image already running, so a rollback has somewhere
+-- to go back to even though Hosbah never built it. Safe only because an imported app has no prior
+-- releases (version 0 would otherwise collide with releases_app_version_key).
+INSERT INTO releases (id, team_id, app_id, deployment_id, version, image, port, containers, config, status, activated_at)
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('deployment_id'), 0,
+    sqlc.arg('image'), sqlc.arg('port'), sqlc.narg('containers'), sqlc.arg('config'), 'live', now())
+RETURNING *;
+
 -- name: RetireLiveRelease :exec
 UPDATE releases SET status = 'standby', updated_at = now() WHERE app_id = $1 AND status = 'live';
 

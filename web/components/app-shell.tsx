@@ -466,7 +466,8 @@ function NotificationsBell() {
           const desktop = new Notification(n.title, { body: n.body ?? undefined, tag: n.id })
           desktop.onclick = () => {
             window.focus()
-            if (n.subject_type === "app" && n.subject_id && slug) router.push(`/${locale}/t/${slug}/apps/${n.subject_id}`)
+            if (n.subject_type === "app" && n.subject_id && slug)
+              router.push(`/${locale}/t/${slug}/apps/${n.subject_id}${n.kind === "adoptable" ? "?adopt=1" : ""}`)
           }
         } catch {
           // Desktop notifications can fail quietly (permission revoked mid-session, etc.).
@@ -506,7 +507,8 @@ function NotificationsBell() {
   }
 
   function open(n: Notification) {
-    if (n.subject_type === "app" && n.subject_id) router.push(`/${locale}/t/${slug}/apps/${n.subject_id}`)
+    if (n.subject_type === "app" && n.subject_id)
+      router.push(`/${locale}/t/${slug}/apps/${n.subject_id}${n.kind === "adoptable" ? "?adopt=1" : ""}`)
     setSheetOpen(false)
   }
 

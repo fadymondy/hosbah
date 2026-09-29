@@ -82,7 +82,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindAppRollback, KindAppLogs, KindAppRemove, KindOpCancel, KindAppExec, KindAppProcesses,
 	KindDBProvision, KindDBCreate, KindDBBackup, KindDBRestore, KindDBRemove, KindProxySet, KindDBDrop, KindTunnelFrp, KindTunnelTailscale,
 	KindWorkloadPower, KindWorkloadLogs, KindWorkloadStats, KindGuestResize, KindGuestSnapshot, KindGuestBackup,
-	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe,
+	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe, KindContainerInspect,
 	KindGitHubInstall, KindGitHubLogin, KindGitHubStatus, KindGitHubLogout, KindGitHubRepos, KindGitHubBranches,
 	KindGitHubCommits, KindGitHubCompare, KindGitHubPulls, KindCaddyCerts,
 	KindVolumeUsage, KindVolumeRemove, KindBucketCreate, KindBucketRemove, KindRealtimeRoute,

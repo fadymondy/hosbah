@@ -165,6 +165,33 @@ func needContainer(w Workload, what string) error {
 	return nil
 }
 
+// enqueueCommitted is enqueue in its own transaction, committed before it returns — for a caller
+// that is about to synchronously AwaitResult the operation from within its own still-open request
+// transaction. AwaitResult polls on a separate connection (ops.Service.Await opens its own
+// tenancy.Tx per poll), so an operation enqueued on the request's own not-yet-committed transaction
+// is invisible to it: Postgres never lets one transaction see another's uncommitted writes, even from
+// the same request. Enqueuing here first, on its own transaction that commits immediately, is what
+// makes the row visible to AwaitResult's very first poll.
+func (s *Service) enqueueCommitted(ctx context.Context, teamID string, actor Actor, w Workload, kind string, params any, action string, extra map[string]any) (db.Operation, error) {
+	var op db.Operation
+	err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: teamID}, func(txq *db.Queries, _ *sql.Tx) error {
+		var err error
+		op, err = s.enqueue(ctx, txq, teamID, actor, w, kind, params, action, extra)
+		return err
+	})
+	return op, err
+}
+
+// systemTx runs fn in its own, immediately-committed System-scoped transaction — for a write a
+// caller needs to make from within its own still-open, team-scoped request transaction, on a table
+// that (like releases: "written only by the worker") has no team-scope write policy at all, only
+// team-scope SELECT plus a System-scope ALL policy.
+func (s *Service) systemTx(ctx context.Context, teamID string, fn func(txq *db.Queries) error) error {
+	return tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: teamID}, func(txq *db.Queries, _ *sql.Tx) error {
+		return fn(txq)
+	})
+}
+
 // enqueue queues the operation on the workload's server and audits it (action "" = no audit entry:
 // the read-only stats, logs and snapshot list are visible in the operation log only).
 func (s *Service) enqueue(ctx context.Context, q *db.Queries, teamID string, actor Actor, w Workload, kind string, params any, action string, extra map[string]any) (db.Operation, error) {

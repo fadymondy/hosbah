@@ -22,6 +22,19 @@ VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('serve
     sqlc.narg('track'), sqlc.narg('track_reason'))
 RETURNING *;
 
+-- name: InsertAdoptDeployment :one
+-- Adopting an imported app: no build ran, so the deployment is recorded already finished. For a
+-- container, release_id is set right after (InsertAdoptRelease then SetDeploymentRelease); for a
+-- guest or unit there is no release to point at.
+INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, created_by, started_at, finished_at)
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('server_id'),
+    (SELECT coalesce(max(d.number), 0) + 1 FROM deployments d WHERE d.app_id = sqlc.arg('app_id')),
+    sqlc.arg('ref'), sqlc.arg('trigger'), 'adopt', 'succeeded', sqlc.arg('created_by'), now(), now())
+RETURNING *;
+
+-- name: SetDeploymentRelease :exec
+UPDATE deployments SET release_id = sqlc.arg('release_id'), updated_at = now() WHERE id = sqlc.arg('id');
+
 -- name: SupersedeQueuedDeployments :many
 -- A later request replaces a waiting one (a later push supersedes a queued one).
 UPDATE deployments SET status = 'cancelled', error = 'superseded by a newer deployment', finished_at = now(), updated_at = now()

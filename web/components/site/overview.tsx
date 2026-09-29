@@ -1,14 +1,20 @@
 "use client"
 
 import Link from "next/link"
-import type { ReactNode } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState, type ReactNode } from "react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
+import { ConfirmButton } from "@/components/confirm-button"
+import { useErrorText } from "@/components/form-error"
 import { ImportedNotice, OriginFacts } from "@/components/imported"
 import { WorkloadStats } from "@/components/imported-controls"
+import { AdoptDialog } from "@/components/site/adopt-dialog"
 import { SiteCanvas } from "@/components/site/canvas/canvas"
 import { useLoadedSite } from "@/components/site/context"
-import { SectionTitle } from "@/components/states"
+import { Notice, SectionTitle } from "@/components/states"
+import { Button } from "@/components/ui/button"
+import { apiFetch } from "@/lib/api"
 import { isImported, runtimeLabel, shortSha } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
@@ -22,17 +28,68 @@ export function SiteOverview() {
   const { t, locale } = useI18n()
   const { team } = useTeam()
   const fmt = useFormatDate()
-  const { detail, app, deployments, path } = useLoadedSite()
+  const errorText = useErrorText()
+  const router = useRouter()
+  const params = useSearchParams()
+  const { detail, app, deployments, path, reload } = useLoadedSite()
   const imported = isImported(app)
   const operate = canOperate(team.role)
   const base = `/${locale}/t/${team.slug}`
   const root = `${base}/apps/${encodeURIComponent(app.name)}`
   const live = detail.live_release
   const last = deployments[0]
+  // Set by adopt-app notifications and the trigger below; cleared once the dialog opens so a
+  // refresh does not reopen it.
+  const [adoptOpen, setAdoptOpen] = useState(false)
+  // An adopted guest or unit whose old workload has not been confirmed stopped yet: still git-sourced,
+  // but origin_kind survives adoption for exactly this (a container clears it itself once retired).
+  const awaitingStopConfirm = !imported && !!app.origin_kind && app.origin_kind !== "container"
+
+  useEffect(() => {
+    if (params.get("adopt") === "1") {
+      setAdoptOpen(true)
+      router.replace(`${root}${window.location.hash}`, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>
       {imported ? <ImportedNotice kind="app" /> : null}
+      {imported && operate ? (
+        <>
+          <Notice title={t("adopt.noticeTitle")}>
+            {t("adopt.noticeApp")}
+            <div className="pt-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setAdoptOpen(true)}>
+                {t("adopt.trigger")}
+              </Button>
+            </div>
+          </Notice>
+          <AdoptDialog path={path} open={adoptOpen} onOpenChange={setAdoptOpen} onAdopted={reload} />
+        </>
+      ) : null}
+      {awaitingStopConfirm && operate ? (
+        <Notice title={t("adopt.stopNoticeTitle")}>
+          {t("adopt.stopNoticeBody")}
+          <div className="pt-2">
+            <ConfirmButton
+              label={t("adopt.confirmStop")}
+              title={t("adopt.confirmStopTitle")}
+              description={t("adopt.confirmStopHint")}
+              confirmLabel={t("adopt.confirmStop")}
+              onConfirm={async () => {
+                try {
+                  await apiFetch(`${path}/adopt/confirm-stop`, { method: "POST" })
+                } catch (err) {
+                  throw new Error(errorText(err))
+                }
+                await reload()
+              }}
+            />
+          </div>
+        </Notice>
+      ) : null}
       <SiteCanvas />
 
       {imported ? (

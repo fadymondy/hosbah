@@ -130,7 +130,13 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 	items := Classify(services)
 	var itemsOut []itemOutcome
 
-	err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
+	// System is set alongside TeamID: notifications only allows INSERT in system scope (never
+	// SELECT or DELETE — CLAUDE.md), and this sync inserts an "adoptable" notification below.
+	// Every other query here still only ever touches this team's rows (team scope, backed by
+	// FORCE RLS), so callers that already run as this team (Sync is only ever invoked from the
+	// agent's own websocket handling and the system backfill job, never from a member request)
+	// see no change in what they can read or write.
+	err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{System: true, TeamID: teamID}, func(q *db.Queries, _ *sql.Tx) error {
 		res = Result{}
 		itemsOut = nil
 		srv, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: serverID, TeamID: teamID})
@@ -352,6 +358,14 @@ func Sync(ctx context.Context, sqlDB *sql.DB, teamID, serverID string, services 
 				} else {
 					out.Outcome, out.RecordID = OutcomeImportedApp, &id
 					res.Created++
+					// Adopting it in place needs no other action from the team than confirming a
+					// pre-filled dialog (internal/deploy/adopt.go); tell them it exists. This whole
+					// transaction runs as Scope{System: true, TeamID: teamID} precisely so this
+					// INSERT clears notifications' system-scope-only policy while staying this
+					// team's row (team_id is still set and still checked on every other query).
+					subjectType, title := "app", name+" can be adopted into Hosbah builds, confirm"
+					_ = q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: teamID, Kind: "adoptable", Title: title,
+						SubjectType: &subjectType, SubjectID: &id})
 				}
 			}
 			itemsOut = append(itemsOut, out)

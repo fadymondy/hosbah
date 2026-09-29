@@ -136,6 +136,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindWorkloadPower: wl.power, agentproto.KindWorkloadLogs: wl.logs, agentproto.KindWorkloadStats: wl.stats,
 		agentproto.KindGuestResize: wl.resize, agentproto.KindGuestSnapshot: wl.snapshot, agentproto.KindGuestBackup: wl.backup,
 		agentproto.KindContainerRecreate: wl.recreate, agentproto.KindWorkloadDestroy: wl.destroy, agentproto.KindDBProbe: wl.probe,
+		agentproto.KindContainerInspect: wl.inspect,
 	} {
 		e.handlers[kind] = h
 	}
@@ -316,7 +317,7 @@ func (e *Executor) Work(ctx context.Context) {
 // laneOf: "" runs concurrently; anything else runs one at a time within its lane.
 func laneOf(op agentproto.SignedOp) string {
 	switch op.Kind {
-	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
+	case agentproto.KindAppLogs, agentproto.KindWorkloadLogs, agentproto.KindWorkloadStats, agentproto.KindContainerInspect, agentproto.KindDBProbe, agentproto.KindCaddyCerts,
 		agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
 		agentproto.KindAppLogsSearch, agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest, agentproto.KindServiceList:
 		return "" // read-only: never queued behind a long action

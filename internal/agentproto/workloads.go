@@ -29,6 +29,12 @@ const (
 	KindContainerRecreate = "container.recreate" // pull the image and recreate the container with the same configuration
 	KindWorkloadDestroy   = "workload.destroy"   // stop and destroy a guest, or docker rm -f a container
 	KindDBProbe           = "db.probe"           // check credentials for an imported database (client in the container, or TCP to a guest)
+	// KindContainerInspect (adopt an imported app): a running container's image ref/digest, env,
+	// published ports, labels, mounts and restart policy, read with `docker inspect` only — nothing
+	// is started, stopped or changed. Env values are never logged (only their names may appear in a
+	// progress line); the result itself still carries them, sealed by the caller into the app's env
+	// vars before anything else touches it.
+	KindContainerInspect = "container.inspect"
 )
 
 // Targets.
@@ -337,6 +343,30 @@ type RecreateResult struct {
 	Name        string `json:"name"`
 	Image       string `json:"image"`
 	ContainerID string `json:"container_id,omitempty"`
+}
+
+// ---- container.inspect ------------------------------------------------------------------------
+
+// ContainerInspectParams: container.inspect. Read-only — nothing about the container changes.
+type ContainerInspectParams struct {
+	Name  string `json:"name"`
+	Label string `json:"label,omitempty"`
+}
+
+func (p ContainerInspectParams) Validate() error { return Container(p.Name, p.Label).Validate() }
+
+// ContainerInspectResult: enough of a running container's configuration to adopt it into a Hosbah
+// app without a rebuild. Env holds the container's actual environment values — the agent never logs
+// them, and the control plane must seal them with the team DEK before they touch anything else.
+type ContainerInspectResult struct {
+	Status        string            `json:"status"`
+	Image         string            `json:"image"`
+	ImageDigest   string            `json:"image_digest,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+	Ports         []string          `json:"ports,omitempty"` // e.g. "8080/tcp -> 0.0.0.0:3000"
+	Labels        map[string]string `json:"labels,omitempty"`
+	Mounts        []string          `json:"mounts,omitempty"` // e.g. "/host/path -> /container/path"
+	RestartPolicy string            `json:"restart_policy,omitempty"`
 }
 
 // ---- workload.destroy ------------------------------------------------------------------------

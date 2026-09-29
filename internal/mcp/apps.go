@@ -206,7 +206,7 @@ func AppTools() []Tool {
 				"RFC 3339; default the last hour). The agent filters the lines itself; at most limit matches are returned.",
 			InputSchema: schema([]string{"app"}, map[string]any{
 				"app": appArg, "q": str("A plain substring, or an RE2 pattern when regex=true"),
-				"regex": map[string]any{"type": "boolean", "description": "Treat q as an RE2 regular expression"},
+				"regex":            map[string]any{"type": "boolean", "description": "Treat q as an RE2 regular expression"},
 				"case_insensitive": map[string]any{"type": "boolean"},
 				"process":          str("web (default: every process) or worker:<name>"),
 				"level":            map[string]any{"type": "string", "enum": []string{"", "error", "warn"}},
@@ -464,6 +464,84 @@ func AppTools() []Tool {
 			},
 		},
 
+		{
+			Name: "adopt_app_proposal", Scope: scopes.Read,
+			Description: "Guessed fields to pre-fill adopt_app for an imported app: a repository, branch, build type and port, each with a confidence " +
+				"(high/medium/low) and where it came from (a container label, a connected GitHub repo, a published port…) and a list of what could not be guessed.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				prop, err := s.Propose(ctx, env.Q, env.Caller.TeamID, a)
+				if err != nil {
+					return "", err
+				}
+				raw, _ := json.MarshalIndent(prop, "", "  ")
+				return string(raw), nil
+			},
+		},
+		{
+			Name: "adopt_app", Scope: scopes.Deploy,
+			Description: "Turn an imported app into a Hosbah-built git app in place — no rebuild is required to take it over. The running workload keeps " +
+				"serving until the first real deploy (build → health gate → switch); for a container, that deploy then automatically retires the old one.",
+			InputSchema: schema([]string{"app", "repo_url"}, map[string]any{"app": appArg, "repo_url": str("github.com/owner/repo, or a full URL"),
+				"branch": str("Default: main"), "build": map[string]any{"type": "string", "enum": []string{"auto", "dockerfile", "railpack"}, "default": "auto"},
+				"port": map[string]any{"type": "integer", "description": "Default: the app's current port"}}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				updated, rel, err := s.Adopt(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a, deploy.AdoptInput{
+					RepoURL: args.Str("repo_url"), Branch: args.Str("branch"), Build: args.Str("build"), Port: args.Int("port", 0, 0, 65535)})
+				if err != nil {
+					return "", err
+				}
+				if rel != nil {
+					return fmt.Sprintf("%s is now a Hosbah git app (release v0 points at its running image). Deploy it to build from git.", updated.Name), nil
+				}
+				return fmt.Sprintf("%s is now a Hosbah git app. Deploy it to build from git; once that deploy is live, confirm_adopted_workload_stopped "+
+					"can stop the old workload.", updated.Name), nil
+			},
+		},
+		{
+			Name: "confirm_adopted_workload_stopped", Scope: scopes.Deploy,
+			Description: "Confirm the old workload of an adopted guest or systemd unit has stopped. Hosbah never stops one on its own — a guest is powered " +
+				"off here, a unit cannot be controlled so this only clears the record. Requires the first real deploy to already be live.",
+			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
+				if err := needs(ctx, env, tenancy.AbilityDeploy); err != nil {
+					return "", err
+				}
+				a, err := findApp(ctx, env, args)
+				if err != nil {
+					return "", err
+				}
+				s, err := deploys(env)
+				if err != nil {
+					return "", err
+				}
+				updated, err := s.ConfirmAdoptedWorkloadStopped(ctx, env.Q, env.Caller.TeamID, mcpActor(env), a)
+				if err != nil {
+					return "", err
+				}
+				return updated.Name + "'s old workload is confirmed stopped.", nil
+			},
+		},
+
 		// ---- write ----
 		{
 			Name: "create_app", Scope: scopes.Write,
@@ -551,7 +629,7 @@ func AppTools() []Tool {
 			Name: "add_domain", Scope: scopes.Write,
 			Description: "Route a hostname to the app (re-routed at once if a release is live). tls: auto (public certificate once verified), internal (Caddy's CA) or off (plain HTTP).",
 			InputSchema: schema([]string{"app", "hostname"}, map[string]any{"app": appArg, "hostname": str("e.g. app.example.com"),
-				"tls": map[string]any{"type": "string", "enum": []string{"auto", "internal", "off"}, "default": "auto"},
+				"tls":  map[string]any{"type": "string", "enum": []string{"auto", "internal", "off"}, "default": "auto"},
 				"port": map[string]any{"type": "integer", "minimum": 0, "maximum": 65535, "description": "Imported apps: a container's published port (default the first) or the port a Proxmox guest's site listens on (required)"}}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageApps); err != nil {

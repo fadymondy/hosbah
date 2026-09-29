@@ -26,7 +26,7 @@ import (
 
 // AppLogsSearchOut is a log search's answer, or null result while the operation is still running.
 type AppLogsSearchOut struct {
-	Operation OperationOut                `json:"operation"`
+	Operation OperationOut                 `json:"operation"`
 	Result    *agentproto.LogsSearchResult `json:"result"`
 }
 
@@ -838,6 +838,102 @@ func (d *deps) registerApps(api huma.API) {
 				return actionErr(err, "could not restart")
 			}
 			out.Body = toDeploymentOut(dep)
+			return nil
+		})
+		return out, err
+	})
+
+	type adoptProposalOut struct {
+		Status int
+		Body   deploy.AdoptProposal
+	}
+	huma.Register(api, huma.Operation{OperationID: "adopt-app-proposal", Method: http.MethodGet, Path: "/api/teams/{team}/apps/{app}/adopt/proposal",
+		Summary: "Guessed fields to pre-fill the adopt dialog for an imported app — a repo, branch, build type and port, each with a confidence and where it came from (owner, admin or deployer)",
+		Tags:    tags,
+	}, func(ctx context.Context, in *AppPath) (*adoptProposalOut, error) {
+		out := &adoptProposalOut{Status: http.StatusOK}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityDeploy, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			prop, err := d.deploys().Propose(ctx, q, m.TeamID, a)
+			if err != nil {
+				if coded := asImported(err); coded != nil {
+					return coded
+				}
+				return actionErr(err, "could not put together an adopt proposal")
+			}
+			out.Body = prop
+			return nil
+		})
+		return out, err
+	})
+
+	type adoptOut struct {
+		Status int
+		Body   struct {
+			App     AppOut      `json:"app"`
+			Release *ReleaseOut `json:"release,omitempty"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "adopt-app", Method: http.MethodPost, Path: "/api/teams/{team}/apps/{app}/adopt",
+		DefaultStatus: http.StatusOK, Tags: tags,
+		Summary: "Turn an imported app into a Hosbah-built git app in place — no rebuild is required to take it over; the running workload keeps serving until the first real deploy (owner, admin or deployer)",
+	}, func(ctx context.Context, in *struct {
+		AppPath
+		Body struct {
+			RepoURL string `json:"repo_url" maxLength:"512" doc:"The app's git repository (github.com/owner/repo, or a full URL)."`
+			Branch  string `json:"branch,omitempty" maxLength:"200" doc:"Default: main."`
+			Build   string `json:"build,omitempty" enum:"auto,dockerfile,railpack" doc:"Default: auto — Hosbah still detects a Dockerfile at deploy time."`
+			Port    int    `json:"port,omitempty" doc:"Default: the app's current port."`
+		}
+	}) (*adoptOut, error) {
+		out := &adoptOut{Status: http.StatusOK}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityDeploy, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			updated, rel, err := d.deploys().Adopt(ctx, q, m.TeamID, webActor(id), a, deploy.AdoptInput{
+				RepoURL: in.Body.RepoURL, Branch: in.Body.Branch, Build: in.Body.Build, Port: in.Body.Port})
+			if err != nil {
+				if coded := asImported(err); coded != nil {
+					return coded
+				}
+				return actionErr(err, "could not adopt")
+			}
+			server, _ := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: updated.ServerID, TeamID: m.TeamID})
+			out.Body.App = toAppOut(updated, server.Name)
+			if rel != nil {
+				o := toReleaseOut(*rel)
+				out.Body.Release = &o
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	type confirmStopOut struct{ Body AppOut }
+	huma.Register(api, huma.Operation{OperationID: "confirm-adopted-workload-stopped", Method: http.MethodPost,
+		Path: "/api/teams/{team}/apps/{app}/adopt/confirm-stop", DefaultStatus: http.StatusOK, Tags: tags,
+		Summary: "Confirm the old workload of an adopted guest or systemd unit has stopped — Hosbah never stops one on its own; a container is retired automatically by its first deploy instead (owner, admin or deployer)",
+	}, func(ctx context.Context, in *AppPath) (*confirmStopOut, error) {
+		out := &confirmStopOut{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityDeploy, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			updated, err := d.deploys().ConfirmAdoptedWorkloadStopped(ctx, q, m.TeamID, webActor(id), a)
+			if err != nil {
+				if coded := asImported(err); coded != nil {
+					return coded
+				}
+				return actionErr(err, "could not confirm")
+			}
+			server, _ := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: updated.ServerID, TeamID: m.TeamID})
+			out.Body = toAppOut(updated, server.Name)
 			return nil
 		})
 		return out, err

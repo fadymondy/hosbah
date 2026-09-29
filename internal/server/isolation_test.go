@@ -444,6 +444,7 @@ func TestIsolationSweep(t *testing.T) {
 		"deploy_logs": {"app": appA.App.ID, "deployment": appA.Deployment.ID}, "list_env": {"app": appA.App.ID},
 		"list_domains": {"app": appA.App.ID}, "app_analytics": {"app": appA.App.ID}, "deploy_app": {"app": appA.App.ID}, "cancel_deployment": {"app": appA.App.ID, "deployment": "1"},
 		"rollback_app": {"app": appA.App.ID}, "restart_app": {"app": appA.App.ID}, "pause_autodeploy": {"app": appA.App.ID},
+		"adopt_app_proposal": {"app": appA.App.ID}, "adopt_app": {"app": appA.App.ID, "repo_url": "github.com/acme/shop"}, "confirm_adopted_workload_stopped": {"app": appA.App.ID},
 		"set_env": {"app": appA.App.ID, "name": "X", "value": "y"}, "unset_env": {"app": appA.App.ID, "name": "SECRET_A"},
 		"add_domain": {"app": appA.App.ID, "hostname": "b.example.test"}, "verify_domain": {"app": appA.App.ID, "domain": domA.ID},
 		"reveal_env": {"app": appA.App.ID, "name": "SECRET_A"}, "delete_app": {"app": appA.App.ID, "confirm": appA.App.Name},

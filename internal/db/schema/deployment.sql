@@ -32,7 +32,9 @@ CREATE TABLE deployments (
 -- request supersedes the waiting one). last_seq allocates deployment_logs.seq under the row lock.
 -- kind rollback/restart skip the build and start target_release_id / the live release's image.
 ALTER TABLE deployments ADD CONSTRAINT deployments_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'));
-ALTER TABLE deployments ADD CONSTRAINT deployments_kind_check CHECK (kind IN ('deploy', 'rollback', 'restart'));
+-- kind adopt: an imported app taken over in place, pointing release #0 at the already-running
+-- image (a container) or, for a guest/unit, recorded with no release at all — see internal/deploy/adopt.go.
+ALTER TABLE deployments ADD CONSTRAINT deployments_kind_check CHECK (kind IN ('deploy', 'rollback', 'restart', 'adopt'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_trigger_check CHECK (trigger IN ('manual', 'hook', 'mcp', 'github'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_track_check CHECK (track IS NULL OR track IN ('fast', 'full'));
 CREATE UNIQUE INDEX deployments_app_number_key ON deployments (app_id, number);

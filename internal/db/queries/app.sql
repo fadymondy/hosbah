@@ -117,6 +117,23 @@ DELETE FROM apps WHERE server_id = $1 AND team_id = $2 AND source = 'imported';
 UPDATE apps SET imported_state = sqlc.arg('imported_state'), status = sqlc.arg('status'), updated_at = now()
 WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported';
 
+-- name: AdoptApp :one
+-- Turns an imported app into a normal git app in place: source becomes 'git', the repository and
+-- branch are set, and port is updated when adopt gave one. origin_kind/origin_key/origin and
+-- imported_state are kept — they are what lets the first real deploy find and, for a container,
+-- automatically retire the old workload (internal/deploy/service.go), and what a systemd unit or
+-- guest's confirm-stop action checks against; ClearAppOrigin drops them once that is done.
+UPDATE apps SET source = 'git', repo_url = sqlc.arg('repo_url')::text, branch = sqlc.arg('branch')::text,
+    port = coalesce(sqlc.narg('port'), port), updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND source = 'imported'
+RETURNING *;
+
+-- name: ClearAppOrigin :exec
+-- The old imported workload has been retired (a container, automatically; a guest or unit, once the
+-- team confirmed it stopped): nothing left to clean up or to point a confirm-stop action at.
+UPDATE apps SET origin_kind = NULL, origin_key = NULL, origin = NULL, imported_state = NULL, updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
 -- name: AppsForRepoInTeam :many
 -- A GitHub App push: the git apps of the installation's team on that repository and branch, except
 -- those whose automatic deploys are paused.

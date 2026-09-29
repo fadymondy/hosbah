@@ -557,8 +557,8 @@ func (r *runner) injectApmEnv(ctx context.Context, env map[string]string) {
 		"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
 		// x-hosbah-key, not "Authorization=Bearer …": the spec percent-decodes header values and a raw
 		// space trips some SDKs.
-		"OTEL_EXPORTER_OTLP_HEADERS":  "x-hosbah-key=" + string(plain),
-		"OTEL_SERVICE_NAME":           r.app.Name,
+		"OTEL_EXPORTER_OTLP_HEADERS": "x-hosbah-key=" + string(plain),
+		"OTEL_SERVICE_NAME":          r.app.Name,
 	}
 	for k, v := range defaults {
 		if _, set := env[k]; !set {
@@ -868,8 +868,8 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 			AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID,
 			GitSource: src,
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
-			NoCache:        r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
-			PHPVersion:     phpVersion, PHPIni: phpIni,
+			NoCache:    r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
+			PHPVersion: phpVersion, PHPIni: phpIni,
 			DockerfilePath: dockerfilePath, BuildContext: buildContext, Env: buildEnvBox,
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
@@ -1030,6 +1030,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	if err := r.op(ctx, "drain", agentproto.KindAppDrain, agentproto.DrainParams{AppID: r.app.ID, Keep: created, GraceSeconds: 10}, nil); err != nil {
 		r.logf("error", "the new release is live, but draining the old containers failed: %v", err)
 	}
+	r.retireAdoptedContainer(ctx)
 	return &rel, nil
 }
 

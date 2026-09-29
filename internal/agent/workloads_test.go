@@ -290,6 +290,48 @@ func TestContainerStatsParsesDocker(t *testing.T) {
 	}
 }
 
+func TestContainerInspectParsesDockerAndNeverLogsEnv(t *testing.T) {
+	answers := map[string]string{
+		"docker inspect --type container shop-web": `[{"Config":{"Image":"ghcr.io/acme/shop:1.2.3","Env":["SECRET_TOKEN=s3cret!","PORT=3000"],` +
+			`"Labels":{"org.opencontainers.image.source":"https://github.com/acme/shop","org.opencontainers.image.revision":"main"}},` +
+			`"Image":"sha256:abc123","State":{"Status":"running"},` +
+			`"HostConfig":{"RestartPolicy":{"Name":"unless-stopped"},"PortBindings":{"3000/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}]}},` +
+			`"Mounts":[{"Source":"/data/shop","Destination":"/app/data"}]}]`,
+	}
+	w, f := newFake(answers)
+	oc, lines := opCtx(t, agentproto.ContainerInspectParams{Name: "shop-web"})
+	res, _, err := w.inspect(oc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := res.(agentproto.ContainerInspectResult)
+	if r.Image != "ghcr.io/acme/shop:1.2.3" || r.ImageDigest != "sha256:abc123" || r.Status != "running" || r.RestartPolicy != "unless-stopped" {
+		t.Fatalf("container inspect: %+v", r)
+	}
+	if r.Env["SECRET_TOKEN"] != "s3cret!" || r.Env["PORT"] != "3000" {
+		t.Fatalf("env not parsed: %+v", r.Env)
+	}
+	if r.Labels["org.opencontainers.image.source"] != "https://github.com/acme/shop" {
+		t.Fatalf("labels not parsed: %+v", r.Labels)
+	}
+	if len(r.Ports) != 1 || r.Ports[0] != "3000/tcp -> 0.0.0.0:8080" {
+		t.Fatalf("ports not parsed: %+v", r.Ports)
+	}
+	if len(r.Mounts) != 1 || r.Mounts[0] != "/data/shop -> /app/data" {
+		t.Fatalf("mounts not parsed: %+v", r.Mounts)
+	}
+	// Read-only: this must never be treated as a mutating call.
+	if muts := f.mutating(); len(muts) != 0 {
+		t.Fatalf("container.inspect must be read-only, got mutating calls: %v", muts)
+	}
+	// The env values must never appear in anything logged for this op.
+	for _, l := range *lines {
+		if strings.Contains(l, "s3cret!") || strings.Contains(l, "SECRET_TOKEN=s3cret") {
+			t.Fatalf("env value leaked into a log line: %q", l)
+		}
+	}
+}
+
 func TestWorkloadLogsArgs(t *testing.T) {
 	got := strings.Join(workloadLogsArgs(agentproto.WorkloadLogsParams{Name: "shop-web", Tail: 500, Since: "15m", FollowSeconds: 30}), " ")
 	if got != "logs --timestamps --tail 500 --since 15m --follow shop-web" {
