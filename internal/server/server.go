@@ -127,6 +127,7 @@ func Boot() *app.App {
 	notify := notifications.New(a, svc, monitors.SafeTransport(nil))
 	a.Notifications = notify
 	watch.SetNotifier(notify)
+	watch.SetBroker(svc.Broker())
 	watch.Start()
 	watch.MountPublic(k.Router) // /hooks/heartbeat/{token} — outside /api, ping-token authenticated
 	a.Monitors = watch

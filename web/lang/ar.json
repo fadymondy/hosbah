@@ -730,6 +730,7 @@
     "neverDeployed": "لم يُنشر بعد",
     "domains": {
       "empty": "لا توجد نطاقات بعد.",
+      "moreCount": "{count} نطاقات أخرى",
       "noAppsDomain": "لا يملك حوسبة نطاقًا مشتركًا للتطبيقات بعد، لذا يُوصَل إلى التطبيق عبر نطاقاته الخاصة.",
       "hostname": "اسم المضيف",
       "tlsLabel": "TLS",
@@ -1688,7 +1689,9 @@
   "notifications": {
     "title": "الإشعارات",
     "titleUnread": "الإشعارات ({count} غير مقروءة)",
-    "empty": "لا جديد."
+    "empty": "لا جديد.",
+    "enableDesktop": "تفعيل إشعارات سطح المكتب",
+    "desktopBlocked": "إشعارات سطح المكتب محظورة في إعدادات المتصفح"
   },
   "databases": {
     "description": "خدمات Postgres وMySQL وRedis المُدارة التي تتصل بها تطبيقات هذا الفريق.",

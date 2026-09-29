@@ -189,6 +189,11 @@ func OpTopic(opID string) string         { return "op:" + opID }
 func DeployTopic(deploymentID string) string { return "deploy:" + deploymentID }
 func AppTopic(appID string) string           { return "app:" + appID }
 
+// TeamTopic: a team's own feed (internal/api's /api/teams/{team}/notifications/stream — the
+// notification bell). Never a global topic; every subscriber still reads back through its own
+// team-scoped transaction, same as every other SSE stream.
+func TeamTopic(teamID string) string { return "team:" + teamID }
+
 func newUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)

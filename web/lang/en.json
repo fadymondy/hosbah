@@ -730,6 +730,7 @@
     "neverDeployed": "Not deployed yet",
     "domains": {
       "empty": "No domains yet.",
+      "moreCount": "{count} more domains",
       "noAppsDomain": "Hosbah has no shared apps domain yet, so an app is reached through its own domains.",
       "hostname": "Hostname",
       "tlsLabel": "TLS",
@@ -1688,7 +1689,9 @@
   "notifications": {
     "title": "Notifications",
     "titleUnread": "Notifications ({count} unread)",
-    "empty": "Nothing new."
+    "empty": "Nothing new.",
+    "enableDesktop": "Enable desktop notifications",
+    "desktopBlocked": "Desktop notifications are blocked in your browser settings"
   },
   "databases": {
     "description": "Managed Postgres, MySQL and Redis this team's apps connect to.",

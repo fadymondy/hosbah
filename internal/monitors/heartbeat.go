@@ -113,6 +113,8 @@ func (s *Service) handleHeartbeatPing(w http.ResponseWriter, r *http.Request) {
 				Body: &body, SubjectType: ptr("app"), SubjectID: &ev.App.ID})
 		}); nerr != nil {
 			s.log.Warn("heartbeat ping: could not write the team notification", "monitor", ev.Monitor.ID, "err", nerr)
+		} else {
+			s.publishTeam(ev.teamID)
 		}
 		s.announce(ctx, *ev)
 	}

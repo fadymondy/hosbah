@@ -12,6 +12,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
 import { AppStatusBadge, DeploymentStatusBadge } from "@/components/app-status"
+import { DomainsSummary } from "@/components/apps/domains"
 import { ImportedBadge, originSummary } from "@/components/imported"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
@@ -146,7 +147,7 @@ export function ServerApps({ serverId }: { serverId: string }) {
                       )}
                     </TableCell>
                     <TableCell dir="ltr" className="text-start font-mono text-xs">
-                      {a.domains?.length ? a.domains.map((h) => <div key={h.id}>{h.hostname}</div>) : "—"}
+                      <DomainsSummary domains={a.domains ?? []} />
                     </TableCell>
                     {manage ? (
                       <TableCell>

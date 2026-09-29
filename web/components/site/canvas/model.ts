@@ -12,11 +12,14 @@ import type { Bucket, Volume } from "@/components/site/storage"
 The site overview canvas as data: which boxes there are, what joins them, and where they go the
 first time. Pure functions; canvas.tsx draws the result with React Flow.
 
-Node keys are stable across reloads ("app", "domain:<hostname>", "db:<service id>", "worker:<name>",
+Node keys are stable across reloads ("app", "domains", "db:<service id>", "worker:<name>",
 …): they are what saved positions are stored under.
 */
 
 export type Status = "ok" | "warn" | "error" | "busy" | "off"
+
+/** The site's one domains box (a stack of cards, not one node per hostname — see BoxData.domains). */
+export const DOMAINS_BOX_ID = "domains"
 
 export type NodeKind =
   | "visitors"
@@ -66,6 +69,12 @@ export type BoxData = {
   rank?: number
   /** Traffic path boxes sit on the centre line of their column; the rest go below them. */
   primary: boolean
+  /**
+   * kind "domain" only: every domain this box stands for. There is one "domains" box for the
+   * whole site (not one per hostname) so it can draw as a stack of offset cards — the front card
+   * is domains[0], and the rest expand into a list on hover/click. Undefined for every other kind.
+   */
+  domains?: AppDetail["domains"]
 }
 
 export type Box = { id: string; data: BoxData }
@@ -106,24 +115,27 @@ export function buildGraph(i: CanvasInputs): { boxes: Box[]; links: Link[] } {
   const link = (source: string, target: string, traffic = false, removal: Removal | null = null) =>
     links.push({ id: `${source}->${target}`, source, target, traffic, removal, label: "" })
 
-  // Traffic: visitors → each domain → Caddy → the app.
+  // Traffic: visitors → the site's domains (one stacked-card box for all of them) → Caddy → the app.
   box("visitors", { kind: "visitors", label: t("site.flow.visitors"), title: t("site.canvas.internet"), lines: [], href: `${root}/monitors`, primary: true })
-  for (const d of detail.domains) {
-    const id = `domain:${d.hostname}`
-    box(id, {
+  if (detail.domains.length > 0) {
+    const first = detail.domains[0]
+    const allVerified = detail.domains.every((d) => d.verified)
+    box(DOMAINS_BOX_ID, {
       kind: "domain",
       label: t("site.canvas.kinds.domain"),
-      title: d.hostname,
-      lines: [`TLS ${t(`apps.domains.tls.${d.tls}`)}`],
-      ...st(d.verified ? "ok" : "warn", d.verified ? t("apps.domains.verified") : t("apps.domains.unverified")),
+      title: first.hostname,
+      lines: detail.domains.length === 1 ? [`TLS ${t(`apps.domains.tls.${first.tls}`)}`] : [],
+      ...st(allVerified ? "ok" : "warn", allVerified ? t("apps.domains.verified") : t("apps.domains.unverified")),
       href: `${root}/dns`,
-      removal: { kind: "domain", domain: d },
+      removal: detail.domains.length === 1 ? { kind: "domain", domain: first } : null,
+      domains: detail.domains,
       primary: true,
     })
-    link("visitors", id, true)
-    link(id, "caddy", true)
+    link("visitors", DOMAINS_BOX_ID, true)
+    link(DOMAINS_BOX_ID, "caddy", true)
+  } else {
+    link("visitors", "caddy", false)
   }
-  if (!detail.domains.length) link("visitors", "caddy", false)
   box("caddy", {
     kind: "caddy",
     label: t("site.flow.proxy"),
@@ -303,7 +315,7 @@ export function buildGraph(i: CanvasInputs): { boxes: Box[]; links: Link[] } {
     let target = "app"
     if (m.kind === "http") {
       const host = hostOf(m.target)
-      if (host && detail.domains.some((d) => d.hostname === host)) target = `domain:${host}`
+      if (host && detail.domains.some((d) => d.hostname === host)) target = DOMAINS_BOX_ID
     }
     const status: Status | null = !m.enabled ? "off" : m.state === "failing" ? "error" : m.state === "ok" ? "ok" : null
     box(id, {

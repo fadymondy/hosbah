@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   BadgeCheckIcon,
   BellIcon,
@@ -56,10 +56,11 @@ import {
 import { GroupLabel, NavLink } from "@/components/shell/nav-link"
 import { ShellScopeProvider } from "@/components/shell/scope"
 import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { apiFetch } from "@/lib/api"
 import type { Notification } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
+import { useEventStream } from "@/lib/servers"
 import { useSession } from "@/lib/session"
 import { usePublicSettings } from "@/lib/platform"
 import { useOptionalTeam } from "@/lib/team"
@@ -423,7 +424,16 @@ function UserMenu() {
   )
 }
 
-/** Team notifications (failed deploys…): a bell with the unread count; opening it marks them read. */
+type NotificationsPayload = { notifications: Notification[]; unread: number }
+
+/**
+ * Team notifications (failed deploys…): a bell with the unread count, opening a side-over sheet
+ * (inline-end; mirrored in RTL) that lists them and marks them read. Kept live by the team's own
+ * SSE stream (/api/teams/{team}/notifications/stream — internal/ops's broker wakes it the moment a
+ * deploy or monitor writes a notification; it also polls every 15s as a fallback, same as every
+ * other stream in this app). A new, unread notification pops a desktop Notification when the tab
+ * is hidden and permission is granted.
+ */
 function NotificationsBell() {
   const { t, locale } = useI18n()
   const teamCtx = useOptionalTeam()
@@ -432,23 +442,51 @@ function NotificationsBell() {
   const slug = teamCtx?.team.slug
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
-
-  const load = useCallback(async () => {
-    if (!slug) return
-    try {
-      const r = await apiFetch<{ notifications: Notification[]; unread: number }>(`/api/teams/${slug}/notifications`)
-      setItems(r.notifications ?? [])
-      setUnread(r.unread ?? 0)
-    } catch {
-      // The bell stays quiet if notifications cannot be read.
-    }
-  }, [slug])
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default")
+  const seenRef = useRef<Set<string> | null>(null)
 
   useEffect(() => {
-    void load()
-    const id = setInterval(load, 30_000)
-    return () => clearInterval(id)
-  }, [load])
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setPermission("unsupported")
+      return
+    }
+    setPermission(Notification.permission)
+  }, [])
+
+  const apply = useCallback((data: NotificationsPayload) => {
+    const list = data.notifications ?? []
+    setItems(list)
+    setUnread(data.unread ?? 0)
+    const seen = seenRef.current
+    if (seen && typeof document !== "undefined" && document.hidden && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      for (const n of list) {
+        if (n.read_at || seen.has(n.id)) continue
+        try {
+          const desktop = new Notification(n.title, { body: n.body ?? undefined, tag: n.id })
+          desktop.onclick = () => {
+            window.focus()
+            if (n.subject_type === "app" && n.subject_id && slug) router.push(`/${locale}/t/${slug}/apps/${n.subject_id}`)
+          }
+        } catch {
+          // Desktop notifications can fail quietly (permission revoked mid-session, etc.).
+        }
+      }
+    }
+    seenRef.current = new Set(list.map((n) => n.id))
+  }, [locale, router, slug])
+
+  useEffect(() => {
+    if (!slug) return
+    apiFetch<NotificationsPayload>(`/api/teams/${slug}/notifications`).then(apply).catch(() => {
+      // The bell stays quiet if notifications cannot be read; the stream retries on its own.
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
+  useEventStream(slug ? `/api/teams/${slug}/notifications/stream` : null, {
+    notifications: (d) => apply(d as NotificationsPayload),
+  })
 
   if (!slug) return null
 
@@ -458,26 +496,30 @@ function NotificationsBell() {
       await apiFetch(`/api/teams/${slug}/notifications/read`, { method: "POST" })
       setUnread(0)
     } catch {
-      // Stays unread; the next poll shows the truth.
+      // Stays unread; the next stream frame shows the truth.
     }
+  }
+
+  function requestDesktop() {
+    if (typeof window === "undefined" || !("Notification" in window)) return
+    void Notification.requestPermission().then(setPermission)
   }
 
   function open(n: Notification) {
     if (n.subject_type === "app" && n.subject_id) router.push(`/${locale}/t/${slug}/apps/${n.subject_id}`)
+    setSheetOpen(false)
   }
 
   return (
-    <DropdownMenu onOpenChange={(o) => (o ? void markRead() : void load())}>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            className="relative inline-flex size-8 items-center justify-center hover:bg-grid-soft aria-expanded:bg-grid-soft"
-            aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
-            data-testid="notifications"
-            data-unread={unread}
-          />
-        }
+    <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (o) void markRead() }}>
+      <button
+        type="button"
+        className="relative inline-flex size-8 items-center justify-center hover:bg-grid-soft aria-expanded:bg-grid-soft"
+        aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
+        aria-expanded={sheetOpen}
+        data-testid="notifications"
+        data-unread={unread}
+        onClick={() => setSheetOpen(true)}
       >
         <BellIcon className="size-4" />
         {unread > 0 ? (
@@ -485,15 +527,29 @@ function NotificationsBell() {
             {unread > 99 ? "99+" : unread}
           </span>
         ) : null}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-80">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs text-muted-foreground">{t("notifications.title")}</DropdownMenuLabel>
+      </button>
+      <SheetContent side={locale === "ar" ? "left" : "right"} className="w-80 gap-0 sm:max-w-sm">
+        <SheetHeader className="border-b border-line">
+          <SheetTitle>{t("notifications.title")}</SheetTitle>
+        </SheetHeader>
+        {permission !== "unsupported" && permission !== "granted" ? (
+          <div className="border-b border-line px-4 py-2">
+            <Button variant="outline" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
+              {permission === "denied" ? t("notifications.desktopBlocked") : t("notifications.enableDesktop")}
+            </Button>
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {items.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">{t("notifications.empty")}</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground">{t("notifications.empty")}</p>
           ) : (
-            items.slice(0, 20).map((n) => (
-              <DropdownMenuItem key={n.id} onClick={() => open(n)} className="flex-col items-start gap-0.5">
+            items.slice(0, 50).map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => open(n)}
+                className="flex w-full flex-col items-start gap-0.5 border-b border-line px-4 py-3 text-start hover:bg-grid-soft"
+              >
                 <span className="flex w-full items-center gap-2">
                   {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
                   <span className="truncate font-medium" dir="auto">
@@ -508,12 +564,12 @@ function NotificationsBell() {
                 <span className="text-xs text-muted-foreground" dir="ltr">
                   {fmt(n.created_at)}
                 </span>
-              </DropdownMenuItem>
+              </button>
             ))
           )}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 

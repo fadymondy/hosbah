@@ -1307,6 +1307,53 @@ func (d *deps) registerApps(api huma.API) {
 		return nil, err
 	})
 
+	huma.Register(api, huma.Operation{OperationID: "stream-notifications", Method: http.MethodGet, Path: "/api/teams/{team}/notifications/stream",
+		Summary: "Live notifications bell (text/event-stream: event notifications, the same shape as list-notifications)", Tags: []string{"Notifications"},
+	}, func(ctx context.Context, in *TeamPath) (*huma.StreamResponse, error) {
+		var teamID string
+		if err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(_ *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			teamID = m.TeamID
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return &huma.StreamResponse{Body: func(hctx huma.Context) {
+			sse := newSSE(hctx)
+			wake, unsub := d.ops.Broker().Subscribe(ops.TeamTopic(teamID))
+			defer unsub()
+			var last []byte
+			for {
+				out := notificationsOut{}
+				out.Body.Notifications = []NotificationOut{}
+				err := d.inTeam(sse.ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+					rows, err := q.ListNotificationsOfTeam(sse.ctx, db.ListNotificationsOfTeamParams{TeamID: m.TeamID, UserID: id.ID, Lim: 50})
+					if err != nil {
+						return err
+					}
+					for _, n := range rows {
+						out.Body.Notifications = append(out.Body.Notifications, NotificationOut{ID: n.ID, Kind: n.Kind, Title: n.Title, Body: n.Body,
+							SubjectType: n.SubjectType, SubjectID: n.SubjectID, ReadAt: n.ReadAt, CreatedAt: n.CreatedAt})
+						if n.ReadAt == nil {
+							out.Body.Unread++
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					sse.event("gone", "", map[string]string{"error": "not found"})
+					return
+				}
+				if b, _ := json.Marshal(out.Body); string(b) != string(last) {
+					sse.raw("notifications", "", b)
+					last = b
+				}
+				if !sse.wait(wake, 15*time.Second) {
+					return
+				}
+			}
+		}}, nil
+	})
+
 	_ = agentproto.KindAppBuild
 }
 

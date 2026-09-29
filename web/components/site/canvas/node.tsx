@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, useState } from "react"
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, Handle, Position, type Edge, type EdgeProps, type Node, type NodeProps } from "@xyflow/react"
 import {
   ActivityIcon,
@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 
 import type { BoxData, NodeKind, Removal, Status } from "@/components/site/canvas/model"
+import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export type BoxNode = Node<BoxData, "box">
@@ -76,75 +77,139 @@ export function StatusDot({ status, label, className }: { status: Status | null;
  * One box. The canvas is always left to right, so handles are physical: things arrive on the left
  * and leave on the right. Only the app's right handle starts a connection; every box's left handle
  * can be hovered with one (so a refusal shows), and only a database that is not connected yet takes it.
+ *
+ * kind "domain" stands for every domain of the site at once (model.ts's DOMAINS_BOX_ID), drawn as a
+ * stack of cards offset behind each other — the front card is data.domains[0] plus a "+N" chip —
+ * that expands into the full list on hover or click/focus of the chip, each with its own remove.
  */
 export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
   const ctx = useContext(CanvasCtx)
+  const { t } = useI18n()
   const Icon = data.kind === "monitor" && data.lines[0]?.startsWith("http") ? ActivityIcon : KIND_ICON[data.kind]
   const manage = !!ctx?.manage
+  const stack = data.kind === "domain" ? (data.domains ?? []) : []
+  const extra = stack.length > 1 ? stack.length - 1 : 0
+  const [expanded, setExpanded] = useState(false)
+
   return (
     <div
-      className={cn(
-        "group relative w-[216px] border bg-grid-card px-3 py-2.5 text-start shadow-xs transition-colors hover:bg-grid-soft",
-        data.kind === "app" ? "border-[var(--grid-brand)]" : "border-line",
-        data.dimmed && "border-dashed bg-grid-bg opacity-80",
-        selected && "ring-2 ring-[var(--grid-brand)] ring-offset-1 ring-offset-[var(--grid-bg)]",
-      )}
+      className="group relative w-[216px]"
+      onMouseEnter={() => extra > 0 && setExpanded(true)}
+      onMouseLeave={() => extra > 0 && setExpanded(false)}
     >
-      <Handle
-        type="target"
-        position={Position.Left}
-        isConnectable={manage && data.kind !== "app" && data.kind !== "visitors"}
-        className={cn("hosbah-handle", manage && data.connect === "target" ? "hosbah-handle-open" : "hosbah-handle-hidden")}
-      />
-      <div className="flex min-w-0 items-center gap-2">
-        <Icon aria-hidden className="size-4 shrink-0 text-grid-brand" />
-        <span dir="auto" className="grid-micro min-w-0 flex-1 truncate">
-          {data.label}
-        </span>
-        <StatusDot status={data.status} label={data.statusLabel} />
-      </div>
-      <div dir="auto" className="mt-1 truncate text-sm font-medium text-grid-fg" title={data.title}>
-        {data.title}
-      </div>
-      {data.lines.map((l, n) => (
-        <div key={n} dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted" title={l}>
-          {l}
-        </div>
-      ))}
-      {manage && data.removal ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={data.removal.kind === "detach" ? ctx!.labels.disconnect : ctx!.labels.remove}
-          title={data.removal.kind === "detach" ? ctx!.labels.disconnect : ctx!.labels.remove}
-          onClick={(e) => {
-            e.stopPropagation()
-            ctx!.remove(data.removal!)
-          }}
-          className="nodrag nopan absolute -top-2.5 -right-2.5 hidden size-5 items-center justify-center border border-line bg-grid-card text-grid-muted group-hover:flex hover:text-grid-danger focus-visible:flex"
-        >
-          <XIcon className="size-3" />
-        </button>
+      {extra > 0 ? (
+        <>
+          <div aria-hidden className="absolute inset-0 -z-10 translate-x-3 translate-y-3 rtl:-translate-x-3 border border-line bg-grid-card opacity-30" />
+          <div aria-hidden className="absolute inset-0 -z-10 translate-x-1.5 translate-y-1.5 rtl:-translate-x-1.5 border border-line bg-grid-card opacity-50" />
+        </>
       ) : null}
-      <Handle
-        type="source"
-        position={Position.Right}
-        isConnectable={manage && data.connect === "source"}
-        className={cn("hosbah-handle", manage && data.connect === "source" ? "hosbah-handle-open" : "hosbah-handle-hidden")}
-      />
-      {manage && data.kind === "app" ? (
-        <button
-          type="button"
-          aria-label={ctx!.labels.add}
-          title={ctx!.labels.add}
-          onClick={(e) => {
-            e.stopPropagation()
-            ctx!.openPalette()
-          }}
-          className="nodrag nopan absolute top-1/2 -right-11 flex size-6 -translate-y-1/2 items-center justify-center border border-[var(--grid-brand)] bg-grid-card text-grid-brand hover:bg-grid-soft"
-        >
-          <PlusIcon className="size-3.5" />
-        </button>
+      <div
+        className={cn(
+          "relative w-[216px] border bg-grid-card px-3 py-2.5 text-start shadow-xs transition-colors hover:bg-grid-soft",
+          data.kind === "app" ? "border-[var(--grid-brand)]" : "border-line",
+          data.dimmed && "border-dashed bg-grid-bg opacity-80",
+          selected && "ring-2 ring-[var(--grid-brand)] ring-offset-1 ring-offset-[var(--grid-bg)]",
+        )}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          isConnectable={manage && data.kind !== "app" && data.kind !== "visitors"}
+          className={cn("hosbah-handle", manage && data.connect === "target" ? "hosbah-handle-open" : "hosbah-handle-hidden")}
+        />
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon aria-hidden className="size-4 shrink-0 text-grid-brand" />
+          <span dir="auto" className="grid-micro min-w-0 flex-1 truncate">
+            {data.label}
+          </span>
+          <StatusDot status={data.status} label={data.statusLabel} />
+        </div>
+        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+          <div dir="auto" className="min-w-0 flex-1 truncate text-sm font-medium text-grid-fg" title={data.title}>
+            {data.title}
+          </div>
+          {extra > 0 ? (
+            <button
+              type="button"
+              dir="ltr"
+              aria-expanded={expanded}
+              aria-label={t("apps.domains.moreCount", { count: extra })}
+              onClick={(e) => {
+                e.stopPropagation()
+                setExpanded((v) => !v)
+              }}
+              className="nodrag nopan shrink-0 rounded-full bg-grid-soft px-1.5 py-0.5 text-[11px] font-medium text-grid-muted hover:bg-grid-soft/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              +{extra}
+            </button>
+          ) : null}
+        </div>
+        {data.lines.map((l, n) => (
+          <div key={n} dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted" title={l}>
+            {l}
+          </div>
+        ))}
+        {manage && data.removal ? (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={data.removal.kind === "detach" ? ctx!.labels.disconnect : ctx!.labels.remove}
+            title={data.removal.kind === "detach" ? ctx!.labels.disconnect : ctx!.labels.remove}
+            onClick={(e) => {
+              e.stopPropagation()
+              ctx!.remove(data.removal!)
+            }}
+            className="nodrag nopan absolute -top-2.5 -right-2.5 hidden size-5 items-center justify-center border border-line bg-grid-card text-grid-muted group-hover:flex hover:text-grid-danger focus-visible:flex"
+          >
+            <XIcon className="size-3" />
+          </button>
+        ) : null}
+        <Handle
+          type="source"
+          position={Position.Right}
+          isConnectable={manage && data.connect === "source"}
+          className={cn("hosbah-handle", manage && data.connect === "source" ? "hosbah-handle-open" : "hosbah-handle-hidden")}
+        />
+        {manage && data.kind === "app" ? (
+          <button
+            type="button"
+            aria-label={ctx!.labels.add}
+            title={ctx!.labels.add}
+            onClick={(e) => {
+              e.stopPropagation()
+              ctx!.openPalette()
+            }}
+            className="nodrag nopan absolute top-1/2 -right-11 flex size-6 -translate-y-1/2 items-center justify-center border border-[var(--grid-brand)] bg-grid-card text-grid-brand hover:bg-grid-soft"
+          >
+            <PlusIcon className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+      {extra > 0 && expanded ? (
+        <div className="nodrag nopan absolute start-0 top-full z-50 mt-1 max-h-56 w-[216px] overflow-y-auto border border-line bg-grid-card shadow-lg">
+          {stack.map((d) => (
+            <div key={d.id} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
+              <StatusDot status={d.verified ? "ok" : "warn"} label={t(d.verified ? "apps.domains.verified" : "apps.domains.unverified")} />
+              <span dir="ltr" className="min-w-0 flex-1 truncate font-mono text-xs" title={d.hostname}>
+                {d.hostname}
+              </span>
+              {manage ? (
+                <button
+                  type="button"
+                  aria-label={ctx!.labels.remove}
+                  title={ctx!.labels.remove}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    ctx!.remove({ kind: "domain", domain: d })
+                  }}
+                  className="shrink-0 text-grid-muted hover:text-grid-danger"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
       ) : null}
     </div>
   )

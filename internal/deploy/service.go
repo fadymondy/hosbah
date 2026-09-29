@@ -406,6 +406,7 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 		r.s.log.Error("could not finish a deployment", "deployment", r.dep.ID, "err", err)
 	}
 	r.publish()
+	r.s.ops.Broker().Publish(ops.TeamTopic(r.dep.TeamID))
 }
 
 // ---- operations --------------------------------------------------------------------------------------

@@ -29,6 +29,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/notifications"
+	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -62,6 +63,7 @@ type Service struct {
 	transport http.RoundTripper
 	send      mail.Sender
 	notify    *notifications.Service
+	broker    *ops.Broker
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -71,6 +73,20 @@ type Service struct {
 // notify_channel_ids then also receive its incidents, alongside notify_emails / notify_webhook.
 // nil (the default) just skips channel delivery.
 func (s *Service) SetNotifier(n *notifications.Service) { s.mu.Lock(); s.notify = n; s.mu.Unlock() }
+
+// SetBroker wires the control plane's wake-up bus (internal/ops) in, so a monitor's own team
+// notification (InsertNotification, below) wakes the team's notifications SSE stream immediately
+// instead of waiting for its poll interval. nil (the default) just skips the wake-up.
+func (s *Service) SetBroker(b *ops.Broker) { s.mu.Lock(); s.broker = b; s.mu.Unlock() }
+
+func (s *Service) publishTeam(teamID string) {
+	s.mu.RLock()
+	b := s.broker
+	s.mu.RUnlock()
+	if b != nil {
+		b.Publish(ops.TeamTopic(teamID))
+	}
+}
 
 func (s *Service) notifier() *notifications.Service {
 	s.mu.RLock()
@@ -437,6 +453,9 @@ func (s *Service) apply(ctx context.Context, m db.Monitor, tg target, res result
 		return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: m.TeamID, Kind: "monitor." + ev.Event, Title: ev.title(),
 			Body: &body, SubjectType: ptr("app"), SubjectID: &tg.App.ID})
 	})
+	if err == nil && ev != nil {
+		s.publishTeam(m.TeamID)
+	}
 	return up, ev, err
 }
 

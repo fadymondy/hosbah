@@ -15,9 +15,51 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { apiFetch } from "@/lib/api"
 import type { Domain, Integrations, TLSMode } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
+
+/**
+ * A compact list-column rendering of an app's domains: the first two hostnames, then a "+N" chip
+ * whose hover card (and keyboard focus — base-ui's Tooltip opens on focus too) lists the rest.
+ */
+export function DomainsSummary({ domains }: { domains: Pick<Domain, "id" | "hostname">[] }) {
+  const { t } = useI18n()
+  if (domains.length === 0) return <>—</>
+  const shown = domains.slice(0, 2)
+  const rest = domains.slice(2)
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {shown.map((d) => (
+        <div key={d.id}>{d.hostname}</div>
+      ))}
+      {rest.length > 0 ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                dir="ltr"
+                aria-label={t("apps.domains.moreCount", { count: rest.length })}
+                className="rounded-full bg-grid-soft px-1.5 py-0.5 text-[11px] font-medium text-grid-muted hover:bg-grid-soft/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              />
+            }
+          >
+            +{rest.length}
+          </TooltipTrigger>
+          <TooltipContent side="top" align="start" className="flex flex-col items-start gap-1">
+            {rest.map((d) => (
+              <span key={d.id} dir="ltr">
+                {d.hostname}
+              </span>
+            ))}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+    </div>
+  )
+}
 
 const TLS: TLSMode[] = ["auto", "internal", "off"]
 
