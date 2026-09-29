@@ -215,7 +215,8 @@ func (s *Service) TestLogDrain(ctx context.Context, q *db.Queries, teamID string
 		return agentproto.DrainTestResult{}, err
 	}
 	raw, _ := json.Marshal(agentproto.DrainTestParams{Drain: cfg})
-	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindLogDrainTest, Params: raw, CreatedBy: "system"})
+	// Its own transaction, committed before AwaitResult polls for it — see enqueueOpCommitted.
+	op, err := s.enqueueOpCommitted(ctx, teamID, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindLogDrainTest, Params: raw, CreatedBy: "system"})
 	if err != nil {
 		return agentproto.DrainTestResult{}, err
 	}

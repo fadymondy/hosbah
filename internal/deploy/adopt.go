@@ -77,6 +77,7 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 
 	w := WorkloadOfApp(a)
 	var inspected *agentproto.ContainerInspectResult
+	var env map[string]string
 	if w.IsContainer() {
 		if _, err := s.check(ctx, q, teamID, w); err != nil {
 			return db.App{}, nil, err
@@ -92,6 +93,13 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 			return db.App{}, nil, err
 		}
 		inspected = &res
+		// The agent sealed the container's env to this control plane's own op-signing key rather
+		// than returning it in the clear — operations.result is persisted, so an Env map here would
+		// put secrets in the database. Opened once, in memory, then re-sealed with the team DEK below.
+		env, err = s.ops.OpenEnvBox(agentproto.AdoptEnvContext(op.ID, w.OriginKey), res.EnvBox)
+		if err != nil {
+			return db.App{}, nil, err
+		}
 	}
 
 	var port *int64
@@ -104,12 +112,12 @@ func (s *Service) Adopt(ctx context.Context, q *db.Queries, teamID string, actor
 		return db.App{}, nil, err
 	}
 
-	if inspected != nil && len(inspected.Env) > 0 {
+	if len(env) > 0 {
 		dek, err := s.ops.TeamDEK(ctx, q, teamID)
 		if err != nil {
 			return db.App{}, nil, err
 		}
-		for name, value := range inspected.Env {
+		for name, value := range env {
 			if !validEnvName(name) || name == "PORT" {
 				continue // PORT is Hosbah's own; other odd names are silently skipped rather than blocking adoption
 			}

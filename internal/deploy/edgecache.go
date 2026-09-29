@@ -95,7 +95,8 @@ func (s *Service) SetEdgeCache(ctx context.Context, q *db.Queries, teamID string
 		return row, conflict("that app's server has no agent enrolled yet")
 	}
 	raw, _ := json.Marshal(params)
-	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindCacheSet, Params: raw, CreatedBy: actor.UserID})
+	// Its own transaction, committed before AwaitResult polls for it — see enqueueOpCommitted.
+	op, err := s.enqueueOpCommitted(ctx, teamID, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindCacheSet, Params: raw, CreatedBy: actor.UserID})
 	if err != nil {
 		return row, err
 	}
@@ -137,7 +138,8 @@ func (s *Service) PurgeEdgeCache(ctx context.Context, q *db.Queries, teamID stri
 		return db.AppEdgeCache{}, conflict("that app's server has no agent enrolled yet")
 	}
 	raw, _ := json.Marshal(agentproto.CachePurgeParams{AppID: a.ID})
-	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindCachePurge, Params: raw, CreatedBy: actor.UserID})
+	// Its own transaction, committed before AwaitResult polls for it — see enqueueOpCommitted.
+	op, err := s.enqueueOpCommitted(ctx, teamID, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindCachePurge, Params: raw, CreatedBy: actor.UserID})
 	if err != nil {
 		return db.AppEdgeCache{}, err
 	}

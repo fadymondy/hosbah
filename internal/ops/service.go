@@ -18,6 +18,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
@@ -174,6 +176,25 @@ func (s *Service) Broker() *Broker { return s.broker }
 
 // PublicKey is the base64 op-signing public key agents pin.
 func (s *Service) PublicKey() string { return s.pubB64 }
+
+// OpenEnvBox opens an env box a container.inspect result sealed to this control plane's own
+// op-signing key (the reverse direction of the env box an agent opens with its own key) — used by
+// deploy.Adopt/Propose to read a container's actual environment values without operations.result
+// ever holding them as plaintext. Kept narrow: callers never see the signing key itself.
+func (s *Service) OpenEnvBox(context, box string) (map[string]string, error) {
+	if box == "" {
+		return map[string]string{}, nil
+	}
+	pt, err := agentproto.OpenBox(s.signer, context, box)
+	if err != nil {
+		return nil, fmt.Errorf("opening the container's environment: %w", err)
+	}
+	env := map[string]string{}
+	if err := json.Unmarshal(pt, &env); err != nil {
+		return nil, fmt.Errorf("the container's environment is malformed: %w", err)
+	}
+	return env, nil
+}
 
 // PublicURL is the origin agents are told to use.
 func (s *Service) PublicURL() string { return s.cfg.PublicURL }

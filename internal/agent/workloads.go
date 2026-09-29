@@ -376,13 +376,28 @@ func (w *workloads) inspect(oc *OpContext) (any, int, error) {
 		Labels:        c.Config.Labels,
 		RestartPolicy: c.HostConfig.RestartPolicy.Name,
 	}
+	envCount := 0
 	if len(c.Config.Env) > 0 {
-		res.Env = make(map[string]string, len(c.Config.Env))
+		env := make(map[string]string, len(c.Config.Env))
 		for _, kv := range c.Config.Env {
 			k, v, ok := strings.Cut(kv, "=")
 			if ok {
-				res.Env[k] = v
+				env[k] = v
 			}
+		}
+		envCount = len(env)
+		if envCount > 0 {
+			envJSON, err := json.Marshal(env)
+			if err != nil {
+				return nil, 1, fmt.Errorf("encoding the container's environment: %w", err)
+			}
+			// Never returned as plaintext: operations.result is persisted, so the values are
+			// sealed to the control plane's own op-signing key and opened only inside deploy.Adopt.
+			box, err := oc.SealToControlPlane(agentproto.AdoptEnvContext(oc.OpID, p.Name), envJSON)
+			if err != nil {
+				return nil, 1, fmt.Errorf("sealing the container's environment: %w", err)
+			}
+			res.EnvBox = box
 		}
 	}
 	for containerPort, bindings := range c.HostConfig.PortBindings {
@@ -398,7 +413,7 @@ func (w *workloads) inspect(oc *OpContext) (any, int, error) {
 	for _, m := range c.Mounts {
 		res.Mounts = append(res.Mounts, fmt.Sprintf("%s -> %s", m.Source, m.Destination))
 	}
-	oc.Info("inspected %s: image %s, %d env var(s), %d port(s)", p.Name, res.Image, len(res.Env), len(res.Ports))
+	oc.Info("inspected %s: image %s, %d env var(s), %d port(s)", p.Name, res.Image, envCount, len(res.Ports))
 	return res, 0, nil
 }
 

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -8,6 +10,8 @@ import (
 	"time"
 
 	"github.com/fadymondy/hosbah/internal/agentproto"
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 /*
@@ -47,9 +51,20 @@ func TestAdoptImportedApp(t *testing.T) {
 	agent := startFakeAgent(t, ts.URL, srv, priv, func(op agentproto.SignedOp) (any, string) {
 		switch op.Kind {
 		case agentproto.KindContainerInspect:
+			// Mirrors what the real agent does: the env never travels as plaintext, only sealed to
+			// the control plane's own op-signing key (the same key the fake agent itself verifies
+			// operations against, svcOf(t).PublicKey()).
+			envJSON, err := json.Marshal(map[string]string{"SECRET_TOKEN": "s3cret!", "PORT": "3000"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			box, err := agentproto.SealBox(svcOf(t).PublicKey(), agentproto.AdoptEnvContext(op.OpID, "shop-web"), envJSON)
+			if err != nil {
+				t.Fatal(err)
+			}
 			return agentproto.ContainerInspectResult{
 				Status: "running", Image: "ghcr.io/acme/shop-web:1.2.3", ImageDigest: "sha256:deadbeef",
-				Env:    map[string]string{"SECRET_TOKEN": "s3cret!", "PORT": "3000"},
+				EnvBox: box,
 				Ports:  []string{"3000/tcp -> 0.0.0.0:8081"},
 				Labels: map[string]string{"org.opencontainers.image.source": "https://github.com/acme/shop-web", "org.opencontainers.image.revision": "main"},
 			}, ""
@@ -162,6 +177,38 @@ func TestAdoptImportedApp(t *testing.T) {
 		// has reached the fake agent.
 		for _, o := range agentOps(agent, agentproto.KindWorkloadDestroy) {
 			t.Fatalf("adopt must never stop the old workload itself: %s", o.Params)
+		}
+
+		// operations.result is persisted as jsonb: the container.inspect op's stored result must
+		// carry only the sealed EnvBox, never SECRET_TOKEN's or PORT's plaintext values.
+		sqlDB := testDB(t)
+		var results []string
+		err := tenancy.Tx(context.Background(), sqlDB, tenancy.Scope{TeamID: team.ID}, func(_ *db.Queries, tx *sql.Tx) error {
+			rows, err := tx.Query(`SELECT result::text FROM operations WHERE team_id = $1 AND kind = $2 AND result IS NOT NULL`,
+				team.ID, agentproto.KindContainerInspect)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var r string
+				if err := rows.Scan(&r); err != nil {
+					return err
+				}
+				results = append(results, r)
+			}
+			return rows.Err()
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(results) == 0 {
+			t.Fatal("expected at least one stored container.inspect result")
+		}
+		for _, r := range results {
+			if strings.Contains(r, "s3cret") {
+				t.Fatalf("operations.result leaked the plaintext env: %s", r)
+			}
 		}
 	})
 

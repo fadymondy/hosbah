@@ -182,6 +182,20 @@ func (s *Service) enqueueCommitted(ctx context.Context, teamID string, actor Act
 	return op, err
 }
 
+// enqueueOpCommitted is s.ops.Enqueue in its own transaction, committed before it returns — the
+// same visibility fix as enqueueCommitted, for a caller that builds an ops.EnqueueSpec directly
+// (edge cache, HTTP rules, log drain test) rather than going through a Workload, and is about to
+// synchronously AwaitResult it from within its own still-open request transaction.
+func (s *Service) enqueueOpCommitted(ctx context.Context, teamID string, spec ops.EnqueueSpec) (db.Operation, error) {
+	var op db.Operation
+	err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: teamID}, func(txq *db.Queries, _ *sql.Tx) error {
+		var err error
+		op, _, err = s.ops.Enqueue(ctx, txq, spec)
+		return err
+	})
+	return op, err
+}
+
 // systemTx runs fn in its own, immediately-committed System-scoped transaction — for a write a
 // caller needs to make from within its own still-open, team-scoped request transaction, on a table
 // that (like releases: "written only by the worker") has no team-scope write policy at all, only

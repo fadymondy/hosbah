@@ -160,7 +160,8 @@ func (s *Service) SetHTTPRulesForApp(ctx context.Context, q *db.Queries, teamID 
 	}
 	params := agentproto.HTTPRulesSetParams{TargetType: agentproto.HTTPRuleTargetApp, TargetID: a.ID, Rules: rules}
 	raw, _ := json.Marshal(params)
-	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindHTTPRulesSet, Params: raw, CreatedBy: actor.UserID})
+	// Its own transaction, committed before AwaitResult polls for it — see enqueueOpCommitted.
+	op, err := s.enqueueOpCommitted(ctx, teamID, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindHTTPRulesSet, Params: raw, CreatedBy: actor.UserID})
 	if err != nil {
 		return row, err
 	}
@@ -208,7 +209,8 @@ func (s *Service) SetHTTPRulesForProxyHost(ctx context.Context, q *db.Queries, t
 	}
 	params := agentproto.HTTPRulesSetParams{TargetType: agentproto.HTTPRuleTargetProxy, TargetID: p.ID, Rules: rules}
 	raw, _ := json.Marshal(params)
-	op, _, err := s.ops.Enqueue(ctx, q, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindHTTPRulesSet, Params: raw, CreatedBy: actor.UserID})
+	// Its own transaction, committed before AwaitResult polls for it — see enqueueOpCommitted.
+	op, err := s.enqueueOpCommitted(ctx, teamID, ops.EnqueueSpec{TeamID: teamID, ServerID: srv.ID, Kind: agentproto.KindHTTPRulesSet, Params: raw, CreatedBy: actor.UserID})
 	if err != nil {
 		return row, err
 	}

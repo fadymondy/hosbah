@@ -48,6 +48,36 @@ func TestBoxRoundTripAndBinding(t *testing.T) {
 	}
 }
 
+// The box primitive is direction-agnostic: an agent can seal to the control plane's own op-signing
+// key (SealToControlPlane, container.inspect's EnvBox) exactly the way the control plane seals env
+// to an agent's key. Round-trips the same way, and is bound to op id + container name so a box
+// copied into another op's result does not open.
+func TestAdoptEnvBoxRoundTripAndBinding(t *testing.T) {
+	cpPub, cpPriv, _ := ed25519.GenerateKey(nil)
+	cpPubB64 := base64.StdEncoding.EncodeToString(cpPub)
+	ctx := AdoptEnvContext("op-1", "shop-web")
+	secret := []byte(`{"SECRET_TOKEN":"s3cret!"}`)
+
+	box, err := SealBox(cpPubB64, ctx, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(box, "s3cret") {
+		t.Fatalf("box leaks plaintext: %s", box)
+	}
+	got, err := OpenBox(cpPriv, ctx, box)
+	if err != nil || !bytes.Equal(got, secret) {
+		t.Fatalf("round trip: %q, %v", got, err)
+	}
+	// A different op id, or a different container name, does not open it.
+	if _, err := OpenBox(cpPriv, AdoptEnvContext("op-2", "shop-web"), box); err == nil {
+		t.Error("a box opened under another op id")
+	}
+	if _, err := OpenBox(cpPriv, AdoptEnvContext("op-1", "other-container"), box); err == nil {
+		t.Error("a box opened under another container name")
+	}
+}
+
 // The public-key map (control plane) and the private-key map (agent) must agree, or no box opens.
 func TestX25519MapsAgree(t *testing.T) {
 	for i := 0; i < 20; i++ {

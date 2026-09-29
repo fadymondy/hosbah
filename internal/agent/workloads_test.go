@@ -82,6 +82,15 @@ func opCtx(t *testing.T, params any) (*OpContext, *[]string) {
 		progress: func(int, int) {}}, &lines
 }
 
+// opCtxWithControlPlane is opCtx plus a control-plane op-signing public key, for handlers (like
+// container.inspect) that seal part of their result to it rather than returning it as plaintext.
+func opCtxWithControlPlane(t *testing.T, params any, cpPub ed25519.PublicKey) (*OpContext, *[]string) {
+	t.Helper()
+	oc, lines := opCtx(t, params)
+	oc.cpPub = cpPub
+	return oc, lines
+}
+
 var pveAnswers = map[string]string{
 	"pvesh get /nodes --output-format json":                               `[{"node":"pve"}]`,
 	"pvesh get /nodes/pve/lxc/101/config":                                 `{"hostname":"wordpress","cores":2,"memory":2048,"rootfs":"local-lvm:vm-101-disk-0,size=8G"}`,
@@ -298,8 +307,12 @@ func TestContainerInspectParsesDockerAndNeverLogsEnv(t *testing.T) {
 			`"HostConfig":{"RestartPolicy":{"Name":"unless-stopped"},"PortBindings":{"3000/tcp":[{"HostIp":"0.0.0.0","HostPort":"8080"}]}},` +
 			`"Mounts":[{"Source":"/data/shop","Destination":"/app/data"}]}]`,
 	}
+	cpPub, cpPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	w, f := newFake(answers)
-	oc, lines := opCtx(t, agentproto.ContainerInspectParams{Name: "shop-web"})
+	oc, lines := opCtxWithControlPlane(t, agentproto.ContainerInspectParams{Name: "shop-web"}, cpPub)
 	res, _, err := w.inspect(oc)
 	if err != nil {
 		t.Fatal(err)
@@ -308,8 +321,29 @@ func TestContainerInspectParsesDockerAndNeverLogsEnv(t *testing.T) {
 	if r.Image != "ghcr.io/acme/shop:1.2.3" || r.ImageDigest != "sha256:abc123" || r.Status != "running" || r.RestartPolicy != "unless-stopped" {
 		t.Fatalf("container inspect: %+v", r)
 	}
-	if r.Env["SECRET_TOKEN"] != "s3cret!" || r.Env["PORT"] != "3000" {
-		t.Fatalf("env not parsed: %+v", r.Env)
+	// The env never travels as plaintext: it is sealed to the control plane's own op-signing key.
+	if r.EnvBox == "" {
+		t.Fatal("expected an env box")
+	}
+	pt, err := agentproto.OpenBox(cpPriv, agentproto.AdoptEnvContext(oc.OpID, "shop-web"), r.EnvBox)
+	if err != nil {
+		t.Fatalf("opening env box: %v", err)
+	}
+	var env map[string]string
+	if err := json.Unmarshal(pt, &env); err != nil {
+		t.Fatal(err)
+	}
+	if env["SECRET_TOKEN"] != "s3cret!" || env["PORT"] != "3000" {
+		t.Fatalf("env not parsed: %+v", env)
+	}
+	// The full result, exactly as it would be persisted to operations.result, must never contain the
+	// plaintext env values.
+	full, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(full), "s3cret!") || strings.Contains(string(full), "SECRET_TOKEN=s3cret") {
+		t.Fatalf("env value leaked into the persisted result: %s", full)
 	}
 	if r.Labels["org.opencontainers.image.source"] != "https://github.com/acme/shop" {
 		t.Fatalf("labels not parsed: %+v", r.Labels)

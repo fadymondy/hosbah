@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -484,7 +485,7 @@ func (e *Executor) run(ctx context.Context, rec *record) {
 
 	e.event(rec, agentproto.Event{Kind: agentproto.EventStatus, Status: agentproto.StatusRunning})
 	oc := &OpContext{
-		Ctx: octx, OpID: rec.op.OpID, ServerID: e.serverID, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane, priv: e.priv,
+		Ctx: octx, OpID: rec.op.OpID, ServerID: e.serverID, Params: rec.op.Params, Version: e.version, ControlPlane: e.controlPlane, priv: e.priv, cpPub: e.cpPub,
 		notify: func(line string, data json.RawMessage) {
 			e.event(rec, agentproto.Event{Kind: agentproto.EventLog, Stream: "info", Line: line, Data: data})
 		},
@@ -571,6 +572,7 @@ type OpContext struct {
 	Version      string
 	ControlPlane string
 	priv         ed25519.PrivateKey
+	cpPub        ed25519.PublicKey // the control plane's own op-signing key, pinned at enrolment
 	log          func(stream, line string)
 	progress     func(step, total int)
 	notify       func(line string, data json.RawMessage)
@@ -600,6 +602,14 @@ func (o *OpContext) OpenEnv(context, box string) (map[string]string, error) {
 		return nil, errors.New("the environment is malformed")
 	}
 	return env, nil
+}
+
+// SealToControlPlane seals plaintext to the control plane's own op-signing key (pinned at
+// enrolment, the same key VerifyOp checks every operation against) — the reverse direction of
+// OpenEnv. Used when a result must carry a secret back to the server: an EnvBox, never a plaintext
+// map, since operations.result is persisted as-is.
+func (o *OpContext) SealToControlPlane(context string, plaintext []byte) (string, error) {
+	return agentproto.SealBox(base64.StdEncoding.EncodeToString(o.cpPub), context, plaintext)
 }
 
 const maxLine = 4096

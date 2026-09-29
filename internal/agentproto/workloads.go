@@ -355,14 +355,21 @@ type ContainerInspectParams struct {
 
 func (p ContainerInspectParams) Validate() error { return Container(p.Name, p.Label).Validate() }
 
+// AdoptEnvContext binds a container.inspect env box to the operation that carried it and the
+// container it came from, so a box copied into another op's result does not open.
+func AdoptEnvContext(opID, name string) string { return "adopt-env:" + opID + ":" + name }
+
 // ContainerInspectResult: enough of a running container's configuration to adopt it into a Hosbah
-// app without a rebuild. Env holds the container's actual environment values — the agent never logs
-// them, and the control plane must seal them with the team DEK before they touch anything else.
+// app without a rebuild. The container's actual environment values never travel as plaintext: the
+// agent seals them to the control plane's own op-signing public key (pinned at enrolment, the
+// reverse direction of the env box sealed to an agent — SealBox/OpenBox, AdoptEnvContext) and
+// returns only EnvBox. operations.result is persisted, so an Env map here would put secrets in the
+// database in the clear; EnvBox is ciphertext only the control plane can open.
 type ContainerInspectResult struct {
 	Status        string            `json:"status"`
 	Image         string            `json:"image"`
 	ImageDigest   string            `json:"image_digest,omitempty"`
-	Env           map[string]string `json:"env,omitempty"`
+	EnvBox        string            `json:"env_box,omitempty" doc:"SealBox(control plane's op-signing key, AdoptEnvContext(op_id, name)) of the container's env values, or empty."`
 	Ports         []string          `json:"ports,omitempty"` // e.g. "8080/tcp -> 0.0.0.0:3000"
 	Labels        map[string]string `json:"labels,omitempty"`
 	Mounts        []string          `json:"mounts,omitempty"` // e.g. "/host/path -> /container/path"
