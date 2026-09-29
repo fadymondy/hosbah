@@ -131,6 +131,18 @@ WHERE team_id = sqlc.arg('team_id')::text AND id != sqlc.arg('exclude_id')::text
 -- Team scope: every server whose parent_server_id points at the given node (its enrolled guests).
 SELECT * FROM servers WHERE team_id = sqlc.arg('team_id')::text AND parent_server_id = sqlc.arg('parent_server_id')::text;
 
+-- name: ServerIsProxmoxNode :one
+-- Team scope: true when this server is a Proxmox node — either another server is already nested
+-- under it (parent_server_id), or it has imported guest apps of its own (its agent's system.info
+-- reported Proxmox guests, importer/classify.go). A brand new node with neither yet is not caught
+-- here (see internal/deploy's own callers); both signals are cheap and need no extra schema.
+SELECT EXISTS (
+    SELECT 1 FROM servers WHERE team_id = sqlc.arg('team_id')::text AND parent_server_id = sqlc.arg('server_id')::text
+) OR EXISTS (
+    SELECT 1 FROM apps WHERE team_id = sqlc.arg('team_id')::text AND server_id = sqlc.arg('server_id')::text
+      AND source = 'imported' AND origin_kind = 'guest'
+) AS is_node;
+
 -- name: ServersDueFactsRefresh :many
 -- System scope: enrolled servers seen recently with no system.info queued or run within the interval,
 -- so the facts refresh loop keeps discovered services and Proxmox guests current.

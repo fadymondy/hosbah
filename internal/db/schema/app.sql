@@ -28,6 +28,7 @@ CREATE TABLE apps (
     resources_memory_mb bigint,
     resources_cpus double precision,
     resources_processes jsonb NOT NULL DEFAULT '{}',
+    connected_server_id text,
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
@@ -75,3 +76,9 @@ ALTER TABLE apps ADD CONSTRAINT apps_icon_check CHECK (icon IS NULL OR icon IN (
 -- without touching the saved defaults (internal/deploy/config.go Resolve).
 ALTER TABLE apps ADD CONSTRAINT apps_resources_memory_check CHECK (resources_memory_mb IS NULL OR resources_memory_mb BETWEEN 32 AND 1048576);
 ALTER TABLE apps ADD CONSTRAINT apps_resources_cpus_check CHECK (resources_cpus IS NULL OR resources_cpus BETWEEN 0.05 AND 256);
+
+-- connected_server_id (P1 nested guest agents): for an imported app whose origin_kind is 'guest',
+-- the byo server created for it once its guest ran connect-guest's install one-liner and enrolled
+-- its own agent — so the UI can show "Connected as server X". Only ever set on a guest; cleared
+-- (SET NULL) if that server is later removed. Never set on a git app.
+CREATE INDEX apps_connected_server_idx ON apps (connected_server_id) WHERE connected_server_id IS NOT NULL;

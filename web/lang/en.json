@@ -842,6 +842,8 @@
       "chooseServer": "Choose a server",
       "noServersTitle": "No enrolled server",
       "noServersHint": "Apps run on a server with the Hosbah agent. Add one first.",
+      "duplicateImportedHint": "Nothing is created yet. Connect or adopt the existing one, or build a separate app anyway.",
+      "duplicateImportedOverride": "Build a separate app anyway",
       "detectTitle": "Runtime",
       "detectHint": "Optional: check how the repository would build before creating the app.",
       "detect": "Detect runtime",
@@ -2434,6 +2436,14 @@
     "confirmStop": "Confirm it has stopped",
     "confirmStopTitle": "Confirm the old workload has stopped?",
     "confirmStopHint": "This only records that you have checked and stopped it yourself. Hosbah never stops it automatically."
+  },
+  "connectGuest": {
+    "noticeTitle": "Put a Hosbah agent inside this guest",
+    "noticeBody": "This is a Proxmox guest, not the node itself — building a git app here would land it on the hypervisor and fail. Connect it instead: Hosbah creates a server for the guest and installs its agent inside, over the node.",
+    "trigger": "Connect guest",
+    "connectedTitle": "Connected",
+    "connectedBody": "This guest is connected as server {server}. Its own containers import automatically once its agent enrols.",
+    "viewServer": "View server"
   },
   "controls": {
     "queued": "Sent to the server. Its progress shows below.",

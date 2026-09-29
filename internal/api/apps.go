@@ -32,32 +32,34 @@ type AppLogsSearchOut struct {
 
 // AppOut is an app as the API shows it. Never the deploy-hook token or its hash.
 type AppOut struct {
-	ID                 string           `json:"id"`
-	Name               string           `json:"name" doc:"The slug used in URLs, containers and hostnames; never changes."`
-	Title              *string          `json:"title" doc:"Display name (at most 80 characters); null: show name."`
-	Description        *string          `json:"description" doc:"A short note (at most 280 characters)."`
-	Color              *string          `json:"color" doc:"#RRGGBB (uppercase), or null for the default."`
-	Icon               *string          `json:"icon" doc:"Icon key (the servers' list), or null for the default."`
-	LogoURL            *string          `json:"logo_url" doc:"The uploaded logo (PUT …/apps/{app}/logo), shown instead of the icon: a relative URL versioned by the image's hash, or null."`
-	ServerID           string           `json:"server_id"`
-	ServerName         string           `json:"server_name,omitempty"`
-	RepoURL            *string          `json:"repo_url" doc:"null for an imported app"`
-	Branch             *string          `json:"branch" doc:"null for an imported app"`
-	Runtime            *string          `json:"runtime"`
-	Port               int64            `json:"port"`
-	HealthcheckPath    string           `json:"healthcheck_path"`
-	HealthcheckTimeout int64            `json:"healthcheck_timeout"`
-	AutodeployPaused   bool             `json:"autodeploy_paused"`
-	Status             string           `json:"status" enum:"new,deploying,running,failed,stopped"`
-	CurrentReleaseID   *string          `json:"current_release_id"`
-	Source             string           `json:"source" enum:"git,imported" doc:"imported: found running on the server; controlled through power, stats, logs, snapshots, resize, backup, recreate, destroy and domains, never deployed from git"`
-	OriginKind         *string          `json:"origin_kind" doc:"imported only: container, systemd or guest"`
-	Origin             *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
-	ImportedState      *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
-	LastSeenAt         *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
-	CreatedAt          time.Time        `json:"created_at"`
-	LatestDeployment   *DeploymentOut   `json:"latest_deployment,omitempty"`
-	Domains            []DomainOut      `json:"domains,omitempty"`
+	ID                  string           `json:"id"`
+	Name                string           `json:"name" doc:"The slug used in URLs, containers and hostnames; never changes."`
+	Title               *string          `json:"title" doc:"Display name (at most 80 characters); null: show name."`
+	Description         *string          `json:"description" doc:"A short note (at most 280 characters)."`
+	Color               *string          `json:"color" doc:"#RRGGBB (uppercase), or null for the default."`
+	Icon                *string          `json:"icon" doc:"Icon key (the servers' list), or null for the default."`
+	LogoURL             *string          `json:"logo_url" doc:"The uploaded logo (PUT …/apps/{app}/logo), shown instead of the icon: a relative URL versioned by the image's hash, or null."`
+	ServerID            string           `json:"server_id"`
+	ServerName          string           `json:"server_name,omitempty"`
+	RepoURL             *string          `json:"repo_url" doc:"null for an imported app"`
+	Branch              *string          `json:"branch" doc:"null for an imported app"`
+	Runtime             *string          `json:"runtime"`
+	Port                int64            `json:"port"`
+	HealthcheckPath     string           `json:"healthcheck_path"`
+	HealthcheckTimeout  int64            `json:"healthcheck_timeout"`
+	AutodeployPaused    bool             `json:"autodeploy_paused"`
+	Status              string           `json:"status" enum:"new,deploying,running,failed,stopped"`
+	CurrentReleaseID    *string          `json:"current_release_id"`
+	Source              string           `json:"source" enum:"git,imported" doc:"imported: found running on the server; controlled through power, stats, logs, snapshots, resize, backup, recreate, destroy and domains, never deployed from git"`
+	OriginKind          *string          `json:"origin_kind" doc:"imported only: container, systemd or guest"`
+	Origin              *importer.Origin `json:"origin" doc:"imported only: what discovery reported"`
+	ImportedState       *string          `json:"imported_state" doc:"imported only: running, stopped or missing (no longer discovered)"`
+	LastSeenAt          *time.Time       `json:"last_seen_at" doc:"imported only: when discovery last reported it"`
+	ConnectedServerID   *string          `json:"connected_server_id,omitempty" doc:"imported guest only: the server put inside it by connect-guest"`
+	ConnectedServerName string           `json:"connected_server_name,omitempty" doc:"imported guest only: connected_server_id's name"`
+	CreatedAt           time.Time        `json:"created_at"`
+	LatestDeployment    *DeploymentOut   `json:"latest_deployment,omitempty"`
+	Domains             []DomainOut      `json:"domains,omitempty"`
 }
 
 // AppDetailOut is the app page: the app, what serves it, and how it is built.
@@ -148,7 +150,8 @@ func toAppOut(a db.App, server string) AppOut {
 	return AppOut{ID: a.ID, Name: a.Name, Title: a.Title, Description: a.Description, Color: a.Color, Icon: a.Icon, ServerID: a.ServerID, ServerName: server, RepoURL: a.RepoURL, Branch: a.Branch,
 		Runtime: a.Runtime, Port: a.Port, HealthcheckPath: a.HealthcheckPath, HealthcheckTimeout: a.HealthcheckTimeout,
 		AutodeployPaused: a.AutodeployPaused, Status: a.Status, CurrentReleaseID: a.CurrentReleaseID, CreatedAt: a.CreatedAt,
-		Source: a.Source, OriginKind: a.OriginKind, Origin: originOf(a.Origin), ImportedState: a.ImportedState, LastSeenAt: a.LastSeenAt}
+		Source: a.Source, OriginKind: a.OriginKind, Origin: originOf(a.Origin), ImportedState: a.ImportedState, LastSeenAt: a.LastSeenAt,
+		ConnectedServerID: a.ConnectedServerID}
 }
 
 // originOf decodes an imported record's origin (nil for a git app or a managed service).
@@ -437,6 +440,7 @@ func (d *deps) registerApps(api huma.API) {
 			HealthcheckPath    string `json:"healthcheck_path,omitempty" maxLength:"200"`
 			HealthcheckTimeout int    `json:"healthcheck_timeout,omitempty" minimum:"0" maximum:"600"`
 			Deploy             bool   `json:"deploy,omitempty" doc:"Queue the first deploy right away."`
+			AllowDuplicate     bool   `json:"allow_duplicate,omitempty" doc:"Build this app anyway, even though the team already has an imported app by this name or repo."`
 		}
 	}) (*createdAppOut, error) {
 		out := &createdAppOut{}
@@ -444,7 +448,7 @@ func (d *deps) registerApps(api huma.API) {
 			s := d.deploys()
 			b := in.Body
 			a, hook, err := s.CreateApp(ctx, q, m.TeamID, webActor(id), deploy.CreateAppInput{Name: b.Name, Server: b.Server, RepoURL: b.RepoURL,
-				Branch: b.Branch, Port: b.Port, HealthPath: b.HealthcheckPath, HealthTimeout: b.HealthcheckTimeout})
+				Branch: b.Branch, Port: b.Port, HealthPath: b.HealthcheckPath, HealthTimeout: b.HealthcheckTimeout, AllowDuplicate: b.AllowDuplicate})
 			if err != nil {
 				return actionErr(err, "could not create the app")
 			}
@@ -934,6 +938,34 @@ func (d *deps) registerApps(api huma.API) {
 			}
 			server, _ := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: updated.ServerID, TeamID: m.TeamID})
 			out.Body = toAppOut(updated, server.Name)
+			return nil
+		})
+		return out, err
+	})
+
+	type connectGuestOut struct {
+		Status int
+		Body   struct {
+			Server  ServerOut    `json:"server"`
+			Install *ops.Install `json:"install,omitempty" doc:"The new server's one-time install command, already queued to run inside the guest. Shown once; the token is not stored. Absent when this app was already connected."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "connect-guest", Method: http.MethodPost, Path: "/api/teams/{team}/apps/{app}/connect-guest",
+		DefaultStatus: http.StatusOK, Tags: tags,
+		Summary: "Put a Hosbah agent inside an imported Proxmox guest: creates a server for it nested under the node and asks the node to install the agent inside the guest (owner or admin)",
+	}, func(ctx context.Context, in *AppPath) (*connectGuestOut, error) {
+		out := &connectGuestOut{Status: http.StatusOK}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageServers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			row, inst, err := d.deploys().ConnectGuest(ctx, q, m.TeamID, webActor(id), a)
+			if err != nil {
+				return actionErr(err, "could not connect the guest")
+			}
+			out.Body.Server = toServerOut(row, time.Now(), true)
+			out.Body.Install = inst
 			return nil
 		})
 		return out, err

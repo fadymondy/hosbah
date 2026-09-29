@@ -131,6 +131,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindAppScan:           appScan,
 		agentproto.KindPasswdSet:         passwdSet,
 		agentproto.KindDeployKeyGenerate: deployKeyGenerate,
+		agentproto.KindGuestEnrol:        guestEnrol,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{

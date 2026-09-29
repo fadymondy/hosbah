@@ -120,6 +120,8 @@ func Timeout(kind string) time.Duration {
 		return 3 * time.Minute
 	case agentproto.KindSSHKeyInstall, agentproto.KindSSHKeyUninstall:
 		return time.Minute
+	case agentproto.KindGuestEnrol:
+		return agentproto.GuestEnrolTimeoutSeconds*time.Second + 30*time.Second
 	}
 	return 10 * time.Minute
 }

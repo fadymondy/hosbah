@@ -70,6 +70,9 @@ export type Imported = {
   } | null
   imported_state?: "running" | "stopped" | "missing" | null
   last_seen_at?: string | null
+  /** imported guest only: the server connect-guest put inside it. */
+  connected_server_id?: string | null
+  connected_server_name?: string
 }
 
 export const isImported = (x: { source?: string } | null | undefined) => x?.source === "imported"

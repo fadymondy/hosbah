@@ -23,6 +23,11 @@ func appOutWithLogo(ctx context.Context, q *db.Queries, teamID string, a db.App,
 	if etag, err := q.AppLogoVersion(ctx, db.AppLogoVersionParams{AppID: a.ID, TeamID: teamID}); err == nil {
 		o.LogoURL = appLogoURL(teamID, a.ID, etag)
 	}
+	if a.ConnectedServerID != nil {
+		if s, err := q.ServerInTeam(ctx, db.ServerInTeamParams{ID: *a.ConnectedServerID, TeamID: teamID}); err == nil {
+			o.ConnectedServerName = s.Name
+		}
+	}
 	return o
 }
 
