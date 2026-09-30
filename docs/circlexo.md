@@ -130,7 +130,7 @@ current team role. The `act` chain is recorded on audit entries as `via_actors`.
 
 ## SDK dependency
 
-`github.com/circlexo/circlexo-go` is a public module pinned at `v0.1.0` in `go.mod` (no `replace`).
+`github.com/circlexo/circlexo-go` is a public module pinned at `v0.1.1` (v0.1.0 requested offline_access, which the hub refuses; the SDK default scopes are now openid profile email org entitlements, and Hosbah sets none itself) in `go.mod` (no `replace`).
 
 ## Owner cut-over checklist
 
