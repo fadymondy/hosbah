@@ -21,6 +21,26 @@ func TestFastBuildModeFollowsTheDetectedPreset(t *testing.T) {
 	}
 }
 
+// An app last built from its Dockerfile, or with a Dockerfile path set, never fast-builds in
+// runtime mode just because detection recorded no preset: that mode copies the new source over
+// the old image without building it.
+func TestFastPresetKeepsDockerfileApps(t *testing.T) {
+	dockerfile := PresetDockerfile
+	node := PresetNode
+	if got := fastPreset(db.AppDeployConfig{}, &dockerfile); got != PresetDockerfile {
+		t.Fatalf("an app last built from its Dockerfile: %q", got)
+	}
+	if got := fastPreset(db.AppDeployConfig{DockerfilePath: "web/Dockerfile"}, nil); got != PresetDockerfile {
+		t.Fatalf("an app with a Dockerfile path: %q", got)
+	}
+	if got := fastPreset(db.AppDeployConfig{Preset: PresetStatic}, &dockerfile); got != PresetStatic {
+		t.Fatalf("the chosen preset must win: %q", got)
+	}
+	if got := fastPreset(db.AppDeployConfig{}, &node); got != "" {
+		t.Fatalf("no Dockerfile signal keeps the detected preset: %q", got)
+	}
+}
+
 func TestFastBuildMode(t *testing.T) {
 	cases := []struct {
 		name, preset, builderImage, want string
