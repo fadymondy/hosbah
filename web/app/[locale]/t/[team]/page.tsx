@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, EmptyState, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PlusIcon, SearchIcon, ServerIcon } from "lucide-react"
@@ -8,9 +9,9 @@ import { PageBody } from "@/components/app-shell"
 import { DeploymentsFeed, type FeedItem } from "@/components/home/deployments-feed"
 import { ServerCard, type Spark, type TunnelSummary } from "@/components/home/server-card"
 import { LoadingRows, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { App, Deployment } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -22,7 +23,7 @@ const PAGE = 8
 /** A small segmented control for one filter. */
 function FilterPills<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [T, string][] }) {
   return (
-    <div role="radiogroup" className="flex border border-line">
+    <div role="radiogroup" className="flex border border-border">
       {options.map(([v, label]) => (
         <button
           key={v || "all"}
@@ -32,8 +33,8 @@ function FilterPills<T extends string>({ value, onChange, options }: { value: T;
           onClick={() => onChange(v)}
           className={
             value === v
-              ? "bg-grid-soft px-2.5 py-1 text-xs font-medium text-grid-fg"
-              : "px-2.5 py-1 text-xs text-grid-muted hover:bg-grid-soft hover:text-grid-fg"
+              ? "bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
+              : "px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
           }
         >
           {label}
@@ -217,12 +218,12 @@ export default function HomePage() {
       actions={
         <>
           {manage ? (
-            <Button variant="outline" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+            <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
               <ServerIcon />
               {t("servers.add")}
             </Button>
           ) : null}
-          <Button nativeButton={false} render={<Link href={`${base}/apps/new`} />}>
+          <Button variant="primary" nativeButton={false} render={<Link href={`${base}/apps/new`} />}>
             <PlusIcon />
             {t("home.newApp")}
           </Button>
@@ -234,26 +235,17 @@ export default function HomePage() {
       {servers === null ? (
         <LoadingRows rows={3} />
       ) : servers.length === 0 ? (
-        <Empty className="border-y">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ServerIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("overview.serversTitle")}</EmptyTitle>
-            <EmptyDescription>{manage ? t("overview.serversHint") : t("common.readOnly")}</EmptyDescription>
-          </EmptyHeader>
-          {manage ? (
-            <Button nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+        <EmptyState className="border-y" icon={ServerIcon} title={t("overview.serversTitle")} description={manage ? t("overview.serversHint") : t("common.readOnly")} actions={<>{manage ? (
+            <Button variant="primary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
               <PlusIcon />
               {t("servers.add")}
             </Button>
-          ) : null}
-        </Empty>
+          ) : null}</>} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
             <div className="relative w-full max-w-xs">
-              <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
+              <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 value={q}
@@ -282,13 +274,13 @@ export default function HomePage() {
                   ["byo", t("home.ownServers")],
                 ]}
               />
-              <Button variant={tunnelled ? "default" : "outline"} size="sm" onClick={() => setTunnelled((v) => !v)} aria-pressed={tunnelled}>
+              <Button variant={tunnelled ? "primary" : "secondary"} size="sm" onClick={() => setTunnelled((v) => !v)} aria-pressed={tunnelled}>
                 {t("home.withTunnel")}
               </Button>
             </div>
           </div>
           {filtered.length === 0 ? (
-            <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p>
+            <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p>
           ) : (
             <div className="flex flex-col gap-4 px-6 pt-6 pb-6">
               {filtered.slice(0, shown).map((s) => (
@@ -315,7 +307,7 @@ export default function HomePage() {
       />
       <div className="px-6 pt-4 pb-8">
         {items.length === 0 ? (
-          <p className="border border-line bg-grid-card px-4 py-6 text-center text-sm text-grid-muted">{t("home.noDeploysYet")}</p>
+          <p className="border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">{t("home.noDeploysYet")}</p>
         ) : (
           <DeploymentsFeed items={items} base={base} />
         )}

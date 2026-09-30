@@ -33,7 +33,7 @@ export function Sparkline({
   if (!pts) return null
   const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ")
   const area = `${line} L${w},${h} L0,${h} Z`
-  const color = tone === "gold" ? "var(--grid-brand-accent, #c9a227)" : tone === "ok" ? "var(--grid-ok, #3fb950)" : "var(--grid-brand)"
+  const color = tone === "gold" ? "var(--nq-accent)" : tone === "ok" ? "var(--nq-success)" : "var(--nq-brand)"
   const [lx, ly] = pts[pts.length - 1]
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block h-10 w-full" style={{ direction: "ltr" }} role="img" aria-label={label}>

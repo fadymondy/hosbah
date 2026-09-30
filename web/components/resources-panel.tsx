@@ -1,13 +1,14 @@
 "use client"
 
+import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useEffect, useState, type FormEvent } from "react"
 
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -54,7 +55,7 @@ function ResourceFields({
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
       <div className="flex items-center gap-2">
-        <label htmlFor={`${idPrefix}-mem`} className="text-xs text-grid-muted">
+        <label htmlFor={`${idPrefix}-mem`} className="text-xs text-muted-foreground">
           {t("resources.memory")}
         </label>
         <Select
@@ -70,8 +71,8 @@ function ResourceFields({
             onChange({ ...value, memory_mb: v === "unlimited" ? 0 : Number(v) })
           }}
         >
-          <SelectTrigger id={`${idPrefix}-mem`} size="sm" className="w-32">
-            <SelectValue />
+          <SelectTrigger id={`${idPrefix}-mem`} className="w-32">
+            <SelectValue>{(v: string) => (v === "unlimited" ? t("resources.unlimited") : v === "custom" ? t("resources.custom") : memoryLabel(Number(v)))}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unlimited">{t("resources.unlimited")}</SelectItem>
@@ -96,14 +97,14 @@ function ResourceFields({
               value={value.memory_mb || ""}
               onChange={(e) => onChange({ ...value, memory_mb: Number(e.target.value) })}
             />
-            <span dir="ltr" className="text-xs text-grid-muted">
+            <span dir="ltr" className="text-xs text-muted-foreground">
               MB
             </span>
           </span>
         ) : null}
       </div>
       <div className="flex items-center gap-2">
-        <label htmlFor={`${idPrefix}-cpu`} className="text-xs text-grid-muted">
+        <label htmlFor={`${idPrefix}-cpu`} className="text-xs text-muted-foreground">
           {t("resources.cpu")}
         </label>
         <Select
@@ -119,8 +120,8 @@ function ResourceFields({
             onChange({ ...value, cpus: v === "unlimited" ? 0 : Number(v) })
           }}
         >
-          <SelectTrigger id={`${idPrefix}-cpu`} size="sm" className="w-28">
-            <SelectValue />
+          <SelectTrigger id={`${idPrefix}-cpu`} className="w-28">
+            <SelectValue>{(v: string) => (v === "unlimited" ? t("resources.unlimited") : v === "custom" ? t("resources.custom") : v)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unlimited">{t("resources.unlimited")}</SelectItem>
@@ -251,7 +252,7 @@ export function ResourcesCard({
     <form onSubmit={save} aria-labelledby="res-h">
       <SectionTitle id="res-h" title={t("resources.title")} hint={t("resources.hint")} />
       <ErrorBand message={error} />
-      {readOnlyReason ? <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{readOnlyReason}</p> : null}
+      {readOnlyReason ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{readOnlyReason}</p> : null}
       <SettingsRow label={t("resources.base")} hint={t("resources.baseHint")}>
         <ResourceFields idPrefix="res-base" value={base} onChange={setBase} disabled={!canEdit || busy} />
       </SettingsRow>
@@ -276,7 +277,7 @@ export function ResourcesCard({
                   {has ? (
                     <ResourceFields idPrefix={`res-${name}`} value={value} onChange={(v) => setOverride(name, v)} disabled={!canEdit || busy} />
                   ) : (
-                    <span className="text-xs text-grid-muted">{t("resources.usesBase")}</span>
+                    <span className="text-xs text-muted-foreground">{t("resources.usesBase")}</span>
                   )}
                 </div>
               )
@@ -285,13 +286,13 @@ export function ResourcesCard({
         </SettingsRow>
       ) : null}
       {canEdit ? (
-        <div className="flex flex-wrap items-center justify-end gap-3 border-b border-line px-6 py-4">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-b border-border px-6 py-4">
           {saved ? (
-            <p role="status" className="text-sm text-grid-muted">
+            <p role="status" className="text-sm text-muted-foreground">
               {t("resources.saved")}
             </p>
           ) : null}
-          <Button type="submit" disabled={busy}>
+          <Button variant="primary" type="submit" disabled={busy}>
             {busy ? t("common.working") : t("common.save")}
           </Button>
         </div>

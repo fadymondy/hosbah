@@ -1,11 +1,12 @@
 "use client"
 
+import { Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 
 import { ServerMark } from "@/components/server-mark"
 import { useServerPage } from "@/components/server-tabs/context"
 import { PresenceBadge } from "@/components/server-status"
-import { Skeleton } from "@/components/ui/skeleton"
+
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -43,7 +44,7 @@ export function ServerHeader({ serverId }: { serverId: string }) {
 
   if (!server) {
     return (
-      <div className="flex items-center gap-3 border-b border-line px-6 py-4">
+      <div className="flex items-center gap-3 border-b border-border px-6 py-4">
         <Skeleton className="size-10" />
         <Skeleton className="h-6 w-40" />
       </div>
@@ -51,16 +52,16 @@ export function ServerHeader({ serverId }: { serverId: string }) {
   }
 
   return (
-    <div className="border-b border-line" data-testid="server-header">
+    <div className="border-b border-border" data-testid="server-header">
       <div className="flex flex-wrap items-end justify-between gap-4 px-6 py-5">
         <Link href={root} className="flex min-w-0 items-center gap-3 hover:opacity-90">
           <ServerMark server={server} size={10} />
           <span className="min-w-0">
-            <span className="grid-micro block">{team.name}</span>
-            <span dir="ltr" className="grid-title block truncate text-2xl">
+            <span className="eyebrow block">{team.name}</span>
+            <span dir="ltr" className="block truncate text-h2">
               {server.name}
             </span>
-            <span className="grid-body block text-sm">
+            <span className="block text-body-sm text-nq-fg-body">
               {t(`servers.providers.${server.provider}`)} · {t(`servers.kinds.${server.kind}`)}
             </span>
           </span>
@@ -68,13 +69,13 @@ export function ServerHeader({ serverId }: { serverId: string }) {
         {server.parent_server_id ? (
           <Link
             href={`${root.replace(/\/servers\/[^/]+$/, "")}/servers/${server.parent_server_id}`}
-            className="inline-flex shrink-0 items-center gap-1.5 border border-line bg-grid-soft px-2 py-1 text-xs text-grid-muted hover:text-grid-fg"
+            className="inline-flex shrink-0 items-center gap-1.5 border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
           >
             {t("servers.guests.parentLink", { node: server.parent_server_name ?? server.parent_server_id })}
           </Link>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-grid-muted" aria-live="polite">
+          <span className="text-xs text-muted-foreground" aria-live="polite">
             {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
           </span>
           <PresenceBadge server={server} />

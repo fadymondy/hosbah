@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, EmptyState, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { PlayIcon, ScrollTextIcon } from "lucide-react"
@@ -8,11 +9,11 @@ import { LogSearchPanel } from "@/components/apps/log-search"
 import { useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
 import { ErrorBand } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -67,10 +68,10 @@ export function RuntimeLogsPanel({
     <div data-testid="runtime-logs">
       {operate ? (
         <>
-          <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
+          <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
             <div className="basis-full space-y-1">
-              <p className="text-sm text-grid-muted">{t("apps.logs.hint")}</p>
-              {!live ? <p className="text-sm text-grid-muted">{t("apps.logs.notLive")}</p> : null}
+              <p className="text-sm text-muted-foreground">{t("apps.logs.hint")}</p>
+              {!live ? <p className="text-sm text-muted-foreground">{t("apps.logs.notLive")}</p> : null}
             </div>
             <Field className="w-44">
               <FieldLabel htmlFor="log-proc">{t("apps.logs.process")}</FieldLabel>
@@ -95,29 +96,22 @@ export function RuntimeLogsPanel({
               <FieldLabel htmlFor="log-follow">{t("apps.logs.follow")}</FieldLabel>
               <Input id="log-follow" dir="ltr" type="number" min={0} max={300} value={follow} onChange={(e) => setFollow(e.target.value)} />
             </Field>
-            <Button disabled={busy} onClick={run}>
+            <Button variant="primary" disabled={busy} onClick={run}>
               <PlayIcon />
               {busy ? t("common.working") : t("apps.logs.fetch")}
             </Button>
           </div>
           <ErrorBand message={error} />
-          <div className="min-h-40 border-b border-line bg-grid-card">
+          <div className="min-h-40 border-b border-border bg-card">
             {op ? (
               <OperationLog team={team} serverId={app.server_id} op={op} />
             ) : (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <ScrollTextIcon />
-                  </EmptyMedia>
-                  <EmptyDescription>{t("apps.logs.empty")}</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
+              <EmptyState icon={ScrollTextIcon} title={t("apps.logs.empty")} />
             )}
           </div>
         </>
       ) : (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("apps.logs.readOnly")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("apps.logs.readOnly")}</p>
       )}
       <LogSearchPanel path={path} processes={names} />
     </div>

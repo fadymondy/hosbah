@@ -1,6 +1,7 @@
 "use client"
+import { Input } from "@fadymondy/nasaq/web"
 
-import { Input } from "@/components/ui/input"
+
 
 /** A 6-digit code field: numeric keyboard, one-time-code autofill, always left-to-right. */
 export function CodeInput({

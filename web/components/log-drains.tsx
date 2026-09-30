@@ -1,21 +1,21 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { PencilIcon, PlusIcon, ScrollTextIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -136,7 +136,7 @@ export function LogDrainsCard({ team, manage }: { team: string; manage: boolean 
         hint={t("settings.logDrains.hint")}
         action={
           manage ? (
-            <Button size="sm" onClick={() => setEditing("new")}>
+            <Button variant="primary" size="sm" onClick={() => setEditing("new")}>
               <PlusIcon />
               {t("settings.logDrains.add")}
             </Button>
@@ -147,14 +147,7 @@ export function LogDrainsCard({ team, manage }: { team: string; manage: boolean 
       {rows === null ? (
         error ? null : <LoadingRows rows={3} />
       ) : rows.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ScrollTextIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("settings.logDrains.empty")}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ScrollTextIcon} title={t("settings.logDrains.empty")} />
       ) : (
         <TableBand>
           <Table>
@@ -176,30 +169,30 @@ export function LogDrainsCard({ team, manage }: { team: string; manage: boolean 
                     <TableCell className="font-medium">
                       <span dir="auto">{d.name}</span>
                       {!d.enabled ? (
-                        <Badge variant="secondary" className="ms-2">
+                        <Badge variant="neutral" className="ms-2">
                           {t("settings.logDrains.disabled")}
                         </Badge>
                       ) : null}
                     </TableCell>
                     <TableCell>{t(`settings.logDrains.kinds.${d.kind}`)}</TableCell>
-                    <TableCell dir="auto" className="max-w-40 truncate text-xs text-grid-muted">
+                    <TableCell dir="auto" className="max-w-40 truncate text-xs text-muted-foreground">
                       {scope}
                     </TableCell>
                     <TableCell className="text-xs">
                       <div className="flex flex-col gap-0.5">
-                        <span dir="ltr" className="tabular-nums text-grid-muted">
+                        <span dir="ltr" className="tabular-nums text-muted-foreground">
                           {t("settings.logDrains.shipped")}: {d.shipped} · {t("settings.logDrains.dropped")}: {d.dropped}
                         </span>
-                        <span className="text-grid-muted">
+                        <span className="text-muted-foreground">
                           {t("settings.logDrains.lastSuccess")}: {when(d.last_success_at, t)}
                         </span>
                         {d.last_error ? (
-                          <span dir="auto" className="text-grid-danger">
+                          <span dir="auto" className="text-nq-danger-text">
                             {d.last_error}
                           </span>
                         ) : null}
                         {res && res !== "busy" ? (
-                          <Badge variant={res.ok ? "default" : "destructive"} className="w-fit">
+                          <Badge variant={res.ok ? "brand" : "danger"} className="w-fit">
                             {res.ok ? t("settings.logDrains.testOk") : (res.detail ?? t("settings.logDrains.testFailed"))}
                           </Badge>
                         ) : null}
@@ -208,10 +201,10 @@ export function LogDrainsCard({ team, manage }: { team: string; manage: boolean 
                     {manage ? (
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="outline" disabled={res === "busy"} onClick={() => test(d)}>
+                          <Button size="sm" variant="secondary" disabled={res === "busy"} onClick={() => test(d)}>
                             {res === "busy" ? t("common.working") : t("settings.logDrains.test")}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditing(d)}>
+                          <Button size="sm" variant="secondary" onClick={() => setEditing(d)}>
                             <PencilIcon />
                           </Button>
                           <ConfirmButton
@@ -390,7 +383,7 @@ function LogDrainDialog({
                     onChange={(e) => setLabelsText(e.target.value)}
                     placeholder="env: prod"
                   />
-                  <p className="text-xs text-grid-muted">{t("settings.logDrains.labelsHint")}</p>
+                  <p className="text-xs text-muted-foreground">{t("settings.logDrains.labelsHint")}</p>
                 </Field>
               ) : null}
             </>
@@ -399,7 +392,7 @@ function LogDrainDialog({
           <Field>
             <FieldLabel htmlFor="ld-auth-value">{t("settings.logDrains.authValue")}</FieldLabel>
             <Input id="ld-auth-value" dir="ltr" type="password" maxLength={4000} value={authValue} onChange={(e) => setAuthValue(e.target.value)} />
-            <p className="text-xs text-grid-muted">{drain?.has_auth_value ? t("settings.logDrains.authValueSet") + " " : ""}{t("settings.logDrains.authValueHint")}</p>
+            <p className="text-xs text-muted-foreground">{drain?.has_auth_value ? t("settings.logDrains.authValueSet") + " " : ""}{t("settings.logDrains.authValueHint")}</p>
           </Field>
 
           <div className="flex flex-wrap items-center gap-4">
@@ -414,13 +407,13 @@ function LogDrainDialog({
               </label>
             ) : null}
           </div>
-          {kind !== "syslog" && internal ? <p className="text-xs text-grid-muted">{t("settings.logDrains.internalHint")}</p> : null}
+          {kind !== "syslog" && internal ? <p className="text-xs text-muted-foreground">{t("settings.logDrains.internalHint")}</p> : null}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : drain ? t("settings.logDrains.save") : t("settings.logDrains.create")}
             </Button>
           </DialogFooter>

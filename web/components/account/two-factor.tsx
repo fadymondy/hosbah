@@ -1,14 +1,14 @@
 "use client"
 
+import { Badge, Button, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CopyIcon, ShieldCheckIcon, ShieldOffIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { CodeInput, RecoveryInput } from "@/components/auth/code-input"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+
+
 import { auth, authMessage } from "@/lib/auth"
 import { useI18n } from "@/lib/i18n"
 
@@ -109,7 +109,7 @@ export function TwoFactor() {
         hint={t("account.twofa.description")}
         action={
           status ? (
-            <Badge variant={status.enabled ? "default" : "outline"}>
+            <Badge variant={status.enabled ? "brand" : "outline"}>
               {status.enabled ? t("account.twofa.on") : t("account.twofa.off")}
             </Badge>
           ) : null
@@ -120,7 +120,7 @@ export function TwoFactor() {
       {!status ? (
         <LoadingRows rows={2} />
       ) : !status.available ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("account.twofaUnavailable")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("account.twofaUnavailable")}</p>
       ) : codes ? (
         <RecoveryCodes codes={codes} onDone={() => setCodes(null)} />
       ) : enroll ? (
@@ -133,14 +133,14 @@ export function TwoFactor() {
                 alt={t("account.qrAlt")}
                 width={168}
                 height={168}
-                className="border border-line bg-white p-2 [image-rendering:pixelated]"
+                className="border border-border bg-white p-2 [image-rendering:pixelated]"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="grid-micro">{t("account.twofa.secret")}</span>
-                <code dir="ltr" className="break-all border border-line bg-grid-card px-3 py-2 font-mono text-sm">
+                <span className="eyebrow">{t("account.twofa.secret")}</span>
+                <code dir="ltr" className="break-all border border-border bg-card px-3 py-2 font-mono text-sm">
                   {enroll.secret}
                 </code>
-                <a href={enroll.otpauth_url} className="text-sm text-grid-brand underline-offset-4 hover:underline">
+                <a href={enroll.otpauth_url} className="text-sm text-nq-brand underline-offset-4 hover:underline">
                   {t("account.twofa.otpauthHint")}
                 </a>
               </div>
@@ -151,18 +151,18 @@ export function TwoFactor() {
               <CodeInput value={code} onChange={setCode} autoFocus />
             </div>
           </SettingsRow>
-          <div className="flex justify-end gap-2 border-b border-line px-6 py-4">
+          <div className="flex justify-end gap-2 border-b border-border px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setEnroll(null)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || code.length !== 6}>
+            <Button variant="primary" type="submit" disabled={busy || code.length !== 6}>
               {busy ? t("common.working") : t("account.twofa.verify")}
             </Button>
           </div>
         </form>
       ) : !status.enabled ? (
-        <div className="flex border-b border-line px-6 py-4">
-          <Button onClick={() => void start()} disabled={busy}>
+        <div className="flex border-b border-border px-6 py-4">
+          <Button variant="primary" onClick={() => void start()} disabled={busy}>
             <ShieldCheckIcon />
             {t("account.twofa.enable")}
           </Button>
@@ -172,11 +172,11 @@ export function TwoFactor() {
           <SettingsRow label={t("account.recoveryLeftLabel")} hint={t("account.recoveryLeftHint")}>
             <span className="font-mono text-xl tabular-nums">{status.recovery_codes_left}</span>
           </SettingsRow>
-          <div className="flex flex-wrap gap-2 border-b border-line px-6 py-4">
-            <Button variant="outline" onClick={() => setPanel("regenerate")}>
+          <div className="flex flex-wrap gap-2 border-b border-border px-6 py-4">
+            <Button variant="secondary" onClick={() => setPanel("regenerate")}>
               {t("account.newRecoveryCodes")}
             </Button>
-            <Button variant="outline" onClick={() => setPanel("disable")}>
+            <Button variant="secondary" onClick={() => setPanel("disable")}>
               <ShieldOffIcon />
               {t("account.twofa.disable")}
             </Button>
@@ -199,18 +199,18 @@ export function TwoFactor() {
             {panel === "disable" ? (
               <button
                 type="button"
-                className="self-start text-xs text-grid-muted underline-offset-4 hover:text-grid-fg hover:underline"
+                className="self-start text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 onClick={() => setUseRecovery((v) => !v)}
               >
                 {useRecovery ? t("account.useAppCode") : t("account.useRecovery")}
               </button>
             ) : null}
           </SettingsRow>
-          <div className="flex justify-end gap-2 border-b border-line px-6 py-4">
+          <div className="flex justify-end gap-2 border-b border-border px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setPanel("none")}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant={panel === "disable" ? "destructive" : "default"} disabled={busy}>
+            <Button type="submit" variant={panel === "disable" ? "danger" : "primary"} disabled={busy}>
               {busy
                 ? t("common.working")
                 : panel === "disable"
@@ -229,19 +229,19 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
   const { t } = useI18n()
   const text = codes.join("\n")
   return (
-    <div className="border-b border-line px-6 py-5">
-      <p className="mb-1 font-medium text-grid-fg">{t("account.recoveryTitle")}</p>
-      <p className="mb-4 max-w-2xl text-sm text-grid-muted">{t("account.recoveryHint")}</p>
-      <ol dir="ltr" className="mb-4 grid max-w-md grid-cols-2 gap-px border border-line bg-line font-mono text-sm">
+    <div className="border-b border-border px-6 py-5">
+      <p className="mb-1 font-medium text-foreground">{t("account.recoveryTitle")}</p>
+      <p className="mb-4 max-w-2xl text-sm text-muted-foreground">{t("account.recoveryHint")}</p>
+      <ol dir="ltr" className="mb-4 grid max-w-md grid-cols-2 gap-px border border-border bg-border font-mono text-sm">
         {codes.map((c) => (
-          <li key={c} className="bg-grid-card px-3 py-2 text-center tracking-widest">
+          <li key={c} className="bg-card px-3 py-2 text-center tracking-widest">
             {c}
           </li>
         ))}
       </ol>
       <div className="flex flex-wrap gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={() => {
             void navigator.clipboard.writeText(text)
             toast.success(t("account.copied"))
@@ -251,13 +251,13 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
           {t("account.copyCodes")}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           nativeButton={false}
           render={<a href={`data:text/plain;charset=utf-8,${encodeURIComponent(text + "\n")}`} download="hosbah-recovery-codes.txt" />}
         >
           {t("account.downloadCodes")}
         </Button>
-        <Button onClick={onDone}>{t("account.savedThem")}</Button>
+        <Button variant="primary" onClick={onDone}>{t("account.savedThem")}</Button>
       </div>
     </div>
   )

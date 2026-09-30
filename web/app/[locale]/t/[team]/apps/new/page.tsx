@@ -1,5 +1,6 @@
 "use client"
 
+import { Alert, Button, Collapsible, CollapsiblePanel, CollapsibleTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useState, type FormEvent } from "react"
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, ScanSearchIcon } from "lucide-react"
@@ -11,12 +12,11 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Notice } from "@/components/states"
 import { OperationLog } from "@/components/op-log"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
 import { ApiError, apiFetch } from "@/lib/api"
 import { APP_NAME, runtimeLabel, shortSha, type App, type Deployment, type DetectResult } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -155,9 +155,9 @@ export default function NewAppPage() {
   if (created) {
     return (
       <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
-        <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="created">
+        <section className="flex flex-col gap-4 border-b border-border px-6 py-6 [&>*]:max-w-3xl" data-testid="created">
           <div className="flex items-center gap-2 font-medium">
-            <CheckCircle2Icon className="size-5 text-grid-brand" aria-hidden />
+            <CheckCircle2Icon className="size-5 text-nq-brand" aria-hidden />
             {t("apps.new.createdTitle", { name: created.app.name })}
           </div>
           <p className="text-sm text-muted-foreground">
@@ -167,13 +167,12 @@ export default function NewAppPage() {
             <h2 className="font-medium">{t("apps.hook.title")}</h2>
             <p className="text-sm text-muted-foreground">{t("apps.hook.hint")}</p>
             <CopyField value={created.deploy_hook_url} />
-            <Alert>
-              <AlertTriangleIcon />
-              <AlertDescription>{t("apps.hook.once")}</AlertDescription>
-            </Alert>
+            <Alert tone="warning">
+{t("apps.hook.once")}
+</Alert>
           </div>
           <div>
-            <Button nativeButton={false} render={<Link href={`${base}/apps/${created.app.name}`} />}>
+            <Button variant="primary" nativeButton={false} render={<Link href={`${base}/apps/${created.app.name}`} />}>
               {t("apps.new.open")}
             </Button>
           </div>
@@ -186,28 +185,21 @@ export default function NewAppPage() {
 
   return (
     <PageBody title={t("apps.new.title")} description={t("apps.new.description")} bleed>
-      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-grid-bg px-6 py-6 [&>*]:max-w-2xl">
+      <div className="grid gap-px border-b border-border bg-border lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-background px-6 py-6 [&>*]:max-w-2xl">
           {stack ? (
-            <Alert>
-              <InfoIcon />
-              <AlertTitle>{t("site.stacks.fromStack", { name: stack.name })}</AlertTitle>
-              {stack.stack.notes ? <AlertDescription>{stack.stack.notes}</AlertDescription> : null}
-            </Alert>
+            <Alert tone="info" title={<>{t("site.stacks.fromStack", { name: stack.name })}</>}>
+{stack.stack.notes ?? null}
+</Alert>
           ) : null}
           {noServers ? (
-            <Alert data-testid="no-servers">
-              <InfoIcon />
-              <AlertTitle>{t("apps.new.noServersTitle")}</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>{t("apps.new.noServersHint")}</span>
-                <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+            <Alert tone="info" title={t("apps.new.noServersTitle")} data-testid="no-servers">
+<div className="flex flex-col items-start gap-3"><span>{t("apps.new.noServersHint")}</span><Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
                   {t("servers.add")}
-                </Button>
-              </AlertDescription>
-            </Alert>
+                </Button></div>
+</Alert>
           ) : null}
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="app-name">{t("apps.name")}</FieldLabel>
               <Input
@@ -307,7 +299,7 @@ export default function NewAppPage() {
               </Field>
             </div>
 
-            <section className="flex flex-col gap-3 border border-line p-4" aria-labelledby="detect-h">
+            <section className="flex flex-col gap-3 border border-border p-4" aria-labelledby="detect-h">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-col gap-1">
                   <h2 id="detect-h" className="font-medium">
@@ -318,7 +310,7 @@ export default function NewAppPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={!repoOK || !server || detecting || detectRunning}
                   onClick={detect}
                 >
@@ -370,7 +362,7 @@ export default function NewAppPage() {
                 <ChevronDownIcon className="transition-transform group-aria-expanded/adv:rotate-180" />
                 {t("apps.new.advanced")}
               </CollapsibleTrigger>
-              <CollapsibleContent>
+              <CollapsiblePanel>
                 <div className="grid gap-4 pt-3 sm:grid-cols-3">
                   <Field>
                     <FieldLabel htmlFor="app-port">{t("apps.port")}</FieldLabel>
@@ -410,35 +402,30 @@ export default function NewAppPage() {
                     />
                   </Field>
                 </div>
-                <FieldDescription className="pt-2">{t("apps.new.advancedHint")}</FieldDescription>
-              </CollapsibleContent>
+                <p className="pt-2 text-caption text-muted-foreground">{t("apps.new.advancedHint")}</p>
+              </CollapsiblePanel>
             </Collapsible>
 
             {duplicateNotice ? (
-              <Alert data-testid="duplicate-imported">
-                <InfoIcon />
-                <AlertTitle>{duplicateNotice}</AlertTitle>
-                <AlertDescription className="flex flex-col items-start gap-3">
-                  <span>{t("apps.new.duplicateImportedHint")}</span>
-                  <Button
+              <Alert tone="info" title={duplicateNotice} data-testid="duplicate-imported">
+<div className="flex flex-col items-start gap-3"><span>{t("apps.new.duplicateImportedHint")}</span><Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     disabled={busy}
                     onClick={() => createApp(true)}
                   >
                     {busy ? t("common.working") : t("apps.new.duplicateImportedOverride")}
-                  </Button>
-                </AlertDescription>
-              </Alert>
+                  </Button></div>
+</Alert>
             ) : null}
             <FormError message={error} />
             <div>
-              <Button type="submit" disabled={busy || !nameOK || !repoOK || !server}>
+              <Button variant="primary" type="submit" disabled={busy || !nameOK || !repoOK || !server}>
                 {busy ? t("common.working") : t("apps.new.create")}
               </Button>
             </div>
-          </FieldGroup>
+          </div>
         </form>
         <HowItWorks />
       </div>
@@ -449,11 +436,11 @@ export default function NewAppPage() {
 function HowItWorks() {
   const { t } = useI18n()
   return (
-    <aside className="flex flex-col bg-grid-bg" aria-labelledby="how-h">
-      <h2 id="how-h" className="border-b border-line px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
+    <aside className="flex flex-col bg-background" aria-labelledby="how-h">
+      <h2 id="how-h" className="border-b border-border px-6 pt-5 pb-3 text-base font-medium text-foreground">
         {t("apps.new.howTitle")}
       </h2>
-      <ol className="flex flex-col divide-y divide-line border-b border-line text-sm lg:border-b-0">
+      <ol className="flex flex-col divide-y divide-border border-b border-border text-sm lg:border-b-0">
         {(["how1", "how2", "how3", "how4"] as const).map((k, i) => (
           <li key={k} className="flex gap-3 px-6 py-3">
             <span className="font-mono text-muted-foreground tabular-nums">{String(i + 1).padStart(2, "0")}</span>

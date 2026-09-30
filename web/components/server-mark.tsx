@@ -66,7 +66,7 @@ export function ServerMark({ server, size = 8 }: { server: Pick<Server, "color" 
   const box = size === 10 ? "size-10 [&_svg]:size-5" : size === 6 ? "size-6 [&_svg]:size-3.5" : "size-8 [&_svg]:size-4"
   return (
     <span
-      className={`flex ${box} shrink-0 items-center justify-center overflow-hidden border border-line bg-background text-grid-brand`}
+      className={`flex ${box} shrink-0 items-center justify-center overflow-hidden border border-border bg-background text-nq-brand`}
       style={server.color && !server.logo_url ? { color: server.color, borderColor: server.color } : undefined}
     >
       {server.logo_url ? (

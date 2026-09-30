@@ -1,17 +1,17 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { BanIcon, CheckCircle2Icon, ShieldIcon, ShieldOffIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { Facts, ListEmpty, ListError, LoadingRows, SectionTitle } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { useAdminResource, type AdminUserDetail } from "@/lib/admin"
 import { apiFetch, ApiError } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -73,15 +73,15 @@ export default function AdminUserPage() {
       title={<span dir="ltr">{u.email}</span>}
       actions={
         <>
-          {u.platform_admin ? <Badge>{t("admin.users.platformAdmin")}</Badge> : null}
-          {u.disabled ? <Badge variant="destructive">{t("admin.users.disabled")}</Badge> : null}
+          {u.platform_admin ? <Badge variant="brand">{t("admin.users.platformAdmin")}</Badge> : null}
+          {u.disabled ? <Badge variant="danger">{t("admin.users.disabled")}</Badge> : null}
         </>
       }
       bleed
     >
       <div className="flex flex-wrap gap-2 px-6 py-6">
         <Button
-          variant="outline"
+          variant="secondary"
           disabled={busy || self}
           title={self ? t("admin.users.notSelf") : undefined}
           onClick={() =>
@@ -95,7 +95,7 @@ export default function AdminUserPage() {
           {u.platform_admin ? t("admin.users.demote") : t("admin.users.promote")}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           disabled={busy || self}
           title={self ? t("admin.users.notSelf") : undefined}
           onClick={() =>
@@ -107,7 +107,7 @@ export default function AdminUserPage() {
         </Button>
         {!self ? (
           <ConfirmButton
-            size="default"
+            size="md"
             icon={<Trash2Icon />}
             label={t("admin.users.delete")}
             title={t("admin.users.deleteTitle")}
@@ -118,10 +118,10 @@ export default function AdminUserPage() {
         ) : null}
       </div>
       {u.disabled ? (
-        <p className="border-t border-line px-6 py-3 text-sm text-grid-muted">{t("admin.users.disabledNote")}</p>
+        <p className="border-t border-border px-6 py-3 text-sm text-muted-foreground">{t("admin.users.disabledNote")}</p>
       ) : null}
 
-      <div className="border-t border-line">
+      <div className="border-t border-border">
         <Facts
           items={[
             [t("admin.users.joined"), <span key="j" dir="ltr">{fmt(u.created_at)}</span>],
@@ -136,7 +136,7 @@ export default function AdminUserPage() {
       {u.teams.length === 0 ? (
         <ListEmpty title={t("admin.users.noTeams")} />
       ) : (
-        <div className="border-y border-line">
+        <div className="border-y border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -153,7 +153,7 @@ export default function AdminUserPage() {
                       {team.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="font-mono text-grid-muted" dir="ltr">
+                  <TableCell className="font-mono text-muted-foreground" dir="ltr">
                     {team.slug}
                   </TableCell>
                   <TableCell className="pe-6 text-end">{t(`roles.${team.role}`)}</TableCell>

@@ -1,19 +1,11 @@
 "use client"
 
+import { Button, useNasaq, DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@fadymondy/nasaq/web"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useTheme } from "next-themes"
 import { LanguagesIcon, MoonIcon, SunIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
+
 import { useI18n } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n-config"
 
@@ -30,7 +22,7 @@ export function useOtherLocaleHref(): { href: string; target: Locale } {
 
 export function ThemeToggle() {
   const { t } = useI18n()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useNasaq()
   return (
     <Button
       variant="ghost"

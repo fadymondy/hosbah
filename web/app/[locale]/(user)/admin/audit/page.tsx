@@ -1,11 +1,12 @@
 "use client"
 
+import { Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useState } from "react"
 
 import { ListEmpty, ListError, ListToolbar, LoadingRows, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { useAdminList, type AdminAuditEntry } from "@/lib/admin"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -40,54 +41,48 @@ export default function AdminAuditPage() {
   return (
     <PageBody eyebrow={t("nav.platform")} title={t("admin.nav.audit")} description={t("admin.audit.hint")} bleed>
       <ListToolbar q={list.q} onQ={list.setQ} placeholder={t("admin.audit.filters.search")}>
-        <input
+        <Input
           value={actor}
           onChange={(e) => setActor(e.target.value)}
           placeholder={t("admin.audit.filters.actor")}
           aria-label={t("admin.audit.filters.actor")}
           dir="ltr"
-          className="h-8 w-36 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
-        />
-        <input
+          className="w-36 font-mono" />
+        <Input
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder={t("admin.audit.filters.action")}
           aria-label={t("admin.audit.filters.action")}
           dir="ltr"
-          className="h-8 w-32 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
-        />
-        <input
+          className="w-32 font-mono" />
+        <Input
           value={targetType}
           onChange={(e) => setTargetType(e.target.value)}
           placeholder={t("admin.audit.filters.targetType")}
           aria-label={t("admin.audit.filters.targetType")}
           dir="ltr"
-          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
-        />
-        <input
+          className="w-28 font-mono" />
+        <Input
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
           placeholder={t("admin.audit.filters.targetId")}
           aria-label={t("admin.audit.filters.targetId")}
           dir="ltr"
-          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
-        />
-        <input
+          className="w-28 font-mono" />
+        <Input
           type="date"
           value={since}
           onChange={(e) => setSince(e.target.value)}
           aria-label={t("admin.audit.filters.since")}
           dir="ltr"
-          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
-        />
-        <input
+          />
+        <Input
           type="date"
           value={until}
           onChange={(e) => setUntil(e.target.value)}
           aria-label={t("admin.audit.filters.until")}
           dir="ltr"
-          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
-        />
+          />
       </ListToolbar>
       {list.error ? (
         <ListError error={list.error} />
@@ -96,7 +91,7 @@ export default function AdminAuditPage() {
       ) : items.length === 0 ? (
         <ListEmpty title={filtered ? t("admin.list.noMatch") : t("admin.audit.empty")} />
       ) : (
-        <div className="border-b border-line">
+        <div className="border-b border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -128,14 +123,14 @@ export default function AdminAuditPage() {
                     </TableCell>
                     <TableCell className="max-w-sm">
                       {details ? (
-                        <code className="line-clamp-1 font-mono text-xs text-grid-muted" dir="ltr" title={details}>
+                        <code className="line-clamp-1 font-mono text-xs text-muted-foreground" dir="ltr" title={details}>
                           {details}
                         </code>
                       ) : (
-                        <span className="text-grid-muted">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                    <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                       {fmt(e.created_at)}
                     </TableCell>
                   </TableRow>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { InfoIcon, LockKeyholeIcon, PlusIcon } from "lucide-react"
 
@@ -8,23 +9,15 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import type { Credential } from "@/lib/servers"
@@ -57,8 +50,8 @@ export default function CredentialsPage() {
   if (!manage) {
     return (
       <PageBody title={t("nav.credentials")} description={t("credentials.description")} bleed>
-        <div role="note" className="flex items-start gap-3 border-b border-line bg-grid-soft px-6 py-4 text-sm text-grid-body">
-          <InfoIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+        <div role="note" className="flex items-start gap-3 border-b border-border bg-secondary px-6 py-4 text-sm text-nq-fg-body">
+          <InfoIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <p>{t("credentials.readOnly")}</p>
         </div>
       </PageBody>
@@ -71,15 +64,7 @@ export default function CredentialsPage() {
       {creds === null ? (
         <LoadingRows />
       ) : creds.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <LockKeyholeIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("credentials.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("credentials.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={LockKeyholeIcon} title={t("credentials.emptyTitle")} description={t("credentials.emptyHint")} />
       ) : (
         <TableBand>
           <Table>
@@ -111,7 +96,7 @@ export default function CredentialsPage() {
                   </TableCell>
                   <TableCell>
                     {c.last_validated_at ? (
-                      <Badge variant="secondary">
+                      <Badge variant="neutral">
                         {t("credentials.validated")} · <span dir="ltr">{fmt(c.last_validated_at)}</span>
                       </Badge>
                     ) : (
@@ -177,7 +162,7 @@ function Reveal({ team, cred }: { team: string; cred: Credential }) {
         if (!o) setSecret(null)
       }}
     >
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>{t("credentials.reveal")}</DialogTrigger>
+      <DialogTrigger render={<Button variant="secondary" size="sm" />}>{t("credentials.reveal")}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("credentials.revealTitle")}</DialogTitle>
@@ -186,11 +171,11 @@ function Reveal({ team, cred }: { team: string; cred: Credential }) {
         {secret !== null ? <CopyField value={secret} /> : null}
         <FormError message={error} />
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
             {secret !== null ? t("common.done") : t("common.cancel")}
           </Button>
           {secret === null ? (
-            <Button onClick={reveal} disabled={busy}>
+            <Button variant="primary" onClick={reveal} disabled={busy}>
               {busy ? t("common.working") : t("credentials.revealConfirm")}
             </Button>
           ) : null}
@@ -281,7 +266,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <PlusIcon />
         {t("credentials.add")}
       </DialogTrigger>
@@ -291,7 +276,7 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
             <DialogTitle>{t("credentials.add")}</DialogTitle>
             <DialogDescription>{t("credentials.addHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="gap-4">
+          <div className="flex w-full flex-col gap-4">
             <Field>
               <FieldLabel htmlFor="cred-name">{t("credentials.name")}</FieldLabel>
               <Input id="cred-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -340,20 +325,20 @@ function AddCredential({ onSaved }: { onSaved: () => Promise<void> }) {
               <FieldLabel htmlFor="cred-secret">{t(`credentials.secretFor.${provider}`)}</FieldLabel>
               <Input id="cred-secret" type="password" dir="ltr" required autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} />
             </Field>
-            <Field orientation="horizontal">
+            <Field className="flex-row items-center">
               <Checkbox id="cred-validate" checked={validate} onCheckedChange={(v) => setValidate(v === true)} />
               <FieldLabel htmlFor="cred-validate" className="flex flex-col items-start gap-1 font-normal">
                 <span>{t(provider === "cloudflare" ? "credentials.validateCloudflare" : "credentials.validate")}</span>
                 <span className="text-xs text-muted-foreground">{t("credentials.validateHint")}</span>
               </FieldLabel>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("credentials.save")}
             </Button>
           </DialogFooter>

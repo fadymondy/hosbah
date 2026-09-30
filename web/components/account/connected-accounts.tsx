@@ -1,15 +1,15 @@
 "use client"
 
+import { buttonVariants, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { KeyRoundIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ProviderMark, oauthHref, useOAuthErrorText } from "@/components/auth/oauth"
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
-import { buttonVariants } from "@/components/ui/button"
+
 import { ApiError, apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -89,26 +89,26 @@ export function ConnectedAccounts() {
             </Notice>
           ) : null}
           {data.identities.length === 0 ? (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">
+            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">
               {data.providers.length ? t("account.identities.none") : t("account.identities.noProviders")}
             </p>
           ) : (
-            <ul className="divide-y divide-line border-b border-line">
+            <ul className="divide-y divide-border border-b border-border">
               {data.identities.map((ident) => {
                 const name = NAMES[ident.provider] ?? ident.provider
                 return (
                   <li key={ident.id} className="flex flex-wrap items-center gap-3 px-6 py-4">
-                    <span className="flex size-8 shrink-0 items-center justify-center border border-line bg-background text-grid-fg">
+                    <span className="flex size-8 shrink-0 items-center justify-center border border-border bg-background text-foreground">
                       <ProviderMark id={ident.provider} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-grid-fg">
+                      <p className="text-sm font-medium text-foreground">
                         {name}{" "}
-                        <span dir="ltr" className="font-normal text-grid-muted">
+                        <span dir="ltr" className="font-normal text-muted-foreground">
                           {ident.email}
                         </span>
                       </p>
-                      <p className="text-xs text-grid-muted">
+                      <p className="text-xs text-muted-foreground">
                         {t("account.identities.since", { date: fmt(ident.created_at) })}
                         {ident.last_used_at ? ` · ${t("account.identities.lastUsed", { date: fmt(ident.last_used_at) })}` : ""}
                       </p>
@@ -126,9 +126,9 @@ export function ConnectedAccounts() {
             </ul>
           )}
           {connectable.length ? (
-            <div className="flex flex-wrap gap-2 border-b border-line px-6 py-4">
+            <div className="flex flex-wrap gap-2 border-b border-border px-6 py-4">
               {connectable.map((p) => (
-                <a key={p} href={oauthHref(p, { locale, link: true })} className={cn(buttonVariants({ variant: "outline" }), "gap-2")}>
+                <a key={p} href={oauthHref(p, { locale, link: true })} className={cn(buttonVariants({ variant: "secondary" }), "gap-2")}>
                   <ProviderMark id={p} />
                   {t("account.identities.connect", { provider: NAMES[p] ?? p })}
                 </a>

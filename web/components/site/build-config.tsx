@@ -1,14 +1,14 @@
 "use client"
 
+import { Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -111,9 +111,9 @@ export function SiteBuildConfig() {
         <>
           {!canSave ? <Notice>{t("common.readOnly")}</Notice> : null}
           <fieldset disabled={!canSave || busy} className="contents">
-            <div className="border-b border-line px-6 py-5">
-              <label className="mb-1 block text-sm font-medium text-grid-fg">{t("site.build.dockerfilePath")}</label>
-              <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.build.dockerfilePathHint")}</p>
+            <div className="border-b border-border px-6 py-5">
+              <label className="mb-1 block text-sm font-medium text-foreground">{t("site.build.dockerfilePath")}</label>
+              <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.build.dockerfilePathHint")}</p>
               <Input
                 dir="ltr"
                 maxLength={200}
@@ -126,9 +126,9 @@ export function SiteBuildConfig() {
               {!dockerfileOk ? <p className="mt-1 text-xs text-destructive">{t("site.build.invalidPath")}</p> : null}
             </div>
 
-            <div className="border-b border-line px-6 py-5">
-              <label className="mb-1 block text-sm font-medium text-grid-fg">{t("site.build.buildContext")}</label>
-              <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.build.buildContextHint")}</p>
+            <div className="border-b border-border px-6 py-5">
+              <label className="mb-1 block text-sm font-medium text-foreground">{t("site.build.buildContext")}</label>
+              <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.build.buildContextHint")}</p>
               <Input
                 dir="ltr"
                 maxLength={200}
@@ -142,16 +142,16 @@ export function SiteBuildConfig() {
             </div>
 
             <div className="flex flex-col gap-3 px-6 py-5">
-              <p className="text-sm font-medium text-grid-fg">{t("site.build.buildEnv")}</p>
-              <p className="max-w-xl text-xs text-grid-muted">{t("site.build.buildEnvHint")}</p>
+              <p className="text-sm font-medium text-foreground">{t("site.build.buildEnv")}</p>
+              <p className="max-w-xl text-xs text-muted-foreground">{t("site.build.buildEnvHint")}</p>
 
               {draft.buildEnv.length === 0 ? (
-                <p className="py-2 text-sm text-grid-muted">{t("site.build.buildEnvEmpty")}</p>
+                <p className="py-2 text-sm text-muted-foreground">{t("site.build.buildEnvEmpty")}</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {[...draft.buildEnv].sort().map((name) => (
                     <div key={name} className="flex flex-wrap items-center gap-2">
-                      <span dir="ltr" className="w-full font-mono text-xs text-grid-fg sm:w-56 sm:shrink-0">
+                      <span dir="ltr" className="w-full font-mono text-xs text-foreground sm:w-56 sm:shrink-0">
                         {name}
                       </span>
                       <Button type="button" variant="ghost" size="icon-sm" onClick={() => removeVar(name)} aria-label={t("site.build.removeVar")}>
@@ -162,9 +162,9 @@ export function SiteBuildConfig() {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-end gap-2 border-t border-line pt-4">
+              <div className="flex flex-wrap items-end gap-2 border-t border-border pt-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-grid-fg">{t("site.build.varName")}</label>
+                  <label className="mb-1 block text-xs font-medium text-foreground">{t("site.build.varName")}</label>
                   <Input
                     dir="ltr"
                     maxLength={128}
@@ -180,7 +180,7 @@ export function SiteBuildConfig() {
                     className="w-full sm:w-56 font-mono text-xs"
                   />
                 </div>
-                <Button type="button" variant="outline" size="sm" disabled={!canSave || busy || !newVar || !newVarOk || newVarTaken} onClick={addVar}>
+                <Button type="button" variant="secondary" size="sm" disabled={!canSave || busy || !newVar || !newVarOk || newVarTaken} onClick={addVar}>
                   <PlusIcon />
                   {t("site.build.addVar")}
                 </Button>
@@ -192,13 +192,13 @@ export function SiteBuildConfig() {
       )}
 
       {canSave && dirty ? (
-        <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-popover/95 px-6 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80">
-          <p className="text-xs text-grid-muted">{t("site.deployScript.unsaved")}</p>
+        <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-border bg-popover/95 px-6 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80">
+          <p className="text-xs text-muted-foreground">{t("site.deployScript.unsaved")}</p>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={discard}>
+            <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={discard}>
               {t("common.discard")}
             </Button>
-            <Button type="button" size="sm" disabled={busy || !dockerfileOk || !contextOk} onClick={() => void save()}>
+            <Button variant="primary" type="button" size="sm" disabled={busy || !dockerfileOk || !contextOk} onClick={() => void save()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>

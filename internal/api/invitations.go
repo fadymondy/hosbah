@@ -15,6 +15,7 @@ import (
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
 
@@ -97,6 +98,12 @@ func (d *deps) registerInvitations(api huma.API) {
 	}) (*invitationCreatedOut, error) {
 		out := &invitationCreatedOut{}
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityManageMembers, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			if err := quota.CheckMembers(ctx, q, m.TeamID); err != nil {
+				if qe := quotaErr(err); qe != nil {
+					return qe
+				}
+				return err
+			}
 			raw := make([]byte, 32)
 			_, _ = rand.Read(raw)
 			token := hex.EncodeToString(raw)
@@ -211,6 +218,12 @@ func (d *deps) registerInvitations(api huma.API) {
 			}
 			if _, err := q.MembershipFor(ctx, db.MembershipForParams{TeamID: inv.TeamID, UserID: id.ID}); err == nil {
 				return huma.Error409Conflict("you are already in this team")
+			}
+			if err := quota.CheckMembers(ctx, q, inv.TeamID); err != nil {
+				if qe := quotaErr(err); qe != nil {
+					return qe
+				}
+				return err
 			}
 			if _, err := q.InsertTeamMember(ctx, db.InsertTeamMemberParams{TeamID: inv.TeamID, UserID: id.ID, Role: inv.Role}); err != nil {
 				return huma.Error500InternalServerError("could not join the team")

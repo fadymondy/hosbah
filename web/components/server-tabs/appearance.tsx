@@ -1,15 +1,15 @@
 "use client"
 
+import { Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useRef, useState, type FormEvent } from "react"
 import { Trash2Icon, UploadIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import type { Server } from "@/lib/servers"
@@ -98,7 +98,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               aria-checked={!color}
               aria-label={t("servers.appearance.none")}
               onClick={() => setColor("")}
-              className={cn("size-7 border border-dashed border-line", !color && "ring-2 ring-[var(--grid-brand)] ring-offset-2 ring-offset-background")}
+              className={cn("size-7 border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
             />
             {SERVER_COLORS.map((c) => (
               <button
@@ -108,7 +108,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
                 aria-checked={color === c}
                 aria-label={c}
                 onClick={() => setColor(c)}
-                className={cn("size-7 border border-line", color === c && "ring-2 ring-[var(--grid-brand)] ring-offset-2 ring-offset-background")}
+                className={cn("size-7 border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
                 style={{ background: c }}
               />
             ))}
@@ -117,7 +117,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.custom")}
               value={color || "#3B82F6"}
               onChange={(e) => setColor(e.target.value.toUpperCase())}
-              className="h-7 w-10 cursor-pointer border border-line bg-transparent"
+              className="h-7 w-10 cursor-pointer border border-border bg-transparent"
             />
           </div>
         </SettingsRow>
@@ -133,8 +133,8 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
                 title={key}
                 onClick={() => setIcon(icon === key ? "" : key)}
                 className={cn(
-                  "flex size-8 items-center justify-center border border-line [&_svg]:size-4",
-                  icon === key ? "bg-grid-soft text-grid-fg ring-1 ring-[var(--grid-brand)]" : "text-grid-muted hover:bg-grid-soft",
+                  "flex size-8 items-center justify-center border border-border [&_svg]:size-4",
+                  icon === key ? "bg-secondary text-foreground ring-1 ring-nq-brand" : "text-muted-foreground hover:bg-secondary",
                 )}
               >
                 <Icon />
@@ -144,7 +144,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
         </SettingsRow>
         <SettingsRow label={t("servers.appearance.logo")} hint={t("servers.appearance.logoHint")}>
           <div
-            className="flex flex-wrap items-center gap-3 border border-dashed border-line px-4 py-3"
+            className="flex flex-wrap items-center gap-3 border border-dashed border-border px-4 py-3"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -160,7 +160,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.logo")}
               onChange={(e) => void upload(e.target.files?.[0])}
             />
-            <Button type="button" variant="outline" size="sm" onClick={() => file.current?.click()}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => file.current?.click()}>
               <UploadIcon />
               {logo ? t("servers.appearance.logoReplace") : t("servers.appearance.logoUpload")}
             </Button>
@@ -170,13 +170,13 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
                 {t("servers.appearance.logoRemove")}
               </Button>
             ) : (
-              <span className="text-xs text-grid-muted">{t("servers.appearance.logoDrop")}</span>
+              <span className="text-xs text-muted-foreground">{t("servers.appearance.logoDrop")}</span>
             )}
           </div>
         </SettingsRow>
         {manage ? (
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy || !name.trim()}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? t("common.working") : t("servers.appearance.save")}
             </Button>
           </div>

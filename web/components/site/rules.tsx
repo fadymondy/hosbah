@@ -1,16 +1,17 @@
 "use client"
 
+import { Badge, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PlusIcon, XIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSiteOptional } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -38,9 +39,9 @@ const HEADER_PRESETS: { key: string; name: string; value: string }[] = [
   { key: "cors", name: "Access-Control-Allow-Origin", value: "*" },
 ]
 
-function statusVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
-  if (status === "error") return "destructive"
-  if (status === "pending") return "secondary"
+function statusVariant(status: string): "success" | "neutral" | "outline" | "danger" {
+  if (status === "error") return "danger"
+  if (status === "pending") return "neutral"
   return "outline"
 }
 
@@ -229,7 +230,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                     ) : null}
                   </Badge>
                 ))}
-                {current.redirects.length === 0 ? <p className="text-xs text-grid-muted">{t("site.rules.redirects.empty")}</p> : null}
+                {current.redirects.length === 0 ? <p className="text-xs text-muted-foreground">{t("site.rules.redirects.empty")}</p> : null}
               </div>
               {manage ? (
                 <div className="mt-2 flex max-w-xl flex-wrap items-center gap-2">
@@ -247,7 +248,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" disabled={busy || !redirectFrom.trim() || !redirectTo.trim()} onClick={addRedirect}>
+                  <Button type="button" variant="secondary" size="icon" disabled={busy || !redirectFrom.trim() || !redirectTo.trim()} onClick={addRedirect}>
                     <PlusIcon />
                   </Button>
                 </div>
@@ -275,13 +276,13 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                   ) : null}
                 </Badge>
               ))}
-              {current.headers.length === 0 ? <p className="text-xs text-grid-muted">{t("site.rules.headers.empty")}</p> : null}
+              {current.headers.length === 0 ? <p className="text-xs text-muted-foreground">{t("site.rules.headers.empty")}</p> : null}
             </div>
             {manage ? (
               <>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {HEADER_PRESETS.map((p) => (
-                    <Button key={p.key} type="button" variant="outline" size="sm" disabled={busy} onClick={() => addHeader(p.name, p.value, "set")}>
+                    <Button key={p.key} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => addHeader(p.name, p.value, "set")}>
                       {t(`site.rules.headers.presets.${p.key}`)}
                     </Button>
                   ))}
@@ -289,7 +290,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                 <div className="mt-2 flex max-w-xl flex-wrap items-center gap-2">
                   <Select value={headerAction} onValueChange={(v) => v && setHeaderAction(v as "set" | "add" | "remove")}>
                     <SelectTrigger className="w-28">
-                      <SelectValue />
+                      <SelectValue>{(v: string) => t(`site.rules.headers.actions.${v}`)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="set">{t("site.rules.headers.actions.set")}</SelectItem>
@@ -301,7 +302,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                   {headerAction !== "remove" ? (
                     <Input dir="ltr" value={headerValue} placeholder={t("site.rules.headers.valuePlaceholder")} onChange={(e) => setHeaderValue(e.target.value)} className="w-56" />
                   ) : null}
-                  <Button type="button" variant="outline" size="icon" disabled={busy || !headerName.trim()} onClick={() => addHeader()}>
+                  <Button type="button" variant="secondary" size="icon" disabled={busy || !headerName.trim()} onClick={() => addHeader()}>
                     <PlusIcon />
                   </Button>
                 </div>
@@ -325,7 +326,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
               />
               <Badge variant={statusVariant(current.status)}>{t(`site.rules.statuses.${current.status}`, undefined, current.status)}</Badge>
             </div>
-            {current.error ? <p className="mt-1 text-xs text-grid-danger">{current.error}</p> : null}
+            {current.error ? <p className="mt-1 text-xs text-nq-danger-text">{current.error}</p> : null}
             {current.basic_auth?.enabled ? (
               <>
                 <div className="mt-2 flex flex-col gap-2">
@@ -345,7 +346,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                     <Input dir="ltr" value={authUser} placeholder={t("site.rules.access.usernamePlaceholder")} onChange={(e) => setAuthUser(e.target.value)} className="w-40" />
                     <Input dir="ltr" type="password" value={authPass} placeholder={t("site.rules.access.passwordPlaceholder")} onChange={(e) => setAuthPass(e.target.value)} className="w-40" />
                     <Input dir="ltr" value={authPrefix} placeholder={t("site.rules.access.pathPrefixPlaceholder")} onChange={(e) => setAuthPrefix(e.target.value)} className="w-40" />
-                    <Button type="button" variant="outline" size="icon" disabled={busy || !authUser.trim() || !authPass} onClick={addAuthUser}>
+                    <Button type="button" variant="secondary" size="icon" disabled={busy || !authUser.trim() || !authPass} onClick={addAuthUser}>
                       <PlusIcon />
                     </Button>
                   </div>
@@ -370,7 +371,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
             {manage ? (
               <div className="mt-2 flex max-w-sm gap-2">
                 <Input dir="ltr" value={allowInput} placeholder={t("site.rules.access.cidrPlaceholder")} onChange={(e) => setAllowInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addAllow()} />
-                <Button type="button" variant="outline" size="icon" disabled={busy || !allowInput.trim()} onClick={addAllow}>
+                <Button type="button" variant="secondary" size="icon" disabled={busy || !allowInput.trim()} onClick={addAllow}>
                   <PlusIcon />
                 </Button>
               </div>
@@ -393,7 +394,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
             {manage ? (
               <div className="mt-2 flex max-w-sm gap-2">
                 <Input dir="ltr" value={denyInput} placeholder={t("site.rules.access.cidrPlaceholder")} onChange={(e) => setDenyInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDeny()} />
-                <Button type="button" variant="outline" size="icon" disabled={busy || !denyInput.trim()} onClick={addDeny}>
+                <Button type="button" variant="secondary" size="icon" disabled={busy || !denyInput.trim()} onClick={addDeny}>
                   <PlusIcon />
                 </Button>
               </div>
@@ -409,11 +410,11 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
             />
           </SettingsRow>
 
-          <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.rules.access.rateLimitNote")}</p>
+          <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.rules.access.rateLimitNote")}</p>
         </section>
       ) : null}
 
-      {notice ? <p className="border-b border-line px-6 py-2 text-xs text-grid-brand">{notice}</p> : null}
+      {notice ? <p className="border-b border-border px-6 py-2 text-xs text-nq-brand">{notice}</p> : null}
       <ErrorBand message={error} />
     </div>
   )

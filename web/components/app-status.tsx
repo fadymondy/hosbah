@@ -1,17 +1,18 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
+
+import { Badge } from "@fadymondy/nasaq/web"
 import type { AppStatus, DeploymentStatus, DeploymentTrack } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 
-type Variant = "default" | "secondary" | "outline" | "destructive"
+type Variant = "success" | "neutral" | "outline" | "danger"
 
 const appVariant: Record<AppStatus, Variant> = {
   new: "outline",
-  deploying: "secondary",
-  running: "default",
-  failed: "destructive",
-  stopped: "secondary",
+  deploying: "neutral",
+  running: "success",
+  failed: "danger",
+  stopped: "neutral",
 }
 
 export function AppStatusBadge({ status }: { status: AppStatus }) {
@@ -29,10 +30,10 @@ export function AppStatusBadge({ status }: { status: AppStatus }) {
 
 const depVariant: Record<DeploymentStatus, Variant> = {
   queued: "outline",
-  running: "secondary",
-  succeeded: "default",
-  failed: "destructive",
-  cancelled: "secondary",
+  running: "neutral",
+  succeeded: "success",
+  failed: "danger",
+  cancelled: "neutral",
 }
 
 export function DeploymentStatusBadge({ status }: { status: DeploymentStatus }) {

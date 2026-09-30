@@ -25,6 +25,9 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api") ||
     // Webhooks (GitHub App, per-app deploy hooks) are the API's, rewritten there: no locale prefix.
     pathname.startsWith("/hooks/") ||
+    // The CircleXO sign-in round trip (rewritten to the API): no locale prefix.
+    pathname.startsWith("/auth/circlexo/") ||
+    pathname === "/sso/circlexo" ||
     pathname.startsWith("/_next") ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {

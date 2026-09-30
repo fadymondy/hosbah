@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PackageIcon, RefreshCwIcon } from "lucide-react"
 
@@ -7,10 +8,10 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import type { UpdateStatus } from "@/lib/servers"
@@ -85,7 +86,7 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
         title={t("servers.updates.title")}
         hint={t("servers.updates.hint")}
         action={
-          <Button variant="outline" size="sm" onClick={() => void checkNow()} disabled={checking}>
+          <Button variant="secondary" size="sm" onClick={() => void checkNow()} disabled={checking}>
             <RefreshCwIcon className={checking ? "animate-spin" : ""} />
             {checking ? t("common.working") : t("servers.updates.checkNow")}
           </Button>
@@ -101,22 +102,22 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
             hint={status.last_checked_at ? t("servers.updates.lastChecked", { when: fmt(status.last_checked_at) }) : t("servers.updates.neverChecked")}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={status.upgradable_count > 0 ? "secondary" : "outline"}>
+              <Badge variant={status.upgradable_count > 0 ? "neutral" : "outline"}>
                 {t("servers.updates.count", { n: status.upgradable_count })}
               </Badge>
               {status.reboot_required ? (
-                <Badge variant="outline" className="text-grid-warn">
+                <Badge variant="outline" className="text-nq-warning-text">
                   {t("servers.updates.rebootRequired")}
                 </Badge>
               ) : null}
               {status.last_upgraded_at ? (
-                <span dir="ltr" className="text-xs text-grid-muted">
+                <span dir="ltr" className="text-xs text-muted-foreground">
                   {t("servers.updates.lastUpgraded", { when: fmt(status.last_upgraded_at) })}
                 </span>
               ) : null}
             </div>
             {status.packages.length > 0 ? (
-              <div className="max-h-64 overflow-y-auto border border-line">
+              <div className="max-h-64 overflow-y-auto border border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -131,7 +132,7 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
                         <TableCell dir="ltr" className="font-mono text-xs">
                           {p.name}
                         </TableCell>
-                        <TableCell dir="ltr" className="font-mono text-xs text-grid-muted">
+                        <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground">
                           {p.current || "—"}
                         </TableCell>
                         <TableCell dir="ltr" className="font-mono text-xs">
@@ -168,7 +169,7 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
                 disabled={!manage || !status.auto_supported || togglingAuto || upgrading}
                 onCheckedChange={(v) => void setAuto(v === true)}
               />
-              <label htmlFor="srv-auto-updates" className="text-sm text-grid-body">
+              <label htmlFor="srv-auto-updates" className="text-sm text-nq-fg-body">
                 {status.auto_supported
                   ? status.auto_security_updates
                     ? t("servers.updates.autoOn")

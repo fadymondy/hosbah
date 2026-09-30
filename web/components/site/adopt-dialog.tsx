@@ -1,14 +1,15 @@
 "use client"
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useState, type FormEvent } from "react"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -90,7 +91,7 @@ export function AdoptDialog({ path, onAdopted, ...controlled }: { path: string; 
             <DialogTitle>{t("adopt.title")}</DialogTitle>
             <DialogDescription>{t("adopt.hint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="adopt-repo">{t("adopt.repoUrl")}</FieldLabel>
               <Input
@@ -149,13 +150,13 @@ export function AdoptDialog({ path, onAdopted, ...controlled }: { path: string; 
               />
               <AdoptConfidence field={fields?.port} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || loading || !ok}>
+            <Button variant="primary" type="submit" disabled={busy || loading || !ok}>
               {busy ? t("common.working") : t("adopt.submit")}
             </Button>
           </DialogFooter>

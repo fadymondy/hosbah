@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from "react"
 import {
   ArrowUpIcon,
@@ -11,26 +12,17 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { formatBytes } from "@/lib/servers"
@@ -231,15 +223,7 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
     return (
       <section aria-labelledby="files-h" data-testid="files">
         <SectionTitle id="files-h" title={t("servers.files.title")} hint={t("servers.files.hint")} />
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FolderIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("servers.files.noAccessTitle")}</EmptyTitle>
-            <EmptyDescription>{t("servers.files.noAccessHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={FolderIcon} title={t("servers.files.noAccessTitle")} description={t("servers.files.noAccessHint")} />
       </section>
     )
   }
@@ -254,7 +238,7 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
           file ? null : (
             <div className="flex items-center gap-2">
               <NewFolderButton onCreate={mkdir} />
-              <Button size="sm" variant="outline" onClick={() => void list(dir)} disabled={loading}>
+              <Button size="sm" variant="secondary" onClick={() => void list(dir)} disabled={loading}>
                 <RefreshCwIcon className={loading ? "animate-spin" : ""} />
                 {t("servers.files.refresh")}
               </Button>
@@ -279,10 +263,10 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
             <Button
               size="icon-sm"
-              variant="outline"
+              variant="secondary"
               aria-label={t("servers.files.up")}
               disabled={dir === "/"}
               onClick={() => navigate(parentOf(dir))}
@@ -292,11 +276,11 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
             <nav aria-label={t("servers.files.title")} className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" dir="ltr">
               {crumbs.map((c, i) => (
                 <span key={c.path} className="flex shrink-0 items-center gap-1">
-                  {i > 0 ? <span className="text-grid-muted">/</span> : null}
+                  {i > 0 ? <span className="text-muted-foreground">/</span> : null}
                   <button
                     type="button"
                     onClick={() => navigate(c.path)}
-                    className={`whitespace-nowrap px-1 text-sm hover:underline ${c.path === dir ? "font-medium text-grid-fg" : "text-grid-muted"}`}
+                    className={`whitespace-nowrap px-1 text-sm hover:underline ${c.path === dir ? "font-medium text-foreground" : "text-muted-foreground"}`}
                   >
                     {c.name}
                   </button>
@@ -319,15 +303,7 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
           {loading && entries === null ? (
             <LoadingRows />
           ) : entries && entries.length === 0 ? (
-            <Empty className="border-b">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FolderIcon />
-                </EmptyMedia>
-                <EmptyTitle>{t("servers.files.emptyTitle")}</EmptyTitle>
-                <EmptyDescription>{t("servers.files.emptyHint")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <EmptyState className="border-b" icon={FolderIcon} title={t("servers.files.emptyTitle")} description={t("servers.files.emptyHint")} />
           ) : entries ? (
             <TableBand>
               <Table>
@@ -348,31 +324,31 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
                           <button
                             type="button"
                             onClick={() => navigate(joinPath(dir, e.name))}
-                            className="flex items-center gap-2 font-medium text-grid-fg hover:underline"
+                            className="flex items-center gap-2 font-medium text-foreground hover:underline"
                             dir="ltr"
                           >
-                            <FolderIcon className="size-4 shrink-0 text-grid-muted" />
+                            <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
                             <span className="truncate">{e.name}</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => void openFile(e)}
-                            className="flex items-center gap-2 text-grid-fg hover:underline"
+                            className="flex items-center gap-2 text-foreground hover:underline"
                             dir="ltr"
                           >
-                            <FileIcon className="size-4 shrink-0 text-grid-muted" />
+                            <FileIcon className="size-4 shrink-0 text-muted-foreground" />
                             <span className="truncate">{e.name}</span>
                           </button>
                         )}
                       </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-xs text-grid-muted">
+                      <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground">
                         {e.type === "dir" ? "—" : formatBytes(e.size)}
                       </TableCell>
-                      <TableCell dir="ltr" className="text-xs text-grid-muted">
+                      <TableCell dir="ltr" className="text-xs text-muted-foreground">
                         {fmt(e.mtime)}
                       </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-xs text-grid-muted">
+                      <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground">
                         {e.mode}
                       </TableCell>
                       <TableCell>
@@ -424,18 +400,18 @@ function FileViewer({
   const dirty = !file.binary && !file.truncated && draft !== file.content
 
   return (
-    <div className="border-b border-line">
+    <div className="border-b border-border">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
-        <span dir="ltr" className="min-w-0 truncate font-mono text-sm text-grid-fg" title={file.path}>
+        <span dir="ltr" className="min-w-0 truncate font-mono text-sm text-foreground" title={file.path}>
           {file.path}
         </span>
         <div className="flex items-center gap-2">
           {file.binary || file.truncated ? null : (
-            <Button size="sm" onClick={onSave} disabled={saving || !dirty}>
+            <Button variant="primary" size="sm" onClick={onSave} disabled={saving || !dirty}>
               {saving ? t("common.working") : t("servers.files.save")}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={onClose}>
+          <Button size="sm" variant="secondary" onClick={onClose}>
             <XIcon />
             {t("servers.files.close")}
           </Button>
@@ -445,10 +421,10 @@ function FileViewer({
       {loading ? (
         <LoadingRows />
       ) : file.binary ? (
-        <p className="px-6 py-8 text-center text-sm text-grid-muted">{t("servers.files.binaryNotice")}</p>
+        <p className="px-6 py-8 text-center text-sm text-muted-foreground">{t("servers.files.binaryNotice")}</p>
       ) : (
         <div className="px-6 pb-6">
-          {file.truncated ? <p className="mb-2 text-xs text-grid-muted">{t("servers.files.truncatedNotice", { size: formatBytes(file.size) })}</p> : null}
+          {file.truncated ? <p className="mb-2 text-xs text-muted-foreground">{t("servers.files.truncatedNotice", { size: formatBytes(file.size) })}</p> : null}
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -495,7 +471,7 @@ function NewFolderButton({ onCreate }: { onCreate: (name: string) => Promise<voi
         if (!v) setError(null)
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>
         <FolderPlusIcon />
         {t("servers.files.newFolder")}
       </DialogTrigger>
@@ -505,15 +481,15 @@ function NewFolderButton({ onCreate }: { onCreate: (name: string) => Promise<voi
             <DialogTitle>{t("servers.files.newFolderTitle")}</DialogTitle>
             <DialogDescription>{t("servers.files.newFolderHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="py-4">
+          <div className="flex w-full flex-col gap-5 py-4">
             <Field>
               <FieldLabel htmlFor="new-folder-name">{t("servers.files.columns.name")}</FieldLabel>
               <Input id="new-folder-name" value={name} onChange={(e) => setName(e.target.value)} dir="ltr" autoFocus />
             </Field>
             <FormError message={error} />
-          </FieldGroup>
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? t("common.working") : t("servers.files.create")}
             </Button>
           </DialogFooter>
@@ -555,7 +531,7 @@ function RenameButton({ entry, busy, onRename }: { entry: FSEntry; busy: boolean
         else setError(null)
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" disabled={busy} />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" disabled={busy} />}>
         <PencilIcon />
         {t("servers.files.rename")}
       </DialogTrigger>
@@ -564,15 +540,15 @@ function RenameButton({ entry, busy, onRename }: { entry: FSEntry; busy: boolean
           <DialogHeader>
             <DialogTitle>{t("servers.files.renameTitle", { name: entry.name })}</DialogTitle>
           </DialogHeader>
-          <FieldGroup className="py-4">
+          <div className="flex w-full flex-col gap-5 py-4">
             <Field>
               <FieldLabel htmlFor="rename-name">{t("servers.files.columns.name")}</FieldLabel>
               <Input id="rename-name" value={name} onChange={(e) => setName(e.target.value)} dir="ltr" autoFocus />
             </Field>
             <FormError message={error} />
-          </FieldGroup>
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={saving || !name.trim() || name === entry.name}>
+            <Button variant="primary" type="submit" disabled={saving || !name.trim() || name === entry.name}>
               {saving ? t("common.working") : t("servers.files.save")}
             </Button>
           </DialogFooter>

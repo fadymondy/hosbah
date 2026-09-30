@@ -13,6 +13,7 @@ import (
 	"github.com/togo-framework/auth"
 
 	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/circlexo"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/platform"
 )
@@ -50,6 +51,13 @@ func activeAccount(a *app.App) func(http.Handler) http.Handler {
 			if st.SessionsRevokedAt != nil {
 				iat, ok := issuedAt(r)
 				if !ok || !iat.After(st.SessionsRevokedAt.Truncate(time.Second)) {
+					writeJSONError(w, http.StatusUnauthorized, "session_revoked")
+					return
+				}
+			}
+			// A session born from a hub sign-in that the hub has since revoked (session.revoked).
+			if hub := circlexo.Current(); hub != nil {
+				if iat, ok := issuedAt(r); ok && circlexo.SessionEnded(r.Context(), hub, id.ID, iat) {
 					writeJSONError(w, http.StatusUnauthorized, "session_revoked")
 					return
 				}

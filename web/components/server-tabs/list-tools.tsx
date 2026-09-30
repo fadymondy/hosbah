@@ -1,12 +1,13 @@
 "use client"
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input } from "@fadymondy/nasaq/web"
 import { useState, type FormEvent, type ReactNode } from "react"
 import { PencilIcon, SearchIcon } from "lucide-react"
 
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+
+
+
 import { useI18n } from "@/lib/i18n"
 
 /** The search band above a server tab's list, with the shown / total count. */
@@ -27,13 +28,13 @@ export function ListSearch({
 }) {
   const { t } = useI18n()
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
+    <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
       <div className="relative w-full max-w-xs">
-        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
+        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} className="ps-8" />
       </div>
       {children}
-      <span className="ms-auto text-xs text-grid-muted tabular-nums" aria-live="polite">
+      <span className="ms-auto text-xs text-muted-foreground tabular-nums" aria-live="polite">
         {value.trim() ? t("lists.count", { shown, total }) : t("lists.total", { total })}
       </span>
     </div>
@@ -91,7 +92,7 @@ export function EditDialog({
         }
       }}
     >
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <DialogTrigger render={<Button variant="secondary" size="sm" />}>
         <PencilIcon />
         {t("lists.edit")}
       </DialogTrigger>
@@ -104,10 +105,10 @@ export function EditDialog({
           {children}
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

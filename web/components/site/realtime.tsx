@@ -1,9 +1,9 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { RadioIcon, SparklesIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -11,13 +11,13 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -85,8 +85,8 @@ export function SiteRealtime() {
           action={
             st?.config ? (
               <span className="flex flex-wrap items-center gap-2">
-                <Badge variant={st.routed ? "default" : "outline"}>{st.routed ? t("site.realtime.routed") : t("site.realtime.notRouted")}</Badge>
-                <Badge variant={st.process_running ? "secondary" : "outline"}>{st.process_running ? t("site.realtime.running") : t("site.realtime.notRunning")}</Badge>
+                <Badge variant={st.routed ? "brand" : "outline"}>{st.routed ? t("site.realtime.routed") : t("site.realtime.notRouted")}</Badge>
+                <Badge variant={st.process_running ? "neutral" : "outline"}>{st.process_running ? t("site.realtime.running") : t("site.realtime.notRunning")}</Badge>
               </span>
             ) : null
           }
@@ -97,17 +97,17 @@ export function SiteRealtime() {
         ) : (
           <>
             {!st.config && sg && sg.confidence !== "unknown" ? (
-              <p className="flex flex-wrap items-center gap-2 border-b border-line bg-grid-card px-6 py-3 text-sm">
-                <SparklesIcon className="size-4 text-grid-brand" />
+              <p className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-6 py-3 text-sm">
+                <SparklesIcon className="size-4 text-nq-brand" />
                 {t("site.realtime.suggested", { kind: t(`site.realtime.kinds.${sg.kind}`) })}
-                <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                   {sg.evidence.join(" · ")}
                 </span>
               </p>
             ) : null}
             {st.hostnames.length && st.config ? (
-              <div className="flex flex-col gap-2 border-b border-line px-6 py-4">
-                <span className="grid-micro">{t("site.realtime.endpoints")}</span>
+              <div className="flex flex-col gap-2 border-b border-border px-6 py-4">
+                <span className="eyebrow">{t("site.realtime.endpoints")}</span>
                 {st.hostnames.map((h) => (
                   <CopyField key={h} value={h} />
                 ))}
@@ -120,26 +120,26 @@ export function SiteRealtime() {
 
       <section aria-labelledby="rtn-h">
         <SectionTitle id="rtn-h" title={t("site.realtime.notes")} />
-        <ul className="flex flex-col gap-2 border-b border-line px-6 py-4 text-sm text-grid-body">
+        <ul className="flex flex-col gap-2 border-b border-border px-6 py-4 text-sm text-nq-fg-body">
           <li className="flex items-start gap-2">
-            <RadioIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+            <RadioIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             {t("site.realtime.noteListen")}
           </li>
           <li className="flex items-start gap-2">
-            <RadioIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+            <RadioIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             {t("site.realtime.noteDeploy")}
           </li>
           <li className="flex items-start gap-2">
-            <RadioIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+            <RadioIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span>
               {t("site.realtime.noteKeys")}{" "}
-              <Link href={`${base}/environment`} className="text-grid-brand underline-offset-4 hover:underline">
+              <Link href={`${base}/environment`} className="text-nq-brand underline-offset-4 hover:underline">
                 {t("site.nav.environment")}
               </Link>
             </span>
           </li>
           <li className="flex items-start gap-2">
-            <RadioIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+            <RadioIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             {t("site.realtime.noteConnections")}
           </li>
         </ul>
@@ -149,7 +149,7 @@ export function SiteRealtime() {
 }
 
 /** Remove the realtime route (plain confirmation). Also opened from the overview canvas. */
-export function RemoveRealtime({ path, onRemoved, size, ...controlled }: { path: string; onRemoved: () => Promise<void> | void; size?: "sm" | "default" } & Controlled) {
+export function RemoveRealtime({ path, onRemoved, size, ...controlled }: { path: string; onRemoved: () => Promise<void> | void; size?: "sm" | "md" } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
   return (
@@ -302,16 +302,16 @@ export function RealtimeForm({
   return (
     <form onSubmit={save} className={layout === "dialog" ? "flex flex-col gap-4" : undefined}>
       <fieldset disabled={!manage || busy} className="contents">
-        {layout === "dialog" ? <FieldGroup>{fields}</FieldGroup> : fields}
+        {layout === "dialog" ? <div className="flex w-full flex-col gap-5">{fields}</div> : fields}
         {manage ? (
-          <div className={layout === "section" ? "flex flex-wrap justify-end gap-2 border-b border-line px-6 py-4" : "flex flex-wrap justify-end gap-2"}>
+          <div className={layout === "section" ? "flex flex-wrap justify-end gap-2 border-b border-border px-6 py-4" : "flex flex-wrap justify-end gap-2"}>
             {onCancel ? (
-              <Button type="button" variant="outline" onClick={onCancel}>
+              <Button type="button" variant="secondary" onClick={onCancel}>
                 {t("common.cancel")}
               </Button>
             ) : null}
-            {st.config && layout === "section" ? <RemoveRealtime path={path} size="default" onRemoved={onSaved} /> : null}
-            <Button type="submit" disabled={busy || !process.trim()}>
+            {st.config && layout === "section" ? <RemoveRealtime path={path} size="md" onRemoved={onSaved} /> : null}
+            <Button variant="primary" type="submit" disabled={busy || !process.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>
@@ -371,7 +371,7 @@ export function RealtimeDialog({ path, onSaved, ...controlled }: { path: string;
             }}
           />
         ) : error ? null : (
-          <p className="text-sm text-grid-muted">{t("common.loading")}</p>
+          <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
         )}
         <FormError message={error} />
       </DialogContent>

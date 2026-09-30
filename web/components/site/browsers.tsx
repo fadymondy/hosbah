@@ -1,22 +1,22 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { humanBytes } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
@@ -89,16 +89,7 @@ export function SiteBrowsers() {
       {items === null ? (
         <LoadingRows rows={2} />
       ) : items.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GlobeIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.browsers.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.browsers.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={GlobeIcon} title={t("site.browsers.emptyTitle")} description={t("site.browsers.emptyHint")} actions={<>{add}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("site.browsers.search")} shown={shown.length} total={items.length} />
@@ -118,28 +109,28 @@ export function SiteBrowsers() {
                   <TableRow key={b.id}>
                     <TableCell>
                       <span className="flex items-center gap-1.5">
-                        {b.kind === "desktop" ? <MonitorIcon className="size-3.5 shrink-0 text-grid-muted" /> : null}
+                        {b.kind === "desktop" ? <MonitorIcon className="size-3.5 shrink-0 text-muted-foreground" /> : null}
                         <span dir="ltr" className="font-medium">
                           {b.name}
                         </span>
                       </span>
-                      <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-grid-muted" title={b.image}>
+                      <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-muted-foreground" title={b.image}>
                         {b.image}
                       </div>
                     </TableCell>
                     <TableCell>
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant={b.status === "ready" ? "default" : b.status === "failed" ? "destructive" : "secondary"}>{t(`site.storage.status.${b.status}`)}</Badge>
+                        <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
                         {b.status === "ready" && b.running != null ? (
-                          <Badge variant={b.running ? "secondary" : "outline"}>{b.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
+                          <Badge variant={b.running ? "neutral" : "outline"}>{b.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
                         ) : null}
                       </span>
                       {b.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-danger">
+                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
                           {b.error}
                         </p>
                       ) : null}
-                      {b.restarts ? <p className="mt-1 text-xs text-grid-muted">{t("site.browsers.restarts", { n: b.restarts })}</p> : null}
+                      {b.restarts ? <p className="mt-1 text-xs text-muted-foreground">{t("site.browsers.restarts", { n: b.restarts })}</p> : null}
                     </TableCell>
                     <TableCell className="text-xs">
                       <span dir="ltr">
@@ -147,20 +138,20 @@ export function SiteBrowsers() {
                         {b.memory_mb} MB · {b.cpus} CPU
                       </span>
                       {b.kind === "headless" ? (
-                        <div className="text-grid-muted">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
+                        <div className="text-muted-foreground">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
                       ) : null}
                     </TableCell>
                     <TableCell className="max-w-64 text-xs">
                       {b.kind === "desktop" ? (
                         b.hostname ? (
-                          <span dir="ltr" className="truncate font-mono text-grid-muted" title={b.hostname}>
+                          <span dir="ltr" className="truncate font-mono text-muted-foreground" title={b.hostname}>
                             {b.hostname}
                           </span>
                         ) : (
-                          <span className="text-grid-muted">{t("site.browsers.noHostname")}</span>
+                          <span className="text-muted-foreground">{t("site.browsers.noHostname")}</span>
                         )
                       ) : (
-                        <span dir="ltr" className="truncate text-start font-mono text-grid-muted">
+                        <span dir="ltr" className="truncate text-start font-mono text-muted-foreground">
                           {b.env.join(" ")}
                         </span>
                       )}
@@ -178,7 +169,7 @@ export function SiteBrowsers() {
           </TableBand>
         </>
       )}
-      <ul className="flex flex-col gap-1.5 border-b border-line px-6 py-4 text-xs text-grid-muted">
+      <ul className="flex flex-col gap-1.5 border-b border-border px-6 py-4 text-xs text-muted-foreground">
         <li>{t("site.browsers.noteConnect")}</li>
         <li>{t("site.browsers.notePrivate")}</li>
         <li>{t("site.browsers.noteDesktop")}</li>
@@ -246,7 +237,7 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("site.browsers.add")}
         </DialogTrigger>
@@ -257,12 +248,12 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
             <DialogTitle>{t("site.browsers.add")}</DialogTitle>
             <DialogDescription>{kind === "desktop" ? t("site.browsers.dialogHintDesktop") : t("site.browsers.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="br-kind">{t("site.browsers.kind")}</FieldLabel>
               <Select value={kind} onValueChange={(v) => v && onKindChange(v as "headless" | "desktop")}>
                 <SelectTrigger id="br-kind">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => (v === "desktop" ? t("site.browsers.kindDesktop") : t("site.browsers.kindHeadless"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="headless">{t("site.browsers.kindHeadless")}</SelectItem>
@@ -320,13 +311,13 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
                 <FieldDescription>{t("site.browsers.hostnameHint")}</FieldDescription>
               </Field>
             )}
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -360,7 +351,7 @@ export function OpenBrowser({ path, browser }: { path: string; browser: Browser 
   }
 
   return (
-    <Button size="sm" variant="outline" disabled={!ready || busy} onClick={open}>
+    <Button size="sm" variant="secondary" disabled={!ready || busy} onClick={open}>
       <ExternalLinkIcon />
       {busy ? t("common.working") : t("site.browsers.open")}
     </Button>
@@ -398,7 +389,7 @@ export function RemoveBrowser({ path, browser, onRemoved, ...controlled }: { pat
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DialogTrigger render={<Button size="sm" variant="secondary" />}>
           <Trash2Icon />
           {t("site.storage.remove")}
         </DialogTrigger>
@@ -415,10 +406,10 @@ export function RemoveBrowser({ path, browser, onRemoved, ...controlled }: { pat
           </Field>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="destructive" disabled={busy || typed !== name}>
+            <Button type="submit" variant="danger" disabled={busy || typed !== name}>
               {busy ? t("common.working") : t("site.storage.remove")}
             </Button>
           </DialogFooter>

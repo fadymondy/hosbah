@@ -1,8 +1,8 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { HistoryIcon, PencilIcon, PlayIcon, PlusIcon, TerminalSquareIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
@@ -11,17 +11,17 @@ import { OperationLog } from "@/components/op-log"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { OpStatusBadge } from "@/components/server-status"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import type { BuiltinScript, Script, ScriptRun, ScriptRunServer } from "@/lib/scripts"
@@ -99,16 +99,7 @@ export function TeamScripts() {
         {scripts === null ? (
           <LoadingRows rows={3} />
         ) : scripts.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <TerminalSquareIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("scripts.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("scripts.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {manage ? <ScriptDialog path={base} onSaved={load} /> : null}
-          </Empty>
+          <EmptyState className="border-b" icon={TerminalSquareIcon} title={t("scripts.emptyTitle")} description={t("scripts.emptyHint")} actions={<>{manage ? <ScriptDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("scripts.search")} shown={shown.length} total={scripts.length} />
@@ -130,7 +121,7 @@ export function TeamScripts() {
                           {s.name}
                         </span>
                         {s.description ? (
-                          <div dir="auto" className="max-w-72 truncate text-xs text-grid-muted">
+                          <div dir="auto" className="max-w-72 truncate text-xs text-muted-foreground">
                             {s.description}
                           </div>
                         ) : null}
@@ -138,13 +129,13 @@ export function TeamScripts() {
                       <TableCell>
                         <Badge variant="outline">{s.run_as}</Badge>
                       </TableCell>
-                      <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+                      <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
                         {s.timeout_seconds}s
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
                           {manage ? (
-                            <Button size="sm" onClick={() => setRunTarget({ scriptId: s.id })}>
+                            <Button variant="primary" size="sm" onClick={() => setRunTarget({ scriptId: s.id })}>
                               <PlayIcon />
                               {t("scripts.run")}
                             </Button>
@@ -167,16 +158,16 @@ export function TeamScripts() {
         {builtins === null ? (
           <LoadingRows rows={3} />
         ) : (
-          <div className="grid gap-px border-b border-line bg-line sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-3">
             {builtins.map((b) => (
-              <div key={b.id} className="flex flex-col gap-2 bg-grid-bg p-4">
+              <div key={b.id} className="flex flex-col gap-2 bg-background p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-grid-fg">{b.name}</p>
-                    <p className="text-xs text-grid-muted">{b.description}</p>
+                    <p className="font-medium text-foreground">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">{b.description}</p>
                   </div>
                   {manage ? (
-                    <Button size="sm" variant="outline" onClick={() => setRunTarget({ builtinName: b.id })}>
+                    <Button size="sm" variant="secondary" onClick={() => setRunTarget({ builtinName: b.id })}>
                       <PlayIcon />
                       {t("scripts.run")}
                     </Button>
@@ -193,7 +184,7 @@ export function TeamScripts() {
         {runs === null ? (
           <LoadingRows rows={3} />
         ) : runs.length === 0 ? (
-          <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("scripts.runs.empty")}</p>
+          <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("scripts.runs.empty")}</p>
         ) : (
           <TableBand>
             <Table>
@@ -269,12 +260,12 @@ function RunRow({
       <TableCell>
         <OpStatusBadge status={run.status as OperationStatus} />
       </TableCell>
-      <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+      <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
         {fmt(run.created_at)}
       </TableCell>
       <TableCell>
         <div className="flex justify-end">
-          <Button size="sm" variant="outline" disabled={busy || !canRead} onClick={() => void open()}>
+          <Button size="sm" variant="secondary" disabled={busy || !canRead} onClick={() => void open()}>
             <HistoryIcon />
             {t("scripts.runs.view")}
           </Button>
@@ -301,19 +292,19 @@ function RunView({ team, run, rows, onClose }: { team: string; run: ScriptRun; r
           <DialogDescription>{t("scripts.runs.viewHint")}</DialogDescription>
         </DialogHeader>
         {rows.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("scripts.runs.empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("scripts.runs.empty")}</p>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
             <TabsList>
               {rows.map((rs) => (
-                <TabsTrigger key={rs.server_id} value={rs.server_id} dir="ltr">
+                <TabsTab key={rs.server_id} value={rs.server_id} dir="ltr">
                   {rs.server_id.slice(0, 8)}
                   <OpStatusBadge status={rs.status as OperationStatus} />
-                </TabsTrigger>
+                </TabsTab>
               ))}
             </TabsList>
             {rows.map((rs) => (
-              <TabsContent key={rs.server_id} value={rs.server_id}>
+              <TabsPanel key={rs.server_id} value={rs.server_id}>
                 {rs.operation_id ? (
                   <OperationLog team={team} serverId={rs.server_id} op={runServerAsOperation(rs)} />
                 ) : (
@@ -321,7 +312,7 @@ function RunView({ team, run, rows, onClose }: { team: string; run: ScriptRun; r
                     {rs.output || t("scripts.runs.noOutput")}
                   </pre>
                 )}
-              </TabsContent>
+              </TabsPanel>
             ))}
           </Tabs>
         )}
@@ -413,7 +404,7 @@ function ScriptDialog({ path, script, onSaved, ...controlled }: { path: string; 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={script ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={script ? "secondary" : "primary"} />}>
           {script ? <PencilIcon /> : <PlusIcon />}
           {script ? t("lists.edit") : t("scripts.add")}
         </DialogTrigger>
@@ -424,7 +415,7 @@ function ScriptDialog({ path, script, onSaved, ...controlled }: { path: string; 
             <DialogTitle>{script ? script.name : t("scripts.add")}</DialogTitle>
             <DialogDescription>{t("scripts.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="scr-name">{t("scripts.name")}</FieldLabel>
               <Input id="scr-name" dir="auto" required maxLength={128} value={name} onChange={(e) => setName(e.target.value)} />
@@ -464,13 +455,13 @@ function ScriptDialog({ path, script, onSaved, ...controlled }: { path: string; 
                 <Input id="scr-to" dir="ltr" type="number" min={1} max={3600} required value={timeout} onChange={(e) => setTimeoutS(e.target.value)} />
               </Field>
             </div>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !body.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || !body.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -550,11 +541,11 @@ function RunDialog({
             <DialogTitle>{t("scripts.runDialog.title", { name: title })}</DialogTitle>
             <DialogDescription>{t("scripts.runDialog.hint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel>{t("scripts.runDialog.servers")}</FieldLabel>
               {servers.length === 0 ? (
-                <p className="text-sm text-grid-muted">{t("scripts.runDialog.noServers")}</p>
+                <p className="text-sm text-muted-foreground">{t("scripts.runDialog.noServers")}</p>
               ) : (
                 <div className="flex max-h-48 flex-col gap-2 overflow-y-auto border border-input p-3">
                   {servers.map((s) => (
@@ -592,13 +583,13 @@ function RunDialog({
                 )}
               </Field>
             ))}
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || servers.length === 0}>
+            <Button variant="primary" type="submit" disabled={busy || servers.length === 0}>
               {busy ? t("common.working") : t("scripts.run")}
             </Button>
           </DialogFooter>

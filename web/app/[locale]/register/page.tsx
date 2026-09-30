@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Field, FieldDescription, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, type FormEvent } from "react"
@@ -7,9 +8,9 @@ import { useState, type FormEvent } from "react"
 import { AuthFrame } from "@/components/auth-frame"
 import { OAuthButtons } from "@/components/auth/oauth"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 import { auth, authMessage, MIN_PASSWORD, nextStep } from "@/lib/auth"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { safeNext } from "@/lib/next-param"
@@ -76,14 +77,14 @@ export default function RegisterPage() {
       }
     >
       {blocked ? (
-        <div role="status" className="flex flex-col gap-2 border border-line bg-grid-card px-5 py-4">
-          <p className="font-medium text-grid-fg">{t(`auth.register.${blocked}Title`)}</p>
-          <p className="text-sm text-grid-muted">{t(`auth.register.${blocked}Body`)}</p>
+        <div role="status" className="flex flex-col gap-2 border border-border bg-card px-5 py-4">
+          <p className="font-medium text-foreground">{t(`auth.register.${blocked}Title`)}</p>
+          <p className="text-sm text-muted-foreground">{t(`auth.register.${blocked}Body`)}</p>
           {settings?.support_email ? (
             <a
               href={`mailto:${settings.support_email}`}
               dir="ltr"
-              className="text-sm text-grid-brand underline-offset-4 hover:underline"
+              className="text-sm text-nq-brand underline-offset-4 hover:underline"
             >
               {settings.support_email}
             </a>
@@ -91,7 +92,7 @@ export default function RegisterPage() {
         </div>
       ) : (
         <form onSubmit={onSubmit}>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <FormError message={error} />
             <OAuthButtons next={next} invitation={invitation} />
             <Field>
@@ -132,11 +133,11 @@ export default function RegisterPage() {
               />
             </Field>
             <Field>
-              <Button type="submit" disabled={busy}>
+              <Button variant="primary" type="submit" disabled={busy}>
                 {busy ? t("common.working") : t("auth.register.submit")}
               </Button>
             </Field>
-          </FieldGroup>
+          </div>
         </form>
       )}
     </AuthFrame>

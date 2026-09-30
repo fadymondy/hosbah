@@ -1,15 +1,15 @@
 "use client"
 
+import { Badge, Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckIcon, CopyIcon, ExternalLinkIcon, GithubIcon, LogOutIcon, RefreshCwIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useEventStream, type LogLine, type Operation } from "@/lib/servers"
@@ -150,7 +150,7 @@ export function ServerGitHub({ team, serverId, manage }: { team: string; serverI
         action={
           <span className="flex items-center gap-2">
             {status ? (
-              <Badge variant={connected ? "default" : "outline"}>
+              <Badge variant={connected ? "brand" : "outline"}>
                 {connected ? t("github.statusConnected") : t("github.statusNotConnected")}
               </Badge>
             ) : null}
@@ -170,7 +170,7 @@ export function ServerGitHub({ team, serverId, manage }: { team: string; serverI
               {status?.user ? `@${status.user}` : "—"}
             </span>
             {status?.version ? (
-              <span dir="ltr" className="font-mono text-xs text-grid-muted">
+              <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                 gh {status.version}
               </span>
             ) : null}
@@ -191,9 +191,9 @@ export function ServerGitHub({ team, serverId, manage }: { team: string; serverI
           {waiting && (device.code || device.url) ? (
             <DeviceCode code={device.code} url={device.url} />
           ) : waiting ? (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("github.starting")}</p>
+            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("github.starting")}</p>
           ) : finished && finished !== "ok" ? (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-danger">{t("github.failed")}</p>
+            <p className="border-b border-border px-6 py-4 text-sm text-nq-danger-text">{t("github.failed")}</p>
           ) : null}
 
           {!waiting ? (
@@ -210,18 +210,18 @@ export function ServerGitHub({ team, serverId, manage }: { team: string; serverI
                     onChange={(e) => setToken(e.target.value)}
                   />
                 </SettingsRow>
-                <div className="flex flex-wrap justify-end gap-2 border-b border-line px-6 py-4">
+                <div className="flex flex-wrap justify-end gap-2 border-b border-border px-6 py-4">
                   <Button type="button" variant="ghost" onClick={() => setTokenMode(false)}>
                     {t("github.useBrowser")}
                   </Button>
-                  <Button type="submit" disabled={busy || token.trim().length < 20}>
+                  <Button variant="primary" type="submit" disabled={busy || token.trim().length < 20}>
                     {busy ? t("common.working") : t("github.connectToken")}
                   </Button>
                 </div>
               </form>
             ) : (
-              <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-4">
-                <Button disabled={busy} onClick={() => void connect("device")}>
+              <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-4">
+                <Button variant="primary" disabled={busy} onClick={() => void connect("device")}>
                   <GithubIcon />
                   {busy ? t("common.working") : t("github.connect")}
                 </Button>
@@ -233,7 +233,7 @@ export function ServerGitHub({ team, serverId, manage }: { team: string; serverI
           ) : null}
         </>
       ) : (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("github.askAdmin")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("github.askAdmin")}</p>
       )}
     </section>
   )
@@ -245,15 +245,15 @@ function DeviceCode({ code, url }: { code?: string; url?: string }) {
   const [copied, setCopied] = useState(false)
   const link = url ?? "https://github.com/login/device"
   return (
-    <div className="flex flex-col gap-4 border-b border-line bg-grid-card px-6 py-5" role="status" aria-live="polite">
-      <p className="text-sm text-grid-fg">{t("github.deviceIntro")}</p>
+    <div className="flex flex-col gap-4 border-b border-border bg-card px-6 py-5" role="status" aria-live="polite">
+      <p className="text-sm text-foreground">{t("github.deviceIntro")}</p>
       <div className="flex flex-wrap items-center gap-3">
-        <code dir="ltr" className="border border-line bg-background px-4 py-2 font-mono text-2xl tracking-[0.3em] text-grid-fg">
+        <code dir="ltr" className="border border-border bg-background px-4 py-2 font-mono text-2xl tracking-[0.3em] text-foreground">
           {code ?? "····-····"}
         </code>
         {code ? (
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => {
               void navigator.clipboard.writeText(code)
               setCopied(true)
@@ -264,12 +264,12 @@ function DeviceCode({ code, url }: { code?: string; url?: string }) {
             {copied ? t("github.copied") : t("github.copy")}
           </Button>
         ) : null}
-        <Button nativeButton={false} render={<a href={link} target="_blank" rel="noreferrer" />}>
+        <Button variant="primary" nativeButton={false} render={<a href={link} target="_blank" rel="noreferrer" />}>
           <ExternalLinkIcon />
           {t("github.openGitHub")}
         </Button>
       </div>
-      <p className="text-xs text-grid-muted">{t("github.deviceWaiting")}</p>
+      <p className="text-xs text-muted-foreground">{t("github.deviceWaiting")}</p>
     </div>
   )
 }

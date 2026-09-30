@@ -1,12 +1,13 @@
 "use client"
 
+import { Button, EmptyState } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { ChartNoAxesColumnIcon } from "lucide-react"
 
 import { MetricChart, type ChartPoint } from "@/components/servers/metrics-chart"
 import { ErrorBand, LoadingRows } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
 import { apiFetch } from "@/lib/api"
 import { humanBytes } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
@@ -74,17 +75,17 @@ export function DbMetricsHistory({ teamSlug, serviceRef, kind }: { teamSlug: str
   const line = (values: (i: number) => number | null): ChartPoint[] => points.map((_, i) => ({ at: at(i), value: values(i) }))
 
   return (
-    <section aria-labelledby="db-metrics-h" className="border-b border-line">
+    <section aria-labelledby="db-metrics-h" className="border-b border-border">
       <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3">
         <div>
-          <h3 id="db-metrics-h" className="text-sm font-medium text-grid-fg">
+          <h3 id="db-metrics-h" className="text-sm font-medium text-foreground">
             {t("databases.metrics.title")}
           </h3>
-          <p className="text-xs text-grid-muted">{t("databases.metrics.hint")}</p>
+          <p className="text-xs text-muted-foreground">{t("databases.metrics.hint")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("databases.metrics.range")}>
           {RANGES.map((r) => (
-            <Button key={r} size="sm" variant={range === r ? "default" : "outline"} onClick={() => setRange(r)}>
+            <Button key={r} size="sm" variant={range === r ? "primary" : "secondary"} onClick={() => setRange(r)}>
               {t(`databases.metrics.ranges.${r}`)}
             </Button>
           ))}
@@ -94,29 +95,21 @@ export function DbMetricsHistory({ teamSlug, serviceRef, kind }: { teamSlug: str
       {series === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ChartNoAxesColumnIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("databases.metrics.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("databases.metrics.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState icon={ChartNoAxesColumnIcon} title={t("databases.metrics.emptyTitle")} description={t("databases.metrics.emptyHint")} />
       ) : (
-        <div className="grid grid-cols-1 gap-px border-t border-line bg-line lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-px border-t border-border bg-border lg:grid-cols-2">
           <ChartCard title={t("databases.metrics.connections")}>
             <MetricChart
               ariaLabel={t("databases.metrics.connections")}
               max={maxConn}
-              series={[{ key: "conn", label: t("databases.metrics.connections"), color: "var(--grid-brand)", points: line((i) => points[i].connections) }]}
+              series={[{ key: "conn", label: t("databases.metrics.connections"), color: "var(--nq-brand)", points: line((i) => points[i].connections) }]}
               formatTime={fmtTime}
             />
           </ChartCard>
           <ChartCard title={kind === "mysql" ? t("databases.metrics.rateMysql") : t("databases.metrics.rate")}>
             <MetricChart
               ariaLabel={kind === "mysql" ? t("databases.metrics.rateMysql") : t("databases.metrics.rate")}
-              series={[{ key: "rate", label: "rate", color: "var(--grid-brand-accent, #c9a227)", points: line((i) => points[i].rate_per_sec) }]}
+              series={[{ key: "rate", label: "rate", color: "var(--nq-accent)", points: line((i) => points[i].rate_per_sec) }]}
               formatValue={(v) => `${v.toFixed(2)}/s`}
               formatTime={fmtTime}
             />
@@ -126,14 +119,14 @@ export function DbMetricsHistory({ teamSlug, serviceRef, kind }: { teamSlug: str
               ariaLabel={t("databases.metrics.cacheHit")}
               max={100}
               unit="%"
-              series={[{ key: "cache", label: t("databases.metrics.cacheHit"), color: "var(--grid-ok, #3fb950)", points: line((i) => points[i].cache_hit_ratio) }]}
+              series={[{ key: "cache", label: t("databases.metrics.cacheHit"), color: "var(--nq-success)", points: line((i) => points[i].cache_hit_ratio) }]}
               formatTime={fmtTime}
             />
           </ChartCard>
           <ChartCard title={t("databases.metrics.size")}>
             <MetricChart
               ariaLabel={t("databases.metrics.size")}
-              series={[{ key: "size", label: t("databases.metrics.size"), color: "var(--grid-brand)", points: line((i) => points[i].size_bytes) }]}
+              series={[{ key: "size", label: t("databases.metrics.size"), color: "var(--nq-brand)", points: line((i) => points[i].size_bytes) }]}
               formatValue={(v) => humanBytes(v)}
               formatTime={fmtTime}
             />
@@ -142,7 +135,7 @@ export function DbMetricsHistory({ teamSlug, serviceRef, kind }: { teamSlug: str
             <MetricChart
               ariaLabel={t("databases.metrics.slowQueries")}
               series={[
-                { key: "slow", label: t("databases.metrics.slowQueries"), color: "var(--grid-danger, #f85149)", points: line((i) => points[i].slow_query_count) },
+                { key: "slow", label: t("databases.metrics.slowQueries"), color: "var(--nq-danger)", points: line((i) => points[i].slow_query_count) },
               ]}
               formatTime={fmtTime}
             />
@@ -155,8 +148,8 @@ export function DbMetricsHistory({ teamSlug, serviceRef, kind }: { teamSlug: str
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 bg-grid-bg px-6 py-4">
-      <h4 className="text-sm font-medium text-grid-fg">{title}</h4>
+    <div className="flex min-w-0 flex-col gap-3 bg-background px-6 py-4">
+      <h4 className="text-sm font-medium text-foreground">{title}</h4>
       {children}
     </div>
   )

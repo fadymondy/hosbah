@@ -1,15 +1,15 @@
 "use client"
 
+import { Badge, buttonVariants, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ExternalLinkIcon, InfoIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ProviderMark } from "@/components/auth/oauth"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { buttonVariants } from "@/components/ui/button"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -74,7 +74,7 @@ export function GitHubAppSection({ team }: { team: string }) {
         className="mt-6 border-t"
         action={
           status?.configured && status.can_manage ? (
-            <a href={installHref} className={cn(buttonVariants({ variant: status.installations.length ? "outline" : "default" }), "gap-2")}>
+            <a href={installHref} className={cn(buttonVariants({ variant: status.installations.length ? "secondary" : "primary" }), "gap-2")}>
               <ProviderMark id="github" />
               {status.installations.length ? t("github.app.addAccount") : t("github.app.install")}
             </a>
@@ -86,25 +86,25 @@ export function GitHubAppSection({ team }: { team: string }) {
       {status === null ? (
         error ? null : <LoadingRows rows={1} />
       ) : !status.configured ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("github.app.notConfigured")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("github.app.notConfigured")}</p>
       ) : status.installations.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">
           {t("github.app.none")} {status.can_manage ? null : t("github.app.askAdmin")}
         </p>
       ) : (
-        <ul className="divide-y divide-line border-b border-line" data-testid="github-installations">
+        <ul className="divide-y divide-border border-b border-border" data-testid="github-installations">
           {status.installations.map((i) => (
             <li key={i.id} className="flex flex-wrap items-center gap-3 px-6 py-4">
-              <span className="flex size-8 shrink-0 items-center justify-center border border-line bg-background text-grid-fg">
+              <span className="flex size-8 shrink-0 items-center justify-center border border-border bg-background text-foreground">
                 <ProviderMark id="github" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-grid-fg">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                   <span dir="ltr">{i.account_login}</span>
                   <Badge variant="outline">{t(`github.app.types.${i.account_type}`, undefined, i.account_type)}</Badge>
-                  {i.suspended_at ? <Badge variant="destructive">{t("github.app.suspended")}</Badge> : null}
+                  {i.suspended_at ? <Badge variant="danger">{t("github.app.suspended")}</Badge> : null}
                 </p>
-                <p className="text-xs text-grid-muted">
+                <p className="text-xs text-muted-foreground">
                   {i.repository_selection === "all" ? t("github.app.allRepos") : t("github.app.selectedRepos")}
                 </p>
               </div>

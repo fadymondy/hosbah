@@ -1,12 +1,13 @@
 "use client"
 
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { GithubIcon, LockIcon, SearchIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -84,10 +85,10 @@ export function RepoPicker({
 
   if (!connected) {
     return (
-      <p className="flex flex-wrap items-center gap-2 border border-dashed border-line px-3 py-2 text-xs text-grid-muted">
+      <p className="flex flex-wrap items-center gap-2 border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
         <GithubIcon className="size-3.5" />
         {t("github.connectFirst")}
-        <Link href={`${base}/servers/${serverId}/github`} className="text-grid-brand underline-offset-4 hover:underline">
+        <Link href={`${base}/servers/${serverId}/github`} className="text-nq-brand underline-offset-4 hover:underline">
           {t("github.openServer")}
         </Link>
       </p>
@@ -97,7 +98,7 @@ export function RepoPicker({
   return (
     <div className="flex flex-col gap-2">
       <div className="relative">
-        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
+        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
           value={q}
@@ -107,16 +108,16 @@ export function RepoPicker({
           className="ps-8"
         />
       </div>
-      {error ? <p className="text-xs text-grid-danger">{error}</p> : null}
-      <div className="max-h-64 overflow-y-auto border border-line" role="listbox" aria-label={t("github.pickRepo")}>
+      {error ? <p className="text-xs text-nq-danger-text">{error}</p> : null}
+      <div className="max-h-64 overflow-y-auto border border-border" role="listbox" aria-label={t("github.pickRepo")}>
         {repos === null ? (
           <div className="flex flex-col gap-2 p-3">
-            <span className="text-xs text-grid-muted">{t("github.loadingRepos")}</span>
+            <span className="text-xs text-muted-foreground">{t("github.loadingRepos")}</span>
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-5 w-1/2" />
           </div>
         ) : list.length === 0 ? (
-          <p className="p-3 text-sm text-grid-muted">{t("github.noRepos")}</p>
+          <p className="p-3 text-sm text-muted-foreground">{t("github.noRepos")}</p>
         ) : (
           list.map((r) => {
             const on = picked?.name_with_owner === r.name_with_owner
@@ -129,16 +130,16 @@ export function RepoPicker({
                 onClick={() => onPick(r.url, r.default_branch ?? null)}
                 className={
                   on
-                    ? "flex w-full items-center gap-2 border-b border-line bg-grid-soft px-3 py-2 text-start text-sm last:border-b-0"
-                    : "flex w-full items-center gap-2 border-b border-line px-3 py-2 text-start text-sm last:border-b-0 hover:bg-grid-soft"
+                    ? "flex w-full items-center gap-2 border-b border-border bg-secondary px-3 py-2 text-start text-sm last:border-b-0"
+                    : "flex w-full items-center gap-2 border-b border-border px-3 py-2 text-start text-sm last:border-b-0 hover:bg-secondary"
                 }
               >
-                <GithubIcon className="size-3.5 shrink-0 text-grid-muted" />
-                <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-grid-fg">
+                <GithubIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-foreground">
                   {r.name_with_owner}
                 </span>
                 {r.is_private ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-grid-muted">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                     <LockIcon className="size-3" />
                     {t("github.private")}
                   </span>
@@ -149,20 +150,20 @@ export function RepoPicker({
         )}
       </div>
       {picked && branches?.length ? (
-        <label className="flex items-center gap-2 text-xs text-grid-muted">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           {t("github.branch")}
-          <select
-            value={branch}
-            onChange={(e) => onBranch(e.target.value)}
-            dir="ltr"
-            className="h-8 border border-line bg-background px-2 font-mono text-sm text-grid-fg"
-          >
-            {branches.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <Select value={branch} onValueChange={(v) => v && onBranch(v as string)}>
+            <SelectTrigger dir="ltr" className="h-8 w-auto gap-2 font-mono text-sm">
+              <SelectValue>{() => branch}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {branches.map((b) => (
+                <SelectItem key={b} value={b}>
+                  <span dir="ltr">{b}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       ) : null}
     </div>

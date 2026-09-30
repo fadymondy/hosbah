@@ -1,12 +1,13 @@
 "use client"
 
+import { Button, EmptyState } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { ChartNoAxesColumnIcon } from "lucide-react"
 
 import { MetricChart, type ChartPoint } from "@/components/servers/metrics-chart"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { formatBytes } from "@/lib/servers"
@@ -84,7 +85,7 @@ export function ServerMetrics({ path }: { path: string }) {
         action={
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("servers.metrics.range")}>
             {RANGES.map((r) => (
-              <Button key={r} size="sm" variant={range === r ? "default" : "outline"} onClick={() => setRange(r)}>
+              <Button key={r} size="sm" variant={range === r ? "primary" : "secondary"} onClick={() => setRange(r)}>
                 {t(`servers.metrics.ranges.${r}`)}
               </Button>
             ))}
@@ -95,23 +96,15 @@ export function ServerMetrics({ path }: { path: string }) {
       {series === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ChartNoAxesColumnIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("servers.metrics.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("servers.metrics.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ChartNoAxesColumnIcon} title={t("servers.metrics.emptyTitle")} description={t("servers.metrics.emptyHint")} />
       ) : (
-        <div className="grid grid-cols-1 gap-px border-b border-line bg-line lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-px border-b border-border bg-border lg:grid-cols-2">
           <ChartCard title={t("servers.cpu")}>
             <MetricChart
               ariaLabel={t("servers.cpu")}
               max={100}
               unit="%"
-              series={[{ key: "cpu", label: t("servers.cpu"), color: "var(--grid-brand)", points: line((i) => points[i].cpu) }]}
+              series={[{ key: "cpu", label: t("servers.cpu"), color: "var(--nq-brand)", points: line((i) => points[i].cpu) }]}
               formatTime={fmtTime}
             />
           </ChartCard>
@@ -124,7 +117,7 @@ export function ServerMetrics({ path }: { path: string }) {
                 {
                   key: "mem",
                   label: t("servers.memory"),
-                  color: "var(--grid-brand-accent, #c9a227)",
+                  color: "var(--nq-accent)",
                   points: line((i) => pct(points[i].mem_used, points[i].mem_total)),
                 },
               ]}
@@ -140,7 +133,7 @@ export function ServerMetrics({ path }: { path: string }) {
                 {
                   key: "disk",
                   label: t("servers.disk"),
-                  color: "var(--grid-ok, #3fb950)",
+                  color: "var(--nq-success)",
                   points: line((i) => pct(points[i].disk_used, points[i].disk_total)),
                 },
               ]}
@@ -150,7 +143,7 @@ export function ServerMetrics({ path }: { path: string }) {
           <ChartCard title={t("servers.load")}>
             <MetricChart
               ariaLabel={t("servers.load")}
-              series={[{ key: "load1", label: t("servers.load"), color: "var(--grid-brand)", points: line((i) => points[i].load1) }]}
+              series={[{ key: "load1", label: t("servers.load"), color: "var(--nq-brand)", points: line((i) => points[i].load1) }]}
               formatValue={(v) => v.toFixed(2)}
               formatTime={fmtTime}
             />
@@ -159,8 +152,8 @@ export function ServerMetrics({ path }: { path: string }) {
             <MetricChart
               ariaLabel={t("servers.metrics.network")}
               series={[
-                { key: "rx", label: t("servers.metrics.rx"), color: "var(--grid-brand)", points: line((i) => points[i].net_rx) },
-                { key: "tx", label: t("servers.metrics.tx"), color: "var(--grid-brand-accent, #c9a227)", points: line((i) => points[i].net_tx) },
+                { key: "rx", label: t("servers.metrics.rx"), color: "var(--nq-brand)", points: line((i) => points[i].net_rx) },
+                { key: "tx", label: t("servers.metrics.tx"), color: "var(--nq-accent)", points: line((i) => points[i].net_tx) },
               ]}
               formatValue={(v) => `${formatBytes(v)}/s`}
               formatTime={fmtTime}
@@ -177,7 +170,7 @@ export function ServerMetrics({ path }: { path: string }) {
                       {
                         key: `gpu${gi}`,
                         label: t("servers.metrics.gpu", { n: gi }),
-                        color: "var(--grid-ok, #3fb950)",
+                        color: "var(--nq-success)",
                         points: line((i) => points[i].gpus?.find((g) => g.index === gi)?.util ?? null),
                       },
                     ]}
@@ -194,8 +187,8 @@ export function ServerMetrics({ path }: { path: string }) {
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 bg-grid-bg px-6 py-4">
-      <h3 className="text-sm font-medium text-grid-fg">{title}</h3>
+    <div className="flex min-w-0 flex-col gap-3 bg-background px-6 py-4">
+      <h3 className="text-sm font-medium text-foreground">{title}</h3>
       {children}
     </div>
   )

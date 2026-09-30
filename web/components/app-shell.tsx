@@ -1,13 +1,32 @@
 "use client"
 
+import {
+  AppHeader,
+  AppMain,
+  AppShell as NasaqAppShell,
+  Button,
+  DropdownMenuItem,
+  ProductMark,
+  SectionHeader,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarTrigger,
+  UserMenu,
+  WorkspaceSwitcher,
+} from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   BadgeCheckIcon,
   BellIcon,
-  CheckIcon,
-  ChevronsUpDownIcon,
   CircleDollarSignIcon,
   FingerprintIcon,
   GlobeIcon,
@@ -18,14 +37,9 @@ import {
   MailIcon,
   MegaphoneIcon,
   TriangleAlertIcon,
-  LogOutIcon,
   MailPlusIcon,
-  MenuIcon,
-  PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
   MessageSquareWarningIcon,
   PackageIcon,
-  PlusIcon,
   ScrollTextIcon,
   ServerIcon,
   SettingsIcon,
@@ -39,24 +53,13 @@ import {
   UsersIcon,
 } from "lucide-react"
 
-import { ThemedCubeMark } from "@/components/cube-mark"
 import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
 import { LanguageMenu, ThemeToggle } from "@/components/preferences"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { GroupLabel, NavLink } from "@/components/shell/nav-link"
+import { NavLink } from "@/components/shell/nav-link"
 import { ShellScopeProvider } from "@/components/shell/scope"
 import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+
 import { apiFetch } from "@/lib/api"
 import type { Notification } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -67,98 +70,51 @@ import { useOptionalTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 /**
- * The app shell, in the same structure as Mahaam: the grid's sticky sidebar (brand, then the
- * navigation) and a slim top bar (team switcher at the start; report, notifications, language,
- * theme and account at the end). Below md the navigation moves into a slide-out sheet.
- * `title` is kept for callers; the page header (PageBody) carries the visible title.
+ * The signed-in shell on Nasaq's AppShell: the sidebar (team switcher, then the navigation, then
+ * the account menu) and a slim header (sidebar trigger, brand and scope crumbs at the start;
+ * report, notifications, language and theme at the end). The rail, its width and Ctrl/Cmd+B are
+ * Nasaq's; below md the sidebar is its sheet. `title` is kept for callers; the page header
+ * (PageBody) carries the visible title.
  */
 export function AppShell({ children }: { children: ReactNode; title?: ReactNode }) {
-  const { t, locale } = useI18n()
-  const [navOpen, setNavOpen] = useState(false)
-  // The desktop sidebar can be minimised to its icons; the choice is kept on this device (Ctrl/⌘+B toggles).
-  const [collapsed, setCollapsed] = useState(false)
-  useEffect(() => {
-    setCollapsed(localStorage.getItem("hosbah.sidebar") === "min")
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-        e.preventDefault()
-        toggleNav()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  function toggleNav() {
-    setCollapsed((c) => {
-      localStorage.setItem("hosbah.sidebar", c ? "full" : "min")
-      return !c
-    })
-  }
-
+  const { t } = useI18n()
   return (
     <ShellScopeProvider>
-      <div className="grid-shell" data-collapsed={collapsed}>
-        <aside
-          data-collapsed={collapsed}
-          className="group/nav grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
-        >
-          <div className="flex h-14 shrink-0 items-center border-b border-line px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
-            <Brand />
+      <NasaqAppShell sidebar={<AppSidebar />} resizeLabel={t("shell.resizeNav")}>
+        <AppHeader>
+          <SidebarTrigger label={t("shell.navigation")} />
+          <Brand />
+          <ScopeCrumbs />
+          <div className="ms-auto flex items-center gap-1">
+            <ReportProblem />
+            <NotificationsBell />
+            <LanguageMenu />
+            <ThemeToggle />
           </div>
-          <ShellNav />
-        </aside>
-
-        <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-line bg-background px-3 sm:px-4">
-            <div className="flex min-w-0 items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="md:hidden"
-                aria-label={t("shell.navigation")}
-                onClick={() => setNavOpen(true)}
-              >
-                <MenuIcon />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="hidden md:inline-flex rtl:[&_svg]:-scale-x-100"
-                aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-                aria-pressed={collapsed}
-                title={`${collapsed ? t("shell.expandNav") : t("shell.collapseNav")} (Ctrl+B)`}
-                onClick={toggleNav}
-              >
-                {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-              </Button>
-              <TeamSwitcher />
-              <ScopeCrumbs />
-            </div>
-            <div className="flex items-center gap-1">
-              <ReportProblem />
-              <NotificationsBell />
-              <LanguageMenu />
-              <ThemeToggle />
-              <UserMenu />
-            </div>
-          </header>
-          <Announcement />
-          <main className="flex min-w-0 flex-1 flex-col">{children}</main>
-        </div>
+        </AppHeader>
+        <Announcement />
+        <AppMain className="p-0">{children}</AppMain>
         {/* Mahaam Feedback SDK, for signed-in people only: the shell only renders behind the session. */}
         <MahaamFeedback />
-
-        <Sheet open={navOpen} onOpenChange={setNavOpen}>
-          <SheetContent side={locale === "ar" ? "right" : "left"} className="w-72 gap-0 p-0">
-            <SheetTitle className="flex h-14 items-center border-b border-line px-4">
-              <Brand />
-            </SheetTitle>
-            <ShellNav onNavigate={() => setNavOpen(false)} />
-          </SheetContent>
-        </Sheet>
-      </div>
+      </NasaqAppShell>
     </ShellScopeProvider>
+  )
+}
+
+function AppSidebar() {
+  const { t } = useI18n()
+  return (
+    <Sidebar aria-label={t("shell.navigation")}>
+      <SidebarHeader>
+        <TeamSwitcher />
+      </SidebarHeader>
+      <SidebarContent>
+        <ShellNav />
+      </SidebarContent>
+      <SidebarFooter>
+        <AccountMenu />
+      </SidebarFooter>
+    </Sidebar>
   )
 }
 
@@ -172,14 +128,14 @@ function Announcement() {
     <div
       role="status"
       className={cn(
-        "flex items-start gap-3 border-b border-line px-6 py-3 text-sm",
-        warn ? "bg-[color-mix(in_oklab,var(--grid-warn)_14%,transparent)] text-grid-fg" : "bg-grid-card text-grid-fg",
+        "flex items-start gap-3 border-b border-border px-6 py-3 text-body-sm",
+        warn ? "bg-[color-mix(in_oklab,var(--nq-warning)_14%,transparent)] text-foreground" : "bg-card text-foreground",
       )}
     >
       {warn ? (
-        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-grid-warn" aria-hidden />
+        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-nq-warning-text" aria-hidden />
       ) : (
-        <MegaphoneIcon className="mt-0.5 size-4 shrink-0 text-grid-brand" aria-hidden />
+        <MegaphoneIcon className="mt-0.5 size-4 shrink-0 text-nq-brand" aria-hidden />
       )}
       <p dir="auto" className="whitespace-pre-line">
         {text}
@@ -191,9 +147,9 @@ function Announcement() {
 function Brand() {
   const { locale, t } = useI18n()
   return (
-    <Link href={`/${locale}`} className="flex items-center gap-2.5" aria-label={t("common.brand")}>
-      <ThemedCubeMark size={24} />
-      <span className="text-[15px] font-medium group-data-[collapsed=true]/nav:hidden">{t("common.brand")}</span>
+    <Link href={`/${locale}`} className="flex items-center gap-2" aria-label={t("common.brand")}>
+      <ProductMark brand="hosbah" size={22} title="" />
+      <span className="hidden text-label sm:inline">{t("common.brand")}</span>
     </Link>
   )
 }
@@ -201,127 +157,130 @@ function Brand() {
 /** The team's sections, then its settings, then the platform (admins only). Inside /admin the
  * sidebar is the platform's own: its sections, then its settings. Inside a server or a site the
  * sidebar is that level's own sections, with the way back up at its top. */
-function ShellNav({ onNavigate }: { onNavigate?: () => void }) {
+function ShellNav() {
   const { t, locale } = useI18n()
   const teamCtx = useOptionalTeam()
   const { me } = useSession()
   const pathname = usePathname() ?? ""
   const scope = useScope()
-  const L = (props: { href: string; icon: ReactNode; children: ReactNode; exact?: boolean }) => (
-    <NavLink {...props} onNavigate={onNavigate} />
-  )
+  const L = (props: { href: string; icon: ReactNode; children: string; exact?: boolean }) => <NavLink {...props} />
   const base = teamCtx ? `/${locale}/t/${teamCtx.team.slug}` : null
   const admin = `/${locale}/admin`
 
   if (me.user.platform_admin && (pathname === admin || pathname.startsWith(admin + "/"))) {
     return (
-      <nav className="flex flex-col py-3" aria-label={t("shell.navigation")}>
-        <L href={admin} exact icon={<LayoutGridIcon />}>
-          {t("admin.nav.overview")}
-        </L>
-        <L href={`${admin}/users`} icon={<UsersIcon />}>
-          {t("admin.nav.users")}
-        </L>
-        <L href={`${admin}/teams`} icon={<UsersRoundIcon />}>
-          {t("admin.nav.teams")}
-        </L>
-        <L href={`${admin}/servers`} icon={<ServerIcon />}>
-          {t("admin.nav.servers")}
-        </L>
-        <L href={`${admin}/operations`} icon={<WorkflowIcon />}>
-          {t("admin.nav.operations")}
-        </L>
-        <L href={`${admin}/audit`} icon={<ScrollTextIcon />}>
-          {t("admin.nav.audit")}
-        </L>
-        <GroupLabel>{t("nav.settings")}</GroupLabel>
-        <L href={`${admin}/settings`} icon={<SlidersHorizontalIcon />}>
-          {t("admin.nav.settings")}
-        </L>
-        <L href={`${admin}/tokens`} icon={<KeyRoundIcon />}>
-          {t("admin.nav.tokens")}
-        </L>
-      </nav>
+      <>
+        <SidebarGroup>
+          <L href={admin} exact icon={<LayoutGridIcon />}>
+            {t("admin.nav.overview")}
+          </L>
+          <L href={`${admin}/users`} icon={<UsersIcon />}>
+            {t("admin.nav.users")}
+          </L>
+          <L href={`${admin}/teams`} icon={<UsersRoundIcon />}>
+            {t("admin.nav.teams")}
+          </L>
+          <L href={`${admin}/servers`} icon={<ServerIcon />}>
+            {t("admin.nav.servers")}
+          </L>
+          <L href={`${admin}/operations`} icon={<WorkflowIcon />}>
+            {t("admin.nav.operations")}
+          </L>
+          <L href={`${admin}/audit`} icon={<ScrollTextIcon />}>
+            {t("admin.nav.audit")}
+          </L>
+        </SidebarGroup>
+        <SidebarGroup label={t("nav.settings")}>
+          <L href={`${admin}/settings`} icon={<SlidersHorizontalIcon />}>
+            {t("admin.nav.settings")}
+          </L>
+          <L href={`${admin}/tokens`} icon={<KeyRoundIcon />}>
+            {t("admin.nav.tokens")}
+          </L>
+        </SidebarGroup>
+      </>
     )
   }
 
-  if (scope.kind === "server") return <ServerNav serverId={scope.serverId} onNavigate={onNavigate} />
-  if (scope.kind === "site") return <SiteNav site={scope.site} onNavigate={onNavigate} />
+  if (scope.kind === "server") return <ServerNav serverId={scope.serverId} />
+  if (scope.kind === "site") return <SiteNav site={scope.site} />
 
   return (
-    <nav className="flex flex-col py-3" aria-label={t("shell.navigation")}>
+    <>
       {base ? (
         <>
-          <L href={base} exact icon={<LayoutGridIcon />}>
-            {t("nav.overview")}
-          </L>
-          <L href={`${base}/shared-services`} icon={<WorkflowIcon />}>
-            {t("nav.sharedServices")}
-          </L>
-          <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
-            {t("nav.scripts")}
-          </L>
-          <L href={`${base}/mail`} icon={<MailIcon />}>
-            {t("nav.mail")}
-          </L>
-          <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
-            {t("nav.templates")}
-          </L>
-          <L href={`${base}/products`} icon={<PackageIcon />}>
-            {t("nav.products")}
-          </L>
-          <L href={`${base}/members`} icon={<UsersIcon />}>
-            {t("nav.members")}
-          </L>
-          <L href={`${base}/invitations`} icon={<MailPlusIcon />}>
-            {t("nav.invitations")}
-          </L>
-          <L href={`${base}/approvals`} icon={<ShieldCheckIcon />}>
-            {t("nav.approvals")}
-          </L>
-          <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
-            {t("nav.costs")}
-          </L>
-          <L href={`${base}/audit`} icon={<ScrollTextIcon />}>
-            {t("nav.audit")}
-          </L>
-          <GroupLabel>{t("nav.settings")}</GroupLabel>
-          <L href={`${base}/tokens`} icon={<KeyRoundIcon />}>
-            {t("nav.tokens")}
-          </L>
-          <L href={`${base}/ssh-keys`} icon={<FingerprintIcon />}>
-            {t("nav.sshKeys")}
-          </L>
-          <L href={`${base}/certificates`} icon={<BadgeCheckIcon />}>
-            {t("nav.certificates")}
-          </L>
-          <L href={`${base}/dns`} icon={<GlobeIcon />}>
-            {t("nav.dns")}
-          </L>
-          {/* Credentials are owner/admin only (the API answers 403 to anyone else). */}
-          {teamCtx?.manage ? (
-            <L href={`${base}/credentials`} icon={<LockKeyholeIcon />}>
-              {t("nav.credentials")}
+          <SidebarGroup>
+            <L href={base} exact icon={<LayoutGridIcon />}>
+              {t("nav.overview")}
             </L>
-          ) : null}
-          <L href={`${base}/settings`} icon={<SettingsIcon />}>
-            {t("nav.teamSettings")}
-          </L>
+            <L href={`${base}/shared-services`} icon={<WorkflowIcon />}>
+              {t("nav.sharedServices")}
+            </L>
+            <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
+              {t("nav.scripts")}
+            </L>
+            <L href={`${base}/mail`} icon={<MailIcon />}>
+              {t("nav.mail")}
+            </L>
+            <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
+              {t("nav.templates")}
+            </L>
+            <L href={`${base}/products`} icon={<PackageIcon />}>
+              {t("nav.products")}
+            </L>
+            <L href={`${base}/members`} icon={<UsersIcon />}>
+              {t("nav.members")}
+            </L>
+            <L href={`${base}/invitations`} icon={<MailPlusIcon />}>
+              {t("nav.invitations")}
+            </L>
+            <L href={`${base}/approvals`} icon={<ShieldCheckIcon />}>
+              {t("nav.approvals")}
+            </L>
+            <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
+              {t("nav.costs")}
+            </L>
+            <L href={`${base}/audit`} icon={<ScrollTextIcon />}>
+              {t("nav.audit")}
+            </L>
+          </SidebarGroup>
+          <SidebarGroup label={t("nav.settings")}>
+            <L href={`${base}/tokens`} icon={<KeyRoundIcon />}>
+              {t("nav.tokens")}
+            </L>
+            <L href={`${base}/ssh-keys`} icon={<FingerprintIcon />}>
+              {t("nav.sshKeys")}
+            </L>
+            <L href={`${base}/certificates`} icon={<BadgeCheckIcon />}>
+              {t("nav.certificates")}
+            </L>
+            <L href={`${base}/dns`} icon={<GlobeIcon />}>
+              {t("nav.dns")}
+            </L>
+            {/* Credentials are owner/admin only (the API answers 403 to anyone else). */}
+            {teamCtx?.manage ? (
+              <L href={`${base}/credentials`} icon={<LockKeyholeIcon />}>
+                {t("nav.credentials")}
+              </L>
+            ) : null}
+            <L href={`${base}/settings`} icon={<SettingsIcon />}>
+              {t("nav.teamSettings")}
+            </L>
+          </SidebarGroup>
         </>
       ) : null}
       {me.user.platform_admin ? (
-        <>
-          <GroupLabel>{t("nav.platform")}</GroupLabel>
+        <SidebarGroup label={t("nav.platform")}>
           <L href={`/${locale}/admin`} icon={<ShieldIcon />}>
             {t("nav.admin")}
           </L>
-        </>
+        </SidebarGroup>
       ) : null}
-    </nav>
+    </>
   )
 }
 
-/** The current team in the top bar, as Mahaam's workspace switcher: initial tile, name, chevrons. */
+/** The current team, as Nasaq's workspace switcher (first in the sidebar header). */
 function TeamSwitcher() {
   const { t, locale } = useI18n()
   const { me } = useSession()
@@ -337,53 +296,24 @@ function TeamSwitcher() {
     return pathname.startsWith(prefix) ? `/${locale}/t/${slug}${pathname.slice(prefix.length)}` : `/${locale}/t/${slug}`
   }
 
-  const name = active?.name ?? t("shell.chooseTeam")
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            className="h-9 max-w-[9rem] justify-between gap-2 px-2.5 sm:max-w-[16rem]"
-            aria-label={t("shell.switchTeam")}
-          />
-        }
-      >
-        <span className="flex size-6 shrink-0 items-center justify-center border border-line bg-grid-card text-xs font-medium text-grid-brand">
-          {active ? name.slice(0, 1).toUpperCase() : <UsersRoundIcon className="size-3.5" />}
-        </span>
-        <span className="hidden truncate text-sm font-medium sm:inline">{name}</span>
-        <ChevronsUpDownIcon className="text-grid-muted" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-64">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t("shell.teams")}</DropdownMenuLabel>
-          {me.teams.map((team) => (
-            <DropdownMenuItem key={team.id} onClick={() => router.push(hrefFor(team.slug))}>
-              <span className="min-w-0 flex-1 truncate">{team.name}</span>
-              <span className="text-xs text-grid-muted">{t(`roles.${team.role}`)}</span>
-              {team.slug === active?.slug ? <CheckIcon aria-label={t("shell.current")} /> : null}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push(`/${locale}/onboarding`)}>
-          <PlusIcon />
-          {t("shell.createTeam")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <WorkspaceSwitcher
+      workspaces={me.teams.map((team) => ({ id: team.slug, name: team.name, description: t(`roles.${team.role}`) }))}
+      value={active?.slug ?? ""}
+      onValueChange={(slug) => router.push(hrefFor(slug))}
+      onCreate={() => router.push(`/${locale}/onboarding`)}
+      labels={{ heading: t("shell.teams"), create: t("shell.createTeam") }}
+    />
   )
 }
 
-function UserMenu() {
+/** The account menu at the foot of the sidebar: identity, account, report a problem, sign out. */
+function AccountMenu() {
   const { t, locale } = useI18n()
   const { me } = useSession()
   const router = useRouter()
-  const [signingOut, setSigningOut] = useState(false)
 
   async function signOut() {
-    setSigningOut(true)
     try {
       await apiFetch("/api/auth/logout", { method: "POST" })
     } catch {
@@ -393,34 +323,21 @@ function UserMenu() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t("shell.account")} />}>
+    <UserMenu
+      user={{ name: me.user.email.split("@")[0] || me.user.email, email: me.user.email }}
+      preferences={false}
+      onSignOut={signOut}
+      labels={{ signOut: t("shell.signOut") }}
+    >
+      <DropdownMenuItem onClick={() => router.push(`/${locale}/account`)}>
         <UserIcon />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>
-            <span className="grid-micro block">{t("shell.signedInAs")}</span>
-            <span dir="ltr" className="mt-1 block truncate text-sm text-grid-fg">
-              {me.user.email}
-            </span>
-          </DropdownMenuLabel>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push(`/${locale}/account`)}>
-          <UserIcon />
-          {t("shell.accountAnd2fa")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={requestReport}>
-          <MessageSquareWarningIcon />
-          {t("feedback.launcher")}
-        </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" disabled={signingOut} onClick={signOut}>
-          <LogOutIcon />
-          {t("shell.signOut")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        {t("shell.accountAnd2fa")}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={requestReport}>
+        <MessageSquareWarningIcon />
+        {t("feedback.launcher")}
+      </DropdownMenuItem>
+    </UserMenu>
   )
 }
 
@@ -514,56 +431,57 @@ function NotificationsBell() {
 
   return (
     <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (o) void markRead() }}>
-      <button
-        type="button"
-        className="relative inline-flex size-8 items-center justify-center hover:bg-grid-soft aria-expanded:bg-grid-soft"
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="relative"
         aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
         aria-expanded={sheetOpen}
         data-testid="notifications"
         data-unread={unread}
         onClick={() => setSheetOpen(true)}
       >
-        <BellIcon className="size-4" />
+        <BellIcon />
         {unread > 0 ? (
-          <span className="absolute -end-0.5 -top-0.5 min-w-4 bg-primary px-1 text-center font-mono text-[11px] leading-4 text-primary-foreground tabular-nums">
+          <span className="absolute -end-0.5 -top-0.5 min-w-4 rounded-full bg-nq-danger px-1 text-center text-[11px] leading-4 text-white tabular-nums">
             {unread > 99 ? "99+" : unread}
           </span>
         ) : null}
-      </button>
-      <SheetContent side={locale === "ar" ? "left" : "right"} className="w-80 gap-0 sm:max-w-sm">
-        <SheetHeader className="border-b border-line">
+      </Button>
+      <SheetContent side="end" className="w-80 gap-0 sm:max-w-sm">
+        <SheetHeader className="border-b border-border">
           <SheetTitle>{t("notifications.title")}</SheetTitle>
         </SheetHeader>
         {permission !== "unsupported" && permission !== "granted" ? (
-          <div className="border-b border-line px-4 py-2">
-            <Button variant="outline" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
+          <div className="border-b border-border px-4 py-2">
+            <Button variant="secondary" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
               {permission === "denied" ? t("notifications.desktopBlocked") : t("notifications.enableDesktop")}
             </Button>
           </div>
         ) : null}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {items.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-muted-foreground">{t("notifications.empty")}</p>
+            <p className="px-4 py-3 text-body-sm text-muted-foreground">{t("notifications.empty")}</p>
           ) : (
             items.slice(0, 50).map((n) => (
               <button
                 key={n.id}
                 type="button"
                 onClick={() => open(n)}
-                className="flex w-full flex-col items-start gap-0.5 border-b border-line px-4 py-3 text-start hover:bg-grid-soft"
+                className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-start hover:bg-secondary"
               >
                 <span className="flex w-full items-center gap-2">
-                  {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
+                  {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-nq-brand" /> : null}
                   <span className="truncate font-medium" dir="auto">
                     {n.title}
                   </span>
                 </span>
                 {n.body ? (
-                  <span className="line-clamp-2 text-xs text-muted-foreground" dir="auto">
+                  <span className="line-clamp-2 text-caption text-muted-foreground" dir="auto">
                     {n.body}
                   </span>
                 ) : null}
-                <span className="text-xs text-muted-foreground" dir="ltr">
+                <span className="text-caption text-muted-foreground" dir="ltr">
                   {fmt(n.created_at)}
                 </span>
               </button>
@@ -575,8 +493,8 @@ function NotificationsBell() {
   )
 }
 
-/** The page header, as Mahaam's SectionHeader: a micro label (the team by default), the title,
- * a description and the page's action at the far end. Content follows below a hairline. */
+/** The page header: an eyebrow (the team by default), then Nasaq's SectionHeader (the h1, its
+ * description and the page's actions at the inline end). Content follows below a hairline. */
 export function PageBody({
   title,
   description,
@@ -597,13 +515,14 @@ export function PageBody({
   const micro = eyebrow ?? teamCtx?.team.name
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-6 py-6">
-        <div className="min-w-0 space-y-1.5">
-          {micro ? <p className="grid-micro">{micro}</p> : null}
-          <h1 className="grid-title text-2xl">{title}</h1>
-          {description ? <p className="grid-body max-w-2xl text-sm">{description}</p> : null}
-        </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      <div className="flex flex-col gap-1.5 border-b border-border px-6 py-6">
+        {micro ? <p className="eyebrow">{micro}</p> : null}
+        <SectionHeader
+          as="h1"
+          title={title}
+          description={description}
+          action={actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : undefined}
+        />
       </div>
       {bleed ? children : <div className="flex flex-col gap-6 px-6 py-6">{children}</div>}
     </div>

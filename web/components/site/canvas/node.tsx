@@ -46,11 +46,11 @@ export const KIND_ICON: Record<NodeKind, LucideIcon> = {
 }
 
 export const STATUS_DOT: Record<Status, string> = {
-  ok: "bg-grid-ok",
-  warn: "bg-grid-warn",
-  error: "bg-grid-danger",
-  busy: "bg-grid-brand animate-pulse",
-  off: "bg-grid-muted",
+  ok: "bg-nq-success",
+  warn: "bg-nq-warning",
+  error: "bg-nq-danger",
+  busy: "bg-nq-brand animate-pulse",
+  off: "bg-nq-fg-muted",
 }
 
 /** What boxes and edges ask of the canvas around them. */
@@ -99,16 +99,16 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
     >
       {extra > 0 ? (
         <>
-          <div aria-hidden className="absolute inset-0 -z-10 translate-x-3 translate-y-3 rtl:-translate-x-3 border border-line bg-grid-card opacity-30" />
-          <div aria-hidden className="absolute inset-0 -z-10 translate-x-1.5 translate-y-1.5 rtl:-translate-x-1.5 border border-line bg-grid-card opacity-50" />
+          <div aria-hidden className="absolute inset-0 -z-10 translate-x-3 translate-y-3 rtl:-translate-x-3 border border-border bg-card opacity-30" />
+          <div aria-hidden className="absolute inset-0 -z-10 translate-x-1.5 translate-y-1.5 rtl:-translate-x-1.5 border border-border bg-card opacity-50" />
         </>
       ) : null}
       <div
         className={cn(
-          "relative w-[216px] border bg-grid-card px-3 py-2.5 text-start shadow-xs transition-colors hover:bg-grid-soft",
-          data.kind === "app" ? "border-[var(--grid-brand)]" : "border-line",
-          data.dimmed && "border-dashed bg-grid-bg opacity-80",
-          selected && "ring-2 ring-[var(--grid-brand)] ring-offset-1 ring-offset-[var(--grid-bg)]",
+          "relative w-[216px] border bg-card px-3 py-2.5 text-start shadow-xs transition-colors hover:bg-secondary",
+          data.kind === "app" ? "border-nq-brand" : "border-border",
+          data.dimmed && "border-dashed bg-background opacity-80",
+          selected && "ring-2 ring-nq-brand ring-offset-1 ring-offset-nq-bg",
         )}
       >
         <Handle
@@ -118,14 +118,14 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
           className={cn("hosbah-handle", manage && data.connect === "target" ? "hosbah-handle-open" : "hosbah-handle-hidden")}
         />
         <div className="flex min-w-0 items-center gap-2">
-          <Icon aria-hidden className="size-4 shrink-0 text-grid-brand" />
-          <span dir="auto" className="grid-micro min-w-0 flex-1 truncate">
+          <Icon aria-hidden className="size-4 shrink-0 text-nq-brand" />
+          <span dir="auto" className="eyebrow min-w-0 flex-1 truncate">
             {data.label}
           </span>
           <StatusDot status={data.status} label={data.statusLabel} />
         </div>
         <div className="mt-1 flex min-w-0 items-center gap-1.5">
-          <div dir="auto" className="min-w-0 flex-1 truncate text-sm font-medium text-grid-fg" title={data.title}>
+          <div dir="auto" className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={data.title}>
             {data.title}
           </div>
           {extra > 0 ? (
@@ -138,14 +138,14 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
                 e.stopPropagation()
                 setExpanded((v) => !v)
               }}
-              className="nodrag nopan shrink-0 rounded-full bg-grid-soft px-1.5 py-0.5 text-[11px] font-medium text-grid-muted hover:bg-grid-soft/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="nodrag nopan shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               +{extra}
             </button>
           ) : null}
         </div>
         {data.lines.map((l, n) => (
-          <div key={n} dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted" title={l}>
+          <div key={n} dir="ltr" className="truncate text-start font-mono text-xs text-muted-foreground" title={l}>
             {l}
           </div>
         ))}
@@ -159,7 +159,7 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
               e.stopPropagation()
               ctx!.remove(data.removal!)
             }}
-            className="nodrag nopan absolute -top-2.5 -right-2.5 hidden size-5 items-center justify-center border border-line bg-grid-card text-grid-muted group-hover:flex hover:text-grid-danger focus-visible:flex"
+            className="nodrag nopan absolute -top-2.5 -right-2.5 hidden size-5 items-center justify-center border border-border bg-card text-muted-foreground group-hover:flex hover:text-nq-danger-text focus-visible:flex"
           >
             <XIcon className="size-3" />
           </button>
@@ -179,16 +179,16 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
               e.stopPropagation()
               ctx!.openPalette()
             }}
-            className="nodrag nopan absolute top-1/2 -right-11 flex size-6 -translate-y-1/2 items-center justify-center border border-[var(--grid-brand)] bg-grid-card text-grid-brand hover:bg-grid-soft"
+            className="nodrag nopan absolute top-1/2 -right-11 flex size-6 -translate-y-1/2 items-center justify-center border border-nq-brand bg-card text-nq-brand hover:bg-secondary"
           >
             <PlusIcon className="size-3.5" />
           </button>
         ) : null}
       </div>
       {extra > 0 && expanded ? (
-        <div className="nodrag nopan absolute start-0 top-full z-50 mt-1 max-h-56 w-[216px] overflow-y-auto border border-line bg-grid-card shadow-lg">
+        <div className="nodrag nopan absolute start-0 top-full z-50 mt-1 max-h-56 w-[216px] overflow-y-auto border border-border bg-card shadow-lg">
           {stack.map((d) => (
-            <div key={d.id} className="flex items-center gap-2 border-b border-line px-3 py-2 last:border-b-0">
+            <div key={d.id} className="flex items-center gap-2 border-b border-border px-3 py-2 last:border-b-0">
               <StatusDot status={d.verified ? "ok" : "warn"} label={t(d.verified ? "apps.domains.verified" : "apps.domains.unverified")} />
               <span dir="ltr" className="min-w-0 flex-1 truncate font-mono text-xs" title={d.hostname}>
                 {d.hostname}
@@ -202,7 +202,7 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
                     e.stopPropagation()
                     ctx!.remove({ kind: "domain", domain: d })
                   }}
-                  className="shrink-0 text-grid-muted hover:text-grid-danger"
+                  className="shrink-0 text-muted-foreground hover:text-nq-danger-text"
                 >
                   <XIcon className="size-3" />
                 </button>
@@ -234,7 +234,7 @@ export function LinkLine({ id, sourceX, sourceY, targetX, targetY, sourcePositio
               ctx.remove(removal)
             }}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            className="nodrag nopan pointer-events-auto absolute flex size-6 items-center justify-center border border-line bg-grid-card text-grid-muted hover:text-grid-danger"
+            className="nodrag nopan pointer-events-auto absolute flex size-6 items-center justify-center border border-border bg-card text-muted-foreground hover:text-nq-danger-text"
           >
             <XIcon className="size-3.5" />
           </button>

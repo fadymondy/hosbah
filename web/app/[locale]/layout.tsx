@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { notFound } from "next/navigation"
 import { Suspense, type ReactNode } from "react"
 import { Inter } from "next/font/google"
+import { nasaqThemeScript } from "@fadymondy/nasaq/web"
 
 import "../globals.css"
 import { Providers } from "@/components/providers"
@@ -55,10 +56,14 @@ export default async function RootLayout({
     <html
       lang={locale}
       dir={dirFor(locale)}
-      data-brand="cloudy"
-      className={`grid-surface ${inter.variable}`}
+      data-brand="hosbah"
+      className={inter.variable}
       suppressHydrationWarning
     >
+      <head>
+        {/* Applies the saved theme before first paint, so a dark-mode reload does not flash light. */}
+        <script dangerouslySetInnerHTML={{ __html: nasaqThemeScript("system") }} />
+      </head>
       {/* Extensions (Grammarly and the like) stamp attributes on <body> before React hydrates. */}
       <body className="antialiased" suppressHydrationWarning>
         <Providers locale={locale} dict={locale === "ar" ? ar : en}>

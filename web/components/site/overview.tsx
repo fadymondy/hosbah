@@ -1,5 +1,6 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
@@ -13,7 +14,7 @@ import { AdoptDialog } from "@/components/site/adopt-dialog"
 import { SiteCanvas } from "@/components/site/canvas/canvas"
 import { useLoadedSite } from "@/components/site/context"
 import { Notice, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
+
 import { apiFetch } from "@/lib/api"
 import { isImported, runtimeLabel, shortSha } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -68,7 +69,7 @@ export function SiteOverview() {
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={connecting}
               onClick={async () => {
                 setConnecting(true)
@@ -97,7 +98,7 @@ export function SiteOverview() {
         <Notice title={t("connectGuest.connectedTitle")}>
           {t("connectGuest.connectedBody", { server: app.connected_server_name || app.connected_server_id })}
           <div className="pt-2">
-            <Button type="button" size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/servers/${app.connected_server_id}`} />}>
+            <Button type="button" size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/${app.connected_server_id}`} />}>
               {t("connectGuest.viewServer")}
             </Button>
           </div>
@@ -108,7 +109,7 @@ export function SiteOverview() {
           <Notice title={t("adopt.noticeTitle")}>
             {t("adopt.noticeApp")}
             <div className="pt-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => setAdoptOpen(true)}>
+              <Button type="button" size="sm" variant="secondary" onClick={() => setAdoptOpen(true)}>
                 {t("adopt.trigger")}
               </Button>
             </div>
@@ -147,14 +148,14 @@ export function SiteOverview() {
       ) : (
         <section aria-labelledby="details-h">
           <SectionTitle id="details-h" title={t("site.details")} />
-          <dl className="grid grid-cols-1 gap-px border-b border-line bg-line sm:grid-cols-2 xl:grid-cols-4" data-testid="app-summary">
+          <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-4" data-testid="app-summary">
             <Stat label={t("apps.liveRelease")}>
               {live ? (
                 <span dir="ltr" className="font-mono text-sm">
                   v{live.version} · {shortSha(live.commit_sha)}
                 </span>
               ) : (
-                <span className="text-sm text-grid-muted">{t("apps.noLive")}</span>
+                <span className="text-sm text-muted-foreground">{t("apps.noLive")}</span>
               )}
             </Stat>
             <Stat label={t("apps.latestDeploy")}>
@@ -164,12 +165,12 @@ export function SiteOverview() {
                     #{last.number}
                   </span>
                   <DeploymentStatusBadge status={last.status} />
-                  <span dir="ltr" className="text-xs text-grid-muted">
+                  <span dir="ltr" className="text-xs text-muted-foreground">
                     {fmt(last.created_at)}
                   </span>
                 </Link>
               ) : (
-                <span className="text-sm text-grid-muted">{t("apps.neverDeployed")}</span>
+                <span className="text-sm text-muted-foreground">{t("apps.neverDeployed")}</span>
               )}
             </Stat>
             <Stat label={t("apps.runtime")}>
@@ -191,8 +192,8 @@ export function SiteOverview() {
 
 function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro">{label}</dt>
+    <div className="flex min-w-0 flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
   )

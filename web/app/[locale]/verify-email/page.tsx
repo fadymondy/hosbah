@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Field, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type FormEvent } from "react"
@@ -7,9 +8,9 @@ import { useEffect, useState, type FormEvent } from "react"
 import { CodeInput, RESEND_SECONDS } from "@/components/auth/code-input"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 import { auth, authMessage, nextStep } from "@/lib/auth"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { safeNext } from "@/lib/next-param"
@@ -79,7 +80,7 @@ export default function VerifyEmailPage() {
       }
     >
       <form onSubmit={onSubmit}>
-        <FieldGroup>
+        <div className="flex w-full flex-col gap-5">
           <FormError message={error} />
           <Field>
             <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
@@ -103,14 +104,14 @@ export default function VerifyEmailPage() {
             </p>
           ) : null}
           <Field>
-            <Button type="submit" disabled={busy || code.length !== 6}>
+            <Button variant="primary" type="submit" disabled={busy || code.length !== 6}>
               {busy ? t("common.working") : t("account.verify")}
             </Button>
             <Button type="button" variant="ghost" disabled={!email || cooldown > 0} onClick={() => void resend()}>
               {cooldown > 0 ? t("account.resendIn", { seconds: cooldown }) : t("account.resend")}
             </Button>
           </Field>
-        </FieldGroup>
+        </div>
       </form>
     </AuthFrame>
   )

@@ -1,15 +1,18 @@
 "use client"
 
+import { Alert } from "@fadymondy/nasaq/web"
 import { AlertCircleIcon } from "lucide-react"
+import { useCallback } from "react"
 
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
 /** Maps an API error to a translated sentence; unknown server text is kept, LTR. */
 export function useErrorText() {
   const { t } = useI18n()
-  return (err: unknown): string => {
+  // Stable per locale: callers list it in effect/callback dependencies, and a fresh function on
+  // every render would refetch in a loop.
+  return useCallback((err: unknown): string => {
     if (err instanceof ApiError) {
       const key = `errors.api.${err.code.replace(/\s+/g, "_")}`
       const known = t(key)
@@ -21,15 +24,14 @@ export function useErrorText() {
       return `${t("errors.generic")} (${err.message})`
     }
     return t("errors.network")
-  }
+  }, [t])
 }
 
 export function FormError({ message }: { message: string | null }) {
   if (!message) return null
   return (
-    <Alert variant="destructive" role="alert">
-      <AlertCircleIcon />
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
+    <Alert tone="danger" role="alert">
+{message}
+</Alert>
   )
 }

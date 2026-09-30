@@ -1,14 +1,15 @@
 "use client"
 
+import { Badge, Button, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ActivityIcon, ChartNoAxesColumnIcon, ExternalLinkIcon, GaugeIcon, TriangleAlertIcon, UsersIcon } from "lucide-react"
 
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -78,7 +79,7 @@ export function SiteAnalytics() {
         action={
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("site.analytics.range")}>
             {RANGES.map((r) => (
-              <Button key={r} size="sm" variant={range === r ? "default" : "outline"} onClick={() => setRange(r)}>
+              <Button key={r} size="sm" variant={range === r ? "primary" : "secondary"} onClick={() => setRange(r)}>
                 {t(`site.analytics.ranges.${r}`)}
               </Button>
             ))}
@@ -89,19 +90,11 @@ export function SiteAnalytics() {
       {series === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ChartNoAxesColumnIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.analytics.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.analytics.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ChartNoAxesColumnIcon} title={t("site.analytics.emptyTitle")} description={t("site.analytics.emptyHint")} />
       ) : (
         <>
           <Tiles t={t} totals={series.totals} />
-          <div className="border-b border-line px-6 py-6">
+          <div className="border-b border-border px-6 py-6">
             <RequestsChart points={series.points} />
           </div>
           <StatusBreakdown t={t} points={series.points} />
@@ -123,14 +116,14 @@ function Tiles({ t, totals }: { t: TFunc; totals: Totals }) {
     { icon: <GaugeIcon />, label: t("site.analytics.p95"), value: `${Math.round(totals.p95_ms)} ms` },
   ]
   return (
-    <div className="grid grid-cols-2 divide-x divide-line border-b border-line rtl:divide-x-reverse sm:grid-cols-4">
+    <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse sm:grid-cols-4">
       {tiles.map((tile) => (
         <div key={tile.label} className="flex flex-col gap-1 px-6 py-4">
-          <span className="flex items-center gap-2 text-xs text-grid-muted [&_svg]:size-3.5">
+          <span className="flex items-center gap-2 text-xs text-muted-foreground [&_svg]:size-3.5">
             {tile.icon}
             {tile.label}
           </span>
-          <span dir="ltr" className="text-start text-xl font-semibold text-grid-fg">
+          <span dir="ltr" className="text-start text-xl font-semibold text-foreground">
             {tile.value}
           </span>
         </div>
@@ -167,17 +160,17 @@ function RequestsChart({ points }: { points: Point[] }) {
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block h-56 w-full" role="img" aria-label="Requests over time">
         <line x1={0} y1={pad.top + innerH / 2} x2={w} y2={pad.top + innerH / 2} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="4 4" />
         <line x1={0} y1={h - pad.bottom} x2={w} y2={h - pad.bottom} stroke="currentColor" strokeOpacity={0.15} />
-        {area ? <path d={area} fill="var(--grid-brand)" opacity={0.14} /> : null}
-        {points.length > 1 ? <path d={path} fill="none" stroke="var(--grid-brand)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
+        {area ? <path d={area} fill="var(--nq-brand)" opacity={0.14} /> : null}
+        {points.length > 1 ? <path d={path} fill="none" stroke="var(--nq-brand)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
         {bars.map(({ x, y, p }, i) => (
-          <circle key={i} cx={x} cy={y} r={points.length > 60 ? 0 : 2} fill="var(--grid-brand)" vectorEffect="non-scaling-stroke">
+          <circle key={i} cx={x} cy={y} r={points.length > 60 ? 0 : 2} fill="var(--nq-brand)" vectorEffect="non-scaling-stroke">
             <title>
               {p.at}: {p.requests}
             </title>
           </circle>
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-xs text-grid-muted">
+      <div className="mt-1 flex justify-between text-xs text-muted-foreground">
         <time dateTime={first}>{first ? new Date(first).toLocaleString() : ""}</time>
         <span>max {max.toLocaleString()}</span>
         <time dateTime={last}>{last ? new Date(last).toLocaleString() : ""}</time>
@@ -200,16 +193,16 @@ function StatusBreakdown({ t, points }: { t: TFunc; points: Point[] }) {
   const total = Math.max(1, sums["2xx"] + sums["3xx"] + sums["4xx"] + sums["5xx"])
   const classes: (keyof typeof sums)[] = ["2xx", "3xx", "4xx", "5xx"]
   return (
-    <section aria-labelledby="an-status-h" className="border-b border-line px-6 py-6">
-      <h3 id="an-status-h" className="mb-3 text-sm font-medium text-grid-fg">
+    <section aria-labelledby="an-status-h" className="border-b border-border px-6 py-6">
+      <h3 id="an-status-h" className="mb-3 text-sm font-medium text-foreground">
         {t("site.analytics.statusBreakdown")}
       </h3>
-      <div dir="ltr" className="flex h-3 w-full overflow-hidden rounded-full bg-line">
+      <div dir="ltr" className="flex h-3 w-full overflow-hidden rounded-full bg-border">
         {classes.map((c) =>
           sums[c] > 0 ? (
             <div
               key={c}
-              className={c === "2xx" ? "bg-grid-ok" : c === "3xx" ? "bg-sky-500" : c === "4xx" ? "bg-amber-500" : "bg-grid-danger"}
+              className={c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-nq-info" : c === "4xx" ? "bg-nq-warning" : "bg-nq-danger"}
               style={{ width: `${(sums[c] / total) * 100}%` }}
               title={`${c}: ${sums[c]}`}
             />
@@ -221,12 +214,12 @@ function StatusBreakdown({ t, points }: { t: TFunc; points: Point[] }) {
           <div key={c} className="flex items-center gap-1.5">
             <span
               aria-hidden
-              className={`size-2 rounded-full ${c === "2xx" ? "bg-grid-ok" : c === "3xx" ? "bg-sky-500" : c === "4xx" ? "bg-amber-500" : "bg-grid-danger"}`}
+              className={`size-2 rounded-full ${c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-nq-info" : c === "4xx" ? "bg-nq-warning" : "bg-nq-danger"}`}
             />
-            <dt dir="ltr" className="text-grid-muted">
+            <dt dir="ltr" className="text-muted-foreground">
               {c}
             </dt>
-            <dd dir="ltr" className="font-medium text-grid-fg">
+            <dd dir="ltr" className="font-medium text-foreground">
               {sums[c].toLocaleString()}
             </dd>
           </div>
@@ -242,7 +235,7 @@ function TopTable({ title, rows, empty, external }: { title: string; rows: KeyCo
     <section aria-labelledby={`${title}-h`}>
       <SectionTitle id={`${title}-h`} title={title} />
       {rows.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{empty}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{empty}</p>
       ) : (
         <TableBand>
           <Table>

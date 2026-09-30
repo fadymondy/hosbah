@@ -1,14 +1,14 @@
 "use client"
 
+import { Button, Checkbox, Input, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState, type FormEvent } from "react"
-import { toast } from "sonner"
 
 import { ListError, LoadingRows } from "@/components/admin/admin-list"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
+
+
+
 import { useAdminResource } from "@/lib/admin"
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -72,8 +72,8 @@ export function QuotaEditor({ teamId }: { teamId: string }) {
             value={form.max_data_services}
             onChange={(v) => setForm((f) => (f ? { ...f, max_data_services: v } : f))}
           />
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>

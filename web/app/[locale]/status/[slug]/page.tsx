@@ -1,13 +1,14 @@
 "use client"
 
+import { Badge, EmptyState } from "@fadymondy/nasaq/web"
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { CheckCircle2Icon, CircleHelpIcon, CircleXIcon, FrownIcon } from "lucide-react"
 
 import { AuthFrame } from "@/components/auth-frame"
 import { useTimeAgo } from "@/components/home/sparkline"
-import { Badge } from "@/components/ui/badge"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
 import { apiFetch, ApiError } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 
@@ -58,15 +59,7 @@ export default function PublicStatusPage() {
   if (notFound) {
     return (
       <AuthFrame eyebrow={t("common.brand")} title={t("publicStatus.notFoundTitle")}>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FrownIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("publicStatus.notFoundTitle")}</EmptyTitle>
-            <EmptyDescription>{t("publicStatus.notFoundHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState icon={FrownIcon} title={t("publicStatus.notFoundTitle")} description={t("publicStatus.notFoundHint")} />
       </AuthFrame>
     )
   }
@@ -84,7 +77,7 @@ export default function PublicStatusPage() {
   return (
     <AuthFrame eyebrow={t("common.brand")} title={page.title}>
       <div className="flex flex-col gap-6">
-        <Badge variant={allOk ? "default" : "destructive"} className="w-fit gap-1.5">
+        <Badge variant={allOk ? "brand" : "danger"} className="w-fit gap-1.5">
           {allOk ? <CheckCircle2Icon className="size-3.5" /> : <CircleXIcon className="size-3.5" />}
           {allOk ? t("publicStatus.allOk") : t("publicStatus.someDown")}
         </Badge>
@@ -98,7 +91,7 @@ export default function PublicStatusPage() {
                   <span dir="auto" className="font-medium">
                     {m.name}
                   </span>
-                  <Badge variant={m.state === "failing" ? "destructive" : m.state === "ok" ? "default" : "secondary"} className="gap-1.5">
+                  <Badge variant={m.state === "failing" ? "danger" : m.state === "ok" ? "brand" : "neutral"} className="gap-1.5">
                     {m.state === "failing" ? (
                       <CircleXIcon className="size-3.5" />
                     ) : m.state === "ok" ? (

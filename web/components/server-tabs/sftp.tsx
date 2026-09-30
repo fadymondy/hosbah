@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { KeyRoundIcon, PlusIcon } from "lucide-react"
 
@@ -9,23 +10,15 @@ import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import type { SFTPUser } from "@/lib/servers"
@@ -68,15 +61,15 @@ export function ServerSFTP({ serverId }: { serverId: string }) {
       />
       <ErrorBand message={error} />
       {host ? (
-        <div className="border-b border-line px-6 py-4">
-          <p className="mb-2 text-sm text-grid-muted">{t("sftp.connection")}</p>
+        <div className="border-b border-border px-6 py-4">
+          <p className="mb-2 text-sm text-muted-foreground">{t("sftp.connection")}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <p className="mb-1 text-xs text-grid-muted">{t("sftp.host")}</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t("sftp.host")}</p>
               <CopyField value={host} />
             </div>
             <div>
-              <p className="mb-1 text-xs text-grid-muted">{t("sftp.port")}</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t("sftp.port")}</p>
               <CopyField value="22" />
             </div>
           </div>
@@ -85,19 +78,11 @@ export function ServerSFTP({ serverId }: { serverId: string }) {
       {users === null ? (
         <LoadingRows />
       ) : users.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <KeyRoundIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("sftp.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("sftp.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={KeyRoundIcon} title={t("sftp.emptyTitle")} description={t("sftp.emptyHint")} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchSftp")} shown={shown.length} total={users.length} />
-          {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
+          {shown.length === 0 ? <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
           <TableBand>
             <Table>
               <TableHeader>
@@ -126,10 +111,10 @@ export function ServerSFTP({ serverId }: { serverId: string }) {
                       {u.root_dir}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={u.read_only ? "outline" : "secondary"}>{u.read_only ? t("sftp.readOnly") : t("sftp.readWrite")}</Badge>
+                      <Badge variant={u.read_only ? "outline" : "neutral"}>{u.read_only ? t("sftp.readOnly") : t("sftp.readWrite")}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={u.status === "active" ? "secondary" : u.status === "failed" ? "destructive" : "outline"}>
+                      <Badge variant={u.status === "active" ? "neutral" : u.status === "failed" ? "danger" : "outline"}>
                         {t(`sftp.status.${u.status}`)}
                       </Badge>
                     </TableCell>
@@ -226,7 +211,7 @@ function AddSFTPUser({ serverId, onSaved }: { serverId: string; onSaved: () => P
           }
         }}
       >
-        <DialogTrigger render={<Button />}>
+        <DialogTrigger render={<Button variant="primary" />}>
           <PlusIcon />
           {t("sftp.add")}
         </DialogTrigger>
@@ -239,7 +224,7 @@ function AddSFTPUser({ serverId, onSaved }: { serverId: string; onSaved: () => P
               </DialogHeader>
               <CopyField value={shownPassword} />
               <DialogFooter>
-                <Button
+                <Button variant="primary"
                   type="button"
                   onClick={() => {
                     setOpen(false)
@@ -256,7 +241,7 @@ function AddSFTPUser({ serverId, onSaved }: { serverId: string; onSaved: () => P
                 <DialogTitle>{t("sftp.add")}</DialogTitle>
                 <DialogDescription>{t("sftp.addHint")}</DialogDescription>
               </DialogHeader>
-              <FieldGroup className="gap-4">
+              <div className="flex w-full flex-col gap-4">
                 <Field>
                   <FieldLabel htmlFor="sf-user">{t("sftp.username")}</FieldLabel>
                   <Input
@@ -297,25 +282,25 @@ function AddSFTPUser({ serverId, onSaved }: { serverId: string; onSaved: () => P
                   />
                   <FieldDescription>{t("sftp.publicKeysHint")}</FieldDescription>
                 </Field>
-                <Field orientation="horizontal">
+                <Field className="flex-row items-center">
                   <Checkbox id="sf-genpw" checked={genPassword} onCheckedChange={(v) => setGenPassword(v === true)} />
                   <FieldLabel htmlFor="sf-genpw" className="font-normal">
                     {t("sftp.generatePassword")}
                   </FieldLabel>
                 </Field>
-                <Field orientation="horizontal">
+                <Field className="flex-row items-center">
                   <Checkbox id="sf-ro" checked={readOnly} onCheckedChange={(v) => setReadOnly(v === true)} />
                   <FieldLabel htmlFor="sf-ro" className="font-normal">
                     {t("sftp.readOnly")}
                   </FieldLabel>
                 </Field>
-              </FieldGroup>
+              </div>
               <FormError message={error} />
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                   {t("common.cancel")}
                 </Button>
-                <Button type="submit" disabled={busy || !username.trim() || !rootDir.trim() || (!genPassword && !keys.trim())}>
+                <Button variant="primary" type="submit" disabled={busy || !username.trim() || !rootDir.trim() || (!genPassword && !keys.trim())}>
                   {busy ? t("common.working") : t("sftp.save")}
                 </Button>
               </DialogFooter>
@@ -381,7 +366,7 @@ function EditSFTPUser({ user, team, serverId, onSaved }: { user: SFTPUser; team:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>{t("lists.edit")}</DialogTrigger>
+      <DialogTrigger render={<Button variant="secondary" size="sm" />}>{t("lists.edit")}</DialogTrigger>
       <DialogContent>
         {shownPassword ? (
           <div className="flex flex-col gap-4">
@@ -391,7 +376,7 @@ function EditSFTPUser({ user, team, serverId, onSaved }: { user: SFTPUser; team:
             </DialogHeader>
             <CopyField value={shownPassword} />
             <DialogFooter>
-              <Button type="button" onClick={() => setOpen(false)}>
+              <Button variant="primary" type="button" onClick={() => setOpen(false)}>
                 {t("common.done")}
               </Button>
             </DialogFooter>
@@ -402,7 +387,7 @@ function EditSFTPUser({ user, team, serverId, onSaved }: { user: SFTPUser; team:
               <DialogTitle>{user.username}</DialogTitle>
               <DialogDescription>{t("sftp.editHint")}</DialogDescription>
             </DialogHeader>
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <Field>
                 <FieldLabel htmlFor="ef-root">{t("sftp.rootDir")}</FieldLabel>
                 <Input id="ef-root" dir="ltr" required value={rootDir} onChange={(e) => setRootDir(e.target.value)} />
@@ -412,25 +397,25 @@ function EditSFTPUser({ user, team, serverId, onSaved }: { user: SFTPUser; team:
                 <Textarea id="ef-keys" dir="ltr" rows={3} value={keys} onChange={(e) => setKeys(e.target.value)} />
                 <FieldDescription>{t("sftp.publicKeysHint")}</FieldDescription>
               </Field>
-              <Field orientation="horizontal">
+              <Field className="flex-row items-center">
                 <Checkbox id="ef-genpw" checked={genPassword} onCheckedChange={(v) => setGenPassword(v === true)} />
                 <FieldLabel htmlFor="ef-genpw" className="font-normal">
                   {t("sftp.rotatePassword")}
                 </FieldLabel>
               </Field>
-              <Field orientation="horizontal">
+              <Field className="flex-row items-center">
                 <Checkbox id="ef-ro" checked={readOnly} onCheckedChange={(v) => setReadOnly(v === true)} />
                 <FieldLabel htmlFor="ef-ro" className="font-normal">
                   {t("sftp.readOnly")}
                 </FieldLabel>
               </Field>
-            </FieldGroup>
+            </div>
             <FormError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={busy}>
+              <Button variant="primary" type="submit" disabled={busy}>
                 {busy ? t("common.working") : t("common.save")}
               </Button>
             </DialogFooter>

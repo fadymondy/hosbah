@@ -1,10 +1,11 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { BoxIcon, CpuIcon, ExternalLinkIcon, HardDriveIcon, MemoryStickIcon, MonitorIcon } from "lucide-react"
 
 import { SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
+
 import { formatBytes, type Guest } from "@/lib/servers"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -26,7 +27,7 @@ export function Guests({ guests }: { guests: Guest[] }) {
     return (
       <div className="px-6 py-4">
         <SectionTitle title={t("servers.guests.title")} hint={t("servers.guests.description")} />
-        <p className="border-y border-line py-8 text-center text-sm text-grid-muted">{t("servers.guests.empty")}</p>
+        <p className="border-y border-border py-8 text-center text-sm text-muted-foreground">{t("servers.guests.empty")}</p>
       </div>
     )
   }
@@ -36,18 +37,18 @@ export function Guests({ guests }: { guests: Guest[] }) {
       <SectionTitle title={t("servers.guests.title")} hint={t("servers.guests.description")} />
       <div className="grid gap-3 py-4 sm:grid-cols-2 lg:grid-cols-3">
         {guests.map((g) => (
-          <article key={g.server_id ?? g.vmid} className="flex flex-col gap-2 border border-line bg-grid-card p-4" data-testid="guest-card">
+          <article key={g.server_id ?? g.vmid} className="flex flex-col gap-2 border border-border bg-card p-4" data-testid="guest-card">
             <div className="flex items-center gap-2">
-              <MonitorIcon className="size-4 text-grid-muted" />
-              <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-grid-fg">
+              <MonitorIcon className="size-4 text-muted-foreground" />
+              <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-foreground">
                 {g.name || `${g.type}-${g.vmid}`}
               </span>
               <span
                 aria-hidden
-                className={running(g.status) ? "size-2 shrink-0 bg-[var(--grid-ok,#3fb950)]" : "size-2 shrink-0 bg-grid-muted opacity-60"}
+                className={running(g.status) ? "size-2 shrink-0 bg-nq-success" : "size-2 shrink-0 bg-nq-fg-muted opacity-60"}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <BoxIcon className="size-3.5" />
                 {t(`servers.guests.types.${g.type}`, undefined, g.type)}
@@ -61,7 +62,7 @@ export function Guests({ guests }: { guests: Guest[] }) {
               ) : null}
             </div>
             {g.cpus || g.mem_bytes || g.disk_bytes ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {g.cpus ? (
                   <span className="inline-flex items-center gap-1">
                     <CpuIcon className="size-3.5" />
@@ -84,12 +85,12 @@ export function Guests({ guests }: { guests: Guest[] }) {
             ) : null}
             <div className="mt-auto pt-2">
               {g.server_id ? (
-                <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/servers/${g.server_id}`} />}>
+                <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/${g.server_id}`} />}>
                   <ExternalLinkIcon />
                   {t("servers.guests.open")}
                 </Button>
               ) : (
-                <span className="text-xs text-grid-muted">{t("servers.guests.notEnrolled")}</span>
+                <span className="text-xs text-muted-foreground">{t("servers.guests.notEnrolled")}</span>
               )}
             </div>
           </article>

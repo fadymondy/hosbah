@@ -1,10 +1,15 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
 /*
@@ -190,6 +195,60 @@ func TestDestructiveGate(t *testing.T) {
 		}
 		if list := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "list_servers", nil); !strings.Contains(list.Text, name2) {
 			t.Fatalf("%s should still exist after a rejection, got %q", name2, list.Text)
+		}
+	})
+
+	t.Run("an overdue request is expired and a retry files a fresh one", func(t *testing.T) {
+		// The retry after the rejection above left a pending request for gate2. Age it past its hour.
+		name2 := "gate2-" + suffix
+		sqlDB := testDB(t)
+		err := tenancy.Tx(context.Background(), sqlDB, tenancy.Scope{System: true, TeamID: team.ID}, func(_ *db.Queries, tx *sql.Tx) error {
+			res, err := tx.ExecContext(context.Background(),
+				`UPDATE approval_requests SET expires_at = now() - interval '1 minute' WHERE team_id = $1 AND status = 'pending'`, team.ID)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n != 1 {
+				return fmt.Errorf("aged %d requests, want 1", n)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("ageing the request: %v", err)
+		}
+
+		type row struct {
+			ID           string `json:"id"`
+			Status       string `json:"status"`
+			ResourceName string `json:"resource_name"`
+		}
+		var out struct {
+			Requests []row `json:"requests"`
+		}
+		// The queue never offers an overdue request as still waiting.
+		owner.mustJSON("GET", "/api/teams/"+team.ID+"/approvals?status=pending", nil, 200, &out)
+		if len(out.Requests) != 0 {
+			t.Fatalf("an overdue request must not be listed as pending, got %+v", out.Requests)
+		}
+		owner.mustJSON("GET", "/api/teams/"+team.ID+"/approvals?status=expired", nil, 200, &out)
+		if len(out.Requests) != 1 || out.Requests[0].ResourceName != name2 {
+			t.Fatalf("expected the overdue request as expired, got %+v", out.Requests)
+		}
+		stale := out.Requests[0].ID
+
+		// A retry is held on a NEW request that can be approved, not handed the dead one back.
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "delete_server",
+			map[string]any{"server": name2, "confirm": name2}); !res.IsError || strings.Contains(res.Text, stale) {
+			t.Fatalf("a retry after expiry must file a fresh request, got %q", res.Text)
+		}
+		owner.mustJSON("GET", "/api/teams/"+team.ID+"/approvals?status=pending", nil, 200, &out)
+		if len(out.Requests) != 1 || out.Requests[0].ID == stale {
+			t.Fatalf("expected one fresh pending request, got %+v", out.Requests)
+		}
+		owner.mustJSON("POST", "/api/teams/"+team.ID+"/approvals/"+out.Requests[0].ID+"/approve", nil, 200, nil)
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "delete_server",
+			map[string]any{"server": name2, "confirm": name2}); res.IsError {
+			t.Fatalf("the fresh approval must let the call through, got %q", res.Text)
 		}
 	})
 }

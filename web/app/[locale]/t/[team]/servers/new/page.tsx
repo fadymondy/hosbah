@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, Button, Checkbox, Field, FieldDescription, FieldLabel, Input, Radio, RadioGroup, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@fadymondy/nasaq/web"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -10,29 +11,13 @@ import { CopyField } from "@/components/copy-field";
 import { FormError, useErrorText } from "@/components/form-error";
 import { Notice } from "@/components/states";
 import { CheckBadge } from "@/components/server-status";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-  FieldTitle,
-} from "@/components/ui/field";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api";
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n";
 import { useEventStream, type Install, type ProviderOption, type Server } from "@/lib/servers";
@@ -170,9 +155,9 @@ export default function NewServerPage() {
     return (
       <PageBody title={t("servers.new.title")} description={t("servers.new.description")} bleed>
         {enrolled ? (
-          <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="enrolled">
+          <section className="flex flex-col gap-4 border-b border-border px-6 py-6 [&>*]:max-w-3xl" data-testid="enrolled">
             <div className="flex items-center gap-2 font-medium">
-              <CheckCircle2Icon className="size-5 text-grid-brand" aria-hidden />
+              <CheckCircle2Icon className="size-5 text-nq-brand" aria-hidden />
               {t("servers.new.enrolledTitle")}
             </div>
             <p className="text-sm text-muted-foreground">
@@ -192,13 +177,13 @@ export default function NewServerPage() {
               ))}
             </ul>
             <div>
-              <Button nativeButton={false} render={<Link href={`${base}/servers/${server.id}`} />}>
+              <Button variant="primary" nativeButton={false} render={<Link href={`${base}/servers/${server.id}`} />}>
                 {t("servers.new.open")}
               </Button>
             </div>
           </section>
         ) : (
-          <section className="flex flex-col gap-4 border-b border-line px-6 py-6 [&>*]:max-w-3xl" data-testid="install">
+          <section className="flex flex-col gap-4 border-b border-border px-6 py-6 [&>*]:max-w-3xl" data-testid="install">
             <div className="flex flex-col gap-1">
               <h2 className="font-medium">{t("servers.new.installTitle")}</h2>
               <p className="text-sm text-muted-foreground">{t("servers.new.installHint")}</p>
@@ -223,59 +208,54 @@ export default function NewServerPage() {
 
   return (
     <PageBody title={t("servers.new.title")} description={t("servers.new.description")} bleed>
-      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-grid-bg px-6 py-6 [&>*]:max-w-2xl">
-          <FieldSet>
-            <FieldLegend variant="label">{t("servers.new.source")}</FieldLegend>
+      <div className="grid gap-px border-b border-border bg-border lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-background px-6 py-6 [&>*]:max-w-2xl">
+          <fieldset className="flex flex-col gap-4">
+            <legend className="mb-3 text-label">{t("servers.new.source")}</legend>
             <RadioGroup value={source} onValueChange={(v) => setSource(v as Source)}>
-              <FieldLabel htmlFor="src-byo">
-                <Field orientation="horizontal">
-                  <RadioGroupItem value="byo" id="src-byo" />
-                  <FieldContent>
-                    <FieldTitle>{t("servers.new.byoTitle")}</FieldTitle>
+              <label htmlFor="src-byo" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
+                <Field className="flex-row items-center">
+                  <Radio value="byo" id="src-byo" />
+                  <div className="flex flex-1 flex-col gap-0.5">
+                    <div className="text-label">{t("servers.new.byoTitle")}</div>
                     <FieldDescription>{t("servers.new.byoHint")}</FieldDescription>
-                  </FieldContent>
+                  </div>
                 </Field>
-              </FieldLabel>
-              <FieldLabel htmlFor="src-connect">
-                <Field orientation="horizontal">
-                  <RadioGroupItem value="connect" id="src-connect" />
-                  <FieldContent>
-                    <FieldTitle>{t("servers.new.connectTitle")}</FieldTitle>
+              </label>
+              <label htmlFor="src-connect" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
+                <Field className="flex-row items-center">
+                  <Radio value="connect" id="src-connect" />
+                  <div className="flex flex-1 flex-col gap-0.5">
+                    <div className="text-label">{t("servers.new.connectTitle")}</div>
                     <FieldDescription>{t("servers.new.connectHint")}</FieldDescription>
-                  </FieldContent>
+                  </div>
                 </Field>
-              </FieldLabel>
-              <FieldLabel htmlFor="src-proxmox">
-                <Field orientation="horizontal">
-                  <RadioGroupItem value="proxmox" id="src-proxmox" />
-                  <FieldContent>
-                    <FieldTitle>{t("servers.new.proxmoxTitle")}</FieldTitle>
+              </label>
+              <label htmlFor="src-proxmox" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
+                <Field className="flex-row items-center">
+                  <Radio value="proxmox" id="src-proxmox" />
+                  <div className="flex flex-1 flex-col gap-0.5">
+                    <div className="text-label">{t("servers.new.proxmoxTitle")}</div>
                     <FieldDescription>{t("servers.new.proxmoxHint")}</FieldDescription>
-                  </FieldContent>
+                  </div>
                 </Field>
-              </FieldLabel>
+              </label>
             </RadioGroup>
-          </FieldSet>
+          </fieldset>
 
           {source === "proxmox" && proxmox && !proxmox.available ? (
-            <Alert data-testid="proxmox-not-configured">
-              <InfoIcon />
-              <AlertTitle>{t("servers.new.notConfiguredTitle")}</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>{t("servers.new.notConfiguredHint")}</span>
-                <Button
+            <Alert tone="info" title={t("servers.new.notConfiguredTitle")} data-testid="proxmox-not-configured">
+<div className="flex flex-col items-start gap-3"><span>{t("servers.new.notConfiguredHint")}</span><Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   nativeButton={false}
                   render={<Link href={`${base}/credentials`} />}
                 >
                   {t("servers.new.addCredential")}
-                </Button>
-              </AlertDescription>
-            </Alert>
+                </Button></div>
+</Alert>
           ) : (
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <Field>
                 <FieldLabel htmlFor="server-name">{t("servers.name")}</FieldLabel>
                 <Input
@@ -411,7 +391,7 @@ export default function NewServerPage() {
               ) : null}
               <FormError message={error} />
               <div>
-                <Button
+                <Button variant="primary"
                   type="submit"
                   disabled={
                     busy || !nameOK || providers === null || (source === "connect" && !connectOK)
@@ -426,7 +406,7 @@ export default function NewServerPage() {
                         : t("servers.new.createProxmox")}
                 </Button>
               </div>
-            </FieldGroup>
+            </div>
           )}
         </form>
         <HowItWorks />
@@ -438,11 +418,11 @@ export default function NewServerPage() {
 function HowItWorks() {
   const { t } = useI18n();
   return (
-    <aside className="flex flex-col bg-grid-bg" aria-labelledby="how-h">
-      <h2 id="how-h" className="border-b border-line px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
+    <aside className="flex flex-col bg-background" aria-labelledby="how-h">
+      <h2 id="how-h" className="border-b border-border px-6 pt-5 pb-3 text-base font-medium text-foreground">
         {t("servers.new.howTitle")}
       </h2>
-      <ol className="flex flex-col divide-y divide-line border-b border-line text-sm lg:border-b-0">
+      <ol className="flex flex-col divide-y divide-border border-b border-border text-sm lg:border-b-0">
         {(["how1", "how2", "how3"] as const).map((k, i) => (
           <li key={k} className="flex gap-3 px-6 py-3">
             <span className="font-mono text-muted-foreground tabular-nums">
@@ -515,23 +495,23 @@ function ConnectFields(p: {
         />
         <FieldDescription>{t("servers.new.userHint")}</FieldDescription>
       </Field>
-      <FieldSet>
-        <FieldLegend variant="label">{t("servers.new.auth")}</FieldLegend>
+      <fieldset className="flex flex-col gap-4">
+        <legend className="mb-3 text-label">{t("servers.new.auth")}</legend>
         <RadioGroup
           value={p.auth}
           onValueChange={(v) => p.setAuth(v as "password" | "key")}
           className="flex flex-wrap gap-6"
         >
-          <Field orientation="horizontal" className="w-auto">
-            <RadioGroupItem value="password" id="c-auth-pw" />
+          <Field className="flex-row items-center w-auto">
+            <Radio value="password" id="c-auth-pw" />
             <FieldLabel htmlFor="c-auth-pw">{t("servers.new.authPassword")}</FieldLabel>
           </Field>
-          <Field orientation="horizontal" className="w-auto">
-            <RadioGroupItem value="key" id="c-auth-key" />
+          <Field className="flex-row items-center w-auto">
+            <Radio value="key" id="c-auth-key" />
             <FieldLabel htmlFor="c-auth-key">{t("servers.new.authKey")}</FieldLabel>
           </Field>
         </RadioGroup>
-      </FieldSet>
+      </fieldset>
       {p.auth === "password" ? (
         <Field>
           <FieldLabel htmlFor="c-pw">{t("servers.new.password")}</FieldLabel>
@@ -565,16 +545,16 @@ function ConnectFields(p: {
           </FieldDescription>
         </Field>
       )}
-      <Field orientation="horizontal">
+      <Field className="flex-row items-center">
         <Checkbox
           id="c-pve"
           checked={p.registerProxmox}
           onCheckedChange={(v) => p.setRegisterProxmox(v === true)}
         />
-        <FieldContent>
+        <div className="flex flex-1 flex-col gap-0.5">
           <FieldLabel htmlFor="c-pve">{t("servers.new.registerProxmox")}</FieldLabel>
           <FieldDescription>{t("servers.new.registerProxmoxHint")}</FieldDescription>
-        </FieldContent>
+        </div>
       </Field>
     </>
   );

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { DatabaseIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -9,22 +10,14 @@ import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { DataService, DataServiceKind } from "@/lib/databases"
 import { isImported } from "@/lib/apps"
@@ -35,10 +28,10 @@ import { useTeam } from "@/lib/team"
 
 const KINDS: DataServiceKind[] = ["postgres", "mysql", "redis", "minio"]
 
-export function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "running") return "default"
-  if (status === "failed") return "destructive"
-  if (status === "provisioning" || status === "new") return "secondary"
+export function statusVariant(status: string): "success" | "neutral" | "danger" | "outline" {
+  if (status === "running") return "success"
+  if (status === "failed") return "danger"
+  if (status === "provisioning" || status === "new") return "neutral"
   return "outline"
 }
 
@@ -80,20 +73,11 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
       {services === null ? (
         <LoadingRows />
       ) : services.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <DatabaseIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("databases.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{manage ? t("databases.emptyHint") : t("common.readOnly")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={DatabaseIcon} title={t("databases.emptyTitle")} description={manage ? t("databases.emptyHint") : t("common.readOnly")} actions={<>{add}</>} />
       ) : (
         <>
         <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchDatabases")} shown={shown.length} total={services.length} />
-        {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
+        {shown.length === 0 ? <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
         <TableBand>
           <Table>
             <TableHeader>
@@ -129,7 +113,7 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
                   {manage ? (
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
-                        <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
+                        <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
                           {t("lists.manage")}
                         </Button>
                         {isImported(s) ? null : (
@@ -205,7 +189,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <PlusIcon />
         {t("databases.add")}
       </DialogTrigger>
@@ -215,7 +199,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
             <DialogTitle>{t("databases.createTitle")}</DialogTitle>
             <DialogDescription>{t("databases.createHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="py-4">
+          <div className="flex w-full flex-col gap-5 py-4">
             <Field>
               <FieldLabel htmlFor="db-name">{t("databases.name")}</FieldLabel>
               <Input id="db-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="my-db" autoFocus />
@@ -239,7 +223,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
               <FieldLabel>{t("databases.server")}</FieldLabel>
               <Select value={server} onValueChange={(v) => v && setServer(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder={t("databases.chooseServer")} />
+                  <SelectValue placeholder={t("databases.chooseServer")}>{(v: string) => servers.find((s) => s.id === v)?.name ?? t("databases.chooseServer")}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {servers.map((s) => (
@@ -255,7 +239,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
                 <FieldLabel>{t("databases.pgvectorLabel")}</FieldLabel>
                 <Select value={version === "pgvector-pg17" ? "pgvector-pg17" : "default"} onValueChange={(v) => v && setVersion(v === "pgvector-pg17" ? "pgvector-pg17" : "")}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>{(v: string) => (v === "pgvector-pg17" ? t("databases.pgvectorOption") : t("databases.pgvectorDefault"))}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="default">{t("databases.pgvectorDefault")}</SelectItem>
@@ -271,9 +255,9 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
               <FieldDescription>{t("databases.versionHint")}</FieldDescription>
             </Field>
             <FormError message={error} />
-          </FieldGroup>
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={busy || !name || !server}>
+            <Button variant="primary" type="submit" disabled={busy || !name || !server}>
               {busy ? t("common.working") : t("databases.create")}
             </Button>
           </DialogFooter>

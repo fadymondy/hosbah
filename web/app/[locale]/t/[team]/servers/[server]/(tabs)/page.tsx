@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Progress } from "@fadymondy/nasaq/web"
 import { useState } from "react"
 import { AlertCircleIcon, LoaderIcon } from "lucide-react"
 
@@ -8,8 +9,7 @@ import { useErrorText } from "@/components/form-error"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { CheckBadge } from "@/components/server-status"
 import { Notice, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { formatBytes, formatUptime, percent, platformOf, type Install } from "@/lib/servers"
@@ -58,7 +58,7 @@ export default function ServerOverview() {
           ) : null}
           {manage ? (
             <div>
-              <Button size="sm" variant="outline" onClick={newInstall}>
+              <Button size="sm" variant="secondary" onClick={newInstall}>
                 {t("servers.detail.newInstall")}
               </Button>
             </div>
@@ -80,7 +80,7 @@ export default function ServerOverview() {
         <section aria-labelledby="metrics-h">
           <SectionTitle id="metrics-h" title={t("servers.detail.metrics")} />
           {m ? (
-            <dl className="grid grid-cols-1 gap-px border-b border-line bg-line sm:grid-cols-3 lg:grid-cols-6" data-testid="metrics">
+            <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-3 lg:grid-cols-6" data-testid="metrics">
               <Meter label={t("servers.cpu")} value={Math.round(m.cpu_percent)} text={`${m.cpu_percent.toFixed(1)}%`} />
               <Meter
                 label={t("servers.memory")}
@@ -97,17 +97,17 @@ export default function ServerOverview() {
               <Stat label={t("servers.lastSeen")} value={server.last_seen_at ? fmt(server.last_seen_at) : t("servers.never")} small />
             </dl>
           ) : (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("servers.detail.noMetrics")}</p>
+            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.detail.noMetrics")}</p>
           )}
         </section>
       ) : null}
 
-      <div className="grid gap-px border-b border-line bg-line lg:grid-cols-2">
-        <section aria-labelledby="facts-h" className="min-w-0 bg-grid-bg">
-          <h2 id="facts-h" className="px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
+      <div className="grid gap-px border-b border-border bg-border lg:grid-cols-2">
+        <section aria-labelledby="facts-h" className="min-w-0 bg-background">
+          <h2 id="facts-h" className="px-6 pt-5 pb-3 text-base font-medium text-foreground">
             {t("servers.detail.facts")}
           </h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-line px-6 py-4 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-border px-6 py-4 text-sm">
             <Fact
               label={t("servers.discovered.platform")}
               value={
@@ -137,19 +137,19 @@ export default function ServerOverview() {
             />
           </dl>
         </section>
-        <section aria-labelledby="checks-h" className="min-w-0 bg-grid-bg">
-          <h2 id="checks-h" className="px-6 pt-5 pb-3 text-base font-medium text-grid-fg">
+        <section aria-labelledby="checks-h" className="min-w-0 bg-background">
+          <h2 id="checks-h" className="px-6 pt-5 pb-3 text-base font-medium text-foreground">
             {t("servers.detail.checks")}
           </h2>
           {server.checks.length === 0 ? (
-            <p className="border-t border-line px-6 py-4 text-sm text-grid-muted">{t("servers.detail.checksEmpty")}</p>
+            <p className="border-t border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.detail.checksEmpty")}</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-line border-t border-line text-sm" data-testid="checks">
+            <ul className="flex flex-col divide-y divide-border border-t border-border text-sm" data-testid="checks">
               {server.checks.map((c) => (
                 <li key={c.name} className="flex flex-wrap items-center gap-2 px-6 py-2.5">
                   <CheckBadge status={c.status} />
                   <span className="font-medium">{t(`servers.check.names.${c.name}`, undefined, c.name)}</span>
-                  <span dir="auto" className="text-grid-muted">
+                  <span dir="auto" className="text-muted-foreground">
                     {c.detail}
                   </span>
                 </li>
@@ -165,13 +165,13 @@ export default function ServerOverview() {
 
 function Meter({ label, value, text }: { label: string; value: number; text: string }) {
   return (
-    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro">{label}</dt>
+    <div className="flex flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow">{label}</dt>
       <dd className="flex flex-col gap-2">
         <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
           {text}
         </span>
-        <Progress value={value} aria-label={label} />
+        <Progress value={value} aria-label={label} size="sm" />
       </dd>
     </div>
   )
@@ -179,8 +179,8 @@ function Meter({ label, value, text }: { label: string; value: number; text: str
 
 function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
   return (
-    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro">{label}</dt>
+    <div className="flex flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow">{label}</dt>
       <dd dir="ltr" className={cn("text-start font-mono tabular-nums", small ? "text-xs" : "text-sm")}>
         {value}
       </dd>
@@ -191,7 +191,7 @@ function Stat({ label, value, small }: { label: string; value: string; small?: b
 function Fact({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <>
-      <dt className="text-grid-muted">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd dir="ltr" className="min-w-0 text-start font-mono text-xs leading-5 break-all">
         {value || "—"}
       </dd>

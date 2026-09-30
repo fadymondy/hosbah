@@ -16,6 +16,10 @@ const nextConfig = {
       { source: "/api/:path*", destination: `${origin}/api/:path*` },
       // GitHub App webhooks and per-app deploy hooks are served by the API too.
       { source: "/hooks/:path*", destination: `${origin}/hooks/:path*` },
+      // Sign in with CircleXO (internal/circlexo): the hub redirects the browser to these on the web
+      // origin, so they are the API's, rewritten there. Off (404) unless CIRCLEXO_ISSUER is set.
+      { source: "/auth/circlexo/:path*", destination: `${origin}/auth/circlexo/:path*` },
+      { source: "/sso/circlexo", destination: `${origin}/sso/circlexo` },
       // The real-user-monitoring beacon (internal/rum); its ingest endpoint is under /api/rum/.
       { source: "/rum.js", destination: `${origin}/rum.js` },
     ]

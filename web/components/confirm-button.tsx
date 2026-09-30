@@ -1,19 +1,12 @@
 "use client"
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@fadymondy/nasaq/web"
 import { useState, type ReactNode } from "react"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+
+
 import { useI18n } from "@/lib/i18n"
 
 /**
@@ -35,7 +28,7 @@ export function ConfirmButton({
   description: ReactNode
   confirmLabel: string
   onConfirm: () => Promise<void>
-  size?: "sm" | "default"
+  size?: "sm" | "md"
   icon?: ReactNode
 } & Controlled) {
   const { t } = useI18n()
@@ -59,7 +52,7 @@ export function ConfirmButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button variant="outline" size={size} />}>
+        <DialogTrigger render={<Button variant="secondary" size={size} />}>
           {icon}
           {label}
         </DialogTrigger>
@@ -75,10 +68,10 @@ export function ConfirmButton({
           </p>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button variant="destructive" onClick={run} disabled={busy}>
+          <Button variant="danger" onClick={run} disabled={busy}>
             {busy ? t("common.working") : confirmLabel}
           </Button>
         </DialogFooter>

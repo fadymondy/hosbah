@@ -1,18 +1,18 @@
 "use client"
 
+import { Alert, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react"
 import { PlayIcon, SearchIcon, TableIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { humanBytes, type DatabaseRow } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
@@ -79,14 +79,14 @@ export function DataConsole({
   }, [database])
 
   if (databases.length === 0) {
-    return <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.data.noDatabases")}</p>
+    return <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.data.noDatabases")}</p>
   }
 
   const filtered = (tables ?? []).filter((tb) => tb.name.toLowerCase().includes(search.trim().toLowerCase()))
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3">
         <div className="min-w-48">
           <Select
             value={database}
@@ -107,12 +107,12 @@ export function DataConsole({
           </Select>
         </div>
         {selected ? (
-          <Button size="sm" variant="outline" onClick={() => setSelected(null)}>
+          <Button size="sm" variant="secondary" onClick={() => setSelected(null)}>
             {t("databases.data.backToTables")}
           </Button>
         ) : (
           <div className="relative min-w-56 max-w-xs flex-1">
-            <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" aria-hidden />
+            <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("databases.data.searchTables")} dir="ltr" className="ps-8" />
           </div>
         )}
@@ -124,7 +124,7 @@ export function DataConsole({
         tables === null ? (
           <LoadingRows rows={3} />
         ) : filtered.length === 0 ? (
-          <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.data.noTables")}</p>
+          <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.data.noTables")}</p>
         ) : (
           <TableBand>
             <Table>
@@ -140,7 +140,7 @@ export function DataConsole({
                   <TableRow key={qualify(tb)} className="cursor-pointer" onClick={() => setSelected(tb)}>
                     <TableCell dir="ltr" className="font-mono text-xs">
                       <span className="flex items-center gap-2">
-                        <TableIcon className="size-3.5 text-grid-muted" aria-hidden />
+                        <TableIcon className="size-3.5 text-muted-foreground" aria-hidden />
                         {qualify(tb)}
                       </span>
                     </TableCell>
@@ -156,7 +156,7 @@ export function DataConsole({
         <TableView teamSlug={teamSlug} serviceRef={serviceRef} database={database} table={qualify(selected)} />
       )}
 
-      <div className="border-t border-line">
+      <div className="border-t border-border">
         <SqlConsole teamSlug={teamSlug} serviceRef={serviceRef} database={database} manage={manage} />
       </div>
     </div>
@@ -201,12 +201,12 @@ function TableView({ teamSlug, serviceRef, database, table }: { teamSlug: string
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3">
-        <span dir="ltr" className="font-mono text-sm text-grid-fg">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
+        <span dir="ltr" className="font-mono text-sm text-foreground">
           {table}
         </span>
         {result ? (
-          <span className="text-xs text-grid-muted" dir="ltr">
+          <span className="text-xs text-muted-foreground" dir="ltr">
             {t("databases.data.rowCount", { count: result.row_count })}
             {result.truncated ? ` — ${t("databases.data.truncated")}` : ""}
             {" · "}
@@ -220,13 +220,13 @@ function TableView({ teamSlug, serviceRef, database, table }: { teamSlug: string
       ) : (
         <>
           <ResultGrid columns={columns ?? []} rows={result?.rows ?? []} />
-          <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-3">
-            <Button size="sm" variant="outline" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - ROWS_PAGE))}>
+          <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-3">
+            <Button size="sm" variant="secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - ROWS_PAGE))}>
               {t("databases.data.prevPage")}
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               disabled={!result || result.rows.length < ROWS_PAGE}
               onClick={() => setOffset(offset + ROWS_PAGE)}
             >
@@ -242,10 +242,10 @@ function TableView({ teamSlug, serviceRef, database, table }: { teamSlug: string
 function ResultGrid({ columns, rows }: { columns: ColumnInfo[]; rows: (string | null)[][] }) {
   const { t } = useI18n()
   if (columns.length === 0) {
-    return <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.data.noColumns")}</p>
+    return <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.data.noColumns")}</p>
   }
   return (
-    <div className="max-h-[28rem] overflow-auto border-b border-line">
+    <div className="max-h-[28rem] overflow-auto border-b border-border">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-background">
           <TableRow>
@@ -253,7 +253,7 @@ function ResultGrid({ columns, rows }: { columns: ColumnInfo[]; rows: (string | 
               <TableHead key={c.name} dir="ltr">
                 <span className="flex flex-col">
                   <span>{c.name}</span>
-                  {c.type ? <span className="text-[10px] font-normal text-grid-muted">{c.type}</span> : null}
+                  {c.type ? <span className="text-[10px] font-normal text-muted-foreground">{c.type}</span> : null}
                 </span>
               </TableHead>
             ))}
@@ -265,7 +265,7 @@ function ResultGrid({ columns, rows }: { columns: ColumnInfo[]; rows: (string | 
               {row.map((cell, j) => (
                 <TableCell key={j} dir="ltr" title={cell && cell.length > CELL_CLAMP ? cell : undefined}>
                   {cell === null ? (
-                    <span className="italic text-grid-muted">{t("databases.data.null")}</span>
+                    <span className="italic text-muted-foreground">{t("databases.data.null")}</span>
                   ) : cell.length > CELL_CLAMP ? (
                     `${cell.slice(0, CELL_CLAMP)}…`
                   ) : (
@@ -338,7 +338,7 @@ function SqlConsole({
 
   return (
     <div className="px-6 py-5">
-      <p className="mb-2 text-sm font-medium text-grid-fg">{t("databases.data.sqlConsoleTitle")}</p>
+      <p className="mb-2 text-sm font-medium text-foreground">{t("databases.data.sqlConsoleTitle")}</p>
       <Textarea
         value={sql}
         onChange={(e) => setSql(e.target.value)}
@@ -349,22 +349,22 @@ function SqlConsole({
         className="min-h-32 font-mono text-xs"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button size="sm" onClick={attemptRun} disabled={busy || !sql.trim()}>
+        <Button variant="primary" size="sm" onClick={attemptRun} disabled={busy || !sql.trim()}>
           <PlayIcon />
           {busy ? t("common.working") : t("databases.data.runQuery")}
         </Button>
         {manage ? (
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={allowWrites} onCheckedChange={(v) => setAllowWrites(Boolean(v))} />
-            <span className={allowWrites ? "font-medium text-grid-danger" : "text-grid-muted"}>{t("databases.data.allowWrites")}</span>
+            <span className={allowWrites ? "font-medium text-nq-danger-text" : "text-muted-foreground"}>{t("databases.data.allowWrites")}</span>
           </label>
         ) : null}
-        <span className="text-xs text-grid-muted">{t("databases.data.runHint")}</span>
+        <span className="text-xs text-muted-foreground">{t("databases.data.runHint")}</span>
       </div>
       {allowWrites ? (
-        <Alert className="mt-3" variant="destructive">
-          <AlertDescription>{t("databases.data.allowWritesHint")}</AlertDescription>
-        </Alert>
+        <Alert tone="danger" className="mt-3">
+{t("databases.data.allowWritesHint")}
+</Alert>
       ) : null}
       <ConfirmButton
         open={confirmOpen}
@@ -377,8 +377,8 @@ function SqlConsole({
       />
       <FormError message={error} />
       {result ? (
-        <div className="-mx-6 mt-4 border-t border-line">
-          <div className="flex items-center justify-between gap-3 px-6 py-2 text-xs text-grid-muted" dir="ltr">
+        <div className="-mx-6 mt-4 border-t border-border">
+          <div className="flex items-center justify-between gap-3 px-6 py-2 text-xs text-muted-foreground" dir="ltr">
             <span>
               {t("databases.data.rowCount", { count: result.row_count })}
               {result.truncated ? ` — ${t("databases.data.truncated")}` : ""}

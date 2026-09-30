@@ -13,6 +13,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/app"
 	"github.com/fadymondy/hosbah/internal/brand"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/quota"
 	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
@@ -40,6 +41,10 @@ func UserServer() *Server {
 
 func authenticateUser(ctx context.Context, a *app.App, bearer string) (Caller, error) {
 	if !tokens.HasPrefix(bearer, tokens.UserMCP) || a == nil {
+		// Not one of Hosbah's own tokens: a CircleXO hub token, when that integration is on.
+		if c, err, ok := authHub(ctx, a, bearer); ok {
+			return c, err
+		}
 		return Caller{}, ErrUnauthorized
 	}
 	hash := tokens.Hash(bearer)
@@ -97,6 +102,9 @@ func auditChanges(env *Env, extra map[string]any) map[string]any {
 	}
 	extra["via"] = "mcp"
 	extra["mcp_token_id"] = env.Caller.TokenID
+	if len(env.Caller.Actors) > 0 {
+		extra["via_actors"] = env.Caller.Actors
+	}
 	return extra
 }
 
@@ -289,6 +297,9 @@ func UserTools() []Tool {
 			}),
 			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				if err := needs(ctx, env, tenancy.AbilityManageMembers); err != nil {
+					return "", err
+				}
+				if err := quota.CheckMembers(ctx, env.Q, env.Caller.TeamID); err != nil {
 					return "", err
 				}
 				email := strings.ToLower(args.Str("email"))

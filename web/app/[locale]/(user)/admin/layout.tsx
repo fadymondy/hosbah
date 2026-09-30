@@ -1,11 +1,12 @@
 "use client"
 
+import { Button, EmptyState } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { ShieldOffIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 
@@ -20,22 +21,10 @@ function Forbidden() {
   const { t, locale } = useI18n()
   useDocumentTitle(t("errors.forbiddenTitle"))
   return (
-    <Empty className="flex-1 border-y">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ShieldOffIcon />
-        </EmptyMedia>
-        <EmptyTitle>
-          <span dir="ltr" className="font-mono">
+    <EmptyState className="flex-1 border-y" icon={ShieldOffIcon} title={<><span dir="ltr" className="font-mono">
             403
-          </span>{" "}
-          {t("errors.forbiddenTitle")}
-        </EmptyTitle>
-        <EmptyDescription>{t("admin.forbidden")}</EmptyDescription>
-      </EmptyHeader>
-      <Button nativeButton={false} render={<Link href={`/${locale}`} />}>
+          </span>{" "}{t("errors.forbiddenTitle")}</>} description={t("admin.forbidden")} actions={<><Button variant="primary" nativeButton={false} render={<Link href={`/${locale}`} />}>
         {t("common.home")}
-      </Button>
-    </Empty>
+      </Button></>} />
   )
 }

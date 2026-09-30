@@ -1,14 +1,15 @@
 "use client"
 
+import { Badge, Button, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
+
 import { apiFetch, ApiError, type Role, type Team } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 
@@ -57,10 +58,10 @@ export default function InvitePage() {
     return (
       <AuthFrame title={t("invite.title")} description={t("invite.signInFirst")}>
         <div className="flex flex-col gap-2">
-          <Button nativeButton={false} render={<Link href={`/${locale}/login?next=${back}`} />}>
+          <Button variant="primary" nativeButton={false} render={<Link href={`/${locale}/login?next=${back}`} />}>
             {t("auth.login.title")}
           </Button>
-          <Button variant="outline" nativeButton={false} render={<Link href={`/${locale}/register?next=${back}`} />}>
+          <Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/register?next=${back}`} />}>
             {t("auth.register.title")}
           </Button>
         </div>
@@ -91,11 +92,11 @@ export default function InvitePage() {
               </dd>
               <dt className="text-muted-foreground">{t("invite.role")}</dt>
               <dd>
-                <Badge variant="secondary">{t(`roles.${invite.role}`)}</Badge>
+                <Badge variant="neutral">{t(`roles.${invite.role}`)}</Badge>
               </dd>
             </dl>
             {pending ? (
-              <Button onClick={accept} disabled={busy}>
+              <Button variant="primary" onClick={accept} disabled={busy}>
                 {busy ? t("common.working") : t("invite.accept")}
               </Button>
             ) : (

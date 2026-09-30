@@ -80,6 +80,11 @@ func (d *deps) registerApprovals(api huma.API) {
 			}
 			out.Body.Enabled = t.RequireDestructiveApproval
 
+			// Overdue requests are expired here, so the page never offers a button that cannot work.
+			if _, err := q.ExpireApprovalRequestsOfTeam(ctx, m.TeamID); err != nil {
+				return huma.Error500InternalServerError("could not list approval requests")
+			}
+
 			limit := int32(in.Limit)
 			if limit == 0 {
 				limit = 50
@@ -116,7 +121,7 @@ func (d *deps) registerApprovals(api huma.API) {
 					// The statement only matches a pending, unexpired row of this team, so one
 					// answer covers "no such request", "already decided" and "expired" — and the
 					// caller cannot tell a stranger's id from a stale one, which is the point.
-					return huma.Error404NotFound("no pending approval request with that id")
+					return huma.Error404NotFound("no pending approval request with that id: it expired or was already decided")
 				}
 				if err := tenancy.Record(ctx, q, m.TeamID, id.ID, action, r.ResourceType, r.ResourceName,
 					map[string]any{"tool": r.Tool, "approval_request": r.ID, "mcp_token_id": r.TokenID}); err != nil {

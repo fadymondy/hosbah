@@ -1,6 +1,7 @@
 "use client"
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { ROLES, type Role } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 

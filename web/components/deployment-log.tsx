@@ -1,11 +1,12 @@
 "use client"
 
+import { ScrollArea } from "@fadymondy/nasaq/web"
 import { useEffect, useRef, useState } from "react"
 import { LoaderIcon } from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
 import { clock, lineTone, render, scrollToEnd } from "@/components/op-log"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 import { isActive, type Deployment, type DeployLogLine } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 import { useEventStream } from "@/lib/servers"
@@ -75,7 +76,7 @@ export function DeploymentLog({
       data-status={live.status}
       data-lines={lines.length}
     >
-      <div className="grid-rule-bottom flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
+      <div className="border-b border-border flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
         <span className="font-medium">
           {t(`apps.deploy.kinds.${live.kind}`, undefined, live.kind)}{" "}
           <span dir="ltr" className="font-mono">
@@ -99,7 +100,7 @@ export function DeploymentLog({
         </span>
       </div>
       {live.error ? (
-        <p dir="auto" role="alert" className="grid-rule-bottom px-4 py-2 text-sm text-destructive">
+        <p dir="auto" role="alert" className="border-b border-border px-4 py-2 text-sm text-destructive">
           {live.error}
         </p>
       ) : null}

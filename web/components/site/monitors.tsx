@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import {
   ActivityIcon,
@@ -14,7 +15,6 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -25,15 +25,15 @@ import type { NotificationChannel } from "@/components/notification-channels"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -166,13 +166,13 @@ export function SiteMonitors() {
         <SectionTitle id="mon-h" title={t("site.nav.monitors")} hint={t("site.planned.monitors.hint")} action={add} />
         <ErrorBand message={error} />
         {pingURL ? (
-          <div className="border-b border-line px-6 py-4">
+          <div className="border-b border-border px-6 py-4">
             <p dir="auto" className="mb-2 text-sm font-medium">
               {t("site.monitors.pingUrlTitle")} — {pingURL.name}
             </p>
-            <p className="mb-2 text-xs text-grid-muted">{t("site.monitors.pingUrlHint")}</p>
+            <p className="mb-2 text-xs text-muted-foreground">{t("site.monitors.pingUrlHint")}</p>
             <CopyField value={pingURL.url} />
-            <p className="mt-2 text-xs text-grid-muted">{t("site.monitors.pingUrlCurl")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("site.monitors.pingUrlCurl")}</p>
             <CopyField block value={`curl ${pingURL.url}`} className="mt-1" />
             <Button size="sm" variant="ghost" className="mt-2" onClick={() => setPingURL(null)}>
               {t("common.done")}
@@ -182,16 +182,7 @@ export function SiteMonitors() {
         {monitors === null ? (
           <LoadingRows rows={3} />
         ) : monitors.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <BellRingIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("site.monitors.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("site.monitors.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {add}
-          </Empty>
+          <EmptyState className="border-b" icon={BellRingIcon} title={t("site.monitors.emptyTitle")} description={t("site.monitors.emptyHint")} actions={<>{add}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("site.monitors.search")} shown={shown.length} total={monitors.length} />
@@ -211,12 +202,12 @@ export function SiteMonitors() {
                   {shown.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell>
-                        <span className="inline-flex items-center gap-2 font-medium [&_svg]:size-4 [&_svg]:text-grid-brand">
+                        <span className="inline-flex items-center gap-2 font-medium [&_svg]:size-4 [&_svg]:text-nq-brand">
                           {KIND_ICON[m.kind]}
                           <span dir="auto">{m.name}</span>
                         </span>
                         {m.kind === "http" ? (
-                          <div dir="ltr" className="max-w-64 truncate text-start font-mono text-xs text-grid-muted">
+                          <div dir="ltr" className="max-w-64 truncate text-start font-mono text-xs text-muted-foreground">
                             {m.target}
                           </div>
                         ) : null}
@@ -225,16 +216,16 @@ export function SiteMonitors() {
                         {!m.enabled ? (
                           <Badge variant="outline">{t("site.monitors.paused")}</Badge>
                         ) : (
-                          <Badge variant={m.state === "failing" ? "destructive" : m.state === "ok" ? "default" : "secondary"}>
+                          <Badge variant={m.state === "failing" ? "danger" : m.state === "ok" ? "brand" : "neutral"}>
                             {t(`site.monitors.state.${m.state}`)}
                           </Badge>
                         )}
                         {m.open_incident ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-danger">
+                          <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
                             {m.open_incident.reason} · {ago(m.open_incident.opened_at)}
                           </p>
                         ) : m.last_error ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-muted">
+                          <p dir="auto" className="mt-1 max-w-xs text-xs text-muted-foreground">
                             {m.last_error}
                           </p>
                         ) : null}
@@ -247,7 +238,7 @@ export function SiteMonitors() {
                             ? t("site.monitors.ruleHeartbeat", { every: m.heartbeat_interval_seconds, grace: m.heartbeat_grace_seconds })
                             : t("site.monitors.ruleResource", { kind: t(`site.monitors.kinds.${m.kind}`), pct: m.threshold, min: m.window_minutes })}
                       </TableCell>
-                      <TableCell className="text-xs text-grid-muted">
+                      <TableCell className="text-xs text-muted-foreground">
                         {m.kind === "heartbeat"
                           ? m.last_ping_at
                             ? ago(m.last_ping_at)
@@ -263,7 +254,7 @@ export function SiteMonitors() {
                         <TableCell>
                           <div className="flex flex-wrap justify-end gap-2">
                             {m.kind === "heartbeat" ? null : (
-                              <Button size="sm" variant="outline" disabled={busy === m.id || !m.enabled} onClick={() => void check(m)}>
+                              <Button size="sm" variant="secondary" disabled={busy === m.id || !m.enabled} onClick={() => void check(m)}>
                                 <PlayIcon />
                                 {t("site.monitors.checkNow")}
                               </Button>
@@ -285,23 +276,23 @@ export function SiteMonitors() {
       <section aria-labelledby="inc-h">
         <SectionTitle id="inc-h" title={t("site.monitors.incidents")} hint={t("site.monitors.incidentsHint")} />
         {incidents.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <ActivityIcon className="size-4" />
             {t("site.monitors.noIncidents")}
           </p>
         ) : (
-          <ol className="flex flex-col divide-y divide-line border-b border-line">
+          <ol className="flex flex-col divide-y divide-border border-b border-border">
             {incidents.map((i) => (
               <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm">
-                <Badge variant={i.resolved_at ? "secondary" : "destructive"}>{i.resolved_at ? t("site.monitors.resolved") : t("site.monitors.open")}</Badge>
+                <Badge variant={i.resolved_at ? "neutral" : "danger"}>{i.resolved_at ? t("site.monitors.resolved") : t("site.monitors.open")}</Badge>
                 <span dir="auto" className="font-medium">
                   {i.monitor.name}
                 </span>
-                <span dir="auto" className="min-w-0 flex-1 truncate text-grid-muted">
+                <span dir="auto" className="min-w-0 flex-1 truncate text-muted-foreground">
                   {i.reason}
                   {i.last_value ? ` (${i.last_value})` : ""}
                 </span>
-                <span dir="ltr" className="text-xs text-grid-muted">
+                <span dir="ltr" className="text-xs text-muted-foreground">
                   {fmt(i.opened_at)}
                   {i.resolved_at ? ` → ${fmt(i.resolved_at)}` : ""}
                 </span>
@@ -310,7 +301,7 @@ export function SiteMonitors() {
           </ol>
         )}
         {cursor ? (
-          <div className="flex justify-center border-b border-line px-6 py-3">
+          <div className="flex justify-center border-b border-border px-6 py-3">
             <Button variant="ghost" size="sm" onClick={() => void more()}>
               {t("site.monitors.more")}
             </Button>
@@ -365,10 +356,10 @@ function UptimeBadge({ path, monitor: m }: { path: string; monitor: Monitor }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, m.id])
 
-  if (!uptime) return <span className="text-grid-muted">—</span>
+  if (!uptime) return <span className="text-muted-foreground">—</span>
   const title = `${t("site.monitors.uptime7d")}: ${uptime.last_7d}% · ${t("site.monitors.uptime30d")}: ${uptime.last_30d}%`
   return (
-    <Badge variant={uptime.last_24h >= 99.9 ? "default" : uptime.last_24h >= 95 ? "secondary" : "destructive"} title={title} dir="ltr">
+    <Badge variant={uptime.last_24h >= 99.9 ? "brand" : uptime.last_24h >= 95 ? "neutral" : "danger"} title={title} dir="ltr">
       {uptime.last_24h}%
     </Badge>
   )
@@ -477,7 +468,7 @@ export function MonitorDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={monitor ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={monitor ? "secondary" : "primary"} />}>
           {monitor ? <PencilIcon /> : <PlusIcon />}
           {monitor ? t("lists.edit") : t("site.monitors.add")}
         </DialogTrigger>
@@ -488,7 +479,7 @@ export function MonitorDialog({
             <DialogTitle>{monitor ? monitor.name : t("site.monitors.add")}</DialogTitle>
             <DialogDescription>{t("site.monitors.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="mon-name">{t("site.monitors.name")}</FieldLabel>
               <Input id="mon-name" dir="auto" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -588,19 +579,19 @@ export function MonitorDialog({
                 </div>
               </Field>
             ) : (
-              <FieldDescription>{t("site.monitors.noChannels")}</FieldDescription>
+              <p className="text-caption text-muted-foreground">{t("site.monitors.noChannels")}</p>
             )}
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
               {t("site.monitors.enabled")}
             </label>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

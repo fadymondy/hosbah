@@ -1,22 +1,22 @@
 "use client"
 
+import { Badge, Button, Checkbox, Collapsible, CollapsiblePanel, CollapsibleTrigger, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, HistoryIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -207,16 +207,16 @@ export function SiteDeployConfig() {
 
   const usedKeys = new Set((draft?.steps ?? []).map((s) => s.key))
   const availableKeys = DEPLOY_STEP_KEYS.filter((k) => !usedKeys.has(k))
-  const sheetSide = locale === "ar" ? "left" : "right"
+  const sheetSide = "end"
 
   return (
     <>
       <SectionTitle
-        title={t("site.nav.deployScript")}
+        title={t("site.nav.deploy-script")}
         hint={t("site.deployScript.hint")}
         action={
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => {
               setHistoryOpen(true)
@@ -235,8 +235,8 @@ export function SiteDeployConfig() {
         <>
           {!canSave ? <Notice>{t("common.readOnly")}</Notice> : null}
           <fieldset disabled={!canSave || busy} className="contents">
-            <div className="border-b border-line px-6 py-5">
-              <p className="mb-3 text-sm font-medium text-grid-fg">{t("site.deployScript.mode")}</p>
+            <div className="border-b border-border px-6 py-5">
+              <p className="mb-3 text-sm font-medium text-foreground">{t("site.deployScript.mode")}</p>
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("site.deployScript.mode")}>
                 {(["auto", "fast", "full"] as DeployMode[]).map((m) => (
                   <button
@@ -247,19 +247,19 @@ export function SiteDeployConfig() {
                     onClick={() => setDraft((d) => (d ? { ...d, mode: m } : d))}
                     className={cn(
                       "flex-1 min-w-40 border px-3 py-2 text-start transition-colors",
-                      draft.mode === m ? "border-[var(--grid-brand)] bg-grid-soft" : "border-line hover:bg-grid-soft",
+                      draft.mode === m ? "border-nq-brand bg-secondary" : "border-border hover:bg-secondary",
                     )}
                   >
-                    <span className="block text-sm font-medium text-grid-fg">{t(`site.deployScript.modes.${m}`)}</span>
-                    <span className="block text-xs text-grid-muted">{t(`site.deployScript.modeHints.${m}`)}</span>
+                    <span className="block text-sm font-medium text-foreground">{t(`site.deployScript.modes.${m}`)}</span>
+                    <span className="block text-xs text-muted-foreground">{t(`site.deployScript.modeHints.${m}`)}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="border-b border-line px-6 py-5">
-              <p className="mb-2 text-sm font-medium text-grid-fg">{t("site.deployScript.preset")}</p>
-              <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.deployScript.presetHint")}</p>
+            <div className="border-b border-border px-6 py-5">
+              <p className="mb-2 text-sm font-medium text-foreground">{t("site.deployScript.preset")}</p>
+              <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.deployScript.presetHint")}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={draft.preset} onValueChange={(v) => v && applyPreset(v, false)} disabled={!canSave || busy || !presets}>
                   <SelectTrigger className="w-full sm:w-64">
@@ -273,19 +273,19 @@ export function SiteDeployConfig() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" size="sm" disabled={!canSave || busy || detecting} onClick={() => void detectPreset()}>
+                <Button type="button" variant="secondary" size="sm" disabled={!canSave || busy || detecting} onClick={() => void detectPreset()}>
                   <SearchIcon />
                   {detecting ? t("common.working") : t("site.deployScript.detect")}
                 </Button>
                 {config?.detected_preset ? (
-                  <span className="text-xs text-grid-muted">{t("site.deployScript.detectedAs", { preset: config.detected_preset })}</span>
+                  <span className="text-xs text-muted-foreground">{t("site.deployScript.detectedAs", { preset: config.detected_preset })}</span>
                 ) : null}
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-b border-line px-6 py-5">
+            <div className="flex flex-col gap-3 border-b border-border px-6 py-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-grid-fg">{t("site.deployScript.steps")}</p>
+                <p className="text-sm font-medium text-foreground">{t("site.deployScript.steps")}</p>
                 <Select
                   value={addKey}
                   onValueChange={(v) => {
@@ -311,11 +311,11 @@ export function SiteDeployConfig() {
               </div>
 
               {draft.steps.length === 0 ? (
-                <p className="py-4 text-sm text-grid-muted">{t("site.deployScript.stepsEmpty")}</p>
+                <p className="py-4 text-sm text-muted-foreground">{t("site.deployScript.stepsEmpty")}</p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {draft.steps.map((s, i) => (
-                    <div key={`${s.key}-${i}`} className="flex flex-col gap-3 border border-line bg-grid-card px-4 py-3">
+                    <div key={`${s.key}-${i}`} className="flex flex-col gap-3 border border-border bg-card px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" dir="ltr">
                           {t(`site.deployScript.stepKeys.${s.key}`, undefined, s.key)}
@@ -328,7 +328,7 @@ export function SiteDeployConfig() {
                           aria-label={t("site.deployScript.stepName")}
                           className="min-w-0 flex-1"
                         />
-                        <label className="flex items-center gap-2 text-xs text-grid-muted">
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Checkbox checked={s.enabled} onCheckedChange={(v) => updateStep(i, { enabled: v === true })} />
                           {t("site.deployScript.enabled")}
                         </label>
@@ -366,16 +366,16 @@ export function SiteDeployConfig() {
               )}
             </div>
 
-            <div className="border-b border-line px-6 py-5">
+            <div className="border-b border-border px-6 py-5">
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger render={<button type="button" className="flex w-full items-center justify-between text-start group/deploy-adv" />}>
-                  <span className="text-sm font-medium text-grid-fg">{t("site.deployScript.advanced")}</span>
-                  <ChevronDownIcon className="size-4 text-grid-muted transition-transform group-aria-expanded/deploy-adv:rotate-180" />
+                  <span className="text-sm font-medium text-foreground">{t("site.deployScript.advanced")}</span>
+                  <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-aria-expanded/deploy-adv:rotate-180" />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
-                  <p className="mb-3 max-w-xl text-xs text-grid-muted">{t("site.deployScript.advancedHint")}</p>
+                <CollapsiblePanel className="pt-4">
+                  <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.deployScript.advancedHint")}</p>
                   <div className="mb-4">
-                    <label className="mb-1 block text-xs font-medium text-grid-fg">{t("site.deployScript.builderImage")}</label>
+                    <label className="mb-1 block text-xs font-medium text-foreground">{t("site.deployScript.builderImage")}</label>
                     <Input
                       dir="ltr"
                       maxLength={200}
@@ -386,8 +386,8 @@ export function SiteDeployConfig() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-grid-fg">{t("site.deployScript.outputs")}</label>
-                    <p className="mb-2 text-xs text-grid-muted">{t("site.deployScript.outputsHint")}</p>
+                    <label className="mb-1 block text-xs font-medium text-foreground">{t("site.deployScript.outputs")}</label>
+                    <p className="mb-2 text-xs text-muted-foreground">{t("site.deployScript.outputsHint")}</p>
                     <div className="mb-2 flex flex-wrap gap-2">
                       {draft.outputs.map((o, i) => (
                         <Badge key={`${o}-${i}`} variant="outline" dir="ltr" className="gap-1">
@@ -413,13 +413,13 @@ export function SiteDeployConfig() {
                         }}
                         className="w-full sm:w-64"
                       />
-                      <Button type="button" variant="outline" size="sm" onClick={addOutput}>
+                      <Button type="button" variant="secondary" size="sm" onClick={addOutput}>
                         <PlusIcon />
                         {t("site.deployScript.addOutput")}
                       </Button>
                     </div>
                   </div>
-                </CollapsibleContent>
+                </CollapsiblePanel>
               </Collapsible>
             </div>
           </fieldset>
@@ -427,13 +427,13 @@ export function SiteDeployConfig() {
       )}
 
       {canSave && dirty ? (
-        <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-popover/95 px-6 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80">
-          <p className="text-xs text-grid-muted">{t("site.deployScript.unsaved")}</p>
+        <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-border bg-popover/95 px-6 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80">
+          <p className="text-xs text-muted-foreground">{t("site.deployScript.unsaved")}</p>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={discard}>
+            <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={discard}>
               {t("common.discard")}
             </Button>
-            <Button type="button" size="sm" disabled={busy} onClick={() => void save()}>
+            <Button variant="primary" type="button" size="sm" disabled={busy} onClick={() => void save()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>
@@ -447,17 +447,17 @@ export function SiteDeployConfig() {
             <DialogDescription>{t("site.deployScript.presetConfirmBody")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingPreset(null)}>
+            <Button variant="secondary" onClick={() => setPendingPreset(null)}>
               {t("common.cancel")}
             </Button>
-            <Button onClick={() => pendingPreset && applyPreset(pendingPreset, true)}>{t("site.deployScript.presetConfirmAction")}</Button>
+            <Button variant="primary" onClick={() => pendingPreset && applyPreset(pendingPreset, true)}>{t("site.deployScript.presetConfirmAction")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent side={sheetSide} className="w-full gap-0 p-0 sm:max-w-md">
-          <SheetHeader className="border-b border-line px-4 py-4">
+          <SheetHeader className="border-b border-border px-4 py-4">
             <SheetTitle>{t("site.deployScript.history")}</SheetTitle>
             <SheetDescription>{t("site.deployScript.historyHint", { name: app.name })}</SheetDescription>
           </SheetHeader>
@@ -465,7 +465,7 @@ export function SiteDeployConfig() {
             {versions === null ? (
               <LoadingRows rows={4} />
             ) : versions.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-grid-muted">{t("site.deployScript.historyEmpty")}</p>
+              <p className="px-4 py-6 text-sm text-muted-foreground">{t("site.deployScript.historyEmpty")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -491,7 +491,7 @@ export function SiteDeployConfig() {
                       <TableCell dir="ltr">{new Date(v.created_at).toLocaleString(locale)}</TableCell>
                       {canSave ? (
                         <TableCell className="text-end">
-                          <Button size="sm" variant="outline" disabled={v.version === config?.version} onClick={() => setRestoreTarget(v)}>
+                          <Button size="sm" variant="secondary" disabled={v.version === config?.version} onClick={() => setRestoreTarget(v)}>
                             {t("site.deployScript.restore")}
                           </Button>
                         </TableCell>
@@ -512,10 +512,10 @@ export function SiteDeployConfig() {
             <DialogDescription>{restoreTarget ? t("site.deployScript.restoreConfirmBody", { version: restoreTarget.version }) : null}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRestoreTarget(null)} disabled={restoring}>
+            <Button variant="secondary" onClick={() => setRestoreTarget(null)} disabled={restoring}>
               {t("common.cancel")}
             </Button>
-            <Button disabled={restoring} onClick={() => restoreTarget && void restore(restoreTarget)}>
+            <Button variant="primary" disabled={restoring} onClick={() => restoreTarget && void restore(restoreTarget)}>
               {restoring ? t("common.working") : t("site.deployScript.restoreConfirmAction")}
             </Button>
           </DialogFooter>

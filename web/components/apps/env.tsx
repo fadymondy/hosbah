@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Checkbox, EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { EyeIcon, InfoIcon, KeyRoundIcon, PencilIcon } from "lucide-react"
 
@@ -8,12 +9,12 @@ import type { Controlled } from "@/components/dialog-state"
 import { useErrorText } from "@/components/form-error"
 import type { BuildConfig } from "@/components/site/build-config"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { ENV_NAME, type EnvVar } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -147,14 +148,7 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
       {vars === null ? (
         <LoadingRows />
       ) : vars.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <KeyRoundIcon />
-            </EmptyMedia>
-            <EmptyDescription>{t("apps.env.empty")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={KeyRoundIcon} title={t("apps.env.empty")} />
       ) : (
         <TableBand>
           <Table>
@@ -193,14 +187,14 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
                     <TableCell>
                       <div className="flex justify-end gap-2">
                         {!(v.name in revealed) ? (
-                          <Button size="sm" variant="outline" onClick={() => reveal(v.name)} title={t("apps.env.revealHint")}>
+                          <Button size="sm" variant="secondary" onClick={() => reveal(v.name)} title={t("apps.env.revealHint")}>
                             <EyeIcon />
                             {t("apps.env.reveal")}
                           </Button>
                         ) : null}
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           onClick={() => {
                             setName(v.name)
                             setValue("")
@@ -251,14 +245,14 @@ export function EnvPanel({ path, manage }: { path: string; manage: boolean }) {
               autoComplete="off"
             />
           </SettingsRow>
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy || !nameOK}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy || !nameOK}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>
         </form>
       ) : (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("common.readOnly")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("common.readOnly")}</p>
       )}
     </div>
   )

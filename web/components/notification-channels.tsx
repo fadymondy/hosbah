@@ -1,23 +1,23 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BellIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
+
+
+
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -88,16 +88,7 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
       {channels === null ? (
         <LoadingRows rows={2} />
       ) : channels.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BellIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("alerts.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("alerts.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={BellIcon} title={t("alerts.emptyTitle")} description={t("alerts.emptyHint")} actions={<>{add}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("alerts.search")} shown={shown.length} total={channels.length} />
@@ -126,16 +117,16 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
                       ) : null}
                     </TableCell>
                     <TableCell>{t(`alerts.kinds.${c.kind}`)}</TableCell>
-                    <TableCell dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-muted-foreground">
                       {c.kind === "email" ? c.emails.join(", ") : c.url_hint}
                     </TableCell>
-                    <TableCell className="text-xs text-grid-muted">
+                    <TableCell className="text-xs text-muted-foreground">
                       {c.events.length ? c.events.map((e) => t(`alerts.eventNames.${e}`)).join(", ") : "—"}
                     </TableCell>
                     {manage ? (
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => void test(c)}>
+                          <Button size="sm" variant="secondary" disabled={busy === c.id} onClick={() => void test(c)}>
                             <PlayIcon />
                             {t("alerts.test")}
                           </Button>
@@ -250,7 +241,7 @@ function ChannelDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={channel ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={channel ? "secondary" : "primary"} />}>
           {channel ? <PencilIcon /> : <PlusIcon />}
           {channel ? t("lists.edit") : t("alerts.add")}
         </DialogTrigger>
@@ -261,7 +252,7 @@ function ChannelDialog({
             <DialogTitle>{channel ? channel.name : t("alerts.add")}</DialogTitle>
             <DialogDescription>{t("alerts.emptyHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="ch-name">{t("alerts.name")}</FieldLabel>
               <Input id="ch-name" dir="auto" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -341,13 +332,13 @@ function ChannelDialog({
               <Checkbox checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
               {t("alerts.enabled")}
             </label>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

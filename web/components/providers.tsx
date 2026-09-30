@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, type ReactNode } from "react"
-import { ThemeProvider } from "next-themes"
+import { NasaqProvider, Toaster } from "@fadymondy/nasaq/web"
 
-import { Toaster } from "@/components/ui/sonner"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { installDiagnostics } from "@/lib/feedback/core/diagnostics"
 import { I18nProvider, type Dict } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n-config"
@@ -18,12 +16,11 @@ export function Providers({ locale, dict, children }: { locale: Locale; dict: Di
 
   return (
     <I18nProvider locale={locale} dict={dict}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        <TooltipProvider>
-          {children}
-          <Toaster position={locale === "ar" ? "top-left" : "top-right"} dir={locale === "ar" ? "rtl" : "ltr"} />
-        </TooltipProvider>
-      </ThemeProvider>
+      {/* The locale is owned by the URL (/en, /ar), so it is passed in; the theme is Nasaq's own. */}
+      <NasaqProvider brand="hosbah" defaultTheme="system" locale={locale} density="compact">
+        {children}
+        <Toaster />
+      </NasaqProvider>
     </I18nProvider>
   )
 }

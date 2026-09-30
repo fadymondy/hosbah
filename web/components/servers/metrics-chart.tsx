@@ -137,26 +137,26 @@ export function MetricChart({
       </svg>
       {hover != null && hoverAt ? (
         <div
-          className="pointer-events-none absolute top-1 z-10 flex max-w-[12rem] flex-col gap-0.5 rounded border border-line bg-grid-card px-2 py-1 text-[11px] shadow-sm"
+          className="pointer-events-none absolute top-1 z-10 flex max-w-[12rem] flex-col gap-0.5 rounded border border-border bg-card px-2 py-1 text-[11px] shadow-sm"
           style={{
             left: `${Math.min(88, Math.max(0, (x(hover) / w) * 100))}%`,
             transform: (x(hover) / w) * 100 > 50 ? "translateX(-100%)" : undefined,
           }}
         >
-          <span className="text-grid-muted">{formatTime(hoverAt)}</span>
+          <span className="text-muted-foreground">{formatTime(hoverAt)}</span>
           {series.map((s) => {
             const p = s.points[hover]
             return (
               <span key={s.key} className="flex items-center gap-1.5">
                 <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: s.color }} />
-                <span className="text-grid-muted">{s.label}</span>
-                <span className="ms-auto font-mono tabular-nums text-grid-fg">{p?.value == null ? "—" : fmt(p.value)}</span>
+                <span className="text-muted-foreground">{s.label}</span>
+                <span className="ms-auto font-mono tabular-nums text-foreground">{p?.value == null ? "—" : fmt(p.value)}</span>
               </span>
             )
           })}
         </div>
       ) : null}
-      <div className="mt-1 flex justify-between text-[10px] text-grid-muted">
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
         <span>{first ? formatTime(first.at) : ""}</span>
         <span>{last ? formatTime(last.at) : ""}</span>
       </div>

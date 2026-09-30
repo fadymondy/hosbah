@@ -1,19 +1,20 @@
 "use client"
 
+import { Badge, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { NetworkIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+
+
+
 
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -98,21 +99,12 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
       <SectionTitle id="tunnels-h" title={t("tunnels.title")} hint={t("tunnels.hint")} />
       <ErrorBand message={error} />
       {rows.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <NetworkIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("lists.noTunnels")}</EmptyTitle>
-            {manage && creds.length === 0 ? <EmptyDescription>{t("lists.noTunnelCreds")}</EmptyDescription> : null}
-          </EmptyHeader>
-          {manage && creds.length === 0 ? (
-            <Button variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/credentials`} />}>
+        <EmptyState className="border-b" icon={NetworkIcon} title={t("lists.noTunnels")} description={manage && creds.length === 0 ? t("lists.noTunnelCreds") : undefined} actions={<>{manage && creds.length === 0 ? (
+            <Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/credentials`} />}>
               <PlusIcon />
               {t("lists.credentials")}
             </Button>
-          ) : null}
-        </Empty>
+          ) : null}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchTunnels")} shown={shown.length} total={rows.length} />
@@ -131,16 +123,16 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">
                       <span className="inline-flex items-center gap-2">
-                        <NetworkIcon className="size-4 text-grid-brand" />
+                        <NetworkIcon className="size-4 text-nq-brand" />
                         {t(`tunnels.kinds.${r.kind}`)}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={r.status === "active" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                      <Badge variant={r.status === "active" ? "brand" : r.status === "failed" ? "danger" : "neutral"}>
                         {t(`tunnels.status.${r.status}`, undefined, r.status)}
                       </Badge>
                       {r.error ? (
-                        <p dir="auto" className="mt-1 max-w-md text-xs text-grid-danger">
+                        <p dir="auto" className="mt-1 max-w-md text-xs text-nq-danger-text">
                           {r.error}
                         </p>
                       ) : null}
@@ -154,7 +146,7 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
                           {creds.some((c) => c.provider === r.kind) ? (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="secondary"
                               disabled={busy}
                               onClick={() => {
                                 const c = creds.find((x) => x.provider === r.kind)
@@ -198,7 +190,7 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
                 ))}
               </SelectContent>
             </Select>
-            <Button disabled={busy || !choice} onClick={() => void open()}>
+            <Button variant="primary" disabled={busy || !choice} onClick={() => void open()}>
               <PlusIcon />
               {busy ? t("common.working") : t("tunnels.open")}
             </Button>

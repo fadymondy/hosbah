@@ -1,8 +1,8 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CalendarClockIcon, HistoryIcon, PauseIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
@@ -11,14 +11,14 @@ import { useTimeAgo } from "@/components/home/sparkline"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
@@ -51,12 +51,12 @@ type Run = {
   output?: string
 }
 
-const TONE: Record<RunStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  queued: "secondary",
-  running: "secondary",
-  succeeded: "default",
-  failed: "destructive",
-  timeout: "destructive",
+const TONE: Record<RunStatus, "success" | "neutral" | "danger" | "outline"> = {
+  queued: "neutral",
+  running: "neutral",
+  succeeded: "success",
+  failed: "danger",
+  timeout: "danger",
   skipped: "outline",
 }
 const PRESETS = ["* * * * *", "*/5 * * * *", "0 * * * *", "0 3 * * *", "0 9 * * 1-5", "0 0 1 * *"]
@@ -122,16 +122,7 @@ export function SiteSchedules() {
         {items === null ? (
           <LoadingRows rows={3} />
         ) : items.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <CalendarClockIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("site.schedules.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("site.schedules.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {add}
-          </Empty>
+          <EmptyState className="border-b" icon={CalendarClockIcon} title={t("site.schedules.emptyTitle")} description={t("site.schedules.emptyHint")} actions={<>{add}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("site.schedules.search")} shown={shown.length} total={items.length} />
@@ -153,7 +144,7 @@ export function SiteSchedules() {
                         <span dir="auto" className="font-medium">
                           {s.name}
                         </span>
-                        <div dir="ltr" className="max-w-72 truncate text-start font-mono text-xs text-grid-muted" title={s.command}>
+                        <div dir="ltr" className="max-w-72 truncate text-start font-mono text-xs text-muted-foreground" title={s.command}>
                           {s.command}
                         </div>
                       </TableCell>
@@ -161,7 +152,7 @@ export function SiteSchedules() {
                         <code dir="ltr" className="font-mono text-xs">
                           {s.cron}
                         </code>
-                        <div dir="ltr" className="text-start text-xs text-grid-muted">
+                        <div dir="ltr" className="text-start text-xs text-muted-foreground">
                           {s.timezone}
                         </div>
                       </TableCell>
@@ -169,10 +160,10 @@ export function SiteSchedules() {
                         {s.last_run ? (
                           <span className="flex flex-col items-start gap-1">
                             <Badge variant={TONE[s.last_run.status]}>{t(`site.schedules.status.${s.last_run.status}`)}</Badge>
-                            <span className="text-xs text-grid-muted">{s.last_run.started_at ? ago(s.last_run.started_at) : ""}</span>
+                            <span className="text-xs text-muted-foreground">{s.last_run.started_at ? ago(s.last_run.started_at) : ""}</span>
                           </span>
                         ) : (
-                          <span className="text-xs text-grid-muted">{t("site.schedules.never")}</span>
+                          <span className="text-xs text-muted-foreground">{t("site.schedules.never")}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
@@ -180,14 +171,14 @@ export function SiteSchedules() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setHistory(s)}>
+                          <Button size="sm" variant="secondary" onClick={() => setHistory(s)}>
                             <HistoryIcon />
                             {t("site.schedules.runs")}
                           </Button>
                           {operate ? (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="secondary"
                               disabled={busy === s.id}
                               onClick={() => void act(s, () => apiFetch(`${path}/schedules/${s.id}/run`, { method: "POST" }), t("site.schedules.started"))}
                             >
@@ -199,7 +190,7 @@ export function SiteSchedules() {
                             <>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
                                 disabled={busy === s.id}
                                 onClick={() =>
                                   void act(s, () => apiFetch(`${path}/schedules/${s.id}`, { method: "PATCH", body: { enabled: !s.enabled } }), t("site.saved"))
@@ -282,26 +273,26 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
       {runs === null ? (
         <LoadingRows rows={3} />
       ) : runs.length === 0 ? (
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.schedules.never")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.schedules.never")}</p>
       ) : (
-        <div className="grid border-b border-line xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <ol className="flex max-h-[28rem] min-w-0 flex-col divide-y divide-line overflow-y-auto border-b border-line xl:border-e xl:border-b-0">
+        <div className="grid border-b border-border xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <ol className="flex max-h-[28rem] min-w-0 flex-col divide-y divide-border overflow-y-auto border-b border-border xl:border-e xl:border-b-0">
             {runs.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
                   aria-current={picked?.id === r.id}
                   onClick={() => void open(r)}
-                  className={cn("flex w-full flex-wrap items-center gap-2 px-6 py-3 text-start text-sm hover:bg-grid-soft", picked?.id === r.id && "bg-grid-soft")}
+                  className={cn("flex w-full flex-wrap items-center gap-2 px-6 py-3 text-start text-sm hover:bg-secondary", picked?.id === r.id && "bg-secondary")}
                 >
                   <Badge variant={TONE[r.status]}>{t(`site.schedules.status.${r.status}`)}</Badge>
-                  <span className="text-xs text-grid-muted">{t(`site.schedules.trigger.${r.trigger}`)}</span>
+                  <span className="text-xs text-muted-foreground">{t(`site.schedules.trigger.${r.trigger}`)}</span>
                   {r.exit_code != null ? (
-                    <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                    <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                       exit {r.exit_code}
                     </span>
                   ) : null}
-                  <span dir="ltr" className="ms-auto text-xs text-grid-muted">
+                  <span dir="ltr" className="ms-auto text-xs text-muted-foreground">
                     {r.started_at ? fmt(r.started_at) : "—"}
                     {r.duration_ms != null ? ` · ${(r.duration_ms / 1000).toFixed(1)}s` : ""}
                   </span>
@@ -318,17 +309,17 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
           </ol>
           <div className="min-w-0">
             {!picked ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{t("site.schedules.pickRun")}</p>
+              <p className="px-6 py-4 text-sm text-muted-foreground">{t("site.schedules.pickRun")}</p>
             ) : !canRead ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{t("site.schedules.outputHidden")}</p>
+              <p className="px-6 py-4 text-sm text-muted-foreground">{t("site.schedules.outputHidden")}</p>
             ) : (
               <>
                 {picked.error ? (
-                  <p dir="auto" className="border-b border-line px-6 py-3 text-sm text-grid-danger">
+                  <p dir="auto" className="border-b border-border px-6 py-3 text-sm text-nq-danger-text">
                     {picked.error}
                   </p>
                 ) : null}
-                <pre dir="ltr" className="max-h-[28rem] overflow-auto px-6 py-4 text-start font-mono text-xs leading-5 whitespace-pre-wrap text-grid-fg">
+                <pre dir="ltr" className="max-h-[28rem] overflow-auto px-6 py-4 text-start font-mono text-xs leading-5 whitespace-pre-wrap text-foreground">
                   {picked.output === undefined ? "…" : picked.output || t("site.schedules.noOutput")}
                 </pre>
               </>
@@ -431,7 +422,7 @@ export function ScheduleDialog({ path, schedule, onSaved, ...controlled }: { pat
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={schedule ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={schedule ? "secondary" : "primary"} />}>
           {schedule ? <PencilIcon /> : <PlusIcon />}
           {schedule ? t("lists.edit") : t("site.schedules.add")}
         </DialogTrigger>
@@ -442,7 +433,7 @@ export function ScheduleDialog({ path, schedule, onSaved, ...controlled }: { pat
             <DialogTitle>{schedule ? schedule.name : t("site.schedules.add")}</DialogTitle>
             <DialogDescription>{t("site.schedules.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="sch-name">{t("site.monitors.name")}</FieldLabel>
               <Input id="sch-name" dir="auto" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -457,15 +448,15 @@ export function ScheduleDialog({ path, schedule, onSaved, ...controlled }: { pat
               <Input id="sch-cron" dir="ltr" required value={cron} onChange={(e) => setCron(e.target.value)} className="font-mono" />
               <div className="flex flex-wrap gap-1">
                 {PRESETS.map((p) => (
-                  <button key={p} type="button" dir="ltr" onClick={() => setCron(p)} className="border border-line px-1.5 py-0.5 font-mono text-xs text-grid-muted hover:bg-grid-soft hover:text-grid-fg">
+                  <button key={p} type="button" dir="ltr" onClick={() => setCron(p)} className="border border-border px-1.5 py-0.5 font-mono text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">
                     {p}
                   </button>
                 ))}
               </div>
               {previewError ? (
-                <p className="text-xs text-grid-danger">{previewError}</p>
+                <p className="text-xs text-nq-danger-text">{previewError}</p>
               ) : preview?.length ? (
-                <p className="text-xs text-grid-muted">
+                <p className="text-xs text-muted-foreground">
                   {t("site.schedules.nextRuns")}{" "}
                   <span dir="ltr">{preview.slice(0, 3).map((d) => fmt(d)).join(" · ")}</span>
                 </p>
@@ -485,13 +476,13 @@ export function ScheduleDialog({ path, schedule, onSaved, ...controlled }: { pat
               <Checkbox checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />
               {t("site.monitors.enabled")}
             </label>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !command.trim() || !!previewError}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || !command.trim() || !!previewError}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 
 import { PageBody } from "@/components/app-shell"
@@ -7,8 +8,8 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { RoleSelect } from "@/components/role-select"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { apiFetch, type Member, type Role } from "@/lib/api"
 import { useFormatDate, useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
@@ -82,7 +83,7 @@ export default function MembersPage() {
                       {manage && !self ? (
                         <RoleSelect value={m.role} onChange={(r) => changeRole(m, r)} />
                       ) : (
-                        <Badge variant="secondary">{t(`roles.${m.role}`)}</Badge>
+                        <Badge variant="neutral">{t(`roles.${m.role}`)}</Badge>
                       )}
                     </TableCell>
                     <TableCell dir="ltr" className="text-start">

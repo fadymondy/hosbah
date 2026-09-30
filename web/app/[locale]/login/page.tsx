@@ -1,16 +1,17 @@
 "use client"
 
+import { Button, Field, FieldDescription, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type FormEvent } from "react"
 
 import { CodeInput, RecoveryInput, RESEND_SECONDS } from "@/components/auth/code-input"
-import { OAuthButtons, useOAuthErrorText } from "@/components/auth/oauth"
+import { OAuthButtons, useCircleXOErrorText, useOAuthErrorText } from "@/components/auth/oauth"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 import { ApiError } from "@/lib/api"
 import { auth, authMessage, nextStep } from "@/lib/auth"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const next = safeNext(params.get("next"), locale)
   const errorText = useErrorText()
   const oauthErrorText = useOAuthErrorText()
+  const circlexoErrorText = useCircleXOErrorText()
 
   const [mode, setMode] = useState<Mode>("password")
   const [email, setEmail] = useState("")
@@ -41,7 +43,9 @@ export default function LoginPage() {
   const [useRecovery, setUseRecovery] = useState(false)
   const [busy, setBusy] = useState(false)
   // A Google / GitHub round trip that failed comes back with ?oauth_error=<code>.
-  const [error, setError] = useState<string | null>(() => oauthErrorText(params.get("oauth_error")))
+  const [error, setError] = useState<string | null>(
+    () => oauthErrorText(params.get("oauth_error")) ?? circlexoErrorText(params.get("circlexo_error")),
+  )
   useDocumentTitle(challenge ? t("account.twoFactorTitle") : t("auth.login.title"))
 
   // A Google / GitHub sign-in of an account with two-factor comes back with #challenge=<id> (a
@@ -141,7 +145,7 @@ export default function LoginPage() {
         description={useRecovery ? t("account.recoveryIntro") : t("account.twoFactorIntro")}
       >
         <form onSubmit={onSubmit}>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <FormError message={error} />
             <Field>
               <FieldLabel htmlFor={useRecovery ? "recovery" : "code"}>
@@ -154,7 +158,7 @@ export default function LoginPage() {
               )}
             </Field>
             <Field>
-              <Button type="submit" disabled={busy || !second}>
+              <Button variant="primary" type="submit" disabled={busy || !second}>
                 {busy ? t("common.working") : t("account.continue")}
               </Button>
               <Button
@@ -179,7 +183,7 @@ export default function LoginPage() {
                 {t("account.startOver")}
               </Button>
             </Field>
-          </FieldGroup>
+          </div>
         </form>
       </AuthFrame>
     )
@@ -199,7 +203,7 @@ export default function LoginPage() {
       }
     >
       <form onSubmit={onSubmit}>
-        <FieldGroup>
+        <div className="flex w-full flex-col gap-5">
           <FormError message={error} />
           <OAuthButtons next={next} />
           <Field>
@@ -245,7 +249,7 @@ export default function LoginPage() {
           ) : null}
 
           <Field>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy
                 ? t("common.working")
                 : mode === "code" && !codeSent
@@ -261,7 +265,7 @@ export default function LoginPage() {
               {mode === "password" ? t("account.useEmailCode") : t("account.usePassword")}
             </Button>
           </Field>
-        </FieldGroup>
+        </div>
       </form>
     </AuthFrame>
   )

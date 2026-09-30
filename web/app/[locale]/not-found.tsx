@@ -1,9 +1,10 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 
 import { AuthFrame } from "@/components/auth-frame"
-import { Button } from "@/components/ui/button"
+
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 
 export default function NotFound() {
@@ -11,7 +12,7 @@ export default function NotFound() {
   useDocumentTitle(t("auth.notFoundTitle"))
   return (
     <AuthFrame eyebrow="404" title={t("auth.notFoundTitle")} description={t("auth.notFoundHint")}>
-      <Button nativeButton={false} render={<Link href={`/${locale}`} />}>
+      <Button variant="primary" nativeButton={false} render={<Link href={`/${locale}`} />}>
         {t("common.home")}
       </Button>
     </AuthFrame>

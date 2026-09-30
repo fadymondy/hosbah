@@ -1,30 +1,22 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import type {
@@ -104,24 +96,24 @@ function AccessSection({ team, serverId }: { team: string; serverId: string }) {
     <section aria-labelledby="access-h">
       <SectionTitle id="access-h" title={t("servers.security.access.title")} hint={t("servers.security.access.hint")} />
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
-      <div className="border-b border-line px-6 py-4">
-        <h3 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.access.rootPassword")}</h3>
-        <p className="mb-3 text-sm text-grid-muted">{t("servers.security.access.rootPasswordHint")}</p>
+      <div className="border-b border-border px-6 py-4">
+        <h3 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.access.rootPassword")}</h3>
+        <p className="mb-3 text-sm text-muted-foreground">{t("servers.security.access.rootPasswordHint")}</p>
         {manage ? <ResetPasswordDialog base={base} /> : null}
       </div>
 
       <div className="px-6 py-4">
-        <h3 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.access.deployKey")}</h3>
-        <p className="mb-3 text-sm text-grid-muted">{t("servers.security.access.deployKeyHint")}</p>
+        <h3 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.access.deployKey")}</h3>
+        <p className="mb-3 text-sm text-muted-foreground">{t("servers.security.access.deployKeyHint")}</p>
         {key === null ? (
           <LoadingRows rows={1} />
         ) : !key.public_key ? (
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm text-grid-muted">{t("servers.security.access.deployKeyEmpty")}</p>
+            <p className="text-sm text-muted-foreground">{t("servers.security.access.deployKeyEmpty")}</p>
             {manage ? (
-              <Button size="sm" variant="outline" disabled={genBusy} onClick={() => void generate()}>
+              <Button size="sm" variant="secondary" disabled={genBusy} onClick={() => void generate()}>
                 {genBusy ? t("common.working") : t("servers.security.access.deployKeyGenerate")}
               </Button>
             ) : null}
@@ -129,12 +121,12 @@ function AccessSection({ team, serverId }: { team: string; serverId: string }) {
         ) : (
           <div className="flex flex-col gap-3">
             <CopyField value={key.public_key} block />
-            <p dir="ltr" className="text-xs text-grid-muted">
+            <p dir="ltr" className="text-xs text-muted-foreground">
               {key.fingerprint}
             </p>
             {manage ? (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" disabled={genBusy} onClick={() => void generate()}>
+                <Button size="sm" variant="secondary" disabled={genBusy} onClick={() => void generate()}>
                   {genBusy ? t("common.working") : t("servers.security.access.deployKeyRegenerate")}
                 </Button>
                 <AddToGitHubDialog base={base} onAdded={load} />
@@ -193,7 +185,7 @@ function ResetPasswordDialog({ base }: { base: string }) {
         reset()
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="destructive" />}>{t("servers.security.access.resetPassword")}</DialogTrigger>
+      <DialogTrigger render={<Button size="sm" variant="danger" />}>{t("servers.security.access.resetPassword")}</DialogTrigger>
       <DialogContent>
         {result ? (
           <>
@@ -203,7 +195,7 @@ function ResetPasswordDialog({ base }: { base: string }) {
             </DialogHeader>
             <CopyField value={result.password} />
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+              <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </>
         ) : (
@@ -227,10 +219,10 @@ function ResetPasswordDialog({ base }: { base: string }) {
             </Field>
             <FormError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="destructive" disabled={busy}>
+              <Button type="submit" variant="danger" disabled={busy}>
                 {busy ? t("common.working") : t("servers.security.access.resetPasswordConfirm")}
               </Button>
             </DialogFooter>
@@ -269,7 +261,7 @@ function AddToGitHubDialog({ base, onAdded }: { base: string; onAdded: () => Pro
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>{t("servers.security.access.addToGithub")}</DialogTrigger>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>{t("servers.security.access.addToGithub")}</DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -282,10 +274,10 @@ function AddToGitHubDialog({ base, onAdded }: { base: string; onAdded: () => Pro
           </Field>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !repo.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !repo.trim()}>
               {busy ? t("common.working") : t("servers.security.access.addToGithubConfirm")}
             </Button>
           </DialogFooter>
@@ -387,7 +379,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
   }
 
   const statusBadge = status ? (
-    <Badge variant={status.active ? "default" : "secondary"}>
+    <Badge variant={status.active ? "brand" : "neutral"}>
       {status.active ? t("servers.security.firewall.statusLive") : t("servers.security.firewall.statusInactive")}
     </Badge>
   ) : statusError ? (
@@ -403,7 +395,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
         action={
           <div className="flex flex-wrap items-center gap-2">
             {statusBadge}
-            <Button size="sm" variant="outline" onClick={() => void loadStatus()}>
+            <Button size="sm" variant="secondary" onClick={() => void loadStatus()}>
               <RefreshCwIcon />
               {t("common.refresh")}
             </Button>
@@ -411,9 +403,9 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
         }
       />
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
-      <div className="grid gap-4 border-b border-line px-6 py-4 sm:grid-cols-3">
+      <div className="grid gap-4 border-b border-border px-6 py-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="fw-policy">{t("servers.security.firewall.defaultPolicy")}</FieldLabel>
           <Select value={policyDraft} onValueChange={(v) => manage && onPolicyChange(v as string)} disabled={!manage}>
@@ -441,7 +433,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
         </Field>
         {manage ? (
           <div className="flex items-end">
-            <Button size="sm" disabled={savingSettings || !settings} onClick={() => void saveSettings(policyDraft === "drop" ? "drop" : undefined)}>
+            <Button variant="primary" size="sm" disabled={savingSettings || !settings} onClick={() => void saveSettings(policyDraft === "drop" ? "drop" : undefined)}>
               {savingSettings ? t("common.working") : t("servers.security.firewall.save")}
             </Button>
           </div>
@@ -456,7 +448,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
           </DialogHeader>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => {
                 setConfirmDrop(false)
               }}
@@ -464,7 +456,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
               {t("common.cancel")}
             </Button>
             <Button
-              variant="destructive"
+              variant="danger"
               onClick={() => {
                 setPolicyDraft("drop")
                 setConfirmDrop(false)
@@ -480,19 +472,19 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
         <LoadingRows rows={3} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
-            <h3 className="me-auto text-sm font-medium text-grid-fg">{t("servers.security.firewall.rules")}</h3>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
+            <h3 className="me-auto text-sm font-medium text-foreground">{t("servers.security.firewall.rules")}</h3>
             {manage ? (
               <>
-                <Button size="sm" variant="outline" onClick={() => void addPreset("web")}>
+                <Button size="sm" variant="secondary" onClick={() => void addPreset("web")}>
                   {t("servers.security.firewall.presetWeb")}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => void addPreset("ssh")}>
+                <Button size="sm" variant="secondary" onClick={() => void addPreset("ssh")}>
                   {t("servers.security.firewall.presetSsh")}
                 </Button>
                 <PostgresPresetDialog onAdd={(cidr) => void addPreset("postgres-from-cidr", cidr)} />
                 <RuleDialog base={base} onSaved={load} />
-                <Button size="sm" onClick={() => setApplyOpen(true)}>
+                <Button variant="primary" size="sm" onClick={() => setApplyOpen(true)}>
                   {t("servers.security.firewall.apply")}
                 </Button>
               </>
@@ -500,7 +492,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
           </div>
 
           {rules.length === 0 ? (
-            <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("servers.security.firewall.empty")}</p>
+            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("servers.security.firewall.empty")}</p>
           ) : (
             <TableBand>
               <Table>
@@ -518,10 +510,10 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
                   {rules.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>
-                        <Badge variant={r.action === "allow" ? "secondary" : "destructive"}>
+                        <Badge variant={r.action === "allow" ? "neutral" : "danger"}>
                           {t(`servers.security.firewall.actions.${r.action}`)}
                         </Badge>
-                        {!r.enabled ? <span className="ms-1 text-xs text-grid-muted">({t("servers.security.firewall.disabled")})</span> : null}
+                        {!r.enabled ? <span className="ms-1 text-xs text-muted-foreground">({t("servers.security.firewall.disabled")})</span> : null}
                       </TableCell>
                       <TableCell dir="ltr" className="text-start">
                         {t(`servers.security.firewall.protos.${r.proto}`)}
@@ -532,7 +524,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
                       <TableCell dir="ltr" className="text-start font-mono text-xs">
                         {r.source_cidr}
                       </TableCell>
-                      <TableCell dir="auto" className="max-w-xs truncate text-sm text-grid-muted">
+                      <TableCell dir="auto" className="max-w-xs truncate text-sm text-muted-foreground">
                         {r.comment || "—"}
                       </TableCell>
                       {manage ? (
@@ -632,7 +624,7 @@ function RuleDialog({ base, rule, onSaved, ...controlled }: { base: string; rule
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size={rule ? "sm" : "default"} variant={rule ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size={rule ? "sm" : "md"} variant={rule ? "secondary" : "primary"} />}>
           <PlusIcon />
           {rule ? t("lists.edit") : t("servers.security.firewall.add")}
         </DialogTrigger>
@@ -643,7 +635,7 @@ function RuleDialog({ base, rule, onSaved, ...controlled }: { base: string; rule
             <DialogTitle>{rule ? t("lists.edit") : t("servers.security.firewall.addTitle")}</DialogTitle>
             <DialogDescription>{t("servers.security.firewall.addHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="gap-4">
+          <div className="flex w-full flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="rule-action">{t("servers.security.firewall.action")}</FieldLabel>
@@ -726,19 +718,19 @@ function RuleDialog({ base, rule, onSaved, ...controlled }: { base: string; rule
                 onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
               />
             </Field>
-            <Field orientation="horizontal">
+            <Field className="flex-row items-center">
               <Checkbox id="rule-enabled" checked={form.enabled} onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v === true }))} />
               <FieldLabel htmlFor="rule-enabled" className="font-normal">
                 {t("servers.security.firewall.enabled")}
               </FieldLabel>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -762,7 +754,7 @@ function PostgresPresetDialog({ onAdd }: { onAdd: (cidr: string) => void }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>{t("servers.security.firewall.presetPostgres")}</DialogTrigger>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>{t("servers.security.firewall.presetPostgres")}</DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -774,10 +766,10 @@ function PostgresPresetDialog({ onAdd }: { onAdd: (cidr: string) => void }) {
             <Input id="pg-cidr" dir="ltr" required placeholder="203.0.113.0/24" value={cidr} onChange={(e) => setCidr(e.target.value)} />
           </Field>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={!cidr.trim()}>
+            <Button variant="primary" type="submit" disabled={!cidr.trim()}>
               {t("common.save")}
             </Button>
           </DialogFooter>
@@ -840,13 +832,13 @@ function ApplyDialog({
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <h4 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.firewall.pending")}</h4>
-            <div className="border border-line p-3 text-xs">
+            <h4 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.firewall.pending")}</h4>
+            <div className="border border-border p-3 text-xs">
               <p dir="ltr" className="mb-2 font-mono">
                 {t(`servers.security.firewall.policy${settings.default_policy === "drop" ? "Drop" : "Accept"}`)} · ssh {settings.ssh_port}
               </p>
               {enabled.length === 0 ? (
-                <p className="text-grid-muted">{t("servers.security.firewall.empty")}</p>
+                <p className="text-muted-foreground">{t("servers.security.firewall.empty")}</p>
               ) : (
                 <ul dir="ltr" className="space-y-1 font-mono">
                   {enabled.map((r) => (
@@ -859,12 +851,12 @@ function ApplyDialog({
             </div>
           </div>
           <div>
-            <h4 className="mb-2 text-sm font-medium text-grid-fg">{t("servers.security.firewall.live")}</h4>
-            <div className="border border-line p-3 text-xs">
+            <h4 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.firewall.live")}</h4>
+            <div className="border border-border p-3 text-xs">
               {live === undefined ? (
-                <p className="text-grid-muted">{t("common.loading")}</p>
+                <p className="text-muted-foreground">{t("common.loading")}</p>
               ) : live === null || !live.active ? (
-                <p className="text-grid-muted">{t("servers.security.firewall.notAppliedYet")}</p>
+                <p className="text-muted-foreground">{t("servers.security.firewall.notAppliedYet")}</p>
               ) : (
                 <pre dir="ltr" className="max-h-48 overflow-auto font-mono whitespace-pre-wrap">
                   {live.ruleset}
@@ -873,7 +865,7 @@ function ApplyDialog({
             </div>
           </div>
         </div>
-        <Field orientation="horizontal">
+        <Field className="flex-row items-center">
           <Checkbox id="apply-keep-web" checked={keepWebPorts} onCheckedChange={(v) => setKeepWebPorts(v === true)} />
           <FieldLabel htmlFor="apply-keep-web" className="font-normal">
             {t("servers.security.firewall.keepWebPorts")}
@@ -881,10 +873,10 @@ function ApplyDialog({
         </Field>
         <FormError message={error} />
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={() => void apply()} disabled={busy}>
+          <Button variant="primary" onClick={() => void apply()} disabled={busy}>
             {busy ? t("common.working") : t("servers.security.firewall.applyConfirm")}
           </Button>
         </DialogFooter>
@@ -981,20 +973,20 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
         title={t("servers.security.fail2ban.title")}
         hint={t("servers.security.fail2ban.hint")}
         action={
-          <Button size="sm" variant="outline" onClick={() => void loadBanned()}>
+          <Button size="sm" variant="secondary" onClick={() => void loadBanned()}>
             <RefreshCwIcon />
             {t("servers.security.fail2ban.refresh")}
           </Button>
         }
       />
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
       {settings === null ? (
         <LoadingRows rows={2} />
       ) : (
-        <form onSubmit={save} className="grid gap-4 border-b border-line px-6 py-4 sm:grid-cols-4 sm:items-end">
-          <Field orientation="horizontal">
+        <form onSubmit={save} className="grid gap-4 border-b border-border px-6 py-4 sm:grid-cols-4 sm:items-end">
+          <Field className="flex-row items-center">
             <Checkbox id="f2b-enabled" disabled={!manage} checked={enabledDraft} onCheckedChange={(v) => setEnabledDraft(v === true)} />
             <FieldLabel htmlFor="f2b-enabled" className="font-normal">
               {t("servers.security.fail2ban.enabled")}
@@ -1014,8 +1006,8 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
           </Field>
           {manage ? (
             <div className="sm:col-span-4">
-              <FieldDescription className="mb-2">{t("servers.security.fail2ban.installHint")}</FieldDescription>
-              <Button type="submit" size="sm" disabled={busy}>
+              <p className="mb-2 text-caption text-muted-foreground">{t("servers.security.fail2ban.installHint")}</p>
+              <Button variant="primary" type="submit" size="sm" disabled={busy}>
                 {busy ? t("common.working") : t("servers.security.fail2ban.save")}
               </Button>
             </div>
@@ -1023,14 +1015,14 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
         </form>
       )}
 
-      <div className="border-b border-line px-6 py-4">
-        <h3 className="mb-3 text-sm font-medium text-grid-fg">{t("servers.security.fail2ban.banned")}</h3>
+      <div className="border-b border-border px-6 py-4">
+        <h3 className="mb-3 text-sm font-medium text-foreground">{t("servers.security.fail2ban.banned")}</h3>
         {banned === null ? (
           <LoadingRows rows={2} />
         ) : !banned.active ? (
-          <p className="text-sm text-grid-muted">{t("servers.security.fail2ban.jailInactive")}</p>
+          <p className="text-sm text-muted-foreground">{t("servers.security.fail2ban.jailInactive")}</p>
         ) : banned.banned.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("servers.security.fail2ban.bannedEmpty")}</p>
+          <p className="text-sm text-muted-foreground">{t("servers.security.fail2ban.bannedEmpty")}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -1048,7 +1040,7 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
                   {manage ? (
                     <TableCell>
                       <div className="flex justify-end">
-                        <Button size="sm" variant="outline" disabled={unbanning === ip} onClick={() => void unban(ip)}>
+                        <Button size="sm" variant="secondary" disabled={unbanning === ip} onClick={() => void unban(ip)}>
                           {unbanning === ip ? t("common.working") : t("servers.security.fail2ban.unban")}
                         </Button>
                       </div>

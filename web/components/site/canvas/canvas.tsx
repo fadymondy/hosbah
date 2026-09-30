@@ -1,11 +1,11 @@
 "use client"
 
+import { Button, Skeleton, toast, useNasaq } from "@fadymondy/nasaq/web"
 import "@xyflow/react/dist/style.css"
 import "./canvas.css"
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useTheme } from "next-themes"
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import {
   Background,
@@ -25,7 +25,6 @@ import {
   type NodeChange,
 } from "@xyflow/react"
 import { LayoutGridIcon, PlusIcon, RotateCcwIcon, ServerIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { RemoveDomain } from "@/components/apps/domains"
 import { RemoveEnvVar } from "@/components/apps/env"
@@ -43,8 +42,7 @@ import { DeleteSchedule } from "@/components/site/schedules"
 import { RemoveInstall } from "@/components/site/stacks"
 import { RemoveBucket, RemoveVolume } from "@/components/site/storage"
 import { SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+
 import { useIsMobile } from "@/hooks/use-mobile"
 import { isImported } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -156,7 +154,7 @@ export function SiteCanvas() {
         }
       />
       <CanvasCtx.Provider value={actions}>
-        <div className="border-b border-line" data-testid="site-flow">
+        <div className="border-b border-border" data-testid="site-flow">
           {graph && data ? (
             <ReactFlowProvider>
               <Flow
@@ -177,23 +175,23 @@ export function SiteCanvas() {
       </CanvasCtx.Provider>
 
       {listed.length ? (
-        <ul className="flex flex-col divide-y divide-line border-b border-line md:hidden" aria-label={t("site.canvas.list")}>
+        <ul className="flex flex-col divide-y divide-border border-b border-border md:hidden" aria-label={t("site.canvas.list")}>
           {listed.map((b) => {
             const Icon = KIND_ICON[b.data.kind]
             return (
               <li key={b.id}>
-                <Link href={b.data.href} className="flex items-center gap-3 px-6 py-3 hover:bg-grid-soft">
-                  <Icon aria-hidden className="size-4 shrink-0 text-grid-brand" />
+                <Link href={b.data.href} className="flex items-center gap-3 px-6 py-3 hover:bg-secondary">
+                  <Icon aria-hidden className="size-4 shrink-0 text-nq-brand" />
                   <span className="min-w-0 flex-1">
-                    <span dir="auto" className="grid-micro block truncate">
+                    <span dir="auto" className="eyebrow block truncate">
                       {b.data.label}
                     </span>
-                    <span dir="auto" className="block truncate text-sm text-grid-fg">
+                    <span dir="auto" className="block truncate text-sm text-foreground">
                       {b.data.title}
                     </span>
                   </span>
                   {b.data.status ? (
-                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-grid-muted">
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                       <StatusDot status={b.data.status} label={null} />
                       {b.data.statusLabel}
                     </span>
@@ -205,10 +203,10 @@ export function SiteCanvas() {
         </ul>
       ) : null}
 
-      <Link href={`${base}/servers/${app.server_id}`} className="flex items-center gap-2 border-b border-line px-6 py-3 text-sm text-grid-body hover:bg-grid-soft">
-        <ServerIcon className="size-4 text-grid-brand" />
+      <Link href={`${base}/servers/${app.server_id}`} className="flex items-center gap-2 border-b border-border px-6 py-3 text-sm text-nq-fg-body hover:bg-secondary">
+        <ServerIcon className="size-4 text-nq-brand" />
         {t("site.flow.runsOn")}
-        <span dir="ltr" className="font-medium text-grid-fg">
+        <span dir="ltr" className="font-medium text-foreground">
           {app.server_name ?? app.server_id}
         </span>
       </Link>
@@ -296,7 +294,7 @@ function toEdges(links: GraphLink[], selected: Set<string> = new Set()): LinkEdg
     deletable: false,
     selected: selected.has(l.id),
     data: { removal: l.removal },
-    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: l.traffic ? "var(--grid-brand)" : "var(--grid-muted)" },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: l.traffic ? "var(--nq-brand)" : "var(--nq-fg-muted)" },
   }))
 }
 
@@ -321,7 +319,7 @@ function Flow({
 }) {
   const { t } = useI18n()
   const router = useRouter()
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme } = useNasaq()
   const rf = useReactFlow<BoxNode, LinkEdge>()
   const actions = useCanvas()
   const savedPos = useRef<Record<string, Point>>(saved?.nodes ?? {})
@@ -478,7 +476,7 @@ function Flow({
         )}
         {editable ? (
           <Panel position="top-right">
-            <Button size="sm" onClick={actions.openPalette}>
+            <Button variant="primary" size="sm" onClick={actions.openPalette}>
               <PlusIcon />
               <span dir="auto">{t("site.canvas.addComponent")}</span>
             </Button>

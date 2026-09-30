@@ -1,14 +1,15 @@
 "use client"
 
+import { Badge, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PackageIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Strip, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { shortSha, type Deployment, type Release } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -49,20 +50,13 @@ export function ReleasesPanel({
   return (
     <div data-testid="releases">
       <Strip>
-        <p className="text-sm text-grid-muted">{t("apps.releases.hint")}</p>
+        <p className="text-sm text-muted-foreground">{t("apps.releases.hint")}</p>
       </Strip>
       <ErrorBand message={error} />
       {releases === null ? (
         <LoadingRows />
       ) : releases.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <PackageIcon />
-            </EmptyMedia>
-            <EmptyDescription>{t("apps.releases.empty")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={PackageIcon} title={t("apps.releases.empty")} />
       ) : (
         <TableBand>
           <Table>
@@ -83,7 +77,7 @@ export function ReleasesPanel({
                     v{r.version}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={r.status === "live" ? "default" : r.status === "standby" ? "secondary" : "outline"}>
+                    <Badge variant={r.status === "live" ? "brand" : r.status === "standby" ? "neutral" : "outline"}>
                       {t(`apps.releases.statuses.${r.status}`)}
                     </Badge>
                   </TableCell>

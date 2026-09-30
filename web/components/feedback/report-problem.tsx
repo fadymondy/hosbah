@@ -5,11 +5,11 @@
 // edit it here. This file only supplies Hosbah's strings, its /api/feedback JSON transport and
 // the current team.
 
+import { Button, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { MessageSquareWarningIcon } from "lucide-react"
-import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+
 import { ReportDialog, type FeedbackSubmission } from "@/lib/feedback/react"
 import { apiFetch, ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -57,7 +57,7 @@ export function ReportProblem() {
   return (
     <>
       <Button
-        variant="outline"
+        variant="secondary"
         size="sm"
         className="hidden sm:inline-flex"
         // Mahaam's widget when it is configured and loaded; the in-app dialog otherwise.

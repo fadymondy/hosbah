@@ -1,12 +1,15 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import type { ReactNode } from "react"
+import { SidebarItem } from "@fadymondy/nasaq/web"
+import { usePathname, useRouter } from "next/navigation"
+import type { MouseEvent, ReactNode } from "react"
 
-import { cn } from "@/lib/utils"
+/** True for a plain left-click: modified clicks keep the browser's own new-tab behaviour. */
+export function isPlainClick(e: MouseEvent) {
+  return !(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+}
 
-/** One sidebar item: icon and label, only the icon when the sidebar is minimised. */
+/** One sidebar item (Nasaq SidebarItem): client-side routing through href plus onClick. */
 export function NavLink({
   href,
   icon,
@@ -16,36 +19,27 @@ export function NavLink({
 }: {
   href: string
   icon: ReactNode
-  children: ReactNode
+  children: string
   exact?: boolean
   onNavigate?: () => void
 }) {
   const pathname = usePathname() ?? ""
+  const router = useRouter()
   const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/")
   return (
-    <Link
+    <SidebarItem
       href={href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      title={typeof children === "string" ? children : undefined}
-      className={cn(
-        "flex items-center gap-2.5 border-s-2 px-3 py-2 text-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0",
-        "group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0 group-data-[collapsed=true]/nav:py-2.5",
-        active
-          ? "border-grid-action bg-grid-soft font-medium text-grid-fg"
-          : "border-transparent text-grid-body hover:bg-grid-soft hover:text-grid-fg",
-      )}
+      icon={icon}
+      active={active}
+      tooltip={children}
+      onClick={(e) => {
+        onNavigate?.()
+        if (!isPlainClick(e)) return
+        e.preventDefault()
+        router.push(href)
+      }}
     >
-      {icon}
-      <span className="truncate group-data-[collapsed=true]/nav:hidden">{children}</span>
-    </Link>
-  )
-}
-
-export function GroupLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="grid-micro mt-4 border-t border-line px-4 pt-4 pb-1 group-data-[collapsed=true]/nav:mt-2 group-data-[collapsed=true]/nav:p-0">
-      <span className="group-data-[collapsed=true]/nav:hidden">{children}</span>
-    </p>
+      {children}
+    </SidebarItem>
   )
 }

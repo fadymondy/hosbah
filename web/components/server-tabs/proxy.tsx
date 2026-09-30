@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { NetworkIcon, PlusIcon } from "lucide-react"
 
@@ -8,23 +9,15 @@ import { EditDialog, ListSearch, matches } from "@/components/server-tabs/list-t
 import { FormError, useErrorText } from "@/components/form-error"
 import { SiteRules } from "@/components/site/rules"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import type { ProxyHost, Server } from "@/lib/servers"
@@ -79,19 +72,11 @@ export function ServerProxy({ serverId }: { serverId: string }) {
       {hosts === null ? (
         <LoadingRows />
       ) : hosts.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <NetworkIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("proxy.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("proxy.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={NetworkIcon} title={t("proxy.emptyTitle")} description={t("proxy.emptyHint")} />
       ) : (
         <>
         <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchProxy")} shown={shown.length} total={hosts.length} />
-        {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
+        {shown.length === 0 ? <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
         <TableBand>
           <Table>
             <TableHeader>
@@ -111,11 +96,11 @@ export function ServerProxy({ serverId }: { serverId: string }) {
                       {h.hostname}
                     </span>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <Badge variant={h.enabled ? "secondary" : "outline"}>
+                      <Badge variant={h.enabled ? "neutral" : "outline"}>
                         {h.enabled ? t("proxy.enabled") : t("proxy.disabled")}
                       </Badge>
                       {h.tls === "auto" ? (
-                        <Badge variant={h.verified ? "secondary" : "outline"}>
+                        <Badge variant={h.verified ? "neutral" : "outline"}>
                           {h.verified ? t("proxy.verified") : t("proxy.unverified")}
                         </Badge>
                       ) : null}
@@ -137,13 +122,13 @@ export function ServerProxy({ serverId }: { serverId: string }) {
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
                         {h.tls === "auto" && !h.verified ? (
-                          <Button size="sm" variant="outline" onClick={() => act(`${h.id}/verify`, "POST")}>
+                          <Button size="sm" variant="secondary" onClick={() => act(`${h.id}/verify`, "POST")}>
                             {t("proxy.verify")}
                           </Button>
                         ) : null}
                         <EditProxy host={h} team={team.slug} onSaved={load} />
                         <ProxyRules host={h} team={team.slug} />
-                        <Button size="sm" variant="outline" onClick={() => act(h.id, "PATCH", { enabled: !h.enabled })}>
+                        <Button size="sm" variant="secondary" onClick={() => act(h.id, "PATCH", { enabled: !h.enabled })}>
                           {h.enabled ? t("proxy.disable") : t("proxy.enable")}
                         </Button>
                         <ConfirmButton
@@ -213,7 +198,7 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <PlusIcon />
         {t("proxy.add")}
       </DialogTrigger>
@@ -226,7 +211,7 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
           {servers.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("proxy.noServers")}</p>
           ) : (
-            <FieldGroup className="gap-4">
+            <div className="flex w-full flex-col gap-4">
               <Field>
                 <FieldLabel htmlFor="px-server">{t("proxy.server")}</FieldLabel>
                 <Select value={server} onValueChange={(v) => v && setServer(v as string)}>
@@ -285,21 +270,21 @@ function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => 
                 </Select>
               </Field>
               {upstream.trim().toLowerCase().startsWith("https://") ? (
-                <Field orientation="horizontal">
+                <Field className="flex-row items-center">
                   <Checkbox id="px-skip" checked={skipVerify} onCheckedChange={(v) => setSkipVerify(v === true)} />
                   <FieldLabel htmlFor="px-skip" className="font-normal">
                     {t("proxy.skipVerify")}
                   </FieldLabel>
                 </Field>
               ) : null}
-            </FieldGroup>
+            </div>
           )}
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || servers.length === 0 || !hostname.trim() || !upstream.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || servers.length === 0 || !hostname.trim() || !upstream.trim()}>
               {busy ? t("common.working") : t("proxy.save")}
             </Button>
           </DialogFooter>
@@ -318,7 +303,7 @@ function ProxyRules({ host, team }: { host: ProxyHost; team: string }) {
   const [open, setOpen] = useState(false)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>{t("proxy.rules")}</DialogTrigger>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>{t("proxy.rules")}</DialogTrigger>
       <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto p-0">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle dir="ltr">{host.hostname}</DialogTitle>
@@ -350,7 +335,7 @@ function EditProxy({ host, team, onSaved }: { host: ProxyHost; team: string; onS
         await onSaved()
       }}
     >
-      <FieldGroup>
+      <div className="flex w-full flex-col gap-5">
         <Field>
           <FieldLabel htmlFor="ep-up">{t("proxy.upstream")}</FieldLabel>
           <Input id="ep-up" dir="ltr" required value={upstream} onChange={(e) => setUpstream(e.target.value)} />
@@ -374,7 +359,7 @@ function EditProxy({ host, team, onSaved }: { host: ProxyHost; team: string; onS
           <Checkbox checked={ws} onCheckedChange={(v) => setWs(v === true)} />
           {t("lists.websockets")}
         </label>
-      </FieldGroup>
+      </div>
     </EditDialog>
   )
 }

@@ -1,9 +1,10 @@
 "use client"
 
+import { ScrollArea } from "@fadymondy/nasaq/web"
 import { useEffect, useRef, useState } from "react"
 
 import { OpStatusBadge } from "@/components/server-status"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 import { useI18n } from "@/lib/i18n"
 import { opKey, useEventStream, type LogLine, type Operation } from "@/lib/servers"
 import { cn } from "@/lib/utils"
@@ -46,7 +47,7 @@ export function OperationLog({ team, serverId, op }: { team: string; serverId: s
   const status = live?.status ?? op.status
   return (
     <div className="flex min-w-0 flex-col" data-testid="op-log" data-op={op.id} data-status={status}>
-      <div className="grid-rule-bottom flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
+      <div className="border-b border-border flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
         <span className="font-medium">{t(`servers.ops.kinds.${opKey(op.kind)}`, undefined, op.kind)}</span>
         <OpStatusBadge status={status} />
         <span className="ms-auto text-xs text-muted-foreground" aria-live="polite">
