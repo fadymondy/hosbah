@@ -204,6 +204,8 @@ func Boot() *app.App {
 	k.Router.Post("/api/admin/mcp", mcp.AdminServer().Handler(a))
 	k.Router.Get("/api/admin/mcp", mcp.AdminServer().Handler(a))
 
+	installCircleXO(k, a)
+
 	k.Router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"status":"ok","service":"hosbah","phase":"P5","togo":%q}`, togoVersion())

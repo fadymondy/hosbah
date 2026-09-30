@@ -118,6 +118,12 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/code/verify",
 		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
 		"/api/auth/logout",
+		// The CircleXO hub integration (internal/circlexo): the sign-in button flag, and the signed
+		// webhook / provision endpoints, each authenticated by its Standard Webhooks signature.
+		"/api/circlexo/config",
+		"/api/circlexo/events",
+		"/api/circlexo/provision",
+		"/api/circlexo/deprovision",
 		"/api/settings/public", // sign-up mode, announcement, support email — shown before sign-in
 		"/api/auth/providers":  // which "Continue with Google / GitHub" buttons to show
 		return true

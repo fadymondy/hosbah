@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 )
@@ -23,9 +24,20 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Msg }
 
-func refuse(what string, limit, have int64) error {
+func refuse(q Quota, what string, limit, have int64) error {
+	if q.Hub {
+		return &Error{Status: http.StatusPaymentRequired, Msg: fmt.Sprintf(
+			"this team's CircleXO plan allows at most %d %s (it has %d) — upgrade the plan in CircleXO", limit, what, have)}
+	}
 	return &Error{Status: http.StatusForbidden, Msg: fmt.Sprintf(
 		"this team's quota allows at most %d %s (it has %d) — ask a platform admin to raise it", limit, what, have)}
+}
+
+// refuseReadOnly is the CircleXO hub's fail-closed grace: the team's plan cannot be confirmed right
+// now, so nothing is added (reads and deletes keep working).
+func refuseReadOnly(what string) error {
+	return &Error{Status: http.StatusPaymentRequired, Msg: "this team's CircleXO plan cannot be confirmed right now, so no " +
+		what + " can be added until it is (existing ones keep working)"}
 }
 
 // Quota is a team's limits. A nil field is unlimited.
@@ -33,6 +45,28 @@ type Quota struct {
 	MaxServers      *int64 `json:"max_servers"`
 	MaxApps         *int64 `json:"max_apps"`
 	MaxDataServices *int64 `json:"max_data_services"`
+	// MaxMembers is set only for a team governed by the CircleXO hub (internal/circlexo); every other
+	// team has no member limit.
+	MaxMembers *int64 `json:"max_members,omitempty"`
+	// Hub is true when the limits come from the team's CircleXO plan; ReadOnly is the hub's
+	// fail-closed grace (the plan cannot be confirmed: nothing may be added).
+	Hub      bool `json:"hub,omitempty"`
+	ReadOnly bool `json:"read_only,omitempty"`
+}
+
+// Overlay lets another package replace a team's limits (the CircleXO hub's entitlements for a team
+// it governs). It edits q in place and must leave a team it does not govern untouched.
+type Overlay func(ctx context.Context, teamID string, q *Quota) error
+
+var overlay atomic.Pointer[Overlay]
+
+// SetOverlay installs (or, with nil, removes) the overlay Get applies.
+func SetOverlay(o Overlay) {
+	if o == nil {
+		overlay.Store(nil)
+		return
+	}
+	overlay.Store(&o)
 }
 
 // Usage is a team's current counts against Quota, for GET .../quotas.
@@ -46,6 +80,19 @@ type Usage struct {
 // Get reads a team's quota (q in team scope, or platform-admin scope — the SELECT policy allows
 // both). A team with no row is unlimited on every field.
 func Get(ctx context.Context, q *db.Queries, teamID string) (Quota, error) {
+	quo, err := stored(ctx, q, teamID)
+	if err != nil {
+		return Quota{}, err
+	}
+	if o := overlay.Load(); o != nil {
+		if err := (*o)(ctx, teamID, &quo); err != nil {
+			return Quota{}, fmt.Errorf("could not read the team's plan: %w", err)
+		}
+	}
+	return quo, nil
+}
+
+func stored(ctx context.Context, q *db.Queries, teamID string) (Quota, error) {
 	row, err := q.GetTeamQuota(ctx, teamID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Quota{}, nil
@@ -92,15 +139,21 @@ func Set(ctx context.Context, q *db.Queries, teamID, actorID string, quo Quota) 
 // CheckServers refuses adding a server when the team's max_servers is already met.
 func CheckServers(ctx context.Context, q *db.Queries, teamID string) error {
 	quo, err := Get(ctx, q, teamID)
-	if err != nil || quo.MaxServers == nil {
+	if err != nil {
 		return err
+	}
+	if quo.ReadOnly {
+		return refuseReadOnly("server(s)")
+	}
+	if quo.MaxServers == nil {
+		return nil
 	}
 	n, err := q.CountServersOfTeam(ctx, teamID)
 	if err != nil {
 		return fmt.Errorf("could not count the team's servers: %w", err)
 	}
 	if n >= *quo.MaxServers {
-		return refuse("server(s)", *quo.MaxServers, n)
+		return refuse(quo, "server(s)", *quo.MaxServers, n)
 	}
 	return nil
 }
@@ -108,15 +161,21 @@ func CheckServers(ctx context.Context, q *db.Queries, teamID string) error {
 // CheckApps refuses creating an app when the team's max_apps is already met.
 func CheckApps(ctx context.Context, q *db.Queries, teamID string) error {
 	quo, err := Get(ctx, q, teamID)
-	if err != nil || quo.MaxApps == nil {
+	if err != nil {
 		return err
+	}
+	if quo.ReadOnly {
+		return refuseReadOnly("app(s)")
+	}
+	if quo.MaxApps == nil {
+		return nil
 	}
 	n, err := q.CountAppsOfTeam(ctx, teamID)
 	if err != nil {
 		return fmt.Errorf("could not count the team's apps: %w", err)
 	}
 	if n >= *quo.MaxApps {
-		return refuse("app(s)", *quo.MaxApps, n)
+		return refuse(quo, "app(s)", *quo.MaxApps, n)
 	}
 	return nil
 }
@@ -124,15 +183,44 @@ func CheckApps(ctx context.Context, q *db.Queries, teamID string) error {
 // CheckDataServices refuses creating a data service when the team's max_data_services is already met.
 func CheckDataServices(ctx context.Context, q *db.Queries, teamID string) error {
 	quo, err := Get(ctx, q, teamID)
-	if err != nil || quo.MaxDataServices == nil {
+	if err != nil {
 		return err
+	}
+	if quo.ReadOnly {
+		return refuseReadOnly("data service(s)")
+	}
+	if quo.MaxDataServices == nil {
+		return nil
 	}
 	n, err := q.CountDataServicesOfTeam(ctx, teamID)
 	if err != nil {
 		return fmt.Errorf("could not count the team's data services: %w", err)
 	}
 	if n >= *quo.MaxDataServices {
-		return refuse("data service(s)", *quo.MaxDataServices, n)
+		return refuse(quo, "data service(s)", *quo.MaxDataServices, n)
+	}
+	return nil
+}
+
+// CheckMembers refuses adding (or inviting) a member when the team's CircleXO plan caps members and
+// the team is at the cap. A team the hub does not govern has no member limit.
+func CheckMembers(ctx context.Context, q *db.Queries, teamID string) error {
+	quo, err := Get(ctx, q, teamID)
+	if err != nil {
+		return err
+	}
+	if quo.ReadOnly {
+		return refuseReadOnly("members")
+	}
+	if quo.MaxMembers == nil {
+		return nil
+	}
+	n, err := q.CountMembers(ctx, teamID)
+	if err != nil {
+		return fmt.Errorf("could not count the team's members: %w", err)
+	}
+	if n >= *quo.MaxMembers {
+		return refuse(quo, "member(s)", *quo.MaxMembers, n)
 	}
 	return nil
 }

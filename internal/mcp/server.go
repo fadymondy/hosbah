@@ -48,6 +48,8 @@ type Caller struct {
 	Role          string // the token owner's team role (user server)
 	Scopes        []string
 	PlatformAdmin bool
+	// Actors is the act chain of a CircleXO hub token (the gateway, then any agent), outermost first.
+	Actors []string
 }
 
 // Env is what a tool runs with: the caller, and the open, scoped transaction.
@@ -140,6 +142,12 @@ func (s *Server) Handler(a *app.App) http.HandlerFunc {
 		if errors.Is(err, ErrTeamSuspended) {
 			writeRPC(w, http.StatusLocked, rpcResponse{JSONRPC: "2.0",
 				Error: &rpcError{Code: -32003, Message: ErrTeamSuspended.Error()}})
+			return
+		}
+		var denied *ErrDenied
+		if errors.As(err, &denied) {
+			writeRPC(w, http.StatusForbidden, rpcResponse{JSONRPC: "2.0",
+				Error: &rpcError{Code: -32004, Message: denied.Msg}})
 			return
 		}
 		if err != nil {
