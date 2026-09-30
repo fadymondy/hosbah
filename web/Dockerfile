@@ -7,7 +7,7 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # API_ORIGIN is where next's server-side rewrite sends /api.
 ENV API_ORIGIN=http://api:8710
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 COPY . .
 # NEXT_PUBLIC_* values are inlined at build time, so they are build args (docker build
