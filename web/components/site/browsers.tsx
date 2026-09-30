@@ -253,7 +253,7 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
               <FieldLabel htmlFor="br-kind">{t("site.browsers.kind")}</FieldLabel>
               <Select value={kind} onValueChange={(v) => v && onKindChange(v as "headless" | "desktop")}>
                 <SelectTrigger id="br-kind">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => (v === "desktop" ? t("site.browsers.kindDesktop") : t("site.browsers.kindHeadless"))}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="headless">{t("site.browsers.kindHeadless")}</SelectItem>

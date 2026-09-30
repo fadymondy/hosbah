@@ -223,7 +223,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
               <FieldLabel>{t("databases.server")}</FieldLabel>
               <Select value={server} onValueChange={(v) => v && setServer(v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder={t("databases.chooseServer")} />
+                  <SelectValue placeholder={t("databases.chooseServer")}>{(v: string) => servers.find((s) => s.id === v)?.name ?? t("databases.chooseServer")}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {servers.map((s) => (
@@ -239,7 +239,7 @@ function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; ser
                 <FieldLabel>{t("databases.pgvectorLabel")}</FieldLabel>
                 <Select value={version === "pgvector-pg17" ? "pgvector-pg17" : "default"} onValueChange={(v) => v && setVersion(v === "pgvector-pg17" ? "pgvector-pg17" : "")}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>{(v: string) => (v === "pgvector-pg17" ? t("databases.pgvectorOption") : t("databases.pgvectorDefault"))}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="default">{t("databases.pgvectorDefault")}</SelectItem>

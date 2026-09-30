@@ -159,7 +159,7 @@ export function SiteCache() {
                     disabled={!manage || busy}
                   >
                     <SelectTrigger id="cache-ttl" className="w-40">
-                      <SelectValue />
+                      <SelectValue>{(v: string) => t("site.cache.ttlSeconds", { seconds: Number(v) })}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {TTL_PRESETS.map((seconds) => (

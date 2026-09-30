@@ -290,7 +290,7 @@ export function SiteRules({ basePath }: { basePath?: string } = {}) {
                 <div className="mt-2 flex max-w-xl flex-wrap items-center gap-2">
                   <Select value={headerAction} onValueChange={(v) => v && setHeaderAction(v as "set" | "add" | "remove")}>
                     <SelectTrigger className="w-28">
-                      <SelectValue />
+                      <SelectValue>{(v: string) => t(`site.rules.headers.actions.${v}`)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="set">{t("site.rules.headers.actions.set")}</SelectItem>

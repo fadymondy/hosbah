@@ -117,7 +117,7 @@ export function SitePHPConfig() {
               <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.php.versionHint")}</p>
               <Select value={draft.version} onValueChange={(v) => v && setDraft((d) => (d ? { ...d, version: v } : d))} disabled={!canSave || busy}>
                 <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue />
+                  <SelectValue>{(v: string) => (v === "auto" ? t("site.php.versionAuto") : v)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {config.available_versions.map((v) => (

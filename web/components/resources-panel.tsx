@@ -72,7 +72,7 @@ function ResourceFields({
           }}
         >
           <SelectTrigger id={`${idPrefix}-mem`} className="w-32">
-            <SelectValue />
+            <SelectValue>{(v: string) => (v === "unlimited" ? t("resources.unlimited") : v === "custom" ? t("resources.custom") : memoryLabel(Number(v)))}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unlimited">{t("resources.unlimited")}</SelectItem>
@@ -121,7 +121,7 @@ function ResourceFields({
           }}
         >
           <SelectTrigger id={`${idPrefix}-cpu`} className="w-28">
-            <SelectValue />
+            <SelectValue>{(v: string) => (v === "unlimited" ? t("resources.unlimited") : v === "custom" ? t("resources.custom") : v)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="unlimited">{t("resources.unlimited")}</SelectItem>

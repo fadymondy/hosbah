@@ -594,7 +594,7 @@ function UsersTable({
                       }}
                     >
                       <SelectTrigger className="w-36">
-                        <SelectValue placeholder={t("databases.grantLabels.none")} />
+                        <SelectValue placeholder={t("databases.grantLabels.none")}>{(v: string) => (v ? t(`databases.grantLabels.${v}`) : t("databases.grantLabels.none"))}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {GRANT_PRESETS.map((g) => (
@@ -665,12 +665,12 @@ function PasswordResult({ service, databaseName, user, password }: { service: Da
 {t("databases.passwordOnceHint")}
 </Alert>
       <div className="flex flex-col gap-1">
-        <FieldLabel>{t("databases.passwordShownOnce")}</FieldLabel>
+        <span className="text-label text-foreground">{t("databases.passwordShownOnce")}</span>
         <CopyField value={password} />
       </div>
       {connString ? (
         <div className="flex flex-col gap-1">
-          <FieldLabel>{t("databases.copyConnectionString")}</FieldLabel>
+          <span className="text-label text-foreground">{t("databases.copyConnectionString")}</span>
           <CopyField value={connString} block />
         </div>
       ) : null}
@@ -784,7 +784,7 @@ function AddUserDialog({
                 <FieldLabel>{t("databases.grants")}</FieldLabel>
                 <Select value={grants} onValueChange={(v) => v && setGrants(v)}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>{(v: string) => t(`databases.grantLabels.${v}`)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {GRANT_PRESETS.map((g) => (
@@ -952,13 +952,13 @@ function ConnectionPanel({ teamSlug, serviceRef, canAttach }: { teamSlug: string
         )}
       </div>
       <div className="flex flex-col gap-2 border-t border-border pt-4">
-        <FieldLabel>{t("databases.attachTitle")}</FieldLabel>
+        <span className="text-label text-foreground">{t("databases.attachTitle")}</span>
         <p className="text-sm text-muted-foreground">{t("databases.attachHint")}</p>
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-56">
             <Select value={app} onValueChange={(v) => v && setApp(v)}>
               <SelectTrigger>
-                <SelectValue placeholder={t("databases.chooseApp")} />
+                <SelectValue placeholder={t("databases.chooseApp")}>{(v: string) => apps.find((a) => a.id === v)?.name ?? t("databases.chooseApp")}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {apps.map((a) => (
@@ -1042,7 +1042,7 @@ function ScheduleForm({
           <FieldLabel>{t("databases.target")}</FieldLabel>
           <Select value={target} onValueChange={(v) => v && setTarget(v)}>
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue>{(v: string) => (v === "s3" ? "S3" : t("databases.targetLocal"))}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="local">{t("databases.targetLocal")}</SelectItem>
