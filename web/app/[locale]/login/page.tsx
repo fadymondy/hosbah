@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type FormEvent } from "react"
 
 import { CodeInput, RecoveryInput, RESEND_SECONDS } from "@/components/auth/code-input"
-import { OAuthButtons, useOAuthErrorText } from "@/components/auth/oauth"
+import { OAuthButtons, useCircleXOErrorText, useOAuthErrorText } from "@/components/auth/oauth"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
 
@@ -30,6 +30,7 @@ export default function LoginPage() {
   const next = safeNext(params.get("next"), locale)
   const errorText = useErrorText()
   const oauthErrorText = useOAuthErrorText()
+  const circlexoErrorText = useCircleXOErrorText()
 
   const [mode, setMode] = useState<Mode>("password")
   const [email, setEmail] = useState("")
@@ -42,7 +43,9 @@ export default function LoginPage() {
   const [useRecovery, setUseRecovery] = useState(false)
   const [busy, setBusy] = useState(false)
   // A Google / GitHub round trip that failed comes back with ?oauth_error=<code>.
-  const [error, setError] = useState<string | null>(() => oauthErrorText(params.get("oauth_error")))
+  const [error, setError] = useState<string | null>(
+    () => oauthErrorText(params.get("oauth_error")) ?? circlexoErrorText(params.get("circlexo_error")),
+  )
   useDocumentTitle(challenge ? t("account.twoFactorTitle") : t("auth.login.title"))
 
   // A Google / GitHub sign-in of an account with two-factor comes back with #challenge=<id> (a

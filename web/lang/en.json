@@ -78,6 +78,16 @@
       "inviteOnlyBody": "Open the invitation link a team sent to your email to create your account."
     },
     "oauth": {
+      "circlexo": "Continue with CircleXO",
+      "circlexoErrors": {
+        "failed": "Signing in with CircleXO did not work. Try again.",
+        "email_unverified": "CircleXO has not verified that email address yet. Verify it there, then try again.",
+        "account_conflict": "An account with that email address exists here but has not confirmed it, or is already linked to another CircleXO user. Sign in with your password instead.",
+        "suspended": "This account has been disabled. Contact the platform administrator.",
+        "no_email": "CircleXO did not share an email address for this account.",
+        "not_member": "You are not a member of that organization.",
+        "unavailable": "Something went wrong on our side. Try again."
+      },
       "continueWith": "Continue with {provider}",
       "or": "or",
       "generic": "Signing in with that account did not work. Try again.",
@@ -137,6 +147,7 @@
     "signedInAs": "Signed in as",
     "chooseTeam": "Choose a team",
     "collapseNav": "Minimise sidebar",
+    "resizeNav": "Resize sidebar",
     "expandNav": "Expand sidebar",
     "scope": {
       "workloads": "Workloads",

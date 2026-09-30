@@ -67,6 +67,28 @@ export function oauthHref(
   return `/api/auth/oauth/${encodeURIComponent(provider)}?${q}`
 }
 
+/** Whether "Sign in with CircleXO" is on (GET /api/circlexo/config); false while loading or unreachable. */
+export function useCircleXO(): boolean {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    let live = true
+    apiFetch<{ enabled?: boolean }>("/api/circlexo/config")
+      .then((r) => live && setOn(!!r.enabled))
+      .catch(() => live && setOn(false))
+    return () => {
+      live = false
+    }
+  }, [])
+  return on
+}
+
+/** The message for a ?circlexo_error= code the API sent the browser back with. */
+export function useCircleXOErrorText() {
+  const { t } = useI18n()
+  return (code: string | null | undefined): string | null =>
+    code ? t(`auth.oauth.circlexoErrors.${code}`, undefined, t("auth.oauth.circlexoErrors.failed")) : null
+}
+
 /** The message for an ?oauth_error= code the API sent the browser back with. */
 export function useOAuthErrorText() {
   const { t } = useI18n()
@@ -81,10 +103,20 @@ export function useOAuthErrorText() {
 export function OAuthButtons({ next, invitation }: { next?: string | null; invitation?: string }) {
   const { t, locale } = useI18n()
   const providers = useOAuthProviders()
-  if (!providers?.length) return null
+  const circlexo = useCircleXO()
+  if (!providers?.length && !circlexo) return null
   return (
     <div className="flex flex-col gap-3" data-testid="oauth-buttons">
-      {providers.map((p) => (
+      {circlexo ? (
+        <a
+          href={`/auth/circlexo/login${next ? `?return_to=${encodeURIComponent(next)}` : ""}`}
+          className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full gap-2")}
+          data-testid="circlexo-button"
+        >
+          <span>{t("auth.oauth.circlexo")}</span>
+        </a>
+      ) : null}
+      {(providers ?? []).map((p) => (
         <a
           key={p.id}
           href={oauthHref(p.id, { locale, next, invitation })}
