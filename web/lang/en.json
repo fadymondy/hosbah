@@ -1915,6 +1915,7 @@
     "approved": "Approved. The caller has to run the same call again for it to take effect.",
     "rejected": "Rejected. The call will keep being refused.",
     "viewerNote": "Only owners and admins can approve or reject.",
+    "gone": "This request expired or was already decided. The caller has to run the call again to file a new one.",
     "status": {
       "pending": "Waiting",
       "approved": "Approved",

@@ -86,6 +86,10 @@ func (s *Server) precheck(ctx context.Context, a *app.App, c Caller, t Tool, arg
 		if !required {
 			return nil
 		}
+		// An overdue request still holds the open key, and the insert below would hand it back.
+		if _, err := q.ExpireApprovalRequestsOfTeam(ctx, c.TeamID); err != nil {
+			return err
+		}
 		req, err := q.OpenApprovalRequest(ctx, db.OpenApprovalRequestParams{
 			TeamID:       c.TeamID,
 			TokenID:      c.TokenID,

@@ -29,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { apiFetch, type ApprovalRequest, type Team } from "@/lib/api"
+import { ApiError, apiFetch, type ApprovalRequest, type Team } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 import { useTeam } from "@/lib/team"
@@ -110,7 +110,13 @@ export default function ApprovalsPage() {
       toast.success(action === "approve" ? t("approvals.approved") : t("approvals.rejected"))
       load()
     } catch (err) {
-      setError(errorText(err))
+      // 404 here means the request expired or was decided while this page was open.
+      if (err instanceof ApiError && err.status === 404) {
+        setError(t("approvals.gone"))
+        load()
+      } else {
+        setError(errorText(err))
+      }
     } finally {
       setBusy(null)
     }
