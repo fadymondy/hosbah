@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckCircle2Icon, GlobeIcon, InfoIcon, ShieldCheckIcon } from "lucide-react"
 
@@ -8,13 +9,13 @@ import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from "@/components/ui/empty"
+
+
+
+
+
+
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { apiFetch } from "@/lib/api"
 import type { Domain, Integrations, TLSMode } from "@/lib/apps"
@@ -42,7 +43,7 @@ export function DomainsSummary({ domains }: { domains: Pick<Domain, "id" | "host
                 type="button"
                 dir="ltr"
                 aria-label={t("apps.domains.moreCount", { count: rest.length })}
-                className="rounded-full bg-grid-soft px-1.5 py-0.5 text-[11px] font-medium text-grid-muted hover:bg-grid-soft/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               />
             }
           >
@@ -153,7 +154,7 @@ export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: 
             <DialogTitle>{t("apps.domains.addTitle")}</DialogTitle>
             <DialogDescription>{t("apps.domains.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="cdom-host">{t("apps.domains.hostname")}</FieldLabel>
               <Input
@@ -202,13 +203,13 @@ export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: 
               <FieldDescription>{t(`apps.domains.tlsHint.${tls}`)}</FieldDescription>
               {wildcard ? <FieldDescription>{t("apps.domains.wildcardHint")}</FieldDescription> : null}
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !ok || (!!port?.required && !portValue)}>
+            <Button variant="primary" type="submit" disabled={busy || !ok || (!!port?.required && !portValue)}>
               {busy ? t("common.working") : t("apps.domains.add")}
             </Button>
           </DialogFooter>
@@ -299,16 +300,9 @@ export function DomainsPanel({
       {domains === null ? (
         <LoadingRows rows={2} />
       ) : domains.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GlobeIcon />
-            </EmptyMedia>
-            <EmptyDescription>{t("apps.domains.empty")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={GlobeIcon} title={t("apps.domains.empty")} />
       ) : (
-        <ul className="flex flex-col divide-y divide-line border-b border-line">
+        <ul className="flex flex-col divide-y divide-border border-b border-border">
           {domains.map((d) => (
             <li key={d.id} className="flex flex-col gap-3 px-6 py-4" data-domain={d.hostname}>
               <div className="flex flex-wrap items-center gap-2">
@@ -323,24 +317,24 @@ export function DomainsPanel({
                 </a>
                 <Badge variant="outline">{t(`apps.domains.tls.${d.tls}`)}</Badge>
                 {d.upstream ? (
-                  <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                  <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                     → {d.upstream}
                   </span>
                 ) : null}
                 {d.hostname.startsWith("*.") ? (
-                  <Badge variant="secondary">{t("apps.domains.wildcard")}</Badge>
+                  <Badge variant="neutral">{t("apps.domains.wildcard")}</Badge>
                 ) : d.verified ? (
-                  <Badge>
+                  <Badge variant="brand">
                     <CheckCircle2Icon />
                     {t("apps.domains.verified")}
                   </Badge>
                 ) : (
-                  <Badge variant="secondary">{t("apps.domains.unverified")}</Badge>
+                  <Badge variant="neutral">{t("apps.domains.unverified")}</Badge>
                 )}
                 {manage ? (
                   <span className="ms-auto flex gap-2">
                     {!d.verified && !d.hostname.startsWith("*.") ? (
-                      <Button size="sm" variant="outline" onClick={() => verify(d)}>
+                      <Button size="sm" variant="secondary" onClick={() => verify(d)}>
                         <ShieldCheckIcon />
                         {t("apps.domains.verify")}
                       </Button>
@@ -414,7 +408,7 @@ export function DomainsPanel({
               <span className="flex flex-col gap-1">
                 {TLS.map((m) => (
                   <span key={m}>
-                    <span className="font-medium text-grid-fg">{t(`apps.domains.tls.${m}`)}</span> — {t(`apps.domains.tlsHint.${m}`)}
+                    <span className="font-medium text-foreground">{t(`apps.domains.tls.${m}`)}</span> — {t(`apps.domains.tlsHint.${m}`)}
                   </span>
                 ))}
               </span>
@@ -432,16 +426,16 @@ export function DomainsPanel({
                 ))}
               </SelectContent>
             </Select>
-            {wildcard ? <p className="mt-2 text-sm text-grid-muted">{t("apps.domains.wildcardHint")}</p> : null}
+            {wildcard ? <p className="mt-2 text-sm text-muted-foreground">{t("apps.domains.wildcardHint")}</p> : null}
           </SettingsRow>
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy || !hostOK || (!!port?.required && !portValue)}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy || !hostOK || (!!port?.required && !portValue)}>
               {busy ? t("common.working") : t("apps.domains.add")}
             </Button>
           </div>
         </form>
       ) : (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("common.readOnly")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("common.readOnly")}</p>
       )}
     </div>
   )

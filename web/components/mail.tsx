@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import {
   CheckCircle2Icon,
@@ -18,15 +20,15 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
+
+
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import {
@@ -131,12 +133,12 @@ export function TeamMail() {
                     <TableCell dir="ltr" className="text-start font-medium">
                       {s.hostname}
                     </TableCell>
-                    <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
                       {enrolledServers.find((hs) => hs.id === s.server_id)?.name ?? s.server_id.slice(0, 8)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={mailStatusVariant(s.status)}>{t(`mail.status.${s.status}`, undefined, s.status)}</Badge>
-                      {s.error ? <p className="mt-1 max-w-64 text-xs text-grid-danger">{s.error}</p> : null}
+                      {s.error ? <p className="mt-1 max-w-64 text-xs text-nq-danger-text">{s.error}</p> : null}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
@@ -161,7 +163,7 @@ export function TeamMail() {
         {domains === null ? (
           <LoadingRows rows={2} />
         ) : domains.length === 0 ? (
-          <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">
             {servers && servers.length === 0 ? t("mail.domains.needServer") : t("mail.domains.empty")}
           </p>
         ) : (
@@ -210,7 +212,7 @@ function InstallDialog({ base, servers, onSaved, ...controlled }: { base: string
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("mail.servers.install")}
         </DialogTrigger>
@@ -221,11 +223,11 @@ function InstallDialog({ base, servers, onSaved, ...controlled }: { base: string
             <DialogTitle>{t("mail.servers.install")}</DialogTitle>
             <DialogDescription>{t("mail.servers.installHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="mail-inst-server">{t("mail.servers.onServer")}</FieldLabel>
               {servers.length === 0 ? (
-                <p className="text-sm text-grid-muted">{t("mail.servers.noServers")}</p>
+                <p className="text-sm text-muted-foreground">{t("mail.servers.noServers")}</p>
               ) : (
                 <Select value={server} onValueChange={(v) => setServer(v ?? "")}>
                   <SelectTrigger id="mail-inst-server">
@@ -254,13 +256,13 @@ function InstallDialog({ base, servers, onSaved, ...controlled }: { base: string
               />
               <FieldDescription>{t("mail.servers.hostnameHint")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !server || !hostname.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !server || !hostname.trim()}>
               {busy ? t("common.working") : t("mail.servers.install")}
             </Button>
           </DialogFooter>
@@ -326,7 +328,7 @@ function AddDomainDialog({ base, servers, onSaved, ...controlled }: { base: stri
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("mail.domains.add")}
         </DialogTrigger>
@@ -337,7 +339,7 @@ function AddDomainDialog({ base, servers, onSaved, ...controlled }: { base: stri
             <DialogTitle>{t("mail.domains.add")}</DialogTitle>
             <DialogDescription>{t("mail.domains.addHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="mail-dom-server">{t("mail.servers.title")}</FieldLabel>
               <Select value={server} onValueChange={(v) => setServer(v ?? "")}>
@@ -357,13 +359,13 @@ function AddDomainDialog({ base, servers, onSaved, ...controlled }: { base: stri
               <FieldLabel htmlFor="mail-dom-name">{t("mail.domains.domain")}</FieldLabel>
               <Input id="mail-dom-name" dir="ltr" required maxLength={253} placeholder="example.com" value={domain} onChange={(e) => setDomain(e.target.value)} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !server || !domain.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !server || !domain.trim()}>
               {busy ? t("common.working") : t("mail.domains.add")}
             </Button>
           </DialogFooter>
@@ -470,28 +472,28 @@ function DomainCard({
   }
 
   return (
-    <div className="border-b border-line">
+    <div className="border-b border-border">
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span dir="ltr" className="font-medium text-grid-fg">
+            <span dir="ltr" className="font-medium text-foreground">
               {domain.domain}
             </span>
             <Badge variant={mailStatusVariant(domain.status)}>{t(`mail.status.${domain.status}`, undefined, domain.status)}</Badge>
           </div>
-          {domain.error ? <p className="mt-1 text-xs text-grid-danger">{domain.error}</p> : null}
+          {domain.error ? <p className="mt-1 text-xs text-nq-danger-text">{domain.error}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void checkDns()}>
+          <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void checkDns()}>
             <RefreshCcwIcon />
             {busy === "check" ? t("common.working") : t("mail.dns.check")}
           </Button>
-          <Button size="sm" variant="outline" disabled={report === "loading"} onClick={() => void runDeliverability()}>
+          <Button size="sm" variant="secondary" disabled={report === "loading"} onClick={() => void runDeliverability()}>
             <SearchCheckIcon />
             {report === "loading" ? t("common.working") : t("mail.deliverability.run")}
           </Button>
           {manage ? (
-            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void publishDns()}>
+            <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void publishDns()}>
               <UploadCloudIcon />
               {busy === "publish" ? t("common.working") : t("mail.dns.publish")}
             </Button>
@@ -513,11 +515,11 @@ function DomainCard({
       {report && report !== "loading" ? <DeliverabilityDialog report={report} onClose={() => setReport(null)} /> : null}
 
       {publishResult ? (
-        <div className="mx-6 mb-4 flex items-start gap-3 border border-line bg-grid-soft px-4 py-3 text-sm">
-          <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-grid-brand" />
+        <div className="mx-6 mb-4 flex items-start gap-3 border border-border bg-secondary px-4 py-3 text-sm">
+          <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-nq-brand" />
           <div>
-            <p className="font-medium text-grid-fg">{t("mail.dns.publishedTitle")}</p>
-            <p dir="ltr" className="mt-1 text-xs text-grid-muted">
+            <p className="font-medium text-foreground">{t("mail.dns.publishedTitle")}</p>
+            <p dir="ltr" className="mt-1 text-xs text-muted-foreground">
               {publishResult.published.join(", ") || "—"}
             </p>
           </div>
@@ -526,11 +528,11 @@ function DomainCard({
 
       {/* DNS records */}
       <div className="px-6 pb-4">
-        <p className="mb-2 text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.dns.records")}</p>
+        <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.dns.records")}</p>
         {dns === null ? (
           <LoadingRows rows={2} />
         ) : dns.records.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("mail.dns.noRecords")}</p>
+          <p className="text-sm text-muted-foreground">{t("mail.dns.noRecords")}</p>
         ) : (
           <div className="flex flex-col gap-2">
             {dns.records.map((r, i) => (
@@ -539,7 +541,7 @@ function DomainCard({
                   {r.type}
                 </Badge>
                 <Badge variant={dnsStatusVariant(r.status)}>{t(`mail.dns.status.${r.status}`, undefined, r.status)}</Badge>
-                <span dir="ltr" className="shrink-0 text-xs text-grid-muted">
+                <span dir="ltr" className="shrink-0 text-xs text-muted-foreground">
                   {r.name}
                 </span>
                 <CopyField value={r.value} className="min-w-0 flex-1" />
@@ -550,7 +552,7 @@ function DomainCard({
                 PTR
               </Badge>
               <Badge variant={dnsStatusVariant(dns.ptr.status)}>{t(`mail.dns.status.${dns.ptr.status}`, undefined, dns.ptr.status)}</Badge>
-              <span dir="ltr" className="text-xs text-grid-muted">
+              <span dir="ltr" className="text-xs text-muted-foreground">
                 {dns.ptr.hostname}
               </span>
             </div>
@@ -561,15 +563,15 @@ function DomainCard({
       {/* Mailboxes */}
       <div className="px-6 pb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.mailboxes.title")}</p>
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.mailboxes.title")}</p>
           {manage ? <MailboxDialog base={domBase} domain={domain.domain} onSaved={load} /> : null}
         </div>
         {mailboxes === null ? (
           <LoadingRows rows={2} />
         ) : mailboxes.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("mail.mailboxes.empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("mail.mailboxes.empty")}</p>
         ) : (
-          <div className="border border-line">
+          <div className="border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -592,15 +594,15 @@ function DomainCard({
       {/* Aliases */}
       <div className="px-6 pb-4">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.aliases.title")}</p>
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.aliases.title")}</p>
           {manage ? <AliasDialog base={domBase} domain={domain.domain} onSaved={load} /> : null}
         </div>
         {aliases === null ? (
           <LoadingRows rows={2} />
         ) : aliases.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("mail.aliases.empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("mail.aliases.empty")}</p>
         ) : (
-          <div className="border border-line">
+          <div className="border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -619,7 +621,7 @@ function DomainCard({
                     <TableCell>
                       <Badge variant="outline">{t(`mail.aliases.kinds.${al.kind}`, undefined, al.kind)}</Badge>
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 truncate text-start text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 truncate text-start text-xs text-muted-foreground">
                       {al.destinations.join(", ")}
                     </TableCell>
                     <TableCell>
@@ -654,15 +656,15 @@ function DomainCard({
       {/* SMTP relay credentials (MH-577 I6) */}
       <div className="px-6 pb-6">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.relay.title")}</p>
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.relay.title")}</p>
           {manage && domain.status === "active" && apps.length > 0 ? <RelayDialog base={domBase} domain={domain.domain} apps={apps} onSaved={load} /> : null}
         </div>
         {relays === null ? (
           <LoadingRows rows={1} />
         ) : relays.length === 0 ? (
-          <p className="text-sm text-grid-muted">{apps.length === 0 ? t("mail.relay.needApp") : t("mail.relay.empty")}</p>
+          <p className="text-sm text-muted-foreground">{apps.length === 0 ? t("mail.relay.needApp") : t("mail.relay.empty")}</p>
         ) : (
-          <div className="border border-line">
+          <div className="border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -710,7 +712,7 @@ function MailboxRow({ base, mailbox, manage, onChanged }: { base: string; mailbo
         <TableCell dir="ltr" className="text-start font-medium">
           {mailbox.email}
         </TableCell>
-        <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+        <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
           {mailbox.quota_mb} MB
         </TableCell>
         <TableCell>
@@ -719,7 +721,7 @@ function MailboxRow({ base, mailbox, manage, onChanged }: { base: string; mailbo
         <TableCell>
           <div className="flex flex-wrap justify-end gap-2">
             {manage ? (
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => void rotatePassword()}>
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => void rotatePassword()}>
                 <KeyRoundIcon />
                 {t("mail.mailboxes.resetPassword")}
               </Button>
@@ -767,7 +769,7 @@ function PasswordShown({ email, password, onClose }: { email: string; password: 
         </DialogHeader>
         <CopyField value={password} />
         <DialogFooter>
-          <Button onClick={onClose}>{t("common.close")}</Button>
+          <Button variant="primary" onClick={onClose}>{t("common.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -814,7 +816,7 @@ function MailboxDialog({ base, domain, onSaved, ...controlled }: { base: string;
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         {fromCaller ? null : (
-          <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <DialogTrigger render={<Button size="sm" variant="secondary" />}>
             <PlusIcon />
             {t("mail.mailboxes.add")}
           </DialogTrigger>
@@ -825,7 +827,7 @@ function MailboxDialog({ base, domain, onSaved, ...controlled }: { base: string;
               <DialogTitle>{t("mail.mailboxes.add")}</DialogTitle>
               <DialogDescription>{t("mail.mailboxes.addHint", { domain })}</DialogDescription>
             </DialogHeader>
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <Field>
                 <FieldLabel htmlFor="mbx-local">{t("mail.mailboxes.localPart")}</FieldLabel>
                 <div className="flex items-center gap-2">
@@ -839,7 +841,7 @@ function MailboxDialog({ base, domain, onSaved, ...controlled }: { base: string;
                     onChange={(e) => setLocalPart(e.target.value)}
                     className="max-w-48"
                   />
-                  <span dir="ltr" className="text-sm text-grid-muted">
+                  <span dir="ltr" className="text-sm text-muted-foreground">
                     @{domain}
                   </span>
                 </div>
@@ -849,13 +851,13 @@ function MailboxDialog({ base, domain, onSaved, ...controlled }: { base: string;
                 <Input id="mbx-quota" dir="ltr" type="number" min={1} max={1048576} required value={quota} onChange={(e) => setQuota(e.target.value)} />
                 <FieldDescription>{t("mail.mailboxes.quotaHint")}</FieldDescription>
               </Field>
-            </FieldGroup>
+            </div>
             <FormError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={busy || !localPart.trim()}>
+              <Button variant="primary" type="submit" disabled={busy || !localPart.trim()}>
                 {busy ? t("common.working") : t("mail.mailboxes.add")}
               </Button>
             </DialogFooter>
@@ -907,7 +909,7 @@ function AliasDialog({ base, domain, onSaved, ...controlled }: { base: string; d
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DialogTrigger render={<Button size="sm" variant="secondary" />}>
           <PlusIcon />
           {t("mail.aliases.add")}
         </DialogTrigger>
@@ -918,7 +920,7 @@ function AliasDialog({ base, domain, onSaved, ...controlled }: { base: string; d
             <DialogTitle>{t("mail.aliases.add")}</DialogTitle>
             <DialogDescription>{t("mail.aliases.addHint", { domain })}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="al-local">{t("mail.aliases.localPart")}</FieldLabel>
               <div className="flex items-center gap-2">
@@ -932,7 +934,7 @@ function AliasDialog({ base, domain, onSaved, ...controlled }: { base: string; d
                   onChange={(e) => setLocalPart(e.target.value)}
                   className="max-w-48"
                 />
-                <span dir="ltr" className="text-sm text-grid-muted">
+                <span dir="ltr" className="text-sm text-muted-foreground">
                   @{domain}
                 </span>
               </div>
@@ -961,13 +963,13 @@ function AliasDialog({ base, domain, onSaved, ...controlled }: { base: string; d
               />
               <FieldDescription>{kind === "alias" ? t("mail.aliases.destHintAlias") : t("mail.aliases.destHintForward")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !localPart.trim() || !destinations.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !localPart.trim() || !destinations.trim()}>
               {busy ? t("common.working") : t("mail.aliases.add")}
             </Button>
           </DialogFooter>
@@ -989,7 +991,7 @@ function DeliverabilityDialog({ report, onClose }: { report: DeliverabilityRepor
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div>
-            <p className="mb-2 text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.dns.records")}</p>
+            <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.dns.records")}</p>
             <div className="flex flex-col gap-2">
               {report.dns.records.map((r, i) => (
                 <div key={`${r.type}-${r.name}-${i}`} className="flex flex-wrap items-center gap-2 text-sm">
@@ -997,7 +999,7 @@ function DeliverabilityDialog({ report, onClose }: { report: DeliverabilityRepor
                     {r.type}
                   </Badge>
                   <Badge variant={dnsStatusVariant(r.status)}>{t(`mail.dns.status.${r.status}`, undefined, r.status)}</Badge>
-                  <span dir="ltr" className="text-xs text-grid-muted">
+                  <span dir="ltr" className="text-xs text-muted-foreground">
                     {r.name}
                   </span>
                 </div>
@@ -1007,23 +1009,23 @@ function DeliverabilityDialog({ report, onClose }: { report: DeliverabilityRepor
                   PTR
                 </Badge>
                 <Badge variant={dnsStatusVariant(report.dns.ptr.status)}>{t(`mail.dns.status.${report.dns.ptr.status}`, undefined, report.dns.ptr.status)}</Badge>
-                <span dir="ltr" className="text-xs text-grid-muted">
+                <span dir="ltr" className="text-xs text-muted-foreground">
                   {report.dns.ptr.hostname}
                 </span>
               </div>
             </div>
           </div>
           <div>
-            <p className="mb-2 text-xs font-medium tracking-wide text-grid-muted uppercase">{t("mail.deliverability.blacklists")}</p>
+            <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("mail.deliverability.blacklists")}</p>
             <div className="flex flex-col gap-2">
               {report.blacklists.map((bl) => (
                 <div key={bl.zone} className="flex flex-wrap items-center gap-2 text-sm">
                   <Badge variant={blacklistStatusVariant(bl.status)}>{t(`mail.deliverability.status.${bl.status}`, undefined, bl.status)}</Badge>
-                  <span dir="ltr" className="text-xs text-grid-muted">
+                  <span dir="ltr" className="text-xs text-muted-foreground">
                     {bl.zone}
                   </span>
                   {bl.detail ? (
-                    <span dir="ltr" className="text-xs text-grid-muted">
+                    <span dir="ltr" className="text-xs text-muted-foreground">
                       ({bl.detail})
                     </span>
                   ) : null}
@@ -1031,10 +1033,10 @@ function DeliverabilityDialog({ report, onClose }: { report: DeliverabilityRepor
               ))}
             </div>
           </div>
-          <p className="border-t border-line pt-3 text-xs text-grid-muted">{report.spam_filter_note}</p>
+          <p className="border-t border-border pt-3 text-xs text-muted-foreground">{report.spam_filter_note}</p>
         </div>
         <DialogFooter>
-          <Button onClick={onClose}>{t("common.close")}</Button>
+          <Button variant="primary" onClick={onClose}>{t("common.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1093,26 +1095,26 @@ function RelayRow({
         <TableCell dir="ltr" className="text-start font-medium">
           {relay.email}
         </TableCell>
-        <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+        <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
           {appName}
         </TableCell>
         <TableCell>
-          <Badge variant={relay.attached ? "default" : "outline"}>{relay.attached ? t("mail.relay.yes") : t("mail.relay.no")}</Badge>
+          <Badge variant={relay.attached ? "brand" : "outline"}>{relay.attached ? t("mail.relay.yes") : t("mail.relay.no")}</Badge>
         </TableCell>
         <TableCell>
           <Badge variant={mailStatusVariant(relay.status)}>{t(`mail.status.${relay.status}`, undefined, relay.status)}</Badge>
-          {relay.error ? <p className="mt-1 max-w-64 text-xs text-grid-danger">{relay.error}</p> : null}
+          {relay.error ? <p className="mt-1 max-w-64 text-xs text-nq-danger-text">{relay.error}</p> : null}
         </TableCell>
         <TableCell>
           <div className="flex flex-wrap justify-end gap-2">
             {manage && relay.status === "ready" ? (
-              <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void attach()}>
+              <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void attach()}>
                 <LinkIcon />
                 {busy === "attach" ? t("common.working") : relay.attached ? t("mail.relay.reattach") : t("mail.relay.attach")}
               </Button>
             ) : null}
             {manage ? (
-              <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void rotate()}>
+              <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void rotate()}>
                 <KeyRoundIcon />
                 {busy === "rotate" ? t("common.working") : t("mail.relay.rotate")}
               </Button>
@@ -1189,7 +1191,7 @@ function RelayDialog({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         {fromCaller ? null : (
-          <DialogTrigger render={<Button size="sm" variant="outline" />}>
+          <DialogTrigger render={<Button size="sm" variant="secondary" />}>
             <PlusIcon />
             {t("mail.relay.add")}
           </DialogTrigger>
@@ -1200,7 +1202,7 @@ function RelayDialog({
               <DialogTitle>{t("mail.relay.add")}</DialogTitle>
               <DialogDescription>{t("mail.relay.addHint", { domain })}</DialogDescription>
             </DialogHeader>
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <Field>
                 <FieldLabel htmlFor="relay-app">{t("mail.relay.app")}</FieldLabel>
                 <Select value={app} onValueChange={(v) => setApp(v ?? "")}>
@@ -1217,13 +1219,13 @@ function RelayDialog({
                 </Select>
                 <FieldDescription>{t("mail.relay.appHint")}</FieldDescription>
               </Field>
-            </FieldGroup>
+            </div>
             <FormError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={busy || !app}>
+              <Button variant="primary" type="submit" disabled={busy || !app}>
                 {busy ? t("common.working") : t("mail.relay.add")}
               </Button>
             </DialogFooter>

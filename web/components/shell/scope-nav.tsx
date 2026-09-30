@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
@@ -34,17 +35,9 @@ import { SERVER_TABS, type ServerTab } from "@/components/server-tabs/header"
 import { GroupLabel, NavLink } from "@/components/shell/nav-link"
 import { scopeOf, useShellScope } from "@/components/shell/scope"
 import { sectionsFor, SITE_GROUPS } from "@/components/site/sections"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported, type App } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -99,12 +92,12 @@ function ScopeHead({
   onNavigate?: () => void
 }) {
   return (
-    <div className="border-b border-line pb-3">
+    <div className="border-b border-border pb-3">
       <Link
         href={back}
         onClick={onNavigate}
         title={backLabel}
-        className="flex items-center gap-2 px-4 py-2 text-xs text-grid-muted hover:text-grid-fg group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0"
+        className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0"
       >
         <ArrowLeftIcon className="size-3.5 shrink-0 rtl:-scale-x-100" />
         <span className="truncate group-data-[collapsed=true]/nav:hidden">{backLabel}</span>
@@ -112,10 +105,10 @@ function ScopeHead({
       <div className="flex items-center gap-2.5 px-4 pt-1 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
         {mark}
         <span className="min-w-0 group-data-[collapsed=true]/nav:hidden">
-          <span dir="auto" className="block truncate text-sm font-medium text-grid-fg">
+          <span dir="auto" className="block truncate text-sm font-medium text-foreground">
             {title}
           </span>
-          {subtitle ? <span className="block truncate text-xs text-grid-muted">{subtitle}</span> : null}
+          {subtitle ? <span className="block truncate text-xs text-muted-foreground">{subtitle}</span> : null}
         </span>
       </div>
     </div>
@@ -229,7 +222,7 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
 }
 
 function Sep() {
-  return <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-grid-muted rtl:-scale-x-100" />
+  return <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground rtl:-scale-x-100" />
 }
 
 /**
@@ -306,7 +299,7 @@ export function ScopeCrumbs() {
           <span dir="ltr" className="truncate text-sm font-medium">
             {server?.name ?? "…"}
           </span>
-          <ChevronsUpDownIcon className="text-grid-muted" />
+          <ChevronsUpDownIcon className="text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="max-h-96 min-w-64">
           <DropdownMenuGroup>
@@ -338,7 +331,7 @@ export function ScopeCrumbs() {
               <span dir="auto" className="truncate text-sm font-medium">
                 {site?.title || siteName}
               </span>
-              <ChevronsUpDownIcon className="text-grid-muted" />
+              <ChevronsUpDownIcon className="text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="max-h-96 min-w-64">
               <DropdownMenuGroup>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
@@ -24,11 +25,11 @@ import { AppStatusBadge } from "@/components/app-status"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows } from "@/components/states"
 import { PresenceBadge } from "@/components/server-status"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { AppDetail, Deployment } from "@/lib/apps"
 import type { DataService, DataServiceKind } from "@/lib/databases"
@@ -111,12 +112,12 @@ export default function SiteCanvasPage() {
     <PageBody
       title={
         <span className="flex flex-wrap items-center gap-2">
-          <span className="grid size-8 place-items-center border border-line bg-grid-soft font-mono text-sm uppercase text-grid-brand">
+          <span className="grid size-8 place-items-center border border-border bg-secondary font-mono text-sm uppercase text-nq-brand">
             {app.name.slice(0, 1)}
           </span>
           <span dir="ltr">{app.name}</span>
-          <span className="text-grid-muted">·</span>
-          <span dir="ltr" className="font-normal text-grid-muted">
+          <span className="text-muted-foreground">·</span>
+          <span dir="ltr" className="font-normal text-muted-foreground">
             {app.branch}
           </span>
           <AppStatusBadge status={app.status} />
@@ -130,7 +131,7 @@ export default function SiteCanvasPage() {
       }
       actions={
         manage ? (
-          <Button disabled={busy} onClick={deploy}>
+          <Button variant="primary" disabled={busy} onClick={deploy}>
             <CloudUploadIcon />
             {busy ? t("common.working") : t("sites.deploy")}
           </Button>
@@ -141,7 +142,7 @@ export default function SiteCanvasPage() {
       <ErrorBand message={error} />
       <div
         data-testid="site-canvas"
-        className="relative overflow-x-auto border-b border-line bg-grid-bg p-6 [background-image:radial-gradient(var(--color-line)_1px,transparent_1px)] [background-size:20px_20px]"
+        className="relative overflow-x-auto border-b border-border bg-background p-6 [background-image:radial-gradient(var(--color-line)_1px,transparent_1px)] [background-size:20px_20px]"
       >
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3 lg:gap-10">
           {/* Network: edge and domains */}
@@ -152,7 +153,7 @@ export default function SiteCanvasPage() {
             </Card>
             <Card title={t("sites.domains")} testId="canvas-domains">
               {detail.domains.length === 0 ? (
-                <p className="px-4 py-3 text-sm text-grid-muted">{t("sites.noDomains")}</p>
+                <p className="px-4 py-3 text-sm text-muted-foreground">{t("sites.noDomains")}</p>
               ) : (
                 detail.domains.map((d) => (
                   <Row
@@ -230,7 +231,7 @@ export default function SiteCanvasPage() {
                 />
               </Card>
             ))}
-            <p className="px-1 text-xs break-words text-grid-muted">{t("sites.workersHint")}</p>
+            <p className="px-1 text-xs break-words text-muted-foreground">{t("sites.workersHint")}</p>
           </Group>
 
           {/* Resources: attached on the same server */}
@@ -239,14 +240,14 @@ export default function SiteCanvasPage() {
               <Link
                 key={s.id}
                 href={`${base}/databases/${s.id}`}
-                className="flex items-start gap-3 border border-line bg-grid-card p-4 hover:bg-grid-soft"
+                className="flex items-start gap-3 border border-border bg-card p-4 hover:bg-secondary"
               >
-                <DatabaseIcon className="mt-0.5 size-4 shrink-0 text-grid-brand" aria-hidden />
+                <DatabaseIcon className="mt-0.5 size-4 shrink-0 text-nq-brand" aria-hidden />
                 <span className="flex min-w-0 flex-col">
                   <span dir="ltr" className="font-medium">
                     {s.name}
                   </span>
-                  <span className="text-sm text-grid-muted">
+                  <span className="text-sm text-muted-foreground">
                     {s.kind} {s.version} · {s.status}
                   </span>
                 </span>
@@ -287,8 +288,8 @@ export default function SiteCanvasPage() {
 
 function Group({ icon, label, children }: { icon: ReactNode; label: ReactNode; children: ReactNode }) {
   return (
-    <section className="flex min-w-0 flex-col gap-3 border border-dashed border-line p-3">
-      <div className="flex items-center gap-2 px-1 text-sm text-grid-muted [&_svg]:size-4">
+    <section className="flex min-w-0 flex-col gap-3 border border-dashed border-border p-3">
+      <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground [&_svg]:size-4">
         {icon}
         {label}
       </div>
@@ -299,9 +300,9 @@ function Group({ icon, label, children }: { icon: ReactNode; label: ReactNode; c
 
 function Card({ title, children, testId }: { title: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <div className="flex flex-col border border-line bg-grid-card" data-testid={testId}>
-      <div className="border-b border-line px-4 py-3 text-sm font-medium text-grid-fg">{title}</div>
-      <div className="flex flex-col divide-y divide-line">{children}</div>
+    <div className="flex flex-col border border-border bg-card" data-testid={testId}>
+      <div className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">{title}</div>
+      <div className="flex flex-col divide-y divide-border">{children}</div>
     </div>
   )
 }
@@ -309,7 +310,7 @@ function Card({ title, children, testId }: { title: ReactNode; children: ReactNo
 function Row({ icon, label, value }: { icon: ReactNode; label: ReactNode; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-      <span className="flex min-w-0 items-center gap-2 text-grid-muted [&_svg]:size-4 [&_svg]:shrink-0">
+      <span className="flex min-w-0 items-center gap-2 text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
         {label}
       </span>
@@ -320,8 +321,8 @@ function Row({ icon, label, value }: { icon: ReactNode; label: ReactNode; value:
 
 function Dot({ ok, text }: { ok: boolean; text: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs text-grid-muted">
-      <span className={`size-1.5 rounded-full ${ok ? "bg-grid-brand" : "bg-grid-muted/60"}`} aria-hidden />
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className={`size-1.5 rounded-full ${ok ? "bg-nq-brand" : "bg-nq-fg-muted/60"}`} aria-hidden />
       {text}
     </span>
   )
@@ -329,7 +330,7 @@ function Dot({ ok, text }: { ok: boolean; text: string }) {
 
 function CardLink({ href, icon, children }: { href: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <Link href={href} className="flex items-center gap-2 px-4 py-3 text-sm text-grid-brand hover:bg-grid-soft [&_svg]:size-4">
+    <Link href={href} className="flex items-center gap-2 px-4 py-3 text-sm text-nq-brand hover:bg-secondary [&_svg]:size-4">
       {icon}
       {children}
     </Link>
@@ -354,12 +355,12 @@ function AddCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-start gap-3 border border-dashed border-line bg-grid-card p-4 text-start hover:border-solid hover:bg-grid-soft disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-grid-brand"
+      className="flex items-start gap-3 border border-dashed border-border bg-card p-4 text-start hover:border-solid hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-nq-brand"
     >
       {icon}
       <span className="flex flex-col">
         <span className="font-medium">{title}</span>
-        <span className="text-sm text-grid-muted">{hint}</span>
+        <span className="text-sm text-muted-foreground">{hint}</span>
       </span>
     </button>
   )
@@ -414,7 +415,7 @@ function AddServiceDialog({
             </DialogTitle>
             <DialogDescription>{t("sites.addServiceHint", { server: server.name })}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="gap-4">
+          <div className="flex w-full flex-col gap-4">
             {kinds.length > 1 ? (
               <div className="flex gap-2" role="radiogroup" aria-label={t("databases.kind")}>
                 {kinds.map((k) => (
@@ -422,7 +423,7 @@ function AddServiceDialog({
                     key={k}
                     type="button"
                     size="sm"
-                    variant={k === kind ? "default" : "outline"}
+                    variant={k === kind ? "primary" : "secondary"}
                     aria-pressed={k === kind}
                     onClick={() => setKind(k)}
                   >
@@ -435,13 +436,13 @@ function AddServiceDialog({
               <FieldLabel htmlFor="svc-name">{t("databases.name")}</FieldLabel>
               <Input id="svc-name" dir="ltr" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name}>
+            <Button variant="primary" type="submit" disabled={busy || !name}>
               {busy ? t("common.working") : t("sites.create")}
             </Button>
           </DialogFooter>

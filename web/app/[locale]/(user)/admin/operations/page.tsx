@@ -1,12 +1,13 @@
 "use client"
 
+import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useState } from "react"
 
 import { FilterSelect, ListEmpty, ListError, ListToolbar, LoadingRows, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { useAdminList, type AdminOperation } from "@/lib/admin"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -15,9 +16,9 @@ const STATUSES = ["pending", "sent", "running", "ok", "failed", "timeout"] as co
 function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n()
   const label = t(`admin.operations.status.${status}`, undefined, status)
-  if (status === "failed" || status === "timeout") return <Badge variant="destructive">{label}</Badge>
+  if (status === "failed" || status === "timeout") return <Badge variant="danger">{label}</Badge>
   if (status === "ok") return <Badge variant="outline">{label}</Badge>
-  return <Badge variant="secondary">{label}</Badge>
+  return <Badge variant="neutral">{label}</Badge>
 }
 
 export default function AdminOperationsPage() {
@@ -38,7 +39,7 @@ export default function AdminOperationsPage() {
           placeholder={t("admin.operations.kind")}
           aria-label={t("admin.operations.kind")}
           dir="ltr"
-          className="h-8 w-44 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+          className="h-8 w-44 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
         />
         <FilterSelect
           value={status}
@@ -54,7 +55,7 @@ export default function AdminOperationsPage() {
       ) : items.length === 0 ? (
         <ListEmpty title={status || kind ? t("admin.list.noMatch") : t("admin.operations.empty")} />
       ) : (
-        <div className="border-b border-line">
+        <div className="border-b border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -75,7 +76,7 @@ export default function AdminOperationsPage() {
                   <TableCell>
                     <StatusBadge status={op.status} />
                     {op.exit_code !== null && op.exit_code !== 0 ? (
-                      <span className="ms-2 font-mono text-xs text-grid-muted" dir="ltr">
+                      <span className="ms-2 font-mono text-xs text-muted-foreground" dir="ltr">
                         exit {op.exit_code}
                       </span>
                     ) : null}
@@ -85,17 +86,17 @@ export default function AdminOperationsPage() {
                       {op.team_name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-grid-muted">{op.server_name}</TableCell>
+                  <TableCell className="text-muted-foreground">{op.server_name}</TableCell>
                   <TableCell className="max-w-xs">
                     {op.error ? (
-                      <span className="line-clamp-2 font-mono text-xs text-grid-danger" dir="ltr" title={op.error}>
+                      <span className="line-clamp-2 font-mono text-xs text-nq-danger-text" dir="ltr" title={op.error}>
                         {op.error}
                       </span>
                     ) : (
-                      <span className="text-grid-muted">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                  <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                     {fmt(op.created_at)}
                   </TableCell>
                 </TableRow>

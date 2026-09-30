@@ -16,20 +16,20 @@ export function Planned({ section, icon: Icon }: { section: string; icon: Lucide
   return (
     <section aria-labelledby="planned-h">
       <SectionTitle id="planned-h" title={t(`site.nav.${section}`)} hint={t(`site.planned.${section}.hint`)} />
-      <div className="flex flex-col gap-5 border-b border-line px-6 py-8">
+      <div className="flex flex-col gap-5 border-b border-border px-6 py-8">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center border border-line bg-grid-card text-grid-brand">
+          <span className="flex size-10 items-center justify-center border border-border bg-card text-nq-brand">
             <Icon className="size-5" />
           </span>
-          <span className="inline-flex items-center gap-1.5 border border-dashed border-line px-2 py-1 text-xs text-grid-muted">
+          <span className="inline-flex items-center gap-1.5 border border-dashed border-border px-2 py-1 text-xs text-muted-foreground">
             <HammerIcon className="size-3.5" />
             {t("site.notBuilt")}
           </span>
         </div>
-        <ul className="flex max-w-2xl flex-col gap-2 text-sm text-grid-body">
+        <ul className="flex max-w-2xl flex-col gap-2 text-sm text-nq-fg-body">
           {points.map((p) => (
             <li key={p} className="flex items-start gap-2">
-              <CheckIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+              <CheckIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               <span>{p}</span>
             </li>
           ))}

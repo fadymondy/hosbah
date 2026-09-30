@@ -118,21 +118,21 @@ export type MailRelayCreated = {
   password: string
 }
 
-export function blacklistStatusVariant(status: BlacklistStatus): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "ok") return "default"
-  if (status === "listed") return "destructive"
+export function blacklistStatusVariant(status: BlacklistStatus): "success" | "neutral" | "danger" | "outline" {
+  if (status === "ok") return "success"
+  if (status === "listed") return "danger"
   return "outline"
 }
 
-export function mailStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "running" || status === "active" || status === "ready") return "default"
-  if (status === "failed") return "destructive"
-  if (status === "new" || status === "installing" || status === "creating" || status === "removing") return "secondary"
+export function mailStatusVariant(status: string): "success" | "neutral" | "danger" | "outline" {
+  if (status === "running" || status === "active" || status === "ready") return "success"
+  if (status === "failed") return "danger"
+  if (status === "new" || status === "installing" || status === "creating" || status === "removing") return "neutral"
   return "outline"
 }
 
-export function dnsStatusVariant(status: DnsRecordStatus): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "ok") return "default"
-  if (status === "missing" || status === "mismatch") return "destructive"
+export function dnsStatusVariant(status: DnsRecordStatus): "success" | "neutral" | "danger" | "outline" {
+  if (status === "ok") return "success"
+  if (status === "missing" || status === "mismatch") return "danger"
   return "outline"
 }

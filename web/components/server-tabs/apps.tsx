@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Button, Checkbox, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { BoxesIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -7,18 +9,18 @@ import { BoxesIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { ServerMark } from "@/components/server-mark"
 import { ConfirmButton } from "@/components/confirm-button"
 import { EditDialog, ListSearch, matches } from "@/components/server-tabs/list-tools"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 
 import { AppStatusBadge, DeploymentStatusBadge } from "@/components/app-status"
 import { DomainsSummary } from "@/components/apps/domains"
 import { ImportedBadge, originSummary } from "@/components/imported"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported, runtimeLabel, shortSha, type App } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -58,7 +60,7 @@ export function ServerApps({ serverId }: { serverId: string }) {
   )
 
   const add = manage ? (
-    <Button nativeButton={false} render={<Link href={`${base}/apps/new?server=${serverId}`} />}>
+    <Button variant="primary" nativeButton={false} render={<Link href={`${base}/apps/new?server=${serverId}`} />}>
       <PlusIcon />
       {t("apps.add")}
     </Button>
@@ -84,7 +86,7 @@ export function ServerApps({ serverId }: { serverId: string }) {
       ) : (
         <>
         <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchApps")} shown={shown.length} total={apps.length} />
-        {shown.length === 0 ? <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
+        {shown.length === 0 ? <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
         <TableBand>
           <Table>
             <TableHeader>
@@ -153,7 +155,7 @@ export function ServerApps({ serverId }: { serverId: string }) {
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
                           {isImported(a) ? (
-                            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/apps/${a.name}`} />}>
+                            <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/apps/${a.name}`} />}>
                               {t("lists.manage")}
                             </Button>
                           ) : (
@@ -216,7 +218,7 @@ function EditApp({ app, team, onSaved }: { app: App; team: string; onSaved: () =
         await onSaved()
       }}
     >
-      <FieldGroup>
+      <div className="flex w-full flex-col gap-5">
         <Field>
           <FieldLabel htmlFor="ea-branch">{t("lists.branch")}</FieldLabel>
           <Input id="ea-branch" dir="ltr" value={branch} onChange={(e) => setBranch(e.target.value)} />
@@ -233,7 +235,7 @@ function EditApp({ app, team, onSaved }: { app: App; team: string; onSaved: () =
           <Checkbox checked={paused} onCheckedChange={(v) => setPaused(v === true)} />
           {t("lists.pauseAutodeploy")}
         </label>
-      </FieldGroup>
+      </div>
     </EditDialog>
   )
 }

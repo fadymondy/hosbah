@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { ArchiveIcon, KeyRoundIcon, PackageIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
@@ -9,28 +11,28 @@ import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
+
+
 import { Progress, ProgressLabel, ProgressTrack, ProgressIndicator, ProgressValue } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import type { MintedProductKey, Product, ProductDetail, ProductInstance, ProductKey, ProductUpgrade } from "@/lib/products"
 import { canOperate, type Server } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
 
-function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  if (["active", "ok", "running", "provisioned"].includes(status)) return "default"
-  if (["suspended", "paused", "archived"].includes(status)) return "secondary"
-  if (["failed", "error", "timeout"].includes(status)) return "destructive"
+function statusVariant(status: string): "success" | "neutral" | "danger" | "outline" {
+  if (["active", "ok", "running", "provisioned"].includes(status)) return "success"
+  if (["suspended", "paused", "archived"].includes(status)) return "neutral"
+  if (["failed", "error", "timeout"].includes(status)) return "danger"
   return "outline"
 }
 
@@ -116,7 +118,7 @@ export function TeamProducts() {
                           {p.title || p.name}
                         </button>
                         {p.description ? (
-                          <div dir="auto" className="max-w-72 truncate text-xs text-grid-muted">
+                          <div dir="auto" className="max-w-72 truncate text-xs text-muted-foreground">
                             {p.description}
                           </div>
                         ) : null}
@@ -129,7 +131,7 @@ export function TeamProducts() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setOpenProduct(p)}>
+                          <Button size="sm" variant="secondary" onClick={() => setOpenProduct(p)}>
                             {t("products.open")}
                           </Button>
                           {manage ? <ArchiveProduct path={`${base}/${p.id}`} product={p} onArchived={load} /> : null}
@@ -244,7 +246,7 @@ function ProductDialog({ path, onSaved, ...controlled }: { path: string; onSaved
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("products.add")}
         </DialogTrigger>
@@ -255,7 +257,7 @@ function ProductDialog({ path, onSaved, ...controlled }: { path: string; onSaved
             <DialogTitle>{t("products.add")}</DialogTitle>
             <DialogDescription>{t("products.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="prod-kind">{t("products.sourceKind")}</FieldLabel>
               <Select value={sourceKind} onValueChange={(v) => setSourceKind(v as typeof sourceKind)}>
@@ -307,13 +309,13 @@ function ProductDialog({ path, onSaved, ...controlled }: { path: string; onSaved
               <FieldLabel htmlFor="prod-health">{t("products.healthPath")}</FieldLabel>
               <Input id="prod-health" dir="ltr" maxLength={200} value={healthPath} onChange={(e) => setHealthPath(e.target.value)} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !repoUrl.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || !repoUrl.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -412,7 +414,7 @@ function ProductDetailDialog({
         <ErrorBand message={error} />
 
         {upgrade ? (
-          <div className="flex flex-col gap-2 border border-line p-3">
+          <div className="flex flex-col gap-2 border border-border p-3">
             <Progress value={upgrade.total > 0 ? Math.round(((upgrade.completed + upgrade.failed) / upgrade.total) * 100) : 0}>
               <div className="flex w-full items-center justify-between">
                 <ProgressLabel>{t("products.upgrade.progress")}</ProgressLabel>
@@ -422,26 +424,26 @@ function ProductDetailDialog({
                 <ProgressIndicator />
               </ProgressTrack>
             </Progress>
-            <p className="text-xs text-grid-muted">
+            <p className="text-xs text-muted-foreground">
               {t("products.upgrade.counts", { completed: upgrade.completed, failed: upgrade.failed, total: upgrade.total })} ·{" "}
               <Badge variant={statusVariant(upgrade.status)}>{upgrade.status}</Badge>
             </p>
-            {upgrade.error ? <p className="text-xs text-grid-danger">{upgrade.error}</p> : null}
+            {upgrade.error ? <p className="text-xs text-nq-danger-text">{upgrade.error}</p> : null}
           </div>
         ) : null}
 
         <Tabs defaultValue="instances">
           <TabsList>
-            <TabsTrigger value="instances">{t("products.tabs.instances")}</TabsTrigger>
-            <TabsTrigger value="keys">{t("products.tabs.keys")}</TabsTrigger>
-            <TabsTrigger value="api">{t("products.tabs.api")}</TabsTrigger>
+            <TabsTab value="instances">{t("products.tabs.instances")}</TabsTab>
+            <TabsTab value="keys">{t("products.tabs.keys")}</TabsTab>
+            <TabsTab value="api">{t("products.tabs.api")}</TabsTab>
           </TabsList>
 
-          <TabsContent value="instances">
+          <TabsPanel value="instances">
             <div className="flex flex-wrap items-center justify-between gap-2 py-2">
               {operate ? <ProvisionInstanceDialog path={`${path}/instances`} servers={servers ?? []} onSaved={refreshAll} /> : null}
               {operate ? (
-                <Button size="sm" variant="outline" onClick={() => void startUpgrade()} disabled={!!upgrade && upgrade.status !== "ok" && upgrade.status !== "failed"}>
+                <Button size="sm" variant="secondary" onClick={() => void startUpgrade()} disabled={!!upgrade && upgrade.status !== "ok" && upgrade.status !== "failed"}>
                   <RefreshCwIcon />
                   {t("products.upgrade.action")}
                 </Button>
@@ -450,7 +452,7 @@ function ProductDetailDialog({
             {detail === null ? (
               <LoadingRows rows={2} />
             ) : detail.instances.length === 0 ? (
-              <p className="border-t border-line py-6 text-center text-sm text-grid-muted">{t("products.instances.empty")}</p>
+              <p className="border-t border-border py-6 text-center text-sm text-muted-foreground">{t("products.instances.empty")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -468,16 +470,16 @@ function ProductDetailDialog({
                 </TableBody>
               </Table>
             )}
-          </TabsContent>
+          </TabsPanel>
 
-          <TabsContent value="keys">
+          <TabsPanel value="keys">
             <div className="flex items-center justify-end py-2">
               {manage ? <MintKeyDialog path={`${path}/keys`} onSaved={refreshAll} /> : null}
             </div>
             {detail === null ? (
               <LoadingRows rows={2} />
             ) : detail.keys.length === 0 ? (
-              <p className="border-t border-line py-6 text-center text-sm text-grid-muted">{t("products.keys.empty")}</p>
+              <p className="border-t border-border py-6 text-center text-sm text-muted-foreground">{t("products.keys.empty")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -493,12 +495,12 @@ function ProductDetailDialog({
                       <TableCell dir="auto">
                         {k.name || t("products.keys.unnamed")}
                         {k.revoked_at ? (
-                          <Badge variant="destructive" className="ms-2">
+                          <Badge variant="danger" className="ms-2">
                             {t("products.keys.revoked")}
                           </Badge>
                         ) : null}
                       </TableCell>
-                      <TableCell dir="ltr" className="max-w-52 truncate text-xs text-grid-muted">
+                      <TableCell dir="ltr" className="max-w-52 truncate text-xs text-muted-foreground">
                         {k.webhook_url || "—"}
                       </TableCell>
                       <TableCell>
@@ -528,11 +530,11 @@ function ProductDetailDialog({
                 </TableBody>
               </Table>
             )}
-          </TabsContent>
+          </TabsPanel>
 
-          <TabsContent value="api">
+          <TabsPanel value="api">
             <ApiExamples team={team} product={product} />
-          </TabsContent>
+          </TabsPanel>
         </Tabs>
       </DialogContent>
     </Dialog>
@@ -574,11 +576,11 @@ function InstanceRow({
     <TableRow>
       <TableCell dir="auto">
         <span className="font-medium">{instance.customer_ref}</span>
-        <div className="text-xs text-grid-muted" dir="ltr">
+        <div className="text-xs text-muted-foreground" dir="ltr">
           {instance.name}
         </div>
       </TableCell>
-      <TableCell dir="ltr" className="text-xs text-grid-muted">
+      <TableCell dir="ltr" className="text-xs text-muted-foreground">
         {instance.hostname || "—"}
       </TableCell>
       <TableCell>
@@ -587,7 +589,7 @@ function InstanceRow({
       <TableCell>
         <div className="flex flex-wrap justify-end gap-2">
           {operate ? (
-            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void toggle()}>
+            <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void toggle()}>
               {busy ? t("common.working") : suspended ? t("products.instances.resume") : t("products.instances.suspend")}
             </Button>
           ) : null}
@@ -630,7 +632,7 @@ function DestroyInstance({ path, instance, onDestroyed }: { path: string; instan
         setError(null)
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="destructive" />}>
+      <DialogTrigger render={<Button size="sm" variant="danger" />}>
         <Trash2Icon />
         {t("products.instances.destroy")}
       </DialogTrigger>
@@ -646,10 +648,10 @@ function DestroyInstance({ path, instance, onDestroyed }: { path: string; instan
           </p>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button variant="destructive" disabled={busy || typed !== instance.name} onClick={run}>
+          <Button variant="danger" disabled={busy || typed !== instance.name} onClick={run}>
             {busy ? t("common.working") : t("products.instances.destroy")}
           </Button>
         </DialogFooter>
@@ -711,7 +713,7 @@ function ProvisionInstanceDialog({ path, servers, onSaved }: { path: string; ser
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("products.instances.add")}
         </DialogTrigger>
@@ -722,11 +724,11 @@ function ProvisionInstanceDialog({ path, servers, onSaved }: { path: string; ser
             <DialogTitle>{t("products.instances.add")}</DialogTitle>
             <DialogDescription>{t("products.instances.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="inst-server">{t("products.instances.server")}</FieldLabel>
               {enrolled.length === 0 ? (
-                <p className="text-sm text-grid-muted">{t("products.instances.noServers")}</p>
+                <p className="text-sm text-muted-foreground">{t("products.instances.noServers")}</p>
               ) : (
                 <Select value={server} onValueChange={(v) => setServer(v as string)}>
                   <SelectTrigger id="inst-server">
@@ -756,13 +758,13 @@ function ProvisionInstanceDialog({ path, servers, onSaved }: { path: string; ser
               <Textarea id="inst-env" dir="ltr" rows={5} value={env} onChange={(e) => setEnv(e.target.value)} className="font-mono text-xs" placeholder="KEY=value" />
               <FieldDescription>{t("products.instances.envHint")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !customerRef.trim() || (enrolled.length > 0 && !server)}>
+            <Button variant="primary" type="submit" disabled={busy || !customerRef.trim() || (enrolled.length > 0 && !server)}>
               {busy ? t("common.working") : t("products.instances.add")}
             </Button>
           </DialogFooter>
@@ -815,7 +817,7 @@ function MintKeyDialog({ path, onSaved }: { path: string; onSaved: () => Promise
       }}
     >
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <KeyRoundIcon />
           {t("products.keys.add")}
         </DialogTrigger>
@@ -829,18 +831,18 @@ function MintKeyDialog({ path, onSaved }: { path: string; onSaved: () => Promise
             </DialogHeader>
             <div className="flex flex-col gap-3">
               <div>
-                <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.keys.token")}</p>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.keys.token")}</p>
                 <CopyField value={minted.token} />
               </div>
               {minted.webhook_secret ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.keys.webhookSecret")}</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.keys.webhookSecret")}</p>
                   <CopyField value={minted.webhook_secret} />
                 </div>
               ) : null}
             </div>
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+              <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </>
         ) : (
@@ -849,7 +851,7 @@ function MintKeyDialog({ path, onSaved }: { path: string; onSaved: () => Promise
               <DialogTitle>{t("products.keys.add")}</DialogTitle>
               <DialogDescription>{t("products.keys.dialogHint")}</DialogDescription>
             </DialogHeader>
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <Field>
                 <FieldLabel htmlFor="key-name">{t("products.keys.name")}</FieldLabel>
                 <Input id="key-name" dir="auto" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -859,13 +861,13 @@ function MintKeyDialog({ path, onSaved }: { path: string; onSaved: () => Promise
                 <Input id="key-webhook" dir="ltr" maxLength={500} value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="https://example.com/hooks/hosbah" />
                 <FieldDescription>{t("products.keys.webhookHint")}</FieldDescription>
               </Field>
-            </FieldGroup>
+            </div>
             <FormError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" disabled={busy}>
+              <Button variant="primary" type="submit" disabled={busy}>
                 {busy ? t("common.working") : t("products.keys.add")}
               </Button>
             </DialogFooter>
@@ -896,26 +898,26 @@ function ApiExamples({ team, product }: { team: string; product: Product }) {
 
   return (
     <div className="flex flex-col gap-4 py-2">
-      <p dir="auto" className="text-sm text-grid-muted">
+      <p dir="auto" className="text-sm text-muted-foreground">
         {t("products.api.hint", { name: product.name })}
       </p>
       <div>
-        <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.api.provision")}</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.api.provision")}</p>
         <CopyField value={provision} block />
       </div>
       <div>
-        <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.api.suspend")}</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.api.suspend")}</p>
         <CopyField value={suspend} block />
       </div>
       <div>
-        <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.api.resume")}</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.api.resume")}</p>
         <CopyField value={resume} block />
       </div>
       <div>
-        <p className="mb-1 text-xs font-medium text-grid-muted">{t("products.api.destroy")}</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("products.api.destroy")}</p>
         <CopyField value={destroy} block />
       </div>
-      <p dir="auto" className="text-xs text-grid-muted">
+      <p dir="auto" className="text-xs text-muted-foreground">
         {t("products.api.webhookHint")}
       </p>
     </div>

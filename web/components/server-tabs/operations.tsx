@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { PlayIcon } from "lucide-react"
 
@@ -8,9 +9,9 @@ import { OperationLog } from "@/components/op-log"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { OpStatusBadge } from "@/components/server-status"
 import { SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { canOperate, opKey, PROVISION_STEPS, type Operation } from "@/lib/servers"
@@ -53,17 +54,17 @@ export function ServerOperations() {
 
         {!enrolled ? (
           server.status !== "provisioning" ? (
-            <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.notEnrolled")}</p>
+            <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.notEnrolled")}</p>
           ) : null
         ) : !operate ? (
-          <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.readOnly")}</p>
+          <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.readOnly")}</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3" data-testid="op-actions">
-            <Button size="sm" disabled={busy} onClick={() => run({ kind: "system.info" })}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3" data-testid="op-actions">
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => run({ kind: "system.info" })}>
               <PlayIcon />
               {t("servers.ops.systemInfo")}
             </Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ kind: "docker.check" })}>
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => run({ kind: "docker.check" })}>
               <PlayIcon />
               {t("servers.ops.dockerCheck")}
             </Button>
@@ -81,11 +82,11 @@ export function ServerOperations() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" variant="outline" disabled={busy || !step} onClick={() => run({ kind: "provision.step", step })}>
+                <Button size="sm" variant="secondary" disabled={busy || !step} onClick={() => run({ kind: "provision.step", step })}>
                   {t("servers.ops.run")}
                 </Button>
                 {available && server.agent_version && available !== server.agent_version ? (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={() => run({ kind: "agent.update" })}>
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => run({ kind: "agent.update" })}>
                     {t("servers.ops.update", { version: available })}
                   </Button>
                 ) : null}
@@ -94,13 +95,13 @@ export function ServerOperations() {
           </div>
         )}
         {enrolled && !server.online ? (
-          <p className="border-b border-line px-6 py-3 text-sm text-grid-muted">{t("servers.ops.offlineHint")}</p>
+          <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.offlineHint")}</p>
         ) : null}
 
-        <div className="grid border-b border-line lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <div className="min-w-0 border-b border-line lg:border-e lg:border-b-0 [&_tr>*:first-child]:ps-6">
+        <div className="grid border-b border-border lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="min-w-0 border-b border-border lg:border-e lg:border-b-0 [&_tr>*:first-child]:ps-6">
             {ops.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{t("servers.ops.empty")}</p>
+              <p className="px-6 py-4 text-sm text-muted-foreground">{t("servers.ops.empty")}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -116,14 +117,14 @@ export function ServerOperations() {
                       key={o.id}
                       data-op={o.id}
                       aria-selected={o.id === selected}
-                      className={cn("cursor-pointer", o.id === selected && "bg-grid-soft")}
+                      className={cn("cursor-pointer", o.id === selected && "bg-secondary")}
                       onClick={() => setSelected(o.id)}
                     >
                       <TableCell>
                         <button type="button" className="text-start font-medium" onClick={() => setSelected(o.id)}>
                           {t(`servers.ops.kinds.${opKey(o.kind)}`, undefined, o.kind)}
                           {o.kind === "provision.step" && typeof o.params.step === "string" ? (
-                            <span className="block text-xs font-normal text-grid-muted">
+                            <span className="block text-xs font-normal text-muted-foreground">
                               {t(`servers.ops.steps.${opKey(o.params.step)}`, undefined, o.params.step)}
                             </span>
                           ) : null}

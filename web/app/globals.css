@@ -3,73 +3,27 @@
 @source "../app";
 @source "../components";
 @source "../lib";
+@source "../node_modules/@fadymondy/nasaq/dist/web";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* The grid — fadymondy.com's design system. GENERATED copies: never edit them; re-sync with
-   npm run grid:sync  (node E:/Sites/fadymondy.com-v2/packages/sync-grid.mjs web app/grid) */
+/* Nasaq: tokens, Tailwind theme and base styles. The `hosbah` brand comes from NasaqProvider. */
+@import "@fadymondy/nasaq/tokens.css";
+@import "@fadymondy/nasaq/theme.css";
+@import "@fadymondy/nasaq/web/styles.css";
+
+/* Fonts only (Lusail for Arabic, JetBrains Mono). GENERATED copy: never edit; npm run grid:sync. */
 @import "./grid/grid-fonts.css";
-@import "./grid/grid-tokens.css";
-@import "./grid/grid.css";
-@import "./grid/grid-tailwind.css";
 
-/* Repo-owned: Hosbah's brand block until grid-tokens.css carries it. */
-@import "./grid/brand-cloudy.css";
-
-@custom-variant dark (&:where(.dark, .dark *));
-
-
-/* shadcn's colour utilities (bg-primary, text-muted-foreground…) read the variables that
-   grid-tailwind.css maps onto the grid inside `.grid-surface` (which is on <html>). */
-@theme inline {
-  --font-sans: var(--grid-font-sans);
-  --font-mono: var(--grid-font-mono);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+/* English uses Inter (next/font self-hosts it as --font-inter); Arabic keeps Lusail through Nasaq's
+   Arabic stack. Lusail stays in the English stack so Arabic text inside an English page still renders. */
+html[lang="en"] {
+  --nq-font-sans: var(--font-inter), Inter, Lusail, Alexandria, system-ui, sans-serif;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
   body {
-    @apply bg-background text-foreground;
     min-height: 100dvh;
-  }
-  /* Arabic is never letter-spaced; mono stays mono for codes, tokens, numbers. */
-  :lang(ar) {
-    letter-spacing: 0;
   }
 }
 
@@ -80,7 +34,7 @@
   animation: brand-loader-build 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) infinite both;
 }
 .brand-loader .brand-loader-cell {
-  fill: var(--grid-brand, #2e6f9e);
+  fill: var(--nq-brand);
 }
 @keyframes brand-loader-build {
   0% { opacity: 0; transform: translateY(-60%) scale(0.4); }
@@ -99,61 +53,11 @@
 .brand-loader-label { animation: brand-loader-fade 0.4s ease-out 0.6s both; }
 @keyframes brand-loader-fade { from { opacity: 0; } to { opacity: 1; } }
 
-
-/* The app shell's sidebar, minimised to its icons (the toggle in the top bar, or Ctrl/⌘+B). */
-@media (min-width: 768px) {
-  .grid-shell {
-    transition: grid-template-columns 0.18s ease;
-  }
-  .grid-shell[data-collapsed="true"] {
-    grid-template-columns: 3.5rem minmax(0, 1fr);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .grid-shell {
-    transition: none;
-  }
-}
-
-/* English pages use Inter; Arabic keeps Lusail from the grid. Lusail stays in the stack so Arabic
-   text inside an English page (a name, a quote) still renders in the brand face. */
-html[lang="en"] {
-  --grid-font-sans: var(--font-inter), "Lusail", system-ui, sans-serif;
-}
-
-/* ── Readable type ──
-   One scale for web, desktop and mobile: body text 15px, small text 13px, nothing smaller than
-   11.5px (Latin mono labels, uppercase). The grid's own classes are raised here rather than in
-   app/grid (a synced copy); `.grid-surface` (on <html>) outranks their single-class selectors. */
-@theme {
-  --text-xs: 0.8125rem;
-  --text-xs--line-height: 1.125rem;
-  --text-sm: 0.9375rem;
-  --text-sm--line-height: 1.375rem;
-}
-.grid-surface .grid-micro {
-  font-size: 11.5px;
-  letter-spacing: 0.12em;
-}
-.grid-surface .grid-micro:lang(ar),
-.grid-surface :lang(ar) .grid-micro {
-  font-size: 13px;
-  letter-spacing: 0;
-}
-.grid-surface .grid-meta,
-.grid-surface .grid-chip {
-  font-size: 0.8125rem;
-}
-.grid-surface .grid-btn,
-.grid-surface .grid-input {
-  font-size: 0.9375rem;
-}
 /* Phones: form fields at 16px, or iOS zooms the page in when one is focused. */
 @media (max-width: 767px) {
-  .grid-surface .grid-input,
-  .grid-surface input:not([type="checkbox"]):not([type="radio"]),
-  .grid-surface select,
-  .grid-surface textarea {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
     font-size: 16px;
   }
 }

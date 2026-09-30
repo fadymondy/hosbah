@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Sheet, SheetContent, SheetHeader, SheetTitle } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
@@ -43,20 +44,12 @@ import { ThemedCubeMark } from "@/components/cube-mark"
 import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
 import { LanguageMenu, ThemeToggle } from "@/components/preferences"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
+
 import { GroupLabel, NavLink } from "@/components/shell/nav-link"
 import { ShellScopeProvider } from "@/components/shell/scope"
 import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+
 import { apiFetch } from "@/lib/api"
 import type { Notification } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -103,14 +96,14 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
           data-collapsed={collapsed}
           className="group/nav grid-shell-nav sticky top-0 hidden h-dvh flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden"
         >
-          <div className="flex h-14 shrink-0 items-center border-b border-line px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
+          <div className="flex h-14 shrink-0 items-center border-b border-border px-4 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
             <Brand />
           </div>
           <ShellNav />
         </aside>
 
         <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-line bg-background px-3 sm:px-4">
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-border bg-background px-3 sm:px-4">
             <div className="flex min-w-0 items-center gap-1">
               <Button
                 variant="ghost"
@@ -151,7 +144,7 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
 
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetContent side={locale === "ar" ? "right" : "left"} className="w-72 gap-0 p-0">
-            <SheetTitle className="flex h-14 items-center border-b border-line px-4">
+            <SheetTitle className="flex h-14 items-center border-b border-border px-4">
               <Brand />
             </SheetTitle>
             <ShellNav onNavigate={() => setNavOpen(false)} />
@@ -172,14 +165,14 @@ function Announcement() {
     <div
       role="status"
       className={cn(
-        "flex items-start gap-3 border-b border-line px-6 py-3 text-sm",
-        warn ? "bg-[color-mix(in_oklab,var(--grid-warn)_14%,transparent)] text-grid-fg" : "bg-grid-card text-grid-fg",
+        "flex items-start gap-3 border-b border-border px-6 py-3 text-sm",
+        warn ? "bg-[color-mix(in_oklab,var(--nq-warning)_14%,transparent)] text-foreground" : "bg-card text-foreground",
       )}
     >
       {warn ? (
-        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-grid-warn" aria-hidden />
+        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-nq-warning-text" aria-hidden />
       ) : (
-        <MegaphoneIcon className="mt-0.5 size-4 shrink-0 text-grid-brand" aria-hidden />
+        <MegaphoneIcon className="mt-0.5 size-4 shrink-0 text-nq-brand" aria-hidden />
       )}
       <p dir="auto" className="whitespace-pre-line">
         {text}
@@ -349,11 +342,11 @@ function TeamSwitcher() {
           />
         }
       >
-        <span className="flex size-6 shrink-0 items-center justify-center border border-line bg-grid-card text-xs font-medium text-grid-brand">
+        <span className="flex size-6 shrink-0 items-center justify-center border border-border bg-card text-xs font-medium text-nq-brand">
           {active ? name.slice(0, 1).toUpperCase() : <UsersRoundIcon className="size-3.5" />}
         </span>
         <span className="hidden truncate text-sm font-medium sm:inline">{name}</span>
-        <ChevronsUpDownIcon className="text-grid-muted" />
+        <ChevronsUpDownIcon className="text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-64">
         <DropdownMenuGroup>
@@ -361,7 +354,7 @@ function TeamSwitcher() {
           {me.teams.map((team) => (
             <DropdownMenuItem key={team.id} onClick={() => router.push(hrefFor(team.slug))}>
               <span className="min-w-0 flex-1 truncate">{team.name}</span>
-              <span className="text-xs text-grid-muted">{t(`roles.${team.role}`)}</span>
+              <span className="text-xs text-muted-foreground">{t(`roles.${team.role}`)}</span>
               {team.slug === active?.slug ? <CheckIcon aria-label={t("shell.current")} /> : null}
             </DropdownMenuItem>
           ))}
@@ -400,8 +393,8 @@ function UserMenu() {
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>
-            <span className="grid-micro block">{t("shell.signedInAs")}</span>
-            <span dir="ltr" className="mt-1 block truncate text-sm text-grid-fg">
+            <span className="eyebrow block">{t("shell.signedInAs")}</span>
+            <span dir="ltr" className="mt-1 block truncate text-sm text-foreground">
               {me.user.email}
             </span>
           </DropdownMenuLabel>
@@ -415,7 +408,7 @@ function UserMenu() {
           <MessageSquareWarningIcon />
           {t("feedback.launcher")}
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" disabled={signingOut} onClick={signOut}>
+        <DropdownMenuItem variant="danger" disabled={signingOut} onClick={signOut}>
           <LogOutIcon />
           {t("shell.signOut")}
         </DropdownMenuItem>
@@ -516,7 +509,7 @@ function NotificationsBell() {
     <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (o) void markRead() }}>
       <button
         type="button"
-        className="relative inline-flex size-8 items-center justify-center hover:bg-grid-soft aria-expanded:bg-grid-soft"
+        className="relative inline-flex size-8 items-center justify-center hover:bg-secondary aria-expanded:bg-secondary"
         aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
         aria-expanded={sheetOpen}
         data-testid="notifications"
@@ -531,12 +524,12 @@ function NotificationsBell() {
         ) : null}
       </button>
       <SheetContent side={locale === "ar" ? "left" : "right"} className="w-80 gap-0 sm:max-w-sm">
-        <SheetHeader className="border-b border-line">
+        <SheetHeader className="border-b border-border">
           <SheetTitle>{t("notifications.title")}</SheetTitle>
         </SheetHeader>
         {permission !== "unsupported" && permission !== "granted" ? (
-          <div className="border-b border-line px-4 py-2">
-            <Button variant="outline" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
+          <div className="border-b border-border px-4 py-2">
+            <Button variant="secondary" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
               {permission === "denied" ? t("notifications.desktopBlocked") : t("notifications.enableDesktop")}
             </Button>
           </div>
@@ -550,7 +543,7 @@ function NotificationsBell() {
                 key={n.id}
                 type="button"
                 onClick={() => open(n)}
-                className="flex w-full flex-col items-start gap-0.5 border-b border-line px-4 py-3 text-start hover:bg-grid-soft"
+                className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-start hover:bg-secondary"
               >
                 <span className="flex w-full items-center gap-2">
                   {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
@@ -597,9 +590,9 @@ export function PageBody({
   const micro = eyebrow ?? teamCtx?.team.name
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-6 py-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-6 py-6">
         <div className="min-w-0 space-y-1.5">
-          {micro ? <p className="grid-micro">{micro}</p> : null}
+          {micro ? <p className="eyebrow">{micro}</p> : null}
           <h1 className="grid-title text-2xl">{title}</h1>
           {description ? <p className="grid-body max-w-2xl text-sm">{description}</p> : null}
         </div>

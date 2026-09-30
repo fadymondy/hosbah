@@ -1,31 +1,24 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { KeyRoundIcon, PlusIcon, TriangleAlertIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+
+
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch, MCP_SCOPES, type McpToken } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -91,7 +84,7 @@ export function McpTokens({
   function status(tok: McpToken) {
     if (tok.revoked_at) return <Badge variant="outline">{t("tokens.revoked")}</Badge>
     if (tok.expires_at && new Date(tok.expires_at) < new Date()) return <Badge variant="outline">{t("tokens.expired")}</Badge>
-    return <Badge variant="secondary">{t("tokens.active")}</Badge>
+    return <Badge variant="neutral">{t("tokens.active")}</Badge>
   }
 
   const table =
@@ -115,7 +108,7 @@ export function McpTokens({
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {(tok.scopes ?? []).map((s) => (
-                      <Badge key={s} variant={s === "destructive" ? "destructive" : "outline"} className="font-mono">
+                      <Badge key={s} variant={s === "danger" ? "danger" : "outline"} className="font-mono">
                         <span dir="ltr">{s}</span>
                       </Badge>
                     ))}
@@ -150,15 +143,7 @@ export function McpTokens({
     ) : null
 
   const empty = (className: string) => (
-    <Empty className={className}>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <KeyRoundIcon />
-        </EmptyMedia>
-        <EmptyTitle>{t("tokens.emptyTitle")}</EmptyTitle>
-        <EmptyDescription>{t("tokens.emptyHint")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState className={className} icon={KeyRoundIcon} title={t("tokens.emptyTitle")} description={t("tokens.emptyHint")} />
   )
 
   const create = canCreate ? (
@@ -177,18 +162,18 @@ export function McpTokens({
       <>
         <SettingsRow label={t("tokens.endpoint")} hint={t("tokens.endpointHint")}>
           <CopyField value={endpoint} />
-          <p className="text-sm text-grid-muted">{t("tokens.snippetHint")}</p>
+          <p className="text-sm text-muted-foreground">{t("tokens.snippetHint")}</p>
           <CopyField value={snippet} block />
         </SettingsRow>
 
         {plain ? (
-          <div role="status" className="border-b border-line border-s-2 border-s-grid-gold bg-grid-soft px-6 py-5">
-            <p className="text-sm font-medium text-grid-fg">{t("tokens.createdTitle")}</p>
-            <p className="mt-1 text-xs text-grid-muted">{t("tokens.createdOnce")}</p>
+          <div role="status" className="border-b border-border border-s-2 border-s-nq-accent bg-secondary px-6 py-5">
+            <p className="text-sm font-medium text-foreground">{t("tokens.createdTitle")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("tokens.createdOnce")}</p>
             <div className="mt-3 flex max-w-xl flex-col gap-3">
               <CopyField value={plain} />
               <div>
-                <Button variant="outline" size="sm" onClick={() => setPlain(null)}>
+                <Button variant="secondary" size="sm" onClick={() => setPlain(null)}>
                   {t("tokens.dismiss")}
                 </Button>
               </div>
@@ -229,7 +214,7 @@ export function McpTokens({
       </Card>
 
       {plain ? (
-        <Card className="border-[var(--grid-gold)]">
+        <Card className="border-nq-accent">
           <CardHeader>
             <CardTitle>{t("tokens.createdTitle")}</CardTitle>
             <CardDescription>{t("tokens.createdOnce")}</CardDescription>
@@ -237,7 +222,7 @@ export function McpTokens({
           <CardContent className="flex flex-col gap-3">
             <CopyField value={plain} />
             <div>
-              <Button variant="outline" size="sm" onClick={() => setPlain(null)}>
+              <Button variant="secondary" size="sm" onClick={() => setPlain(null)}>
                 {t("tokens.dismiss")}
               </Button>
             </div>
@@ -330,7 +315,7 @@ function CreateToken({
         if (!o) reset()
       }}
     >
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button variant="primary" size="sm" />}>
         <PlusIcon />
         {t("tokens.create")}
       </DialogTrigger>
@@ -340,18 +325,18 @@ function CreateToken({
             <DialogTitle>{t("tokens.create")}</DialogTitle>
             <DialogDescription>{t("tokens.createHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <FormError message={error} />
             <Field>
               <FieldLabel htmlFor="token-name">{t("tokens.name")}</FieldLabel>
               <Input id="token-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             {withScopes ? (
-              <FieldSet>
-                <FieldLegend variant="label">{t("tokens.scopes")}</FieldLegend>
-                <FieldGroup className="gap-3">
+              <fieldset className="flex flex-col gap-4">
+                <legend className="mb-3 text-label">{t("tokens.scopes")}</legend>
+                <div className="flex w-full flex-col gap-3">
                   {MCP_SCOPES.map((scope) => (
-                    <Field key={scope} orientation="horizontal">
+                    <Field className="flex-row items-center" key={scope}>
                       <Checkbox
                         id={`scope-${scope}`}
                         checked={scopes.includes(scope)}
@@ -363,7 +348,7 @@ function CreateToken({
                         </code>
                         <span className="text-muted-foreground">{t(`tokens.scopeHelp.${scope.replace(":", "_")}`)}</span>
                         {scope === "destructive" ? (
-                          <Badge variant="destructive">
+                          <Badge variant="danger">
                             <TriangleAlertIcon />
                             {t("tokens.dangerous")}
                           </Badge>
@@ -371,8 +356,8 @@ function CreateToken({
                       </FieldLabel>
                     </Field>
                   ))}
-                </FieldGroup>
-              </FieldSet>
+                </div>
+              </fieldset>
             ) : null}
             <Field>
               <FieldLabel htmlFor="token-expiry">{t("tokens.expiry")}</FieldLabel>
@@ -390,9 +375,9 @@ function CreateToken({
               </Select>
               <FieldDescription>{t("tokens.expiryHint")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={busy || !name.trim() || (withScopes && scopes.length === 0)}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || (withScopes && scopes.length === 0)}>
               {busy ? t("common.working") : t("tokens.create")}
             </Button>
           </DialogFooter>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { CircleOffIcon, DatabaseIcon, RefreshCwIcon, ServerIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -9,11 +10,11 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { ErrorBand, LoadingRows } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -114,7 +115,7 @@ export default function SharedServicesPage() {
       description={t("sharedServices.description")}
       actions={
         manage ? (
-          <Button size="sm" onClick={() => void scan()} disabled={scanning}>
+          <Button variant="primary" size="sm" onClick={() => void scan()} disabled={scanning}>
             <RefreshCwIcon className={scanning ? "animate-spin" : undefined} />
             {t("sharedServices.scan")}
           </Button>
@@ -123,9 +124,9 @@ export default function SharedServicesPage() {
       bleed
     >
       <ErrorBand message={error} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
         <ListSearch value={q} onChange={setQ} placeholder={t("sharedServices.search")} shown={shown.length} total={visible.length} />
-        <label className="flex items-center gap-2 text-xs text-grid-muted">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />
           {t("sharedServices.showHidden")}
         </label>
@@ -133,20 +134,12 @@ export default function SharedServicesPage() {
       {services === null ? (
         <LoadingRows />
       ) : visible.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <DatabaseIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("sharedServices.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("sharedServices.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={DatabaseIcon} title={t("sharedServices.emptyTitle")} description={t("sharedServices.emptyHint")} />
       ) : (
         <div className="grid grid-cols-1 gap-4 px-6 py-4 sm:grid-cols-2 lg:grid-cols-3">
           {Object.entries(grouped).map(([kind, list]) => (
             <div key={kind} className="col-span-full">
-              <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-grid-muted first:mt-0">
+              <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
                 {t(`sharedServices.kinds.${kind}`, undefined, kind)}
               </h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -176,9 +169,9 @@ function SharedServiceCard({
   useEffect(() => setName(s.name), [s.name])
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-line bg-grid-card p-4">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm text-grid-muted">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <ServerIcon className="size-3.5" />
           {s.server_name} · CT {s.guest_vmid}
         </div>
@@ -210,11 +203,11 @@ function SharedServiceCard({
           </SelectContent>
         </Select>
       ) : (
-        <Badge variant="secondary" className="w-fit">
+        <Badge variant="neutral" className="w-fit">
           {t(`sharedServices.kinds.${s.kind}`, undefined, s.kind)}
         </Badge>
       )}
-      <p dir="ltr" className="font-mono text-xs text-grid-muted">
+      <p dir="ltr" className="font-mono text-xs text-muted-foreground">
         {s.host ?? "—"}
         {s.port ? `:${s.port}` : ""}
       </p>

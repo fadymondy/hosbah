@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { CloudIcon, LockIcon, RefreshCwIcon, ShieldCheckIcon, Trash2Icon, WrenchIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -8,9 +9,9 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch, ApiError } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -37,12 +38,12 @@ type Cert = {
   error: string | null
 }
 
-const TONE: Record<Status, "default" | "secondary" | "destructive" | "outline"> = {
-  ok: "default",
-  missing: "destructive",
-  mismatch: "destructive",
+const TONE: Record<Status, "success" | "neutral" | "danger" | "outline"> = {
+  ok: "success",
+  missing: "danger",
+  mismatch: "danger",
   unmanaged: "outline",
-  private: "secondary",
+  private: "neutral",
 }
 
 /**
@@ -132,7 +133,7 @@ export function SiteDNS() {
         {rows === null ? (
           <LoadingRows rows={2} />
         ) : rows.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <CloudIcon className="size-4" />
             {t("site.dns.none")}
           </p>
@@ -157,12 +158,12 @@ export function SiteDNS() {
                         <span dir="ltr" className="font-medium">
                           {r.hostname}
                         </span>
-                        <div className="text-xs text-grid-muted">{r.credential ? `${r.zone} · ${r.credential.name}` : t("site.dns.noZone")}</div>
+                        <div className="text-xs text-muted-foreground">{r.credential ? `${r.zone} · ${r.credential.name}` : t("site.dns.noZone")}</div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={TONE[r.status]}>{t(`site.dns.status.${r.status}`)}</Badge>
                         {r.error ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-danger">
+                          <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
                             {r.error}
                           </p>
                         ) : null}
@@ -170,18 +171,18 @@ export function SiteDNS() {
                       <TableCell dir="ltr" className="text-start font-mono text-xs">
                         {r.record ? `${r.record.type} ${r.record.content}` : "—"}
                         {r.status === "mismatch" && r.expected.content ? (
-                          <div className="text-grid-muted">
+                          <div className="text-muted-foreground">
                             → {r.expected.type} {r.expected.content}
                           </div>
                         ) : null}
-                        {foreign ? <div className="font-sans text-grid-muted">{t("site.dns.notOurs")}</div> : null}
+                        {foreign ? <div className="font-sans text-muted-foreground">{t("site.dns.notOurs")}</div> : null}
                       </TableCell>
                       <TableCell>{r.record ? (r.record.proxied ? t("site.dns.proxiedOn") : t("site.dns.proxiedOff")) : "—"}</TableCell>
                       {manage ? (
                         <TableCell>
                           <div className="flex flex-wrap justify-end gap-2">
                             {r.managed && (r.status === "missing" || (r.status === "mismatch" && !foreign)) ? (
-                              <Button size="sm" disabled={busy === r.hostname} onClick={() => void put(r.hostname, {}).catch(() => {})}>
+                              <Button variant="primary" size="sm" disabled={busy === r.hostname} onClick={() => void put(r.hostname, {}).catch(() => {})}>
                                 <WrenchIcon />
                                 {r.status === "missing" ? t("site.dns.create") : t("site.dns.repair")}
                               </Button>
@@ -205,7 +206,7 @@ export function SiteDNS() {
                             {r.record && r.managed ? (
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
                                 disabled={busy === r.hostname}
                                 onClick={() => void put(r.hostname, { proxied: !r.record?.proxied }).catch(() => {})}
                               >
@@ -244,11 +245,11 @@ export function SiteDNS() {
 
       <section aria-labelledby="ssl-h">
         <SectionTitle id="ssl-h" title={t("site.dns.certs")} hint={t("site.dns.certsHint")} />
-        {certNote ? <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{certNote}</p> : null}
+        {certNote ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{certNote}</p> : null}
         {certs === null ? (
           <LoadingRows rows={2} />
         ) : certs.length === 0 ? (
-          certNote ? null : <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.dns.none")}</p>
+          certNote ? null : <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.dns.none")}</p>
         ) : (
           <TableBand>
             <Table>
@@ -266,7 +267,7 @@ export function SiteDNS() {
                     <TableRow key={c.hostname}>
                       <TableCell>
                         <span className="inline-flex items-center gap-2 font-medium" dir="ltr">
-                          {c.found ? <ShieldCheckIcon className="size-4 text-[var(--grid-ok,#3fb950)]" /> : <LockIcon className="size-4 text-grid-muted" />}
+                          {c.found ? <ShieldCheckIcon className="size-4 text-nq-success" /> : <LockIcon className="size-4 text-muted-foreground" />}
                           {c.hostname}
                         </span>
                       </TableCell>
@@ -274,17 +275,17 @@ export function SiteDNS() {
                         {c.found ? (
                           <span className="flex flex-wrap items-center gap-2">
                             <span dir="ltr">{c.issuer ?? "—"}</span>
-                            <Badge variant={c.managed ? "secondary" : "outline"}>{c.managed ? t("site.dns.public") : t("site.dns.internal")}</Badge>
+                            <Badge variant={c.managed ? "neutral" : "outline"}>{c.managed ? t("site.dns.public") : t("site.dns.internal")}</Badge>
                           </span>
                         ) : (
-                          <span className="text-grid-muted">{c.error ?? t("site.dns.noCert")}</span>
+                          <span className="text-muted-foreground">{c.error ?? t("site.dns.noCert")}</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {c.not_after ? (
-                          <span className={soon ? "text-grid-danger" : undefined}>
+                          <span className={soon ? "text-nq-danger-text" : undefined}>
                             <span dir="ltr">{fmt(c.not_after)}</span>
-                            {c.days_left != null ? <span className="ms-2 text-xs text-grid-muted">{t("site.dns.daysLeft", { n: c.days_left })}</span> : null}
+                            {c.days_left != null ? <span className="ms-2 text-xs text-muted-foreground">{t("site.dns.daysLeft", { n: c.days_left })}</span> : null}
                           </span>
                         ) : (
                           "—"

@@ -46,7 +46,7 @@ export function TeamQuotasCard({ team }: { team: string }) {
       {!usage ? (
         error ? null : <LoadingRows rows={3} />
       ) : (
-        <dl className="grid gap-px border-b border-line bg-line sm:grid-cols-3">
+        <dl className="grid gap-px border-b border-border bg-border sm:grid-cols-3">
           <QuotaMeter label={t("settings.quotaServers")} used={usage.servers} max={usage.max_servers} />
           <QuotaMeter label={t("settings.quotaApps")} used={usage.apps} max={usage.max_apps} />
           <QuotaMeter label={t("settings.quotaDataServices")} used={usage.data_services} max={usage.max_data_services} />
@@ -60,8 +60,8 @@ function QuotaMeter({ label, used, max }: { label: string; used: number; max: nu
   const { t } = useI18n()
   const text = max === null ? t("settings.quotaUnlimited") : t("settings.quotaOf", { used, max })
   return (
-    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro">{label}</dt>
+    <div className="flex flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow">{label}</dt>
       <dd className="flex flex-col gap-2">
         <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
           {text}

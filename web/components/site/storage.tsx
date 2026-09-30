@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ArchiveIcon, HardDriveIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -9,14 +10,14 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported } from "@/lib/apps"
 import { humanBytes, type DataService } from "@/lib/databases"
@@ -81,7 +82,7 @@ export function SiteStorage() {
         {volumes === null ? (
           <LoadingRows rows={2} />
         ) : volumes.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <HardDriveIcon className="size-4" />
             {t("site.storage.noVolumes")}
           </p>
@@ -107,7 +108,7 @@ export function SiteStorage() {
                       {v.mount_path}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={v.mounted ? "default" : "outline"}>{v.mounted ? t("site.storage.mounted") : t("site.storage.nextDeploy")}</Badge>
+                      <Badge variant={v.mounted ? "brand" : "outline"}>{v.mounted ? t("site.storage.mounted") : t("site.storage.nextDeploy")}</Badge>
                     </TableCell>
                     <TableCell dir="ltr" className="text-start text-xs tabular-nums">
                       {v.bytes == null ? "—" : `≈ ${humanBytes(v.bytes)}`}
@@ -135,15 +136,15 @@ export function SiteStorage() {
           action={manage && minio.length ? <AddBucket path={path} services={minio} onSaved={load} /> : null}
         />
         {minio.length === 0 && buckets.length === 0 ? (
-          <p className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <ArchiveIcon className="size-4" />
             {t("site.storage.noMinio")}
-            <Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} className="text-grid-brand underline-offset-4 hover:underline">
+            <Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} className="text-nq-brand underline-offset-4 hover:underline">
               {t("nav.databases")}
             </Link>
           </p>
         ) : buckets.length === 0 ? (
-          <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.storage.noBuckets")}</p>
+          <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.storage.noBuckets")}</p>
         ) : (
           <TableBand>
             <Table>
@@ -166,14 +167,14 @@ export function SiteStorage() {
                       {b.service}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={b.status === "ready" ? "default" : b.status === "failed" ? "destructive" : "secondary"}>{t(`site.storage.status.${b.status}`)}</Badge>
+                      <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
                       {b.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-danger">
+                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
                           {b.error}
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-muted-foreground">
                       {b.env.join(" ")}
                     </TableCell>
                     {manage ? (
@@ -189,7 +190,7 @@ export function SiteStorage() {
             </Table>
           </TableBand>
         )}
-        <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.storage.noBrowser")}</p>
+        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.storage.noBrowser")}</p>
       </section>
     </>
   )
@@ -226,7 +227,7 @@ export function AddVolume({ path, onSaved, ...controlled }: { path: string; onSa
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("site.storage.addVolume")}
         </DialogTrigger>
@@ -237,7 +238,7 @@ export function AddVolume({ path, onSaved, ...controlled }: { path: string; onSa
             <DialogTitle>{t("site.storage.addVolume")}</DialogTitle>
             <DialogDescription>{t("site.storage.appliesNext")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="vol-name">{t("site.monitors.name")}</FieldLabel>
               <Input id="vol-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" placeholder="uploads" value={name} onChange={(e) => setName(e.target.value)} />
@@ -248,13 +249,13 @@ export function AddVolume({ path, onSaved, ...controlled }: { path: string; onSa
               <Input id="vol-path" dir="ltr" required placeholder="/app/storage" value={mount} onChange={(e) => setMount(e.target.value)} className="font-mono" />
               <FieldDescription>{t("site.storage.pathHint")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -295,7 +296,7 @@ export function AddBucket({ path, services, onSaved, ...controlled }: { path: st
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("site.storage.addBucket")}
         </DialogTrigger>
@@ -306,7 +307,7 @@ export function AddBucket({ path, services, onSaved, ...controlled }: { path: st
             <DialogTitle>{t("site.storage.addBucket")}</DialogTitle>
             <DialogDescription>{t("site.storage.bucketDialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel>{t("site.storage.service")}</FieldLabel>
               <Select value={service} onValueChange={(v) => v && setService(v as string)}>
@@ -331,13 +332,13 @@ export function AddBucket({ path, services, onSaved, ...controlled }: { path: st
               <Input id="bkt-prefix" dir="ltr" pattern="[A-Z][A-Z0-9_]{0,20}" value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} className="font-mono" />
               <FieldDescription dir="ltr">{`${prefix || "S3"}_ENDPOINT, ${prefix || "S3"}_BUCKET, ${prefix || "S3"}_ACCESS_KEY_ID, …`}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !service}>
+            <Button variant="primary" type="submit" disabled={busy || !service}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -428,7 +429,7 @@ function RemoveDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DialogTrigger render={<Button size="sm" variant="secondary" />}>
           <Trash2Icon />
           {t("site.storage.remove")}
         </DialogTrigger>
@@ -439,7 +440,7 @@ function RemoveDialog({
             <DialogTitle dir="ltr">{name}</DialogTitle>
             <DialogDescription>{warn}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             {allowData ? (
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox checked={data} onCheckedChange={(v) => setData(v === true)} />
@@ -447,7 +448,7 @@ function RemoveDialog({
               </label>
             ) : null}
             {allowForce && data ? (
-              <label className="flex items-center gap-2 text-sm text-grid-danger">
+              <label className="flex items-center gap-2 text-sm text-nq-danger-text">
                 <Checkbox checked={force} onCheckedChange={(v) => setForce(v === true)} />
                 {t("site.storage.force")}
               </label>
@@ -456,13 +457,13 @@ function RemoveDialog({
               <FieldLabel htmlFor="rm-confirm">{t("site.storage.typeName", { name })}</FieldLabel>
               <Input id="rm-confirm" dir="ltr" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="destructive" disabled={busy || typed !== name}>
+            <Button type="submit" variant="danger" disabled={busy || typed !== name}>
               {busy ? t("common.working") : t("site.storage.remove")}
             </Button>
           </DialogFooter>

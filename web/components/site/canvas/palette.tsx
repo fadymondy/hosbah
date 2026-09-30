@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { BlocksIcon, LayersIcon, LinkIcon, PlusIcon, SearchIcon, type LucideIcon } from "lucide-react"
@@ -16,10 +17,10 @@ import { RealtimeDialog } from "@/components/site/realtime"
 import { ScheduleDialog } from "@/components/site/schedules"
 import { InstallDialog, installServices, type Recipe } from "@/components/site/stacks"
 import { AddBucket, AddVolume } from "@/components/site/storage"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
@@ -122,17 +123,17 @@ export function Palette({
   const needle = q.trim().toLowerCase()
   const shown = needle ? items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(needle)) : items
   const groups: Item["group"][] = ["site", "catalog"]
-  const side = mobile ? "bottom" : locale === "ar" ? "left" : "right"
+  const side = mobile ? "bottom" : "end"
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side={side} className={cn("gap-0 p-0", mobile ? "max-h-[80dvh]" : "w-full sm:max-w-sm")} initialFocus={search}>
-        <SheetHeader className="border-b border-line px-4 py-4">
+        <SheetHeader className="border-b border-border px-4 py-4">
           <SheetTitle>{t("site.canvas.addComponent")}</SheetTitle>
           <SheetDescription>{t("site.canvas.addHint")}</SheetDescription>
         </SheetHeader>
-        <div className="flex items-center gap-2 border-b border-line px-4 py-2">
-          <SearchIcon aria-hidden className="size-4 text-grid-muted" />
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+          <SearchIcon aria-hidden className="size-4 text-muted-foreground" />
           <Input
             ref={search}
             type="search"
@@ -144,31 +145,31 @@ export function Palette({
           />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {shown.length === 0 ? <p className="px-4 py-6 text-center text-sm text-grid-muted">{t("home.noMatch")}</p> : null}
+          {shown.length === 0 ? <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
           {groups.map((g) => {
             const list = shown.filter((i) => i.group === g)
             if (!list.length) return null
             return (
               <div key={g} role="group" aria-label={t(`site.canvas.groups.${g}`)}>
-                <p className="grid-micro px-4 pt-4 pb-1">{t(`site.canvas.groups.${g}`)}</p>
+                <p className="eyebrow px-4 pt-4 pb-1">{t(`site.canvas.groups.${g}`)}</p>
                 <ul className="flex flex-col">
                   {list.map((i) => {
                     const body = (
                       <>
-                        <span className="flex size-8 shrink-0 items-center justify-center border border-line bg-grid-card text-grid-brand [&_svg]:size-4">
+                        <span className="flex size-8 shrink-0 items-center justify-center border border-border bg-card text-nq-brand [&_svg]:size-4">
                           <i.icon aria-hidden />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span dir="auto" className="block truncate text-sm font-medium text-grid-fg">
+                          <span dir="auto" className="block truncate text-sm font-medium text-foreground">
                             {i.label}
                           </span>
-                          <span dir="auto" className="line-clamp-2 block text-xs text-grid-muted">
+                          <span dir="auto" className="line-clamp-2 block text-xs text-muted-foreground">
                             {i.disabled ?? i.hint}
                           </span>
                         </span>
                       </>
                     )
-                    const cls = "flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-grid-soft focus-visible:bg-grid-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    const cls = "flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     return (
                       <li key={i.id}>
                         {i.href ? (
@@ -195,7 +196,7 @@ export function Palette({
               </div>
             )
           })}
-          {!imported && recipes === null ? <p className="px-4 py-3 text-xs text-grid-muted">{t("common.loading")}</p> : null}
+          {!imported && recipes === null ? <p className="px-4 py-3 text-xs text-muted-foreground">{t("common.loading")}</p> : null}
         </div>
       </SheetContent>
     </Sheet>
@@ -306,9 +307,9 @@ function AttachDatabase({
           <DialogDescription>{t("site.canvas.attachHint")}</DialogDescription>
         </DialogHeader>
         {services.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("site.canvas.noAttachable")}</p>
+          <p className="text-sm text-muted-foreground">{t("site.canvas.noAttachable")}</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-line border border-line">
+          <ul className="flex flex-col divide-y divide-border border border-border">
             {services.map((s) => (
               <li key={s.id} className="flex items-center gap-3 px-3 py-2">
                 <StatusDot status="ok" label={t(`databases.statuses.${s.status}`, undefined, s.status)} />
@@ -316,11 +317,11 @@ function AttachDatabase({
                   <span dir="ltr" className="block truncate text-sm font-medium">
                     {s.name}
                   </span>
-                  <span dir="ltr" className="block text-xs text-grid-muted">
+                  <span dir="ltr" className="block text-xs text-muted-foreground">
                     {s.kind} {s.version}
                   </span>
                 </span>
-                <Button size="sm" disabled={busy !== null} onClick={() => void attach(s)}>
+                <Button variant="primary" size="sm" disabled={busy !== null} onClick={() => void attach(s)}>
                   <LinkIcon />
                   {t("site.attach")}
                 </Button>
@@ -330,7 +331,7 @@ function AttachDatabase({
         )}
         <FormError message={error} />
         <DialogFooter>
-          <Button variant="outline" nativeButton={false} render={<Link href={serversDatabases} />}>
+          <Button variant="secondary" nativeButton={false} render={<Link href={serversDatabases} />}>
             <PlusIcon />
             {t("site.newDatabase")}
           </Button>

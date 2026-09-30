@@ -1,5 +1,6 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { RotateCcwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
 
@@ -11,7 +12,7 @@ import { useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
+
 import { apiFetch } from "@/lib/api"
 import { isActive, shortSha, type Deployment } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -77,7 +78,7 @@ export function SiteDeployments() {
                 ) : null}
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={busy || !live}
                   title={live ? undefined : t("apps.actions.noLive")}
                   onClick={async () => {
@@ -100,12 +101,12 @@ export function SiteDeployments() {
           }
         />
         {deps.length ? <ListSearch value={q} onChange={setQ} placeholder={t("site.searchDeployments")} shown={shown.length} total={deps.length} /> : null}
-        <div className="grid border-b border-line xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" data-testid="deployments">
-          <div className="min-w-0 border-b border-line xl:border-e xl:border-b-0">
+        <div className="grid border-b border-border xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" data-testid="deployments">
+          <div className="min-w-0 border-b border-border xl:border-e xl:border-b-0">
             {deps.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{t("apps.deploy.empty")}</p>
+              <p className="px-6 py-4 text-sm text-muted-foreground">{t("apps.deploy.empty")}</p>
             ) : (
-              <ol className="flex max-h-[32rem] flex-col divide-y divide-line overflow-y-auto">
+              <ol className="flex max-h-[32rem] flex-col divide-y divide-border overflow-y-auto">
                 {shown.map((d) => (
                   <li key={d.id}>
                     <button
@@ -116,7 +117,7 @@ export function SiteDeployments() {
                         setSelected(d.id)
                         setPinned(d.id !== deps[0]?.id)
                       }}
-                      className={cn("flex w-full flex-col gap-1 px-6 py-3 text-start hover:bg-grid-soft", d.id === selected && "bg-grid-soft")}
+                      className={cn("flex w-full flex-col gap-1 px-6 py-3 text-start hover:bg-secondary", d.id === selected && "bg-secondary")}
                     >
                       <span className="flex flex-wrap items-center gap-2 text-sm">
                         <span dir="ltr" className="font-mono">
@@ -125,12 +126,12 @@ export function SiteDeployments() {
                         <span className="font-medium">{t(`apps.deploy.kinds.${d.kind}`, undefined, d.kind)}</span>
                         <DeploymentStatusBadge status={d.status} />
                         <DeploymentTrackBadge track={d.track} reason={d.track_reason} />
-                        <span className="ms-auto text-xs text-grid-muted">{t(`apps.deploy.triggers.${d.trigger}`, undefined, d.trigger)}</span>
+                        <span className="ms-auto text-xs text-muted-foreground">{t(`apps.deploy.triggers.${d.trigger}`, undefined, d.trigger)}</span>
                       </span>
-                      <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
+                      <span dir="ltr" className="truncate text-start font-mono text-xs text-muted-foreground">
                         {shortSha(d.commit_sha)} {d.commit_message ?? d.ref}
                       </span>
-                      <span dir="ltr" className="text-start text-xs text-grid-muted">
+                      <span dir="ltr" className="text-start text-xs text-muted-foreground">
                         {fmt(d.created_at)}
                       </span>
                     </button>
@@ -151,7 +152,7 @@ export function SiteDeployments() {
               }
             />
           ) : (
-            <p className="px-6 py-4 text-sm text-grid-muted">{t("apps.deploy.select")}</p>
+            <p className="px-6 py-4 text-sm text-muted-foreground">{t("apps.deploy.select")}</p>
           )}
         </div>
       </section>
@@ -170,7 +171,7 @@ function CancelButton({ path, onError }: { path: string; onError: (m: string | n
   return (
     <Button
       size="sm"
-      variant="outline"
+      variant="secondary"
       disabled={busy}
       onClick={async () => {
         setBusy(true)

@@ -35,22 +35,22 @@ function uptime(s: number, t: (k: string, v?: Record<string, string | number>) =
 
 function Meter({ label, value, detail, icon }: { label: string; value: number; detail: string; icon: ReactNode }) {
   const pct = Math.max(0, Math.min(100, Math.round(value)))
-  const tone = pct >= 90 ? "bg-grid-danger" : pct >= 75 ? "bg-[var(--grid-brand-accent)]" : "bg-[var(--grid-brand)]"
+  const tone = pct >= 90 ? "bg-nq-danger" : pct >= 75 ? "bg-nq-accent" : "bg-nq-brand"
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="inline-flex items-center gap-1.5 text-grid-muted [&_svg]:size-3.5">
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground [&_svg]:size-3.5">
           {icon}
           {label}
         </span>
-        <span dir="ltr" className="font-mono tabular-nums text-grid-fg">
+        <span dir="ltr" className="font-mono tabular-nums text-foreground">
           {pct}%
         </span>
       </div>
-      <div className="h-1.5 w-full bg-line" aria-hidden>
+      <div className="h-1.5 w-full bg-border" aria-hidden>
         <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
-      <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
+      <span dir="ltr" className="truncate text-start font-mono text-xs text-muted-foreground">
         {detail}
       </span>
     </div>
@@ -111,25 +111,25 @@ export function ServerCard({
 
   return (
     <article
-      className="flex min-w-0 flex-col border border-line bg-grid-card"
+      className="flex min-w-0 flex-col border border-border bg-card"
       style={server.color ? { borderTopColor: server.color, borderTopWidth: 3 } : undefined}
       data-server={server.name}
     >
-      <Link href={href} className="flex flex-col gap-3 px-5 pt-4 pb-3 hover:bg-grid-soft">
+      <Link href={href} className="flex flex-col gap-3 px-5 pt-4 pb-3 hover:bg-secondary">
         <div className="flex items-center gap-3">
           <ServerMark server={server} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span dir="ltr" className="truncate font-medium text-grid-fg">
+              <span dir="ltr" className="truncate font-medium text-foreground">
                 {server.name}
               </span>
               <span
                 aria-hidden
-                className={online ? "size-2 shrink-0 bg-[var(--grid-ok,#3fb950)]" : "size-2 shrink-0 bg-grid-muted opacity-60"}
+                className={online ? "size-2 shrink-0 bg-nq-success" : "size-2 shrink-0 bg-nq-fg-muted opacity-60"}
               />
-              <span className="text-xs text-grid-muted">{online ? t("home.online") : t(`servers.statuses.${server.status}`, undefined, t("home.offline"))}</span>
+              <span className="text-xs text-muted-foreground">{online ? t("home.online") : t(`servers.statuses.${server.status}`, undefined, t("home.offline"))}</span>
             </span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               {ip ? (
                 <span dir="ltr" className="font-mono">
                   {ip}
@@ -147,12 +147,12 @@ export function ServerCard({
             <span
               className={
                 tunnel.status === "active" || tunnel.status === "up" || tunnel.status === "running"
-                  ? "inline-flex shrink-0 items-center gap-1.5 border border-line bg-background px-2 py-1 text-xs text-grid-fg"
-                  : "inline-flex shrink-0 items-center gap-1.5 border border-line px-2 py-1 text-xs text-grid-muted"
+                  ? "inline-flex shrink-0 items-center gap-1.5 border border-border bg-background px-2 py-1 text-xs text-foreground"
+                  : "inline-flex shrink-0 items-center gap-1.5 border border-border px-2 py-1 text-xs text-muted-foreground"
               }
               title={tunnel.address ?? undefined}
             >
-              <NetworkIcon className="size-3.5 text-grid-brand" />
+              <NetworkIcon className="size-3.5 text-nq-brand" />
               <span className="uppercase">{tunnel.kind}</span>
               <span>{t(`home.tunnel.${tunnel.status}`, undefined, tunnel.status)}</span>
             </span>
@@ -162,8 +162,8 @@ export function ServerCard({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-3">
           {facts.map(([k, v]) => (
             <div key={k} className="min-w-0">
-              <dt className="grid-micro">{k}</dt>
-              <dd className="truncate text-grid-fg" title={typeof v === "string" ? v : undefined}>
+              <dt className="eyebrow">{k}</dt>
+              <dd className="truncate text-foreground" title={typeof v === "string" ? v : undefined}>
                 {v}
               </dd>
             </div>
@@ -174,20 +174,20 @@ export function ServerCard({
       {guests && guests.total > 0 ? (
         <Link
           href={`${href}/guests`}
-          className="flex items-center gap-2 border-t border-line px-5 py-2.5 text-xs hover:bg-grid-soft"
+          className="flex items-center gap-2 border-t border-border px-5 py-2.5 text-xs hover:bg-secondary"
           data-testid="node-guests"
         >
-          <BoxesIcon className="size-3.5 shrink-0 text-grid-brand" />
-          <span className="font-medium text-grid-fg">{t("home.guests", { n: guests.total })}</span>
-          <span className="text-grid-muted">{t("home.guestsRunning", { n: guests.running })}</span>
-          <ChevronRightIcon className="ms-auto size-3.5 shrink-0 text-grid-muted rtl:rotate-180" />
+          <BoxesIcon className="size-3.5 shrink-0 text-nq-brand" />
+          <span className="font-medium text-foreground">{t("home.guests", { n: guests.total })}</span>
+          <span className="text-muted-foreground">{t("home.guestsRunning", { n: guests.running })}</span>
+          <ChevronRightIcon className="ms-auto size-3.5 shrink-0 text-muted-foreground rtl:rotate-180" />
         </Link>
       ) : null}
 
       {online && m ? (
         <Link
           href={`${href}/metrics`}
-          className="grid grid-cols-1 gap-4 border-t border-line px-5 py-4 hover:bg-grid-soft sm:grid-cols-3"
+          className="grid grid-cols-1 gap-4 border-t border-border px-5 py-4 hover:bg-secondary sm:grid-cols-3"
           title={t("home.metricsLink")}
         >
           <div className="flex min-w-0 flex-col gap-2">
@@ -225,26 +225,26 @@ export function ServerCard({
           </div>
         </Link>
       ) : (
-        <p className="border-t border-line px-5 py-4 text-xs text-grid-muted">
+        <p className="border-t border-border px-5 py-4 text-xs text-muted-foreground">
           {server.last_seen_at ? t("home.lastSeen", { when: ago(server.last_seen_at) }) : t("home.noReport")}
         </p>
       )}
 
-      <div className="mt-auto flex items-center gap-2 border-t border-line px-5 py-3 text-xs">
-        <RocketIcon className="size-3.5 shrink-0 text-grid-muted" />
+      <div className="mt-auto flex items-center gap-2 border-t border-border px-5 py-3 text-xs">
+        <RocketIcon className="size-3.5 shrink-0 text-muted-foreground" />
         {lastDeploy ? (
           <Link href={`${base}/apps/${lastDeploy.app.name}`} className="flex min-w-0 flex-1 items-center gap-2 hover:underline">
-            <span dir="ltr" className="truncate font-medium text-grid-fg">
+            <span dir="ltr" className="truncate font-medium text-foreground">
               {lastDeploy.app.name}
             </span>
-            <span dir="ltr" className="font-mono text-grid-muted">
+            <span dir="ltr" className="font-mono text-muted-foreground">
               #{lastDeploy.deployment.number}
             </span>
             <DeploymentStatusBadge status={lastDeploy.deployment.status} />
-            <span className="ms-auto shrink-0 text-grid-muted">{ago(lastDeploy.deployment.created_at)}</span>
+            <span className="ms-auto shrink-0 text-muted-foreground">{ago(lastDeploy.deployment.created_at)}</span>
           </Link>
         ) : (
-          <span className="text-grid-muted">{t("home.noDeploys")}</span>
+          <span className="text-muted-foreground">{t("home.noDeploys")}</span>
         )}
       </div>
     </article>

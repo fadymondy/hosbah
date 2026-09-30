@@ -26,7 +26,7 @@ export default function ServerSettingsTab() {
       <ServerUpdates key={server.id} manage={manage} />
       <SectionTitle title={t("servers.tabs.danger")} />
       {manage ? (
-        <div className="flex justify-end border-b border-line px-6 py-5">
+        <div className="flex justify-end border-b border-border px-6 py-5">
           <ConfirmButton
             label={t("servers.detail.delete")}
             title={t("servers.detail.deleteTitle")}

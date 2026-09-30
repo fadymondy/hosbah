@@ -1,14 +1,15 @@
 "use client"
 
+import { Button, Field, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useState, type FormEvent } from "react"
 
 import { CodeInput } from "@/components/auth/code-input"
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
-import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 import { auth, authMessage, MIN_PASSWORD } from "@/lib/auth"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 
@@ -67,7 +68,7 @@ export default function ForgotPasswordPage() {
   if (step === "done") {
     return (
       <AuthFrame title={t("account.forgotTitle")} description={t("account.resetDone")}>
-        <Button nativeButton={false} render={<Link href={`/${locale}/login`} />}>
+        <Button variant="primary" nativeButton={false} render={<Link href={`/${locale}/login`} />}>
           {t("auth.login.title")}
         </Button>
       </AuthFrame>
@@ -82,7 +83,7 @@ export default function ForgotPasswordPage() {
     >
       {step === "email" ? (
         <form onSubmit={sendCode}>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <FormError message={error} />
             <Field>
               <FieldLabel htmlFor="email">{t("auth.email")}</FieldLabel>
@@ -97,15 +98,15 @@ export default function ForgotPasswordPage() {
               />
             </Field>
             <Field>
-              <Button type="submit" disabled={busy}>
+              <Button variant="primary" type="submit" disabled={busy}>
                 {busy ? t("common.working") : t("account.sendCode")}
               </Button>
             </Field>
-          </FieldGroup>
+          </div>
         </form>
       ) : (
         <form onSubmit={reset}>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <FormError message={error} />
             <Field>
               <FieldLabel htmlFor="code">{t("account.code")}</FieldLabel>
@@ -136,14 +137,14 @@ export default function ForgotPasswordPage() {
               />
             </Field>
             <Field>
-              <Button type="submit" disabled={busy || code.length !== 6}>
+              <Button variant="primary" type="submit" disabled={busy || code.length !== 6}>
                 {busy ? t("common.working") : t("account.setPassword")}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setStep("email")}>
                 {t("account.useAnotherEmail")}
               </Button>
             </Field>
-          </FieldGroup>
+          </div>
         </form>
       )}
     </AuthFrame>

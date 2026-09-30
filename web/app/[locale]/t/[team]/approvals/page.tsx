@@ -16,6 +16,7 @@ Two things on this page are deliberate and easy to get wrong later:
     something to fix by hiding it in the UI.
 */
 
+import { Badge, Button, Checkbox, EmptyState, Field, FieldDescription, FieldLabel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { ShieldCheckIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -23,12 +24,12 @@ import { toast } from "sonner"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SettingsRow, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
 import { apiFetch, type ApprovalRequest, type Team } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
@@ -46,11 +47,11 @@ function argumentNames(summary: string): string[] {
   }
 }
 
-const statusTone: Record<ApprovalRequest["status"], "default" | "secondary" | "destructive" | "outline"> = {
-  pending: "default",
-  approved: "secondary",
+const statusTone: Record<ApprovalRequest["status"], "success" | "neutral" | "danger" | "outline"> = {
+  pending: "success",
+  approved: "neutral",
   used: "outline",
-  rejected: "destructive",
+  rejected: "danger",
   expired: "outline",
 }
 
@@ -121,7 +122,7 @@ export default function ApprovalsPage() {
       <ErrorBand message={error} />
 
       <SettingsRow label={t("approvals.requireTitle")} hint={t("approvals.requireHint")}>
-          <Field orientation="horizontal">
+          <Field className="flex-row items-center">
             <Checkbox
               id="require-approval"
               checked={enabled}
@@ -140,15 +141,7 @@ export default function ApprovalsPage() {
       {requests === null ? (
         <LoadingRows />
       ) : requests.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldCheckIcon />
-            </EmptyMedia>
-            <EmptyTitle>{enabled ? t("approvals.empty") : t("approvals.disabledNote")}</EmptyTitle>
-            <EmptyDescription>{enabled ? t("approvals.description") : t("approvals.emptyDisabled")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ShieldCheckIcon} title={enabled ? t("approvals.empty") : t("approvals.disabledNote")} description={enabled ? t("approvals.description") : t("approvals.emptyDisabled")} />
       ) : (
         <TableBand>
           <Table>
@@ -196,12 +189,12 @@ export default function ApprovalsPage() {
                     <TableCell>
                       {manage && r.status === "pending" ? (
                         <div className="flex gap-2">
-                          <Button size="sm" disabled={busy === r.id} onClick={() => decide(r.id, "approve")}>
+                          <Button variant="primary" size="sm" disabled={busy === r.id} onClick={() => decide(r.id, "approve")}>
                             {t("approvals.approve")}
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             disabled={busy === r.id}
                             onClick={() => decide(r.id, "reject")}
                           >

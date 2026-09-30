@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { ChevronDownIcon, ChevronRightIcon, CircleDollarSignIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
@@ -10,14 +12,14 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { useErrorText } from "@/components/form-error"
 import { MetricChart, type ChartPoint } from "@/components/servers/metrics-chart"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
+
+
+
 import { Progress } from "@/components/ui/progress"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useFormatMoney, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -88,7 +90,7 @@ export default function CostsPage() {
         action={
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("servers.metrics.range")}>
             {WINDOWS.map((w) => (
-              <Button key={w} size="sm" variant={window_ === w ? "default" : "outline"} onClick={() => setWindow(w)}>
+              <Button key={w} size="sm" variant={window_ === w ? "primary" : "secondary"} onClick={() => setWindow(w)}>
                 {t(`servers.metrics.ranges.${w}`)}
               </Button>
             ))}
@@ -100,7 +102,7 @@ export default function CostsPage() {
         error ? null : <LoadingRows rows={3} />
       ) : (
         <>
-          <dl className="grid gap-px border-b border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid gap-px border-b border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
             <KpiTile label={t("costs.kpiTotal")}>
               <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
                 {amountList(overview.totals)}
@@ -118,10 +120,10 @@ export default function CostsPage() {
             </KpiTile>
             <KpiTile label={t("costs.kpiHints")}>
               <span className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-grid-warn">
+                <Badge variant="outline" className="text-nq-warning-text">
                   {t("costs.overProvisionedCount", { n: overview.over_provisioned_count })}
                 </Badge>
-                <Badge variant="outline" className="text-grid-danger">
+                <Badge variant="outline" className="text-nq-danger-text">
                   {t("costs.underPressureCount", { n: overview.under_pressure_count })}
                 </Badge>
               </span>
@@ -138,15 +140,15 @@ export default function CostsPage() {
 
 function KpiTile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro">{label}</dt>
+    <div className="flex flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow">{label}</dt>
       <dd>{children}</dd>
     </div>
   )
 }
 
-function hintTone(hint?: string): "outline" | "destructive" {
-  return hint === "under_pressure" ? "destructive" : "outline"
+function hintTone(hint?: string): "outline" | "danger" {
+  return hint === "under_pressure" ? "danger" : "outline"
 }
 
 // ── Servers ──────────────────────────────────────────────────────────────
@@ -171,15 +173,7 @@ function ServersSection({
     <section aria-labelledby="costs-servers-h">
       <SectionTitle id="costs-servers-h" title={t("costs.serversTitle")} hint={t("costs.serversHint")} />
       {servers.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CircleDollarSignIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("costs.serversEmptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("costs.serversEmptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={CircleDollarSignIcon} title={t("costs.serversEmptyTitle")} description={t("costs.serversEmptyHint")} />
       ) : (
         <TableBand>
           <Table>
@@ -217,11 +211,11 @@ function ServersSection({
 }
 
 function UsageBar({ percent, label }: { percent: number | undefined; label: string }) {
-  if (percent == null) return <span className="text-xs text-grid-muted">—</span>
+  if (percent == null) return <span className="text-xs text-muted-foreground">—</span>
   return (
     <div className="flex w-28 flex-col gap-1">
       <Progress value={percent} aria-label={label} />
-      <span dir="ltr" className="text-start font-mono text-[11px] tabular-nums text-grid-muted">
+      <span dir="ltr" className="text-start font-mono text-[11px] tabular-nums text-muted-foreground">
         {percent}%
       </span>
     </div>
@@ -266,7 +260,7 @@ function ServerRows({
             <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
               {fmtMoney(s.amount ?? 0, s.currency ?? "USD")}
               {s.idle_amount ? (
-                <span className="ms-1 text-xs text-grid-muted">({t("costs.idleOf", { amount: fmtMoney(s.idle_amount, s.currency ?? "USD") })})</span>
+                <span className="ms-1 text-xs text-muted-foreground">({t("costs.idleOf", { amount: fmtMoney(s.idle_amount, s.currency ?? "USD") })})</span>
               ) : null}
             </span>
           ) : (
@@ -283,7 +277,7 @@ function ServerRows({
           <UsageBar percent={s.usage?.disk_percent != null ? Math.round(s.usage.disk_percent) : undefined} label={t("servers.disk")} />
         </TableCell>
         <TableCell>
-          {s.hint ? <Badge variant={hintTone(s.hint)}>{t(`costs.hints.${s.hint}`)}</Badge> : <span className="text-xs text-grid-muted">—</span>}
+          {s.hint ? <Badge variant={hintTone(s.hint)}>{t(`costs.hints.${s.hint}`)}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
         </TableCell>
         {manage ? (
           <TableCell>
@@ -296,7 +290,7 @@ function ServerRows({
       </TableRow>
       {expanded ? (
         <TableRow>
-          <TableCell colSpan={manage ? 8 : 7} className="bg-grid-soft/40">
+          <TableCell colSpan={manage ? 8 : 7} className="bg-secondary/40">
             <ServerDetail team={team} server={s} window={win} />
           </TableCell>
         </TableRow>
@@ -337,28 +331,28 @@ function ServerDetail({ team, server: s, window: win }: { team: string; server: 
   return (
     <div className="flex flex-col gap-6 py-4">
       <div>
-        <h4 className="mb-2 text-xs font-medium text-grid-muted">{t("costs.usageChart")}</h4>
+        <h4 className="mb-2 text-xs font-medium text-muted-foreground">{t("costs.usageChart")}</h4>
         {error ? (
           <ErrorBand message={error} />
         ) : points.length === 0 ? (
-          <p className="text-xs text-grid-muted">{series === null ? t("common.loading") : t("servers.metrics.emptyTitle")}</p>
+          <p className="text-xs text-muted-foreground">{series === null ? t("common.loading") : t("servers.metrics.emptyTitle")}</p>
         ) : (
           <MetricChart
             ariaLabel={t("costs.usageChart")}
             max={100}
             unit="%"
             series={[
-              { key: "cpu", label: t("servers.cpu"), color: "var(--grid-brand)", points: points.map((p) => ({ at: p.at, value: p.cpu })) },
+              { key: "cpu", label: t("servers.cpu"), color: "var(--nq-brand)", points: points.map((p) => ({ at: p.at, value: p.cpu })) },
               {
                 key: "mem",
                 label: t("servers.memory"),
-                color: "var(--grid-brand-accent, #c9a227)",
+                color: "var(--nq-accent)",
                 points: points.map((p) => ({ at: p.at, value: pct(p.mem_used, p.mem_total) })) as ChartPoint[],
               },
               {
                 key: "disk",
                 label: t("servers.disk"),
-                color: "var(--grid-ok, #3fb950)",
+                color: "var(--nq-success)",
                 points: points.map((p) => ({ at: p.at, value: pct(p.disk_used, p.disk_total) })) as ChartPoint[],
               },
             ]}
@@ -367,9 +361,9 @@ function ServerDetail({ team, server: s, window: win }: { team: string; server: 
         )}
       </div>
       <div>
-        <h4 className="mb-2 text-xs font-medium text-grid-muted">{t("costs.byApp")}</h4>
+        <h4 className="mb-2 text-xs font-medium text-muted-foreground">{t("costs.byApp")}</h4>
         {s.apps.length === 0 ? (
-          <p className="text-xs text-grid-muted">{t("costs.noApps")}</p>
+          <p className="text-xs text-muted-foreground">{t("costs.noApps")}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -392,7 +386,7 @@ function ServerDetail({ team, server: s, window: win }: { team: string; server: 
                   </TableCell>
                   <TableCell>
                     {a.hint ? (
-                      <Badge variant="outline" className="text-grid-warn">
+                      <Badge variant="outline" className="text-nq-warning-text">
                         {t(`costs.appHints.${a.hint}`)}
                       </Badge>
                     ) : (
@@ -479,7 +473,7 @@ function PriceDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={s.priced ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={s.priced ? "secondary" : "primary"} />}>
           <PencilIcon />
           {s.priced ? t("costs.editPrice") : t("costs.setPrice")}
         </DialogTrigger>
@@ -490,7 +484,7 @@ function PriceDialog({
             <DialogTitle>{s.server_name}</DialogTitle>
             <DialogDescription>{t("costs.priceHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="cost-amount">{t("costs.amount")}</FieldLabel>
               <Input
@@ -517,17 +511,17 @@ function PriceDialog({
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
               />
             </Field>
-          </FieldGroup>
+          </div>
           {error ? (
             <p role="alert" className="text-sm text-destructive" dir="auto">
               {error}
             </p>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !amount}>
+            <Button variant="primary" type="submit" disabled={busy || !amount}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -587,7 +581,7 @@ function LineItemsSection({
                   <TableCell dir="ltr" className="text-start font-mono text-sm tabular-nums">
                     {fmtMoney(li.amount, li.currency)}
                   </TableCell>
-                  <TableCell dir="ltr" className="text-start text-xs text-grid-muted">
+                  <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
                     {fmtDate(li.created_at)}
                   </TableCell>
                   {manage ? (
@@ -681,7 +675,7 @@ function LineItemDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={item ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={item ? "secondary" : "primary"} />}>
           {item ? <PencilIcon /> : <PlusIcon />}
           {item ? t("lists.edit") : t("costs.addLineItem")}
         </DialogTrigger>
@@ -692,7 +686,7 @@ function LineItemDialog({
             <DialogTitle>{item ? item.name : t("costs.addLineItem")}</DialogTitle>
             <DialogDescription>{t("costs.lineItemsHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="li-name">{t("costs.name")}</FieldLabel>
               <Input id="li-name" dir="auto" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
@@ -723,17 +717,17 @@ function LineItemDialog({
                 onChange={(e) => setCurrency(e.target.value.toUpperCase())}
               />
             </Field>
-          </FieldGroup>
+          </div>
           {error ? (
             <p role="alert" className="text-sm text-destructive" dir="auto">
               {error}
             </p>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !amount}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || !amount}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

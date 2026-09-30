@@ -1,14 +1,15 @@
 "use client"
 
+import { Button, Field, FieldDescription, FieldLabel, Input } from "@fadymondy/nasaq/web"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 
 import { AuthFrame } from "@/components/auth-frame"
 import { FormError, useErrorText } from "@/components/form-error"
 import { PageLoading } from "@/components/page-loading"
-import { Button } from "@/components/ui/button"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
 import { apiFetch, type Team } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { SessionGate, useSession } from "@/lib/session"
@@ -66,7 +67,7 @@ function CreateTeam() {
       }
     >
       <form onSubmit={onSubmit}>
-        <FieldGroup>
+        <div className="flex w-full flex-col gap-5">
           <FormError message={error} />
           <Field>
             <FieldLabel htmlFor="team-name">{t("onboarding.teamName")}</FieldLabel>
@@ -81,11 +82,11 @@ function CreateTeam() {
             <FieldDescription>{t("onboarding.teamHint")}</FieldDescription>
           </Field>
           <Field>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
               {busy ? t("common.working") : t("onboarding.submit")}
             </Button>
           </Field>
-        </FieldGroup>
+        </div>
       </form>
     </AuthFrame>
   )

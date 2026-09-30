@@ -1,11 +1,12 @@
 "use client"
 
+import { Badge } from "@fadymondy/nasaq/web"
 import type { ReactNode } from "react"
 import { EyeIcon } from "lucide-react"
 
 import { Facts } from "@/components/admin/admin-list"
 import { Notice } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
+
 import type { Imported } from "@/lib/apps"
 import { humanBytes } from "@/lib/databases"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -20,10 +21,10 @@ export function ImportedBadge({ item }: { item: Imported }) {
       <span
         className={
           state === "running"
-            ? "text-xs text-grid-fg"
+            ? "text-xs text-foreground"
             : state === "missing"
-              ? "text-xs text-grid-danger"
-              : "text-xs text-grid-muted"
+              ? "text-xs text-nq-danger-text"
+              : "text-xs text-muted-foreground"
         }
       >
         {t(`imported.states.${state}`, undefined, state)}

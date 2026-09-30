@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { AlertTriangleIcon, ListOrderedIcon, RefreshCwIcon, RotateCwIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
@@ -9,9 +10,9 @@ import { useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch, ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
@@ -98,7 +99,7 @@ export function SiteQueues() {
     return (
       <section aria-labelledby="qu-h">
         <SectionTitle id="qu-h" title={t("site.nav.queues")} hint={t("site.planned.queues.hint")} />
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.queues.needsDeployer")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.needsDeployer")}</p>
       </section>
     )
 
@@ -118,24 +119,24 @@ export function SiteQueues() {
           }
         />
         <ErrorBand message={error} />
-        {note ? <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{note}</p> : null}
+        {note ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{note}</p> : null}
         {ov === null ? (
           note || error ? null : <LoadingRows rows={3} />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-6 py-4 text-sm">
-              <ListOrderedIcon className="size-4 text-grid-brand" />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-4 text-sm">
+              <ListOrderedIcon className="size-4 text-nq-brand" />
               <span className="font-medium">{t(`site.queues.drivers.${ov.driver}`)}</span>
-              <Badge variant={ov.confidence === "detected" ? "default" : "outline"}>{t(`site.queues.confidence.${ov.confidence}`)}</Badge>
-              {ov.horizon?.installed ? <Badge variant="secondary">Horizon{ov.horizon.status ? ` · ${ov.horizon.status}` : ""}</Badge> : null}
+              <Badge variant={ov.confidence === "detected" ? "brand" : "outline"}>{t(`site.queues.confidence.${ov.confidence}`)}</Badge>
+              {ov.horizon?.installed ? <Badge variant="neutral">Horizon{ov.horizon.status ? ` · ${ov.horizon.status}` : ""}</Badge> : null}
               {ov.evidence.length ? (
-                <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                   {ov.evidence.join(" · ")}
                 </span>
               ) : null}
             </div>
             {!ov.readable ? (
-              <p className="flex items-start gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+              <p className="flex items-start gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
                 <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
                 <span>
                   {ov.driver === "none" ? t("site.queues.none") : t("site.queues.unreadable")}
@@ -161,16 +162,16 @@ export function SiteQueues() {
                         </TableCell>
                         <TableCell className="tabular-nums">{n(x.pending)}</TableCell>
                         <TableCell className="tabular-nums">{n(x.running)}</TableCell>
-                        <TableCell className={x.failed ? "text-grid-danger tabular-nums" : "tabular-nums"}>{n(x.failed)}</TableCell>
+                        <TableCell className={x.failed ? "text-nq-danger-text tabular-nums" : "tabular-nums"}>{n(x.failed)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </TableBand>
             ) : (
-              <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.queues.noQueues")}</p>
+              <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.noQueues")}</p>
             )}
-            {ov.readable ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("site.queues.dash")}</p> : null}
+            {ov.readable ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.queues.dash")}</p> : null}
           </>
         )}
       </section>
@@ -207,29 +208,29 @@ export function SiteQueues() {
           {jobs === null ? (
             <LoadingRows rows={2} />
           ) : jobs.length === 0 ? (
-            <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.queues.noFailed")}</p>
+            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.noFailed")}</p>
           ) : (
             <>
               <ListSearch value={q} onChange={setQ} placeholder={t("site.queues.search")} shown={shown.length} total={jobs.length} />
-              <ol className="flex flex-col divide-y divide-line border-b border-line">
+              <ol className="flex flex-col divide-y divide-border border-b border-border">
                 {shown.map((j) => (
                   <li key={j.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3">
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span dir="ltr" className="truncate text-start text-sm font-medium text-grid-fg" title={j.name}>
+                      <span dir="ltr" className="truncate text-start text-sm font-medium text-foreground" title={j.name}>
                         {j.name || j.id}
                       </span>
-                      <span dir="ltr" className="truncate text-start font-mono text-xs text-grid-muted">
+                      <span dir="ltr" className="truncate text-start font-mono text-xs text-muted-foreground">
                         {j.queue} · {j.connection} · {j.failed_at} · {j.id}
                       </span>
                       {j.exception ? (
-                        <span dir="ltr" className="truncate text-start text-xs text-grid-danger" title={j.exception}>
+                        <span dir="ltr" className="truncate text-start text-xs text-nq-danger-text" title={j.exception}>
                           {j.exception}
                         </span>
                       ) : null}
                     </span>
                     {manage ? (
                       <>
-                        <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(`/${encodeURIComponent(j.id)}/retry`, "POST", t("site.queues.done")).catch(() => {})}>
+                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => void act(`/${encodeURIComponent(j.id)}/retry`, "POST", t("site.queues.done")).catch(() => {})}>
                           <RotateCwIcon />
                           {t("site.queues.retry")}
                         </Button>
@@ -246,7 +247,7 @@ export function SiteQueues() {
                   </li>
                 ))}
               </ol>
-              {truncated ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("site.queues.truncated")}</p> : null}
+              {truncated ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.queues.truncated")}</p> : null}
             </>
           )}
         </section>

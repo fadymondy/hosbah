@@ -1,14 +1,15 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PauseIcon, PlayIcon, RefreshCwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
@@ -62,7 +63,7 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
     return (
       <section aria-labelledby="svc-h">
         <SectionTitle id="svc-h" title={t("servers.services.title")} hint={t("servers.services.hint")} />
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("servers.services.readOnly")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.services.readOnly")}</p>
       </section>
     )
   }
@@ -76,7 +77,7 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
         title={t("servers.services.title")}
         hint={t("servers.services.hint")}
         action={
-          <Button size="sm" variant="outline" onClick={() => void load()}>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>
             <RefreshCwIcon />
             {t("common.refresh")}
           </Button>
@@ -86,11 +87,11 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
       {units === null ? (
         <LoadingRows rows={5} />
       ) : units.length === 0 ? (
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("servers.services.empty")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("servers.services.empty")}</p>
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("servers.services.search")} shown={shown.length} total={units.length} />
-          <div className="border-b border-line [&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-6">
+          <div className="border-b border-border [&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-6">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -107,32 +108,32 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
                       <span dir="ltr" className="font-mono text-sm">
                         {u.name}
                       </span>
-                      {u.description ? <div className="max-w-xs truncate text-xs text-grid-muted" dir="auto">{u.description}</div> : null}
+                      {u.description ? <div className="max-w-xs truncate text-xs text-muted-foreground" dir="auto">{u.description}</div> : null}
                     </TableCell>
                     <TableCell>
                       <ServiceStateBadge active={u.active_state} sub={u.sub_state} load={u.load_state} />
                     </TableCell>
                     <TableCell>
-                      <Badge variant={u.enabled ? "secondary" : "outline"}>
+                      <Badge variant={u.enabled ? "neutral" : "outline"}>
                         {u.enabled ? t("servers.services.enabledYes") : t("servers.services.enabledNo")}
                       </Badge>
                     </TableCell>
                     {manage ? (
                       <TableCell>
                         <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="outline" disabled={busy === u.name} onClick={() => void act(u, "start")}>
+                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "start")}>
                             <PlayIcon />
                             {t("servers.services.start")}
                           </Button>
-                          <Button size="sm" variant="outline" disabled={busy === u.name} onClick={() => void act(u, "stop")}>
+                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "stop")}>
                             <SquareIcon />
                             {t("servers.services.stop")}
                           </Button>
-                          <Button size="sm" variant="outline" disabled={busy === u.name} onClick={() => void act(u, "restart")}>
+                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "restart")}>
                             <RotateCwIcon />
                             {t("servers.services.restart")}
                           </Button>
-                          <Button size="sm" variant="outline" disabled={busy === u.name} onClick={() => void act(u, "reload")}>
+                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "reload")}>
                             <PauseIcon />
                             {t("servers.services.reload")}
                           </Button>
@@ -151,11 +152,11 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
 }
 
 function ServiceStateBadge({ active, sub, load }: { active: string; sub: string; load: string }) {
-  const variant = active === "active" ? "default" : active === "failed" ? "destructive" : "secondary"
+  const variant = active === "active" ? "success" : active === "failed" ? "danger" : "neutral"
   return (
     <span className="flex flex-col items-start gap-0.5">
       <Badge variant={variant}>{active}</Badge>
-      <span dir="ltr" className="text-xs text-grid-muted">
+      <span dir="ltr" className="text-xs text-muted-foreground">
         {sub} · {load}
       </span>
     </span>

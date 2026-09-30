@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
@@ -43,11 +45,11 @@ import { useLoadedSite } from "@/components/site/context"
 import { SiteBuildConfig } from "@/components/site/build-config"
 import { SitePHPConfig } from "@/components/site/php-config"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
 import { apiFetch, ApiError } from "@/lib/api"
 import { isImported, type App, type EnvVar } from "@/lib/apps"
 import { humanBytes, type DataService } from "@/lib/databases"
@@ -130,7 +132,7 @@ export function SiteDatabases() {
         hint={t("site.databasesHint")}
         action={
           manage ? (
-            <Button size="sm" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/databases`} />}>
+            <Button variant="primary" size="sm" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/databases`} />}>
               <PlusIcon />
               {t("site.newDatabase")}
             </Button>
@@ -139,11 +141,11 @@ export function SiteDatabases() {
       />
       <ErrorBand message={error} />
       {injected.length ? (
-        <p className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3 text-xs text-grid-muted">
+        <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3 text-xs text-muted-foreground">
           <LinkIcon className="size-3.5" />
           {t("site.injected")}
           {injected.map((v) => (
-            <code key={v} dir="ltr" className="border border-line bg-grid-card px-1.5 py-0.5 font-mono text-grid-fg">
+            <code key={v} dir="ltr" className="border border-border bg-card px-1.5 py-0.5 font-mono text-foreground">
               {v}
             </code>
           ))}
@@ -152,15 +154,7 @@ export function SiteDatabases() {
       {services === null ? (
         <LoadingRows rows={2} />
       ) : services.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <DatabaseIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("databases.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.databasesEmpty")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={DatabaseIcon} title={t("databases.emptyTitle")} description={t("site.databasesEmpty")} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchDatabases")} shown={shown.length} total={services.length} />
@@ -186,15 +180,15 @@ export function SiteDatabases() {
                       {s.kind} {s.version}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={s.status === "running" ? "default" : "outline"}>{t(`databases.statuses.${s.status}`, undefined, s.status)}</Badge>
+                      <Badge variant={s.status === "running" ? "brand" : "outline"}>{t(`databases.statuses.${s.status}`, undefined, s.status)}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
-                        <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
+                        <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
                           {t("lists.manage")}
                         </Button>
                         {manage && !isImported(s) && s.kind !== "minio" ? (
-                          <Button size="sm" disabled={busy === s.id || !attachable(s)} onClick={() => void attach(s)}>
+                          <Button variant="primary" size="sm" disabled={busy === s.id || !attachable(s)} onClick={() => void attach(s)}>
                             <LinkIcon />
                             {t("site.attach")}
                           </Button>
@@ -254,14 +248,14 @@ function ConnectedServices() {
   if (links !== null && links.length === 0 && !manage) return null
 
   return (
-    <div className="border-t border-line px-6 py-4">
+    <div className="border-t border-border px-6 py-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-medium">{t("site.connectedServices")}</h3>
-          <p className="text-xs text-grid-muted">{t("site.connectedServicesHint")}</p>
+          <p className="text-xs text-muted-foreground">{t("site.connectedServicesHint")}</p>
         </div>
         {manage ? (
-          <Button size="sm" variant="outline" onClick={() => void detect()} disabled={busy}>
+          <Button size="sm" variant="secondary" onClick={() => void detect()} disabled={busy}>
             <SearchIcon />
             {t("site.detectServices")}
           </Button>
@@ -269,15 +263,15 @@ function ConnectedServices() {
       </div>
       <ErrorBand message={error} />
       {links === null ? null : links.length === 0 ? (
-        <p className="text-sm text-grid-muted">{t("site.connectedServicesEmpty")}</p>
+        <p className="text-sm text-muted-foreground">{t("site.connectedServicesEmpty")}</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {links.map((l) => (
-            <li key={l.variable} className="flex items-center gap-2 rounded-md border border-line bg-grid-card px-3 py-1.5 text-xs">
-              <code dir="ltr" className="font-mono text-grid-fg">
+            <li key={l.variable} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs">
+              <code dir="ltr" className="font-mono text-foreground">
                 {l.variable}
               </code>
-              <Badge variant={l.service_kind === "shared" ? "secondary" : "outline"}>{l.service_kind}</Badge>
+              <Badge variant={l.service_kind === "shared" ? "neutral" : "outline"}>{l.service_kind}</Badge>
             </li>
           ))}
         </ul>
@@ -301,11 +295,11 @@ type ProcessStatus = {
 }
 type ProcessesOut = { processes: ProcessStatus[]; operation: string }
 
-const PROCESS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
-  running: "default",
-  restarting: "secondary",
-  created: "secondary",
-  paused: "secondary",
+const PROCESS_BADGE: Record<string, "success" | "neutral" | "outline"> = {
+  running: "success",
+  restarting: "neutral",
+  created: "neutral",
+  paused: "neutral",
 }
 
 /**
@@ -380,16 +374,8 @@ export function SiteWorkers() {
     return (
       <section aria-labelledby="wk-h">
         <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CogIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.workersEmpty")}</EmptyTitle>
-            <EmptyDescription>{t("site.workersEmptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-        <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.workersNote")}</p>
+        <EmptyState className="border-b" icon={CogIcon} title={t("site.workersEmpty")} description={t("site.workersEmptyHint")} />
+        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
       </section>
     )
 
@@ -397,7 +383,7 @@ export function SiteWorkers() {
     return (
       <section aria-labelledby="wk-h">
         <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.workers.needsDeployer")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.workers.needsDeployer")}</p>
       </section>
     )
 
@@ -414,15 +400,15 @@ export function SiteWorkers() {
         }
       />
       <ErrorBand message={error} />
-      {note ? <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{note}</p> : null}
+      {note ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{note}</p> : null}
       {items === null ? (
         note || error ? null : (
           <LoadingRows rows={detail.processes.length} />
         )
       ) : items.length === 0 ? (
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.workers.notLive")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.workers.notLive")}</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-line border-b border-line">
+        <ul className="flex flex-col divide-y divide-border border-b border-border">
           {items.map((p) => {
             const isWeb = p.process === "web"
             const badge = PROCESS_BADGE[p.state] ?? "outline"
@@ -434,12 +420,12 @@ export function SiteWorkers() {
               <li key={p.process} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4">
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <span dir="ltr" className="text-sm font-medium text-grid-fg">
+                    <span dir="ltr" className="text-sm font-medium text-foreground">
                       {p.process}
                     </span>
                     <Badge variant={badge}>{t(`site.workers.states.${p.state}`, undefined, p.state)}</Badge>
                   </span>
-                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {p.started_at ? <span dir="ltr">{t("site.workers.started", { time: ago(p.started_at) })}</span> : null}
                     <span>{t("site.workers.restarts", { count: p.restart_count })}</span>
                     {p.state === "running" ? (
@@ -455,7 +441,7 @@ export function SiteWorkers() {
                     ) : null}
                   </span>
                   {command ? (
-                    <span dir="ltr" className="truncate font-mono text-xs text-grid-muted" title={command}>
+                    <span dir="ltr" className="truncate font-mono text-xs text-muted-foreground" title={command}>
                       {command}
                     </span>
                   ) : null}
@@ -467,7 +453,7 @@ export function SiteWorkers() {
                       {t("site.workers.viewLogs")}
                     </Button>
                   </Link>
-                  <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void act(p.process, "restart").catch(() => {})}>
+                  <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void act(p.process, "restart").catch(() => {})}>
                     <RotateCwIcon className={restarting ? "animate-spin" : ""} />
                     {t("site.workers.restart")}
                   </Button>
@@ -482,7 +468,7 @@ export function SiteWorkers() {
                     />
                   ) : null}
                   {!isWeb && p.state !== "running" ? (
-                    <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void act(p.process, "start").catch(() => {})}>
+                    <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void act(p.process, "start").catch(() => {})}>
                       <PlayIcon className={starting ? "animate-pulse" : ""} />
                       {t("site.workers.start")}
                     </Button>
@@ -493,7 +479,7 @@ export function SiteWorkers() {
           })}
         </ul>
       )}
-      <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.workersNote")}</p>
+      <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
     </section>
   )
 }
@@ -512,7 +498,7 @@ export function SiteLogs() {
       {operate && app.origin_kind === "container" && app.imported_state !== "missing" ? (
         <WorkloadLogs run={run} busy={busy} />
       ) : (
-        <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.logsGuest")}</p>
+        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.logsGuest")}</p>
       )}
       {log}
     </>
@@ -564,7 +550,7 @@ export function SiteBackups() {
           <EmptyTitle>{t("site.backupsData")}</EmptyTitle>
           <EmptyDescription>{t("site.backupsDataHint")}</EmptyDescription>
         </EmptyHeader>
-        <Button variant="outline" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} />}>
+        <Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} />}>
           <DatabaseIcon />
           {t("nav.databases")}
         </Button>
@@ -603,7 +589,7 @@ export function SiteSettings() {
           {operate && !missing ? (
             <section aria-labelledby="power-h">
               <SectionTitle id="power-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-              <div className="border-b border-line px-6 py-4">
+              <div className="border-b border-border px-6 py-4">
                 <PowerControls item={app} run={(k, s, i) => run(k, s, i).then(reload)} busy={busy} guest={guest} />
               </div>
             </section>
@@ -700,7 +686,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
             maxLength={280}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full border border-line bg-background px-3 py-2 text-sm text-grid-fg outline-none focus-visible:border-[var(--grid-brand)]"
+            className="w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-nq-brand"
           />
         </SettingsRow>
         <SettingsRow label={t("servers.appearance.color")}>
@@ -711,7 +697,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
               aria-checked={!color}
               aria-label={t("servers.appearance.none")}
               onClick={() => setColor("")}
-              className={cn("size-7 border border-dashed border-line", !color && "ring-2 ring-[var(--grid-brand)] ring-offset-2 ring-offset-background")}
+              className={cn("size-7 border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
             />
             {SERVER_COLORS.map((c) => (
               <button
@@ -721,7 +707,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
                 aria-checked={color === c}
                 aria-label={c}
                 onClick={() => setColor(c)}
-                className={cn("size-7 border border-line", color === c && "ring-2 ring-[var(--grid-brand)] ring-offset-2 ring-offset-background")}
+                className={cn("size-7 border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
                 style={{ background: c }}
               />
             ))}
@@ -730,7 +716,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.custom")}
               value={color || "#3B82F6"}
               onChange={(e) => setColor(e.target.value.toUpperCase())}
-              className="h-7 w-10 cursor-pointer border border-line bg-transparent"
+              className="h-7 w-10 cursor-pointer border border-border bg-transparent"
             />
           </div>
         </SettingsRow>
@@ -746,8 +732,8 @@ function SiteAppearance({ manage }: { manage: boolean }) {
                 title={key}
                 onClick={() => setIcon(icon === key ? "" : key)}
                 className={cn(
-                  "flex size-8 items-center justify-center border border-line [&_svg]:size-4",
-                  icon === key ? "bg-grid-soft text-grid-fg ring-1 ring-[var(--grid-brand)]" : "text-grid-muted hover:bg-grid-soft",
+                  "flex size-8 items-center justify-center border border-border [&_svg]:size-4",
+                  icon === key ? "bg-secondary text-foreground ring-1 ring-nq-brand" : "text-muted-foreground hover:bg-secondary",
                 )}
               >
                 <Icon />
@@ -757,7 +743,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
         </SettingsRow>
         <SettingsRow label={t("servers.appearance.logo")} hint={t("servers.appearance.logoHint")}>
           <div
-            className="flex flex-wrap items-center gap-3 border border-dashed border-line px-4 py-3"
+            className="flex flex-wrap items-center gap-3 border border-dashed border-border px-4 py-3"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -773,7 +759,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.logo")}
               onChange={(e) => upload(e.target.files?.[0])}
             />
-            <Button type="button" variant="outline" size="sm" onClick={() => file.current?.click()}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => file.current?.click()}>
               <UploadIcon />
               {logo ? t("servers.appearance.logoReplace") : t("servers.appearance.logoUpload")}
             </Button>
@@ -783,13 +769,13 @@ function SiteAppearance({ manage }: { manage: boolean }) {
                 {t("servers.appearance.logoRemove")}
               </Button>
             ) : (
-              <span className="text-xs text-grid-muted">{t("servers.appearance.logoDrop")}</span>
+              <span className="text-xs text-muted-foreground">{t("servers.appearance.logoDrop")}</span>
             )}
           </div>
         </SettingsRow>
         {manage ? (
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>

@@ -1,17 +1,18 @@
 "use client"
 
+import { Badge, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { Suspense, useEffect, useState } from "react"
 import { InboxIcon, MessageSquareShareIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
-import { Badge } from "@/components/ui/badge"
+
 import { ChangePassword } from "@/components/account/change-password"
 import { ConnectedAccounts } from "@/components/account/connected-accounts"
 import { TwoFactor } from "@/components/account/two-factor"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { apiFetch, type Report } from "@/lib/api"
 import { MAHAAM_FEEDBACK } from "@/lib/config"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -64,15 +65,7 @@ function MyReports() {
           <LoadingRows />
         )
       ) : MAHAAM_FEEDBACK && reports.length === 0 ? null : reports.length === 0 && !error ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <InboxIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("account.reports.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("account.reports.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={InboxIcon} title={t("account.reports.emptyTitle")} description={t("account.reports.emptyHint")} />
       ) : reports.length ? (
         <TableBand>
           <Table>

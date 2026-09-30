@@ -1,11 +1,12 @@
 "use client"
 
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useState } from "react"
 
 import { FilterSelect, ListEmpty, ListError, ListToolbar, LoadingRows, Pager, ServerStatus } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { useAdminList, type AdminServer } from "@/lib/admin"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -36,7 +37,7 @@ export default function AdminServersPage() {
       ) : items.length === 0 ? (
         <ListEmpty title={list.q || status ? t("admin.list.noMatch") : t("admin.servers.empty")} />
       ) : (
-        <div className="border-b border-line">
+        <div className="border-b border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -58,19 +59,19 @@ export default function AdminServersPage() {
                       {s.team_name}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-grid-muted">
+                  <TableCell className="text-muted-foreground">
                     {s.provider} · {s.kind}
                   </TableCell>
                   <TableCell>
                     <ServerStatus online={s.online} status={s.status} />
                   </TableCell>
-                  <TableCell className="font-mono text-grid-muted" dir="ltr">
+                  <TableCell className="font-mono text-muted-foreground" dir="ltr">
                     {s.ip ?? "—"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-grid-muted" dir="ltr">
+                  <TableCell className="font-mono text-xs text-muted-foreground" dir="ltr">
                     {s.agent_version ?? "—"}
                   </TableCell>
-                  <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                  <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                     {fmt(s.last_seen_at)}
                   </TableCell>
                 </TableRow>

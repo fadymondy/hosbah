@@ -1,9 +1,10 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import { useState } from "react"
 import { CheckIcon, CopyIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -33,7 +34,7 @@ export function CopyField({ value, block = false, className }: { value: string; 
           {value}
         </code>
       )}
-      <Button type="button" variant="outline" size="icon-sm" onClick={copy} aria-label={t("common.copy")} title={t("common.copy")}>
+      <Button type="button" variant="secondary" size="icon-sm" onClick={copy} aria-label={t("common.copy")} title={t("common.copy")}>
         {copied ? <CheckIcon /> : <CopyIcon />}
       </Button>
       <span className="sr-only" aria-live="polite">

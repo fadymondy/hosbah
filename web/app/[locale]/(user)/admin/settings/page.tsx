@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Input, Textarea } from "@fadymondy/nasaq/web"
 import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
@@ -7,9 +8,9 @@ import { ListError, LoadingRows } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
 import { useAdminResource, type PlatformSettings, type SignupMode } from "@/lib/admin"
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -75,7 +76,7 @@ export default function AdminSettingsPage() {
 
           <SectionTitle title={t("admin.settings.access")} hint={t("admin.settings.accessHint")} />
           <SettingsRow label={t("admin.settings.signupMode")} hint={t(`admin.settings.signup.${form.signup_mode}Hint`)}>
-            <div role="radiogroup" aria-label={t("admin.settings.signupMode")} className="grid gap-px border border-line bg-line sm:grid-cols-3">
+            <div role="radiogroup" aria-label={t("admin.settings.signupMode")} className="grid gap-px border border-border bg-border sm:grid-cols-3">
               {SIGNUP_MODES.map((m) => {
                 const on = form.signup_mode === m
                 return (
@@ -87,8 +88,8 @@ export default function AdminSettingsPage() {
                     onClick={() => set("signup_mode", m)}
                     className={
                       on
-                        ? "bg-grid-soft px-3 py-2 text-sm font-medium text-grid-fg shadow-[inset_0_-2px_0_var(--grid-action)]"
-                        : "bg-background px-3 py-2 text-sm text-grid-body hover:bg-grid-soft"
+                        ? "bg-secondary px-3 py-2 text-sm font-medium text-foreground shadow-[inset_0_-2px_0_var(--nq-action)]"
+                        : "bg-background px-3 py-2 text-sm text-nq-fg-body hover:bg-secondary"
                     }
                   >
                     {t(`admin.settings.signup.${m}`)}
@@ -108,7 +109,7 @@ export default function AdminSettingsPage() {
               onChange={(e) => set("announcement", e.target.value)}
               placeholder={t("admin.settings.announcementPlaceholder")}
             />
-            <span className="text-xs text-grid-muted tabular-nums">{form.announcement.length}/500</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{form.announcement.length}/500</span>
           </SettingsRow>
           <SettingsRow label={t("admin.settings.level")}>
             <div role="radiogroup" aria-label={t("admin.settings.level")} className="flex gap-2">
@@ -116,7 +117,7 @@ export default function AdminSettingsPage() {
                 <Button
                   key={lvl}
                   type="button"
-                  variant={form.announcement_level === lvl ? "default" : "outline"}
+                  variant={form.announcement_level === lvl ? "primary" : "secondary"}
                   role="radio"
                   aria-checked={form.announcement_level === lvl}
                   onClick={() => set("announcement_level", lvl)}
@@ -163,15 +164,15 @@ export default function AdminSettingsPage() {
             />
           </SettingsRow>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-6 py-4">
-            <span className="text-xs text-grid-muted">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-6 py-4">
+            <span className="text-xs text-muted-foreground">
               {res.data?.updated_at ? (
                 <>
                   {t("admin.settings.updated")} <span dir="ltr">{fmt(res.data.updated_at)}</span>
                 </>
               ) : null}
             </span>
-            <Button type="submit" disabled={busy || !dirty}>
+            <Button variant="primary" type="submit" disabled={busy || !dirty}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>

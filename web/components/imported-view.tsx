@@ -1,5 +1,6 @@
 "use client"
 
+import { Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { LayoutGridIcon, ServerIcon } from "lucide-react"
@@ -21,7 +22,7 @@ import {
   WorkloadStats,
 } from "@/components/imported-controls"
 import { ErrorBand, SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
+
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
@@ -63,7 +64,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
       actions={
         <>
           <ImportedBadge item={app} />
-          <Button variant="outline" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/sites/${app.id}`} />}>
+          <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/sites/${app.id}`} />}>
             <LayoutGridIcon />
             {t("sites.canvas")}
           </Button>
@@ -77,7 +78,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
       {operate && !missing ? (
         <section aria-labelledby="power-h">
           <SectionTitle id="power-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-          <div className="border-b border-line px-6 py-4">
+          <div className="border-b border-border px-6 py-4">
             <PowerControls item={app} run={(k, s, i) => run(k, s, i).then(() => onChanged?.())} busy={busy} guest={guest} />
           </div>
         </section>
@@ -89,7 +90,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
           [
             t("apps.server"),
             <Link key="srv" href={`${base}/servers/${app.server_id}`} className="inline-flex items-center gap-1.5 hover:underline">
-              <ServerIcon className="size-3.5 text-grid-muted" />
+              <ServerIcon className="size-3.5 text-muted-foreground" />
               <span dir="ltr">{app.server_name ?? app.server_id}</span>
             </Link>,
           ],
@@ -174,7 +175,7 @@ export function ImportedDatabaseView({ service, onChanged }: { service: DataServ
           [
             t("apps.server"),
             <Link key="srv" href={`${base}/servers/${service.server_id}`} className="inline-flex items-center gap-1.5 hover:underline">
-              <ServerIcon className="size-3.5 text-grid-muted" />
+              <ServerIcon className="size-3.5 text-muted-foreground" />
               <span dir="ltr">{service.server_id.slice(0, 8)}</span>
             </Link>,
           ],
@@ -229,7 +230,7 @@ export function ImportedDatabaseControls({ service, onChanged }: { service: Data
       <ErrorBand message={error} />
       <section aria-labelledby="dbpower-h">
         <SectionTitle id="dbpower-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-        <div className="border-b border-line px-6 py-4">
+        <div className="border-b border-border px-6 py-4">
           <PowerControls item={service} run={(k, s, i) => run(k, s, i).then(() => onChanged())} busy={busy} guest={guest} />
         </div>
       </section>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Input, Skeleton } from "@fadymondy/nasaq/web"
 import { useCallback, useState, type FormEvent, type ReactNode } from "react"
 import {
   ArchiveIcon,
@@ -19,9 +20,9 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { Imported } from "@/lib/apps"
 import { humanBytes } from "@/lib/databases"
@@ -68,7 +69,7 @@ export function useWorkloadActions(path: string, serverId: string) {
   const log = op ? (
     <section aria-label={t("controls.lastOperation")}>
       <SectionTitle title={t("controls.lastOperation")} hint={op.kind} />
-      <div className="border-b border-line">
+      <div className="border-b border-border">
         <OperationLog team={path.split("/")[3] ?? ""} serverId={serverId} op={op} />
       </div>
     </section>
@@ -97,14 +98,14 @@ export function PowerControls({
   return (
     <div className="flex flex-wrap gap-2">
       {!running ? (
-        <Button disabled={!!busy} onClick={() => power("start")}>
+        <Button variant="primary" disabled={!!busy} onClick={() => power("start")}>
           <PlayIcon />
           {t("controls.start")}
         </Button>
       ) : (
         <>
           <ConfirmButton
-            size="default"
+            size="md"
             icon={<RotateCwIcon />}
             label={t("controls.restart")}
             title={t("controls.restartTitle")}
@@ -114,7 +115,7 @@ export function PowerControls({
           />
           {guest ? (
             <ConfirmButton
-              size="default"
+              size="md"
               icon={<PowerIcon />}
               label={t("controls.shutdown")}
               title={t("controls.shutdownTitle")}
@@ -124,7 +125,7 @@ export function PowerControls({
             />
           ) : null}
           <ConfirmButton
-            size="default"
+            size="md"
             icon={<SquareIcon />}
             label={guest ? t("controls.forceStop") : t("controls.stop")}
             title={t("controls.stopTitle")}
@@ -185,7 +186,7 @@ export function WorkloadStats({ path }: { path: string }) {
         title={t("controls.stats")}
         hint={t("controls.statsHint")}
         action={
-          <Button variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
+          <Button variant="secondary" size="sm" disabled={loading} onClick={() => void load()}>
             <RefreshCwIcon className={loading ? "animate-spin" : ""} />
             {stats ? t("controls.refresh") : t("controls.loadStats")}
           </Button>
@@ -193,15 +194,15 @@ export function WorkloadStats({ path }: { path: string }) {
       />
       <ErrorBand message={error} />
       {loading && !stats ? (
-        <div className="grid grid-cols-2 gap-px border-b border-line bg-line lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-px border-b border-border bg-border lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-grid-bg px-6 py-4">
+            <div key={i} className="bg-background px-6 py-4">
               <Skeleton className="h-10 w-full" />
             </div>
           ))}
         </div>
       ) : stats === "none" ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("controls.statsNone")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("controls.statsNone")}</p>
       ) : stats ? (
         <Facts
           items={[
@@ -228,16 +229,16 @@ export function WorkloadLogs({ run, busy }: { run: (key: string, suffix: string,
   return (
     <form onSubmit={submit}>
       <SectionTitle title={t("controls.logs")} hint={t("controls.logsHint")} />
-      <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
-        <label className="flex flex-col gap-1 text-xs text-grid-muted">
+      <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.tail")}
           <Input type="number" min={1} max={2000} dir="ltr" className="w-28 font-mono" value={tail} onChange={(e) => setTail(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-grid-muted">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.follow")}
           <Input type="number" min={0} max={300} dir="ltr" className="w-28 font-mono" value={follow} onChange={(e) => setFollow(e.target.value)} />
         </label>
-        <Button type="submit" disabled={!!busy}>
+        <Button variant="primary" type="submit" disabled={!!busy}>
           {busy === "logs" ? t("common.working") : t("controls.fetchLogs")}
         </Button>
       </div>
@@ -272,8 +273,8 @@ export function ResizeGuest({ run, busy, item }: { run: (key: string, suffix: st
       <SettingsRow label={t("controls.diskGrow")} htmlFor="rs-disk" hint={t("controls.diskGrowHint")}>
         <Input id="rs-disk" type="number" min={0} dir="ltr" className="w-28 font-mono" placeholder="0" value={grow} onChange={(e) => setGrow(e.target.value)} />
       </SettingsRow>
-      <div className="flex justify-end border-b border-line px-6 py-4">
-        <Button type="submit" disabled={!!busy}>
+      <div className="flex justify-end border-b border-border px-6 py-4">
+        <Button variant="primary" type="submit" disabled={!!busy}>
           {busy === "resize" ? t("common.working") : t("controls.applyResize")}
         </Button>
       </div>
@@ -338,7 +339,7 @@ export function GuestSnapshots({
         hint={t("controls.snapshotsHint")}
         className="border-t"
         action={
-          <Button variant="outline" size="sm" disabled={loading} onClick={() => void load()}>
+          <Button variant="secondary" size="sm" disabled={loading} onClick={() => void load()}>
             <RefreshCwIcon className={loading ? "animate-spin" : ""} />
             {list ? t("controls.refresh") : t("controls.loadSnapshots")}
           </Button>
@@ -346,16 +347,16 @@ export function GuestSnapshots({
       />
       <ErrorBand message={error} />
       {list === null ? null : list.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("controls.noSnapshots")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("controls.noSnapshots")}</p>
       ) : (
-        <ul className="divide-y divide-line border-b border-line">
+        <ul className="divide-y divide-border border-b border-border">
           {list.map((s) => (
             <li key={s.name} className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
               <span className="flex min-w-0 flex-col">
-                <span dir="ltr" className="font-mono text-sm text-grid-fg">
+                <span dir="ltr" className="font-mono text-sm text-foreground">
                   {s.name}
                 </span>
-                <span className="text-xs text-grid-muted">
+                <span className="text-xs text-muted-foreground">
                   {s.description ? `${s.description} · ` : ""}
                   <span dir="ltr">{s.snaptime ? fmt(new Date(s.snaptime * 1000).toISOString()) : ""}</span>
                 </span>
@@ -389,16 +390,16 @@ export function GuestSnapshots({
           ))}
         </ul>
       )}
-      <form onSubmit={create} className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
-        <label className="flex flex-col gap-1 text-xs text-grid-muted">
+      <form onSubmit={create} className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.snapshotName")}
           <Input dir="ltr" className="w-48 font-mono" placeholder="before-upgrade" value={snapName} onChange={(e) => setSnapName(e.target.value)} />
         </label>
-        <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-grid-muted">
+        <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.snapshotNote")}
           <Input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <Button type="submit" disabled={!!busy || !validName}>
+        <Button variant="primary" type="submit" disabled={!!busy || !validName}>
           <CameraIcon />
           {busy === "snap" ? t("common.working") : t("controls.takeSnapshot")}
         </Button>
@@ -414,13 +415,13 @@ export function GuestBackup({ run, busy }: { run: (key: string, suffix: string, 
   return (
     <section>
       <SectionTitle title={t("controls.backup")} hint={t("controls.backupHint")} className="border-t" />
-      <div className="flex flex-wrap items-end gap-3 border-b border-line px-6 py-4">
-        <label className="flex flex-col gap-1 text-xs text-grid-muted">
+      <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.storage")}
           <Input dir="ltr" className="w-48 font-mono" placeholder={t("controls.storageDefault")} value={storage} onChange={(e) => setStorage(e.target.value)} />
         </label>
         <Button
-          variant="outline"
+          variant="secondary"
           disabled={!!busy}
           onClick={() => run("backup", "/backup", { method: "POST", body: storage.trim() ? { storage: storage.trim() } : {} }).catch(() => {})}
         >
@@ -438,9 +439,9 @@ export function RecreateContainer({ run }: { run: (key: string, suffix: string, 
   return (
     <section>
       <SectionTitle title={t("controls.recreate")} hint={t("controls.recreateHint")} className="border-t" />
-      <div className="flex border-b border-line px-6 py-4">
+      <div className="flex border-b border-border px-6 py-4">
         <ConfirmButton
-          size="default"
+          size="md"
           icon={<RefreshCwIcon />}
           label={t("controls.recreateNow")}
           title={t("controls.recreateTitle")}
@@ -484,7 +485,7 @@ export function DangerZone({
       <SettingsRow label={t("imported.removeTitle")} hint={t("imported.removeHint")}>
         <div>
           <ConfirmButton
-            size="default"
+            size="md"
             icon={<Trash2Icon />}
             label={t("imported.remove")}
             title={t("imported.removeConfirmTitle", { name })}
@@ -496,7 +497,7 @@ export function DangerZone({
       </SettingsRow>
       {admin ? (
         <SettingsRow
-          label={<span className="text-grid-danger">{t("controls.destroy")}</span>}
+          label={<span className="text-nq-danger-text">{t("controls.destroy")}</span>}
           hint={guest ? t("controls.destroyGuestHint") : t("controls.destroyContainerHint")}
         >
           <ErrorBand message={error} />
@@ -504,13 +505,13 @@ export function DangerZone({
             <input type="checkbox" checked={purge} onChange={(e) => setPurge(e.target.checked)} />
             {guest ? t("controls.purgeGuest") : t("controls.purgeContainer")}
           </label>
-          <label className="flex flex-col gap-1 text-xs text-grid-muted">
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             {t("controls.typeName", { name })}
             <Input dir="ltr" className="max-w-64 font-mono" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
           </label>
           <div>
             <Button
-              variant="destructive"
+              variant="danger"
               disabled={busy || typed !== name}
               onClick={async () => {
                 setBusy(true)
@@ -576,8 +577,8 @@ export function DatabaseCredentials({ path, onSaved }: { path: string; onSaved: 
       <SettingsRow label={t("controls.dbName")} htmlFor="cr-db" hint={t("controls.dbNameHint")}>
         <Input id="cr-db" dir="ltr" autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
       </SettingsRow>
-      <div className="flex justify-end border-b border-line px-6 py-4">
-        <Button type="submit" disabled={busy || !username.trim()}>
+      <div className="flex justify-end border-b border-border px-6 py-4">
+        <Button variant="primary" type="submit" disabled={busy || !username.trim()}>
           {busy ? t("controls.checking") : t("controls.saveCredentials")}
         </Button>
       </div>

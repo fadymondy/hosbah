@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { KeyRoundIcon, PlusIcon, ServerCogIcon } from "lucide-react"
 
@@ -7,22 +8,14 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import type { Server, SSHKey, SSHKeyInstall } from "@/lib/servers"
@@ -68,15 +61,7 @@ export default function SSHKeysPage() {
       {keys === null ? (
         <LoadingRows />
       ) : keys.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <KeyRoundIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("sshKeys.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("sshKeys.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={KeyRoundIcon} title={t("sshKeys.emptyTitle")} description={t("sshKeys.emptyHint")} />
       ) : (
         <TableBand>
           <Table>
@@ -98,10 +83,10 @@ export default function SSHKeysPage() {
                       {k.key_type}
                     </Badge>
                   </TableCell>
-                  <TableCell dir="ltr" className="text-start font-mono text-xs text-grid-muted">
+                  <TableCell dir="ltr" className="text-start font-mono text-xs text-muted-foreground">
                     {k.fingerprint}
                   </TableCell>
-                  <TableCell dir="ltr" className="text-start text-sm text-grid-muted">
+                  <TableCell dir="ltr" className="text-start text-sm text-muted-foreground">
                     {fmt(k.created_at)}
                   </TableCell>
                   <TableCell>
@@ -175,7 +160,7 @@ function AddKey({ onSaved }: { onSaved: () => Promise<void> }) {
         if (!o) setError(null)
       }}
     >
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <PlusIcon />
         {t("sshKeys.add")}
       </DialogTrigger>
@@ -185,7 +170,7 @@ function AddKey({ onSaved }: { onSaved: () => Promise<void> }) {
             <DialogTitle>{t("sshKeys.add")}</DialogTitle>
             <DialogDescription>{t("sshKeys.addHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="gap-4">
+          <div className="flex w-full flex-col gap-4">
             <Field>
               <FieldLabel htmlFor="key-name">{t("sshKeys.name")}</FieldLabel>
               <Input id="key-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
@@ -204,16 +189,16 @@ function AddKey({ onSaved }: { onSaved: () => Promise<void> }) {
                 onChange={(e) => setPublicKey(e.target.value)}
               />
               <FieldDescription>
-                {looksWellFormed ? t("sshKeys.publicKeyHint") : <span className="text-grid-danger">{t("sshKeys.publicKeyFormatWarning")}</span>}
+                {looksWellFormed ? t("sshKeys.publicKeyHint") : <span className="text-nq-danger-text">{t("sshKeys.publicKeyFormatWarning")}</span>}
               </FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !publicKey.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || !publicKey.trim()}>
               {busy ? t("common.working") : t("sshKeys.save")}
             </Button>
           </DialogFooter>
@@ -278,7 +263,7 @@ function Installs({ sshKey, manage }: { sshKey: SSHKey; manage: boolean }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <DialogTrigger render={<Button variant="secondary" size="sm" />}>
         <ServerCogIcon />
         {t("sshKeys.installs")}
       </DialogTrigger>
@@ -291,7 +276,7 @@ function Installs({ sshKey, manage }: { sshKey: SSHKey; manage: boolean }) {
         {servers === null || installs === null ? (
           <LoadingRows rows={2} />
         ) : servers.length === 0 ? (
-          <p className="text-sm text-grid-muted">{t("sshKeys.noServers")}</p>
+          <p className="text-sm text-muted-foreground">{t("sshKeys.noServers")}</p>
         ) : (
           <Table>
             <TableHeader>
@@ -323,11 +308,11 @@ function Installs({ sshKey, manage }: { sshKey: SSHKey; manage: boolean }) {
                       {!install ? (
                         <Badge variant="outline">{t("sshKeys.notInstalled")}</Badge>
                       ) : install.status === "installed" ? (
-                        <Badge variant="outline" className="text-grid-ok">
+                        <Badge variant="outline" className="text-nq-success-text">
                           {t("sshKeys.installed")}
                         </Badge>
                       ) : install.status === "failed" ? (
-                        <Badge variant="outline" className="text-grid-danger" title={install.last_error}>
+                        <Badge variant="outline" className="text-nq-danger-text" title={install.last_error}>
                           {t("sshKeys.failed")}
                         </Badge>
                       ) : (
@@ -337,7 +322,7 @@ function Installs({ sshKey, manage }: { sshKey: SSHKey; manage: boolean }) {
                     <TableCell className="text-end">
                       {manage ? (
                         <Button
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           disabled={busyServer === s.id || !user.trim()}
                           onClick={() => void run(s.id, installed)}
@@ -353,7 +338,7 @@ function Installs({ sshKey, manage }: { sshKey: SSHKey; manage: boolean }) {
           </Table>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
             {t("common.done")}
           </Button>
         </DialogFooter>

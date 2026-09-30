@@ -1,12 +1,13 @@
 "use client"
 
+import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { ServerIcon, SlidersHorizontalIcon, UsersIcon, UsersRoundIcon, WorkflowIcon } from "lucide-react"
 
 import { Facts, ListError, LoadingRows, SectionTitle } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { useAdminResource, type AdminOverview } from "@/lib/admin"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -20,30 +21,30 @@ export default function AdminOverviewPage() {
   const figure = (n: number, note?: string, warn = false) => (
     <span className="flex items-baseline gap-2">
       <span className="font-mono text-xl tabular-nums">{n}</span>
-      {note ? <span className={warn ? "text-xs text-grid-danger" : "text-xs text-grid-muted"}>{note}</span> : null}
+      {note ? <span className={warn ? "text-xs text-nq-danger-text" : "text-xs text-muted-foreground"}>{note}</span> : null}
     </span>
   )
 
   return (
     <PageBody eyebrow={t("nav.platform")} title={t("admin.title")} description={t("admin.overviewHint")} bleed>
       <div className="flex flex-wrap gap-2 px-6 py-6">
-        <Button nativeButton={false} render={<Link href={`${base}/users`} />}>
+        <Button variant="primary" nativeButton={false} render={<Link href={`${base}/users`} />}>
           <UsersIcon />
           {t("admin.nav.users")}
         </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/teams`} />}>
+        <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/teams`} />}>
           <UsersRoundIcon />
           {t("admin.nav.teams")}
         </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/servers`} />}>
+        <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/servers`} />}>
           <ServerIcon />
           {t("admin.nav.servers")}
         </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/operations`} />}>
+        <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/operations`} />}>
           <WorkflowIcon />
           {t("admin.nav.operations")}
         </Button>
-        <Button variant="outline" nativeButton={false} render={<Link href={`${base}/settings`} />}>
+        <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/settings`} />}>
           <SlidersHorizontalIcon />
           {t("admin.nav.settings")}
         </Button>
@@ -55,7 +56,7 @@ export default function AdminOverviewPage() {
         <LoadingRows rows={2} />
       ) : (
         <>
-          <div className="border-t border-line">
+          <div className="border-t border-border">
             <Facts
               items={[
                 [t("admin.nav.users"), figure(o.data.users, t("admin.overview.admins", { count: o.data.platform_admins }))],
@@ -100,7 +101,7 @@ export default function AdminOverviewPage() {
           >
             {t("admin.overview.recentSignups")}
           </SectionTitle>
-          <div className="border-y border-line">
+          <div className="border-y border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -116,7 +117,7 @@ export default function AdminOverviewPage() {
                         {u.email}
                       </Link>
                     </TableCell>
-                    <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                    <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                       {fmt(u.created_at)}
                     </TableCell>
                   </TableRow>

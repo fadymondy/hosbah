@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { AlertTriangleIcon, ArrowLeftIcon, BugIcon, ChevronDownIcon, ChevronUpIcon, WaypointsIcon } from "lucide-react"
 
@@ -7,11 +8,11 @@ import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -109,14 +110,14 @@ export function SiteApm() {
         {settings?.snippet ? (
           <SettingsRow label={t("site.apm.snippet")} hint={manage ? t("site.apm.rotateHint") : undefined}>
             <CopyField value={settings.snippet} block />
-            <p className="flex items-start gap-2 text-xs text-grid-body">
-              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-grid-brand" />
+            <p className="flex items-start gap-2 text-xs text-nq-fg-body">
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-nq-brand" />
               {t("site.apm.once")}
             </p>
-            <p className="text-xs text-grid-muted">{t("site.apm.autoInjectedNote")}</p>
+            <p className="text-xs text-muted-foreground">{t("site.apm.autoInjectedNote")}</p>
             {manage ? (
               <div>
-                <Button variant="outline" disabled={rotateBusy} onClick={rotate}>
+                <Button variant="secondary" disabled={rotateBusy} onClick={rotate}>
                   {rotateBusy ? t("common.working") : t("site.apm.rotate")}
                 </Button>
               </div>
@@ -124,11 +125,11 @@ export function SiteApm() {
           </SettingsRow>
         ) : settings?.has_key ? (
           <SettingsRow label={t("site.apm.snippet")} hint={t("site.apm.snippetHiddenHint")}>
-            <p className="text-sm text-grid-muted">{t("site.apm.snippetHidden")}</p>
-            <p className="text-xs text-grid-muted">{t("site.apm.autoInjectedNote")}</p>
+            <p className="text-sm text-muted-foreground">{t("site.apm.snippetHidden")}</p>
+            <p className="text-xs text-muted-foreground">{t("site.apm.autoInjectedNote")}</p>
             {manage ? (
               <div>
-                <Button variant="outline" disabled={rotateBusy} onClick={rotate}>
+                <Button variant="secondary" disabled={rotateBusy} onClick={rotate}>
                   {rotateBusy ? t("common.working") : t("site.apm.rotate")}
                 </Button>
               </div>
@@ -181,7 +182,7 @@ function ApmEndpoints({ base }: { base: string }) {
         action={
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("site.apm.range")}>
             {WINDOWS.map((w) => (
-              <Button key={w} size="sm" variant={window_ === w ? "default" : "outline"} onClick={() => setWindow(w)}>
+              <Button key={w} size="sm" variant={window_ === w ? "primary" : "secondary"} onClick={() => setWindow(w)}>
                 {t(`site.apm.windows.${w}`)}
               </Button>
             ))}
@@ -194,15 +195,7 @@ function ApmEndpoints({ base }: { base: string }) {
       ) : endpoints === null ? (
         <LoadingRows rows={4} />
       ) : endpoints.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <WaypointsIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.apm.emptyEndpointsTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.apm.emptyEndpointsHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={WaypointsIcon} title={t("site.apm.emptyEndpointsTitle")} description={t("site.apm.emptyEndpointsHint")} />
       ) : (
         <TableBand>
           <Table>
@@ -238,9 +231,9 @@ function ApmEndpoints({ base }: { base: string }) {
                   </TableCell>
                   <TableCell dir="ltr" className="text-end text-xs">
                     <div className="flex items-center justify-end gap-2">
-                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-line" aria-hidden>
+                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
                         <span
-                          className="block h-full rounded-full bg-grid-brand"
+                          className="block h-full rounded-full bg-nq-brand"
                           style={{ width: `${Math.min(100, (e.p95_ms / maxP95) * 100)}%` }}
                         />
                       </span>
@@ -251,7 +244,7 @@ function ApmEndpoints({ base }: { base: string }) {
                     {Math.round(e.p99_ms)} ms
                   </TableCell>
                   <TableCell className="text-end">
-                    {e.errors > 0 ? <Badge variant="destructive">{e.errors}</Badge> : <span className="text-xs text-grid-muted">0</span>}
+                    {e.errors > 0 ? <Badge variant="danger">{e.errors}</Badge> : <span className="text-xs text-muted-foreground">0</span>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -284,12 +277,12 @@ function ApmTraces({ base, method, route, onBack }: { base: string; method: stri
 
   return (
     <div>
-      <div className="border-b border-line px-6 py-3">
+      <div className="border-b border-border px-6 py-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeftIcon className="rtl:rotate-180" />
           {t("site.apm.backToEndpoints")}
         </Button>
-        <p dir="ltr" className="mt-1 font-mono text-xs text-grid-muted">
+        <p dir="ltr" className="mt-1 font-mono text-xs text-muted-foreground">
           {method} {route}
         </p>
       </div>
@@ -297,7 +290,7 @@ function ApmTraces({ base, method, route, onBack }: { base: string; method: stri
       {traces === null ? (
         <LoadingRows rows={4} />
       ) : traces.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("site.apm.noTraces")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("site.apm.noTraces")}</p>
       ) : (
         <TableBand>
           <Table>
@@ -320,12 +313,12 @@ function ApmTraces({ base, method, route, onBack }: { base: string; method: stri
                   </TableCell>
                   <TableCell className="text-end">
                     {tr.error ? (
-                      <Badge variant="destructive">{tr.http_status ?? t("site.apm.error")}</Badge>
+                      <Badge variant="danger">{tr.http_status ?? t("site.apm.error")}</Badge>
                     ) : (
                       <Badge variant="outline">{tr.http_status ?? "—"}</Badge>
                     )}
                   </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs text-grid-muted">
+                  <TableCell dir="ltr" className="text-end text-xs text-muted-foreground">
                     {new Date(tr.start_time).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -358,12 +351,12 @@ function ApmWaterfall({ base, traceID, onBack }: { base: string; traceID: string
 
   return (
     <div>
-      <div className="border-b border-line px-6 py-3">
+      <div className="border-b border-border px-6 py-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeftIcon className="rtl:rotate-180" />
           {t("site.apm.backToTraces")}
         </Button>
-        <p dir="ltr" className="mt-1 font-mono text-xs text-grid-muted">
+        <p dir="ltr" className="mt-1 font-mono text-xs text-muted-foreground">
           {traceID}
         </p>
       </div>
@@ -371,7 +364,7 @@ function ApmWaterfall({ base, traceID, onBack }: { base: string; traceID: string
       {spans === null ? (
         <LoadingRows rows={3} />
       ) : (
-        <div className="space-y-2 border-b border-line px-6 py-4" dir="ltr">
+        <div className="space-y-2 border-b border-border px-6 py-4" dir="ltr">
           {spans.map((s) => {
             const offset = ((new Date(s.start_time).getTime() - min) / totalMs) * 100
             const width = Math.max(1, (s.duration_ms / totalMs) * 100)
@@ -379,16 +372,16 @@ function ApmWaterfall({ base, traceID, onBack }: { base: string; traceID: string
               <div key={s.span_id} className="flex items-center gap-3">
                 <div className="w-48 shrink-0 truncate text-xs">
                   <span className="font-mono">{s.name}</span>
-                  <span className="ms-2 text-grid-muted">{s.kind}</span>
+                  <span className="ms-2 text-muted-foreground">{s.kind}</span>
                 </div>
-                <div className="relative h-4 flex-1 rounded bg-line">
+                <div className="relative h-4 flex-1 rounded bg-border">
                   <div
-                    className={`absolute h-4 rounded ${s.error ? "bg-grid-danger" : "bg-grid-brand"}`}
+                    className={`absolute h-4 rounded ${s.error ? "bg-nq-danger" : "bg-nq-brand"}`}
                     style={{ left: `${offset}%`, width: `${width}%` }}
                     title={`${Math.round(s.duration_ms)} ms`}
                   />
                 </div>
-                <div className="w-16 shrink-0 text-end text-xs text-grid-muted">{Math.round(s.duration_ms)} ms</div>
+                <div className="w-16 shrink-0 text-end text-xs text-muted-foreground">{Math.round(s.duration_ms)} ms</div>
               </div>
             )
           })}
@@ -462,17 +455,9 @@ function ApmErrors({ base }: { base: string }) {
       {issues === null ? (
         <LoadingRows rows={3} />
       ) : issues.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BugIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.apm.emptyErrorsTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.apm.emptyErrorsHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={BugIcon} title={t("site.apm.emptyErrorsTitle")} description={t("site.apm.emptyErrorsHint")} />
       ) : (
-        <div className="divide-y divide-line border-b border-line">
+        <div className="divide-y divide-border border-b border-border">
           {issues.map((issue) => (
             <IssueRow
               key={issue.id}
@@ -492,9 +477,9 @@ function ApmErrors({ base }: { base: string }) {
   )
 }
 
-function issueBadgeVariant(status: string): "destructive" | "secondary" | "outline" {
-  if (status === "open") return "destructive"
-  if (status === "resolved") return "secondary"
+function issueBadgeVariant(status: string): "danger" | "neutral" | "outline" {
+  if (status === "open") return "danger"
+  if (status === "resolved") return "neutral"
   return "outline"
 }
 
@@ -521,9 +506,9 @@ function IssueRow({
     <div className="px-6 py-4">
       <button type="button" className="flex w-full items-start gap-3 text-start" onClick={onToggle}>
         {expanded ? (
-          <ChevronUpIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+          <ChevronUpIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-grid-muted" />
+          <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -533,10 +518,10 @@ function IssueRow({
             </span>
             <Badge variant="outline">{t("site.apm.count", { count: issue.count })}</Badge>
           </div>
-          <p dir="ltr" className="mt-1 truncate text-sm text-grid-muted">
+          <p dir="ltr" className="mt-1 truncate text-sm text-muted-foreground">
             {issue.message}
           </p>
-          <p className="mt-1 text-xs text-grid-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             {t("site.apm.lastSeen")} {new Date(issue.last_seen).toLocaleString()}
           </p>
         </div>
@@ -546,16 +531,16 @@ function IssueRow({
           {stacktrace === undefined ? (
             <LoadingRows rows={1} />
           ) : stacktrace ? (
-            <pre dir="ltr" className="overflow-x-auto rounded border border-line bg-grid-sunken p-3 text-start font-mono text-xs">
+            <pre dir="ltr" className="overflow-x-auto rounded border border-border bg-secondary p-3 text-start font-mono text-xs">
               {stacktrace}
             </pre>
           ) : (
-            <p className="text-xs text-grid-muted">{t("site.apm.noStacktrace")}</p>
+            <p className="text-xs text-muted-foreground">{t("site.apm.noStacktrace")}</p>
           )}
           {manage ? (
             <div className="flex flex-wrap gap-2">
               {ISSUE_STATUSES.filter((s) => s !== issue.status).map((s) => (
-                <Button key={s} size="sm" variant="outline" disabled={busy} onClick={() => onStatus(s)}>
+                <Button key={s} size="sm" variant="secondary" disabled={busy} onClick={() => onStatus(s)}>
                   {t(`site.apm.setStatus.${s}`)}
                 </Button>
               ))}

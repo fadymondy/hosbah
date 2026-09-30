@@ -1,11 +1,13 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { ShieldOffIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
+
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 
@@ -33,7 +35,7 @@ function Forbidden() {
         </EmptyTitle>
         <EmptyDescription>{t("admin.forbidden")}</EmptyDescription>
       </EmptyHeader>
-      <Button nativeButton={false} render={<Link href={`/${locale}`} />}>
+      <Button variant="primary" nativeButton={false} render={<Link href={`/${locale}`} />}>
         {t("common.home")}
       </Button>
     </Empty>

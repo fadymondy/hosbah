@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { MailPlusIcon, PlusIcon } from "lucide-react"
 
@@ -10,21 +11,13 @@ import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { RoleSelect } from "@/components/role-select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
 import { apiFetch, type Invitation, type Role } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -64,15 +57,7 @@ export default function InvitationsPage() {
       {items === null ? (
         <LoadingRows />
       ) : items.length === 0 && !error ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MailPlusIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("invitations.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("invitations.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={MailPlusIcon} title={t("invitations.emptyTitle")} description={t("invitations.emptyHint")} />
       ) : items.length ? (
         <TableBand>
           <Table>
@@ -92,7 +77,7 @@ export default function InvitationsPage() {
                     {inv.email}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{t(`roles.${inv.role}`)}</Badge>
+                    <Badge variant="neutral">{t(`roles.${inv.role}`)}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{t(`invitations.status.${inv.status}`, undefined, inv.status)}</Badge>
@@ -172,7 +157,7 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
         if (!o) reset()
       }}
     >
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <PlusIcon />
         {t("invitations.invite")}
       </DialogTrigger>
@@ -189,7 +174,7 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
             </Alert>
             <CopyField value={acceptUrl} />
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+              <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </div>
         ) : (
@@ -198,7 +183,7 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
               <DialogTitle>{t("invitations.invite")}</DialogTitle>
               <DialogDescription>{t("invitations.inviteHint")}</DialogDescription>
             </DialogHeader>
-            <FieldGroup>
+            <div className="flex w-full flex-col gap-5">
               <FormError message={error} />
               <Field>
                 <FieldLabel htmlFor="invite-email">{t("members.email")}</FieldLabel>
@@ -215,9 +200,9 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
                 <FieldLabel htmlFor="invite-role">{t("members.role")}</FieldLabel>
                 <RoleSelect id="invite-role" value={role} onChange={setRole} className="w-full" />
               </Field>
-            </FieldGroup>
+            </div>
             <DialogFooter>
-              <Button type="submit" disabled={busy || !email.trim()}>
+              <Button variant="primary" type="submit" disabled={busy || !email.trim()}>
                 {busy ? t("common.working") : t("invitations.send")}
               </Button>
             </DialogFooter>

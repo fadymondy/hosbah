@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckCircle2Icon, EyeIcon, LayoutTemplateIcon, PencilIcon, PlusIcon, RocketIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
@@ -10,15 +12,15 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { App, Deployment } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
@@ -111,16 +113,16 @@ export function TeamSiteTemplates() {
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("siteTemplates.search")} shown={shown.length} total={templates.length} />
-            <div className="grid gap-px border-b border-line bg-line sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((tpl) => (
-                <div key={tpl.id} className="flex flex-col gap-3 bg-grid-bg p-4">
+                <div key={tpl.id} className="flex flex-col gap-3 bg-background p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p dir="auto" className="font-medium text-grid-fg">
+                      <p dir="auto" className="font-medium text-foreground">
                         {tpl.name}
                       </p>
                       {tpl.description ? (
-                        <p dir="auto" className="text-xs text-grid-muted">
+                        <p dir="auto" className="text-xs text-muted-foreground">
                           {tpl.description}
                         </p>
                       ) : null}
@@ -128,15 +130,15 @@ export function TeamSiteTemplates() {
                     {tpl.builtin ? <Badge variant="outline">{t("siteTemplates.builtin")}</Badge> : null}
                   </div>
                   <div>
-                    <Badge variant="secondary">{tpl.driver}</Badge>
+                    <Badge variant="neutral">{tpl.driver}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setPreview(tpl)}>
+                    <Button size="sm" variant="secondary" onClick={() => setPreview(tpl)}>
                       <EyeIcon />
                       {t("siteTemplates.preview")}
                     </Button>
                     {manage ? (
-                      <Button size="sm" onClick={() => setCreateFrom(tpl)}>
+                      <Button variant="primary" size="sm" onClick={() => setCreateFrom(tpl)}>
                         <RocketIcon />
                         {t("siteTemplates.createApp")}
                       </Button>
@@ -231,7 +233,7 @@ function TemplateDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={template ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={template ? "secondary" : "primary"} />}>
           {template ? <PencilIcon /> : <PlusIcon />}
           {template ? t("lists.edit") : t("siteTemplates.add")}
         </DialogTrigger>
@@ -242,7 +244,7 @@ function TemplateDialog({
             <DialogTitle>{template ? template.name : t("siteTemplates.add")}</DialogTitle>
             <DialogDescription>{t("siteTemplates.dialogHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="tpl-yaml">{t("siteTemplates.yaml")}</FieldLabel>
               <Textarea
@@ -256,13 +258,13 @@ function TemplateDialog({
               />
               <FieldDescription>{t("siteTemplates.yamlHint")}</FieldDescription>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !source.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !source.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>
@@ -375,15 +377,15 @@ function PreviewDialog({
         ) : rendered ? (
           <div className="flex flex-col gap-3 text-sm">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-              <dt className="text-grid-muted">{t("siteTemplates.driver")}</dt>
+              <dt className="text-muted-foreground">{t("siteTemplates.driver")}</dt>
               <dd dir="ltr">{rendered.driver.label}</dd>
-              <dt className="text-grid-muted">{t("apps.repo")}</dt>
+              <dt className="text-muted-foreground">{t("apps.repo")}</dt>
               <dd dir="ltr" className="truncate">{rendered.repo_url}</dd>
-              <dt className="text-grid-muted">{t("apps.branch")}</dt>
+              <dt className="text-muted-foreground">{t("apps.branch")}</dt>
               <dd dir="ltr">{rendered.branch}</dd>
-              <dt className="text-grid-muted">{t("apps.port")}</dt>
+              <dt className="text-muted-foreground">{t("apps.port")}</dt>
               <dd dir="ltr">{rendered.port}</dd>
-              <dt className="text-grid-muted">{t("apps.healthPath")}</dt>
+              <dt className="text-muted-foreground">{t("apps.healthPath")}</dt>
               <dd dir="ltr">{rendered.health_path}</dd>
             </dl>
             <div>
@@ -395,7 +397,7 @@ function PreviewDialog({
                     {e.secret ? (
                       <Badge variant="outline">{t("siteTemplates.secret")}</Badge>
                     ) : (
-                      <span className="truncate text-grid-muted">{e.value}</span>
+                      <span className="truncate text-muted-foreground">{e.value}</span>
                     )}
                   </li>
                 ))}
@@ -405,7 +407,7 @@ function PreviewDialog({
           </div>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t("common.close")}
           </Button>
         </DialogFooter>
@@ -472,7 +474,7 @@ function CreateFromTemplateDialog({
           </DialogHeader>
           <CopyField value={created.deploy_hook_url} />
           <DialogFooter>
-            <Button render={<a href={`/${locale}/t/${team.slug}/apps/${created.app.id}`} />}>{t("siteTemplates.viewApp")}</Button>
+            <Button variant="primary" render={<a href={`/${locale}/t/${team.slug}/apps/${created.app.id}`} />}>{t("siteTemplates.viewApp")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -487,7 +489,7 @@ function CreateFromTemplateDialog({
             <DialogTitle>{t("siteTemplates.createFromTitle", { name: template.name })}</DialogTitle>
             <DialogDescription>{t("siteTemplates.createFromHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="tplapp-name">{t("apps.name")}</FieldLabel>
               <Input id="tplapp-name" dir="ltr" required maxLength={40} value={name} onChange={(e) => setName(e.target.value)} />
@@ -495,7 +497,7 @@ function CreateFromTemplateDialog({
             <Field>
               <FieldLabel htmlFor="tplapp-server">{t("apps.server")}</FieldLabel>
               {servers.length === 0 ? (
-                <p className="text-sm text-grid-muted">{t("siteTemplates.noServers")}</p>
+                <p className="text-sm text-muted-foreground">{t("siteTemplates.noServers")}</p>
               ) : (
                 <Select value={server} onValueChange={(v) => setServer((v as string) ?? "")}>
                   <SelectTrigger id="tplapp-server">
@@ -520,13 +522,13 @@ function CreateFromTemplateDialog({
               <Checkbox checked={deploy} onCheckedChange={(v) => setDeploy(!!v)} />
               {t("siteTemplates.deployNow")}
             </label>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || servers.length === 0}>
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || servers.length === 0}>
               {busy ? t("common.working") : t("siteTemplates.createApp")}
             </Button>
           </DialogFooter>

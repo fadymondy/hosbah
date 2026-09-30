@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { GlobeIcon, PlusIcon, ServerIcon, ShieldAlertIcon } from "lucide-react"
 
@@ -7,23 +8,15 @@ import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { DNS_ZONE_RECORD_TYPES, type DNSZone, type DNSZoneRecord, type DNSZoneRecordType } from "@/lib/dns-zones"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -75,15 +68,7 @@ export default function DNSZonesPage() {
       {zones === null ? (
         <LoadingRows />
       ) : zones.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GlobeIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("dns.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("dns.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={GlobeIcon} title={t("dns.emptyTitle")} description={t("dns.emptyHint")} />
       ) : (
         <div className="flex flex-col gap-4 p-4">
           <Field className="max-w-sm">
@@ -140,18 +125,14 @@ function ZoneRecords({ zone, manage }: { zone: DNSZone; manage: boolean }) {
   return (
     <>
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-grid-muted">{t("dns.records")}</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{t("dns.records")}</h2>
         {manage ? <RecordDialog recordsPath={recordsPath} onSaved={load} /> : null}
       </div>
       <ErrorBand message={error} />
       {records === null ? (
         <LoadingRows />
       ) : records.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyTitle>{t("dns.noRecords")}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" title={t("dns.noRecords")} />
       ) : (
         <TableBand>
           <Table>
@@ -177,17 +158,17 @@ function ZoneRecords({ zone, manage }: { zone: DNSZone; manage: boolean }) {
                   <TableCell dir="ltr" className="font-mono text-xs">
                     {r.name}
                   </TableCell>
-                  <TableCell dir="ltr" className="max-w-[24ch] truncate font-mono text-xs text-grid-muted" title={r.content}>
+                  <TableCell dir="ltr" className="max-w-[24ch] truncate font-mono text-xs text-muted-foreground" title={r.content}>
                     {r.content}
                     {r.type === "MX" && r.priority ? ` (${r.priority})` : null}
                   </TableCell>
-                  <TableCell dir="ltr" className="text-sm text-grid-muted">
+                  <TableCell dir="ltr" className="text-sm text-muted-foreground">
                     {r.ttl <= 1 ? t("dns.auto") : r.ttl}
                   </TableCell>
                   <TableCell>{r.proxied ? <Badge variant="outline">{t("dns.proxiedOn")}</Badge> : null}</TableCell>
                   <TableCell>
                     {r.managed_kind ? (
-                      <Badge variant="outline" className="gap-1 text-grid-warn">
+                      <Badge variant="outline" className="gap-1 text-nq-warning-text">
                         <ShieldAlertIcon className="size-3" />
                         {t(MANAGED_KIND_LABEL[r.managed_kind] ?? "dns.managedKind.other")}
                       </Badge>
@@ -318,7 +299,7 @@ function RecordDialog({
         if (o) reset()
       }}
     >
-      <DialogTrigger render={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"} />}>
+      <DialogTrigger render={<Button variant={isEdit ? "secondary" : "primary"} size={isEdit ? "sm" : "md"} />}>
         {isEdit ? t("dns.edit") : (
           <>
             <PlusIcon />
@@ -333,12 +314,12 @@ function RecordDialog({
             <DialogDescription>{isEdit ? t("dns.editRecordHint") : t("dns.addRecordHint")}</DialogDescription>
           </DialogHeader>
           {record?.managed_kind ? (
-            <p className="flex items-center gap-2 rounded-md border border-grid-warn/40 bg-grid-warn/10 p-2 text-sm text-grid-warn" dir="auto">
+            <p className="flex items-center gap-2 rounded-md border border-nq-warning/40 bg-nq-warning/10 p-2 text-sm text-nq-warning-text" dir="auto">
               <ShieldAlertIcon className="size-4 shrink-0" />
               {t("dns.editManagedWarning", { kind: t(MANAGED_KIND_LABEL[record.managed_kind] ?? "dns.managedKind.other") })}
             </p>
           ) : null}
-          <FieldGroup className="gap-4">
+          <div className="flex w-full flex-col gap-4">
             {!isEdit ? (
               <>
                 <Field>
@@ -368,7 +349,7 @@ function RecordDialog({
                 <FieldLabel htmlFor="dns-content">{t("dns.content")}</FieldLabel>
                 {canPointToServer && servers?.length ? (
                   <Select onValueChange={(v) => v && setContent(String(v))}>
-                    <SelectTrigger size="sm" className="h-7 w-auto gap-1 text-xs">
+                    <SelectTrigger className="h-7 w-auto gap-1 text-xs">
                       <ServerIcon className="size-3" />
                       <SelectValue>{() => t("dns.pointToServer")}</SelectValue>
                     </SelectTrigger>
@@ -416,19 +397,19 @@ function RecordDialog({
                 </Field>
               ) : null}
             </div>
-            <Field orientation="horizontal">
+            <Field className="flex-row items-center">
               <Checkbox id="dns-proxied" checked={proxied} onCheckedChange={(v) => setProxied(v === true)} />
               <FieldLabel htmlFor="dns-proxied" className="font-normal">
                 {t("dns.proxied")}
               </FieldLabel>
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !valid}>
+            <Button variant="primary" type="submit" disabled={busy || !valid}>
               {busy ? t("common.working") : isEdit ? t("dns.save") : t("dns.addRecord")}
             </Button>
           </DialogFooter>

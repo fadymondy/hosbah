@@ -1,12 +1,13 @@
 "use client"
 
+import { Button, Input } from "@fadymondy/nasaq/web"
 import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
+
 import { ApiError } from "@/lib/api"
 import { auth, MIN_PASSWORD } from "@/lib/auth"
 import { useI18n } from "@/lib/i18n"
@@ -77,8 +78,8 @@ export function ChangePassword() {
             onChange={(e) => setConfirm(e.target.value)}
           />
         </SettingsRow>
-        <div className="flex justify-end border-b border-line px-6 py-4">
-          <Button type="submit" disabled={busy || !current || !next}>
+        <div className="flex justify-end border-b border-border px-6 py-4">
+          <Button variant="primary" type="submit" disabled={busy || !current || !next}>
             {busy ? t("common.working") : t("account.changePassword")}
           </Button>
         </div>

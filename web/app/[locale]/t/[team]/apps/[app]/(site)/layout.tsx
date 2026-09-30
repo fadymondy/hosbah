@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -13,8 +14,8 @@ import { ServerMark } from "@/components/server-mark"
 import { useProvideSiteScope } from "@/components/shell/scope"
 import { SiteProvider, useSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, Notice } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported, type Deployment } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
@@ -96,18 +97,18 @@ function Frame({ children }: { children: ReactNode }) {
       description={app.description || (imported ? originSummary(app, t) : <span dir="ltr" className="font-mono text-xs">{app.repo_url} · {app.branch}</span>)}
       actions={
         <>
-          <span className="text-xs text-grid-muted" aria-live="polite">
+          <span className="text-xs text-muted-foreground" aria-live="polite">
             {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
           </span>
           {imported ? <ImportedBadge item={app} /> : <AppStatusBadge status={app.status} />}
           {host ? (
-            <Button variant="outline" nativeButton={false} render={<a href={`${host.tls === "off" ? "http" : "https"}://${host.hostname}`} target="_blank" rel="noreferrer" />}>
+            <Button variant="secondary" nativeButton={false} render={<a href={`${host.tls === "off" ? "http" : "https"}://${host.hostname}`} target="_blank" rel="noreferrer" />}>
               <ExternalLinkIcon />
               {t("site.visit")}
             </Button>
           ) : null}
           {operate && !imported ? (
-            <Button disabled={busy} onClick={() => void deploy()}>
+            <Button variant="primary" disabled={busy} onClick={() => void deploy()}>
               <RocketIcon />
               {t("apps.actions.deploy")}
             </Button>

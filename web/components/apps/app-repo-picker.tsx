@@ -1,13 +1,14 @@
 "use client"
 
+import { Field, FieldDescription, FieldLabel, Input, Skeleton } from "@fadymondy/nasaq/web"
 import { useEffect, useMemo, useState } from "react"
 import { LockIcon, SearchIcon } from "lucide-react"
 
 import { ProviderMark } from "@/components/auth/oauth"
 import { useErrorText } from "@/components/form-error"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -76,7 +77,7 @@ export function AppRepoPicker({ team, value, onPick }: { team: string; value: st
     <Field data-testid="app-repo-picker">
       <FieldLabel>{t("github.app.fromApp")}</FieldLabel>
       <div className="relative">
-        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
+        <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
           value={q}
@@ -86,16 +87,16 @@ export function AppRepoPicker({ team, value, onPick }: { team: string; value: st
           className="ps-8"
         />
       </div>
-      {error ? <p className="text-xs text-grid-danger">{error}</p> : null}
-      <div className="max-h-64 overflow-y-auto border border-line" role="listbox" aria-label={t("github.app.fromApp")}>
+      {error ? <p className="text-xs text-nq-danger-text">{error}</p> : null}
+      <div className="max-h-64 overflow-y-auto border border-border" role="listbox" aria-label={t("github.app.fromApp")}>
         {repos === null ? (
           <div className="flex flex-col gap-2 p-3">
-            <span className="text-xs text-grid-muted">{t("github.app.loading")}</span>
+            <span className="text-xs text-muted-foreground">{t("github.app.loading")}</span>
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-5 w-1/2" />
           </div>
         ) : list.length === 0 ? (
-          <p className="p-3 text-sm text-grid-muted">{t("github.app.noRepos")}</p>
+          <p className="p-3 text-sm text-muted-foreground">{t("github.app.noRepos")}</p>
         ) : (
           list.map((r) => {
             const on = picked === r.name_with_owner
@@ -108,16 +109,16 @@ export function AppRepoPicker({ team, value, onPick }: { team: string; value: st
                 onClick={() => onPick(r.url, r.default_branch || null)}
                 className={
                   on
-                    ? "flex w-full items-center gap-2 border-b border-line bg-grid-soft px-3 py-2 text-start text-sm last:border-b-0"
-                    : "flex w-full items-center gap-2 border-b border-line px-3 py-2 text-start text-sm last:border-b-0 hover:bg-grid-soft"
+                    ? "flex w-full items-center gap-2 border-b border-border bg-secondary px-3 py-2 text-start text-sm last:border-b-0"
+                    : "flex w-full items-center gap-2 border-b border-border px-3 py-2 text-start text-sm last:border-b-0 hover:bg-secondary"
                 }
               >
-                <ProviderMark id="github" className="size-3.5 shrink-0 text-grid-muted" />
-                <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-grid-fg">
+                <ProviderMark id="github" className="size-3.5 shrink-0 text-muted-foreground" />
+                <span dir="ltr" className="min-w-0 flex-1 truncate font-medium text-foreground">
                   {r.name_with_owner}
                 </span>
                 {r.is_private ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-grid-muted">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                     <LockIcon className="size-3" />
                     {t("github.private")}
                   </span>

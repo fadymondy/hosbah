@@ -1,10 +1,7 @@
 "use client"
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@fadymondy/nasaq/web"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -49,7 +46,7 @@ export function NavMain({
               <span>{item.title}</span>
               <ChevronRightIcon className="ms-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
             </CollapsibleTrigger>
-            <CollapsibleContent>
+            <CollapsiblePanel>
               <SidebarMenuSub>
                 {item.items?.map((subItem) => (
                   <SidebarMenuSubItem key={subItem.title}>
@@ -59,7 +56,7 @@ export function NavMain({
                   </SidebarMenuSubItem>
                 ))}
               </SidebarMenuSub>
-            </CollapsibleContent>
+            </CollapsiblePanel>
           </Collapsible>
         ))}
       </SidebarMenu>

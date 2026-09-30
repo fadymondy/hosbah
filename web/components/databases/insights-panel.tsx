@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { InfoIcon, RefreshCwIcon, XIcon } from "lucide-react"
 
@@ -7,9 +8,9 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { DbMetricsHistory } from "@/components/databases/metrics-history"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { apiFetch } from "@/lib/api"
 import { humanBytes } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
@@ -129,8 +130,8 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line px-6 py-3">
-        <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border px-6 py-3">
+        <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
           <RefreshCwIcon className={loading ? "animate-spin" : undefined} />
           {t("databases.insights.refresh")}
         </Button>
@@ -141,7 +142,7 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
       <DbMetricsHistory teamSlug={teamSlug} serviceRef={serviceRef} kind={data.kind} />
 
       {/* KPI tiles */}
-      <div className="grid grid-cols-2 gap-px border-b border-line bg-line sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-3 lg:grid-cols-4">
         <Tile
           label={t("databases.insights.connections")}
           value={t("databases.insights.connectionsOf", { used: data.connections, max: data.max_connections })}
@@ -174,11 +175,11 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
       </div>
 
       {/* Long-running queries */}
-      <div className="border-b border-line px-6 py-3">
-        <h3 className="text-sm font-medium text-grid-fg">{t("databases.insights.longRunningTitle")}</h3>
+      <div className="border-b border-border px-6 py-3">
+        <h3 className="text-sm font-medium text-foreground">{t("databases.insights.longRunningTitle")}</h3>
       </div>
       {longRunning.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.insights.noLongRunning")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.insights.noLongRunning")}</p>
       ) : (
         <TableBand>
           <Table>
@@ -225,9 +226,9 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
       )}
 
       {/* Top statements */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-6 py-3">
-        <h3 className="text-sm font-medium text-grid-fg">{t("databases.insights.topStatementsTitle")}</h3>
-        <span className="text-xs text-grid-muted">{t("databases.insights.topStatementsHint")}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-6 py-3">
+        <h3 className="text-sm font-medium text-foreground">{t("databases.insights.topStatementsTitle")}</h3>
+        <span className="text-xs text-muted-foreground">{t("databases.insights.topStatementsHint")}</span>
       </div>
       {!data.stat_statements_available ? (
         <Alert className="mx-6 my-4">
@@ -236,7 +237,7 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
           <AlertDescription dir="ltr">{data.stat_statements_hint}</AlertDescription>
         </Alert>
       ) : topStatements.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.insights.noLongRunning")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.insights.noLongRunning")}</p>
       ) : (
         <TableBand>
           <Table>
@@ -271,13 +272,13 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 bg-grid-bg px-6 py-4">
-      <span className="text-xs text-grid-muted">{label}</span>
-      <span dir="ltr" className="text-lg font-semibold tabular-nums text-grid-fg">
+    <div className="flex min-w-0 flex-col gap-1 bg-background px-6 py-4">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span dir="ltr" className="text-lg font-semibold tabular-nums text-foreground">
         {value}
       </span>
       {hint ? (
-        <span dir="ltr" className="truncate text-[11px] text-grid-muted" title={hint}>
+        <span dir="ltr" className="truncate text-[11px] text-muted-foreground" title={hint}>
           {hint}
         </span>
       ) : null}
@@ -288,9 +289,9 @@ function Tile({ label, value, hint }: { label: string; value: string; hint?: str
 function SortableHead({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <TableHead>
-      <button type="button" onClick={onClick} className="flex items-center gap-1 hover:text-grid-fg">
+      <button type="button" onClick={onClick} className="flex items-center gap-1 hover:text-foreground">
         {label}
-        {active ? <Badge variant="secondary" className="px-1 py-0 text-[9px]">▼</Badge> : null}
+        {active ? <Badge variant="neutral" className="px-1 py-0 text-[9px]">▼</Badge> : null}
       </button>
     </TableHead>
   )

@@ -1,8 +1,9 @@
 "use client"
 
+import { buttonVariants } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 
-import { buttonVariants } from "@/components/ui/button"
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -87,7 +88,7 @@ export function OAuthButtons({ next, invitation }: { next?: string | null; invit
         <a
           key={p.id}
           href={oauthHref(p.id, { locale, next, invitation })}
-          className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full gap-2")}
+          className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full gap-2")}
         >
           <ProviderMark id={p.id} />
           <span>{t("auth.oauth.continueWith", { provider: p.name })}</span>

@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
@@ -10,9 +11,9 @@ import { Facts, ListEmpty, ListError, LoadingRows, SectionTitle, ServerStatus } 
 import { QuotaEditor } from "@/components/admin/quota-editor"
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
 import { useAdminResource, type AdminTeamDetail } from "@/lib/admin"
 import { apiFetch, ApiError } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
@@ -69,18 +70,18 @@ export default function AdminTeamPage() {
           /{team.slug}
         </span>
       }
-      actions={team.suspended ? <Badge variant="destructive">{t("admin.teams.suspended")}</Badge> : null}
+      actions={team.suspended ? <Badge variant="danger">{t("admin.teams.suspended")}</Badge> : null}
       bleed
     >
       <div className="flex flex-wrap gap-2 px-6 py-6">
         {team.suspended ? (
-          <Button variant="outline" disabled={busy} onClick={() => setSuspended(false).catch(() => {})}>
+          <Button variant="secondary" disabled={busy} onClick={() => setSuspended(false).catch(() => {})}>
             <PlayCircleIcon />
             {t("admin.teams.reinstate")}
           </Button>
         ) : (
           <ConfirmButton
-            size="default"
+            size="md"
             icon={<PauseCircleIcon />}
             label={t("admin.teams.suspend")}
             title={t("admin.teams.suspendTitle")}
@@ -91,12 +92,12 @@ export default function AdminTeamPage() {
         )}
       </div>
       {team.suspended && team.suspended_at ? (
-        <p className="border-t border-line px-6 py-3 text-sm text-grid-muted">
+        <p className="border-t border-border px-6 py-3 text-sm text-muted-foreground">
           {t("admin.teams.suspendedSince")} <span dir="ltr">{fmt(team.suspended_at)}</span>
         </p>
       ) : null}
 
-      <div className="border-t border-line">
+      <div className="border-t border-border">
         <Facts
           items={[
             [t("admin.teams.members"), <span key="m" className="font-mono">{counts.members}</span>],
@@ -113,7 +114,7 @@ export default function AdminTeamPage() {
       {members.length === 0 ? (
         <ListEmpty title={t("admin.teams.noMembers")} />
       ) : (
-        <div className="border-y border-line">
+        <div className="border-y border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -141,7 +142,7 @@ export default function AdminTeamPage() {
       {servers.length === 0 ? (
         <ListEmpty title={t("admin.servers.empty")} />
       ) : (
-        <div className="border-y border-line">
+        <div className="border-y border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -155,13 +156,13 @@ export default function AdminTeamPage() {
               {servers.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell className="ps-6 font-medium">{s.name}</TableCell>
-                  <TableCell className="text-grid-muted">
+                  <TableCell className="text-muted-foreground">
                     {s.provider} · {s.kind}
                   </TableCell>
                   <TableCell>
                     <ServerStatus online={s.online} status={s.status} />
                   </TableCell>
-                  <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                  <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                     {fmt(s.last_seen_at)}
                   </TableCell>
                 </TableRow>
@@ -175,7 +176,7 @@ export default function AdminTeamPage() {
       {apps.length === 0 ? (
         <ListEmpty title={t("admin.teams.noApps")} />
       ) : (
-        <div className="border-y border-line">
+        <div className="border-y border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -187,7 +188,7 @@ export default function AdminTeamPage() {
               {apps.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="ps-6 font-medium">{a.name}</TableCell>
-                  <TableCell className="pe-6 text-end text-grid-muted">{a.server_name}</TableCell>
+                  <TableCell className="pe-6 text-end text-muted-foreground">{a.server_name}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

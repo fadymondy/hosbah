@@ -1,5 +1,6 @@
 "use client"
 
+import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ScrollTextIcon } from "lucide-react"
 
@@ -7,8 +8,8 @@ import { ListToolbar, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { apiFetch, type AuditEntry } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -91,7 +92,7 @@ export default function AuditPage() {
           placeholder={t("audit.filters.actor")}
           aria-label={t("audit.filters.actor")}
           dir="ltr"
-          className="h-8 w-36 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+          className="h-8 w-36 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
         />
         <input
           value={action}
@@ -99,7 +100,7 @@ export default function AuditPage() {
           placeholder={t("audit.filters.action")}
           aria-label={t("audit.filters.action")}
           dir="ltr"
-          className="h-8 w-32 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+          className="h-8 w-32 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
         />
         <input
           value={subjectType}
@@ -107,7 +108,7 @@ export default function AuditPage() {
           placeholder={t("audit.filters.subjectType")}
           aria-label={t("audit.filters.subjectType")}
           dir="ltr"
-          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+          className="h-8 w-28 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
         />
         <input
           value={subjectId}
@@ -115,7 +116,7 @@ export default function AuditPage() {
           placeholder={t("audit.filters.subjectId")}
           aria-label={t("audit.filters.subjectId")}
           dir="ltr"
-          className="h-8 w-28 border border-line bg-background px-2 font-mono text-sm text-grid-fg placeholder:font-sans placeholder:text-grid-muted"
+          className="h-8 w-28 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
         />
         <input
           type="date"
@@ -123,7 +124,7 @@ export default function AuditPage() {
           onChange={(e) => setSince(e.target.value)}
           aria-label={t("audit.filters.since")}
           dir="ltr"
-          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+          className="h-8 border border-border bg-background px-2 text-sm text-foreground"
         />
         <input
           type="date"
@@ -131,22 +132,14 @@ export default function AuditPage() {
           onChange={(e) => setUntil(e.target.value)}
           aria-label={t("audit.filters.until")}
           dir="ltr"
-          className="h-8 border border-line bg-background px-2 text-sm text-grid-fg"
+          className="h-8 border border-border bg-background px-2 text-sm text-foreground"
         />
       </ListToolbar>
       <ErrorBand message={error} />
       {entries === null ? (
         <LoadingRows />
       ) : entries.length === 0 && !error ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ScrollTextIcon />
-            </EmptyMedia>
-            <EmptyTitle>{filtered ? t("audit.noMatch") : t("audit.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("audit.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ScrollTextIcon} title={filtered ? t("audit.noMatch") : t("audit.emptyTitle")} description={t("audit.emptyHint")} />
       ) : entries.length ? (
         <TableBand>
           <Table>

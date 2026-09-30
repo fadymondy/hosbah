@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input, Textarea } from "@fadymondy/nasaq/web"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, type FormEvent } from "react"
 import { AlertTriangleIcon, InfoIcon } from "lucide-react"
@@ -7,11 +8,7 @@ import { AlertTriangleIcon, InfoIcon } from "lucide-react"
 import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, Notice, SectionTitle, SettingsRow } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+
 import { apiFetch } from "@/lib/api"
 import type { App, AppDetail, Integrations } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -132,13 +129,13 @@ export function SettingsPanel({
         </SettingsRow>
         <ErrorBand message={error} />
         {manage ? (
-          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-line px-6 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-border px-6 py-4">
             {saved ? (
-              <p role="status" className="text-sm text-grid-muted">
+              <p role="status" className="text-sm text-muted-foreground">
                 {t("apps.settings.saved")}
               </p>
             ) : null}
-            <Button type="submit" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>
@@ -151,8 +148,8 @@ export function SettingsPanel({
           {hook ? (
             <>
               <CopyField value={hook} />
-              <p className="flex items-start gap-2 text-xs text-grid-body">
-                <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-grid-brand" />
+              <p className="flex items-start gap-2 text-xs text-nq-fg-body">
+                <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-nq-brand" />
                 {t("apps.hook.once")}
               </p>
             </>
@@ -161,7 +158,7 @@ export function SettingsPanel({
           )}
           {manage ? (
             <div>
-              <Button variant="outline" onClick={rotate}>
+              <Button variant="secondary" onClick={rotate}>
                 {t("apps.hook.rotate")}
               </Button>
             </div>
@@ -173,7 +170,7 @@ export function SettingsPanel({
       <section data-testid="integrations">
         <SectionTitle title={t("apps.settings.github")} />
         {integrations === null ? null : integrations.github_app.configured ? (
-          <p className="border-b border-line px-6 py-4 text-sm">
+          <p className="border-b border-border px-6 py-4 text-sm">
             {t("apps.settings.githubConfigured")}{" "}
             {integrations.github_app.install_url ? (
               <a href={integrations.github_app.install_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
@@ -187,7 +184,7 @@ export function SettingsPanel({
           </Notice>
         )}
         {integrations ? (
-          <p dir="ltr" className="border-b border-line px-6 py-3 text-start font-mono text-xs text-grid-muted">
+          <p dir="ltr" className="border-b border-border px-6 py-3 text-start font-mono text-xs text-muted-foreground">
             railpack {integrations.railpack_version} · caddy {integrations.caddy_version}
           </p>
         ) : null}
@@ -231,7 +228,7 @@ function ExportTemplate({ path }: { path: string }) {
       <SectionTitle title={t("apps.settings.exportTemplate")} hint={t("apps.settings.exportTemplateHint")} />
       <SettingsRow label={t("apps.settings.exportTemplate")}>
         <div>
-          <Button type="button" variant="outline" onClick={run}>
+          <Button type="button" variant="secondary" onClick={run}>
             {t("apps.settings.exportTemplateAction")}
           </Button>
         </div>
@@ -243,7 +240,7 @@ function ExportTemplate({ path }: { path: string }) {
             <DialogDescription>{t("apps.settings.exportTemplateHint")}</DialogDescription>
           </DialogHeader>
           {busy ? (
-            <p className="text-sm text-grid-muted">{t("common.working")}</p>
+            <p className="text-sm text-muted-foreground">{t("common.working")}</p>
           ) : yaml ? (
             <>
               <Textarea dir="ltr" readOnly rows={18} value={yaml} className="min-h-80 font-mono text-xs" />
@@ -252,7 +249,7 @@ function ExportTemplate({ path }: { path: string }) {
           ) : null}
           <ErrorBand message={error} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
               {t("common.close")}
             </Button>
           </DialogFooter>
@@ -286,7 +283,7 @@ function DeleteApp({ path, name, team }: { path: string; name: string; team: str
   }
 
   return (
-    <section className="border-s-2 border-s-grid-danger">
+    <section className="border-s-2 border-s-nq-danger">
       <SettingsRow label={t("apps.settings.deleteTitle")} hint={t("apps.settings.deleteHint")}>
         <Dialog
           open={open}
@@ -296,7 +293,7 @@ function DeleteApp({ path, name, team }: { path: string; name: string; team: str
             setError(null)
           }}
         >
-          <DialogTrigger render={<Button variant="destructive" className="w-fit" />}>{t("apps.settings.delete")}</DialogTrigger>
+          <DialogTrigger render={<Button variant="danger" className="w-fit" />}>{t("apps.settings.delete")}</DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t("apps.settings.deleteTitle")}</DialogTitle>
@@ -309,10 +306,10 @@ function DeleteApp({ path, name, team }: { path: string; name: string; team: str
               </p>
             ) : null}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button variant="destructive" disabled={busy || typed !== name} onClick={run}>
+              <Button variant="danger" disabled={busy || typed !== name} onClick={run}>
                 {busy ? t("common.working") : t("apps.settings.delete")}
               </Button>
             </DialogFooter>

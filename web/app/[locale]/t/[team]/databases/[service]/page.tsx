@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { DatabaseIcon, DownloadIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
@@ -11,22 +12,14 @@ import { FormError, useErrorText } from "@/components/form-error"
 import { ResourcesCard } from "@/components/resources-panel"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import type { App } from "@/lib/apps"
 import { humanBytes, type DataService, type DataServiceDetail, type DatabaseUser } from "@/lib/databases"
@@ -100,7 +93,7 @@ export default function DataServicePage() {
 
   const actions = manage ? (
     <ConfirmButton
-      size="default"
+      size="md"
       label={t("common.delete")}
       title={t("databases.deleteTitle", { name: s.name })}
       description={t("databases.deleteHint")}
@@ -123,7 +116,7 @@ export default function DataServicePage() {
     >
       {imported ? <ImportedDatabaseControls service={s} onChanged={() => void load()} /> : null}
       <div className="flex flex-col">
-        <div className="flex flex-wrap items-center gap-3 border-b border-line px-6 py-3">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3">
           <Badge variant={statusVariant(s.status)}>{t(`databases.statuses.${s.status}`)}</Badge>
           {s.host && s.port ? (
             <span className="text-sm text-muted-foreground" dir="ltr">
@@ -140,7 +133,7 @@ export default function DataServicePage() {
         {!isRedis ? (
           <Section title={t("databases.databasesTitle")} action={manage ? <CreateDbDialog teamSlug={team.slug} serviceRef={s.id} onDone={load} /> : null}>
             {detail.databases.length === 0 ? (
-              <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noDatabases")}</p>
+              <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.noDatabases")}</p>
             ) : (
               <TableBand>
                 <Table>
@@ -197,7 +190,7 @@ export default function DataServicePage() {
 
         {manage ? (
           <Section title={t("databases.connectionTitle")}>
-            <div className="border-b border-line px-6 py-5">
+            <div className="border-b border-border px-6 py-5">
               <div className="max-w-2xl">
                 <ConnectionPanel teamSlug={team.slug} serviceRef={s.id} canAttach={isRedis || detail.users.length > 0} />
               </div>
@@ -215,7 +208,7 @@ export default function DataServicePage() {
           title={t("databases.backupsTitle")}
           action={
             manage && s.status === "running" && !isGuest ? (
-              <Button
+              <Button variant="primary"
                 size="sm"
                 onClick={async () => {
                   await apiFetch(`/api/teams/${team.slug}/data-services/${s.id}/backups`, { method: "POST" })
@@ -229,9 +222,9 @@ export default function DataServicePage() {
           }
         >
           {isGuest ? (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.guestBackupsUnsupported")}</p>
+            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.guestBackupsUnsupported")}</p>
           ) : detail.backups.length === 0 ? (
-            <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noBackups")}</p>
+            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.noBackups")}</p>
           ) : (
             <TableBand>
               <Table>
@@ -250,12 +243,12 @@ export default function DataServicePage() {
                     <TableRow key={b.id}>
                       <TableCell>{t(`databases.backupKinds.${b.kind}`)}</TableCell>
                       <TableCell>
-                        <Badge variant={b.status === "succeeded" ? "default" : b.status === "failed" ? "destructive" : "secondary"}>{b.status}</Badge>
+                        <Badge variant={b.status === "succeeded" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{b.status}</Badge>
                       </TableCell>
                       <TableCell dir="ltr">{humanBytes(b.size_bytes)}</TableCell>
                       <TableCell>
                         {b.restore_status && b.restore_status !== "untested" ? (
-                          <Badge variant={b.restore_status === "pass" ? "default" : b.restore_status === "fail" ? "destructive" : "secondary"}>
+                          <Badge variant={b.restore_status === "pass" ? "brand" : b.restore_status === "fail" ? "danger" : "neutral"}>
                             {t(`databases.restoreStatuses.${b.restore_status}`)}
                           </Badge>
                         ) : (
@@ -267,7 +260,7 @@ export default function DataServicePage() {
                         {manage && b.status === "succeeded" ? (
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             disabled={b.restore_status === "testing"}
                             onClick={async () => {
                               await apiFetch(`/api/teams/${team.slug}/data-services/${s.id}/backups/${b.id}/restore-test`, { method: "POST" })
@@ -288,7 +281,7 @@ export default function DataServicePage() {
 
         {manage && !isGuest ? (
           <Section title={t("databases.scheduleTitle")}>
-            <div className="border-b border-line px-6 py-5">
+            <div className="border-b border-border px-6 py-5">
               <div className="max-w-2xl">
                 <ScheduleForm teamSlug={team.slug} serviceRef={s.id} schedule={detail.schedule} remoteAvailable={detail.remote_available} onDone={load} />
               </div>
@@ -306,7 +299,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
       <SectionTitle
         title={
           <span className="flex items-center gap-2">
-            <DatabaseIcon className="size-4 text-grid-muted" aria-hidden />
+            <DatabaseIcon className="size-4 text-muted-foreground" aria-hidden />
             {title}
           </span>
         }
@@ -350,7 +343,7 @@ function CreateDbDialog({ teamSlug, serviceRef, onDone }: { teamSlug: string; se
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>
         <PlusIcon />
         {t("databases.addDatabase")}
       </DialogTrigger>
@@ -360,7 +353,7 @@ function CreateDbDialog({ teamSlug, serviceRef, onDone }: { teamSlug: string; se
             <DialogTitle>{t("databases.addDatabase")}</DialogTitle>
             <DialogDescription>{t("databases.addDatabaseHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="py-4">
+          <div className="flex w-full flex-col gap-5 py-4">
             <Field>
               <FieldLabel htmlFor="new-db">{t("databases.dbName")}</FieldLabel>
               <Input id="new-db" value={name} onChange={(e) => setName(e.target.value)} placeholder="app" dir="ltr" autoFocus />
@@ -385,9 +378,9 @@ function CreateDbDialog({ teamSlug, serviceRef, onDone }: { teamSlug: string; se
               </Select>
             </Field>
             <FormError message={error} />
-          </FieldGroup>
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={busy || !name}>
+            <Button variant="primary" type="submit" disabled={busy || !name}>
               {busy ? t("common.working") : t("databases.createDb")}
             </Button>
           </DialogFooter>
@@ -456,7 +449,7 @@ function ImportDatabaseDialog({
         }
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>
         <DownloadIcon />
         {t("databases.importTitle")}
       </DialogTrigger>
@@ -466,7 +459,7 @@ function ImportDatabaseDialog({
             <DialogTitle>{t("databases.importTitle")}</DialogTitle>
             <DialogDescription>{t("databases.importHint", { name: database.name })}</DialogDescription>
           </DialogHeader>
-          <FieldGroup className="py-4">
+          <div className="flex w-full flex-col gap-5 py-4">
             {done ? (
               <Alert>
                 <AlertDescription>{t("databases.importStarted")}</AlertDescription>
@@ -485,7 +478,7 @@ function ImportDatabaseDialog({
                     autoFocus
                   />
                 </Field>
-                <Field orientation="horizontal">
+                <Field className="flex-row items-center">
                   <Checkbox id="import-replace" checked={replace} onCheckedChange={(v) => setReplace(Boolean(v))} />
                   <FieldLabel htmlFor="import-replace" className="font-normal">
                     {t("databases.importReplace")}
@@ -499,14 +492,14 @@ function ImportDatabaseDialog({
                 <FormError message={error} />
               </>
             )}
-          </FieldGroup>
+          </div>
           <DialogFooter>
             {done ? (
-              <Button type="button" onClick={() => setOpen(false)}>
+              <Button variant="primary" type="button" onClick={() => setOpen(false)}>
                 {t("common.close")}
               </Button>
             ) : (
-              <Button type="submit" disabled={busy || !sourceUrl}>
+              <Button variant="primary" type="submit" disabled={busy || !sourceUrl}>
                 {busy ? t("common.working") : t("databases.importButton")}
               </Button>
             )}
@@ -530,10 +523,10 @@ function connectionStringFor(service: DataService, databaseName: string, user: s
 
 const GRANT_PRESETS = ["all", "readwrite", "readonly"] as const
 
-function grantVariant(grants: string): "default" | "secondary" | "outline" {
+function grantVariant(grants: string): "success" | "neutral" | "outline" {
   if (grants === "none") return "outline"
-  if (grants === "readonly") return "secondary"
-  return "default"
+  if (grants === "readonly") return "neutral"
+  return "success"
 }
 
 function UsersTable({
@@ -557,13 +550,13 @@ function UsersTable({
   const dbName = (u: DatabaseUser) => detail.databases.find((d) => d.id === u.database_id)?.name ?? "—"
 
   if (detail.users.length === 0) {
-    return <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("databases.noUsers")}</p>
+    return <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.noUsers")}</p>
   }
 
   return (
     <>
       {rowError ? (
-        <div className="border-b border-line px-6 py-2">
+        <div className="border-b border-border px-6 py-2">
           <FormError message={rowError} />
         </div>
       ) : null}
@@ -601,7 +594,7 @@ function UsersTable({
                         }
                       }}
                     >
-                      <SelectTrigger size="sm" className="w-36">
+                      <SelectTrigger className="w-36">
                         <SelectValue placeholder={t("databases.grantLabels.none")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -744,7 +737,7 @@ function AddUserDialog({
         if (!v) reset()
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>
         <PlusIcon />
         {t("databases.addUser")}
       </DialogTrigger>
@@ -759,7 +752,7 @@ function AddUserDialog({
               <PasswordResult service={service} databaseName={result.database} user={result.user} password={result.password} />
             </div>
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+              <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </>
         ) : (
@@ -768,7 +761,7 @@ function AddUserDialog({
               <DialogTitle>{t("databases.addUser")}</DialogTitle>
               <DialogDescription>{t("databases.addUserHint")}</DialogDescription>
             </DialogHeader>
-            <FieldGroup className="py-4">
+            <div className="flex w-full flex-col gap-5 py-4">
               <Field>
                 <FieldLabel>{t("databases.targetDatabase")}</FieldLabel>
                 <Select value={targetDatabase} onValueChange={(v) => v && setTargetDatabase(v)}>
@@ -804,9 +797,9 @@ function AddUserDialog({
                 </Select>
               </Field>
               <FormError message={error} />
-            </FieldGroup>
+            </div>
             <DialogFooter>
-              <Button type="submit" disabled={busy || !targetDatabase || !user}>
+              <Button variant="primary" type="submit" disabled={busy || !targetDatabase || !user}>
                 {busy ? t("common.working") : t("databases.createUser")}
               </Button>
             </DialogFooter>
@@ -864,7 +857,7 @@ function RotateUserDialog({
         }
       }}
     >
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+      <DialogTrigger render={<Button size="sm" variant="secondary" />}>
         <RefreshCwIcon />
         {t("databases.rotatePassword")}
       </DialogTrigger>
@@ -879,7 +872,7 @@ function RotateUserDialog({
               <PasswordResult service={service} databaseName={databaseName} user={user.name} password={password} />
             </div>
             <DialogFooter>
-              <Button onClick={() => setOpen(false)}>{t("common.done")}</Button>
+              <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>
             </DialogFooter>
           </>
         ) : (
@@ -890,10 +883,10 @@ function RotateUserDialog({
             </DialogHeader>
             <FormError message={error} />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="secondary" onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button onClick={rotate} disabled={busy}>
+              <Button variant="primary" onClick={rotate} disabled={busy}>
                 {busy ? t("common.working") : t("databases.rotatePassword")}
               </Button>
             </DialogFooter>
@@ -952,14 +945,14 @@ function ConnectionPanel({ teamSlug, serviceRef, canAttach }: { teamSlug: string
           <CopyField value={url} />
         ) : (
           <div>
-            <Button size="sm" variant="outline" onClick={reveal}>
+            <Button size="sm" variant="secondary" onClick={reveal}>
               <KeyRoundIcon />
               {t("databases.reveal")}
             </Button>
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2 border-t border-line pt-4">
+      <div className="flex flex-col gap-2 border-t border-border pt-4">
         <FieldLabel>{t("databases.attachTitle")}</FieldLabel>
         <p className="text-sm text-muted-foreground">{t("databases.attachHint")}</p>
         <div className="flex flex-wrap items-center gap-2">
@@ -977,7 +970,7 @@ function ConnectionPanel({ teamSlug, serviceRef, canAttach }: { teamSlug: string
               </SelectContent>
             </Select>
           </div>
-          <Button size="sm" onClick={attach} disabled={!app}>
+          <Button variant="primary" size="sm" onClick={attach} disabled={!app}>
             {t("databases.attach")}
           </Button>
         </div>
@@ -1076,7 +1069,7 @@ function ScheduleForm({
       ) : null}
       <FormError message={error} />
       <div className="flex items-center gap-2">
-        <Button type="submit" disabled={busy}>
+        <Button variant="primary" type="submit" disabled={busy}>
           {busy ? t("common.working") : t("databases.saveSchedule")}
         </Button>
         {saved ? <span className="text-sm text-primary">{t("common.done")}</span> : null}

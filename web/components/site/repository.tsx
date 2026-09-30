@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
@@ -22,8 +23,8 @@ import { useTimeAgo } from "@/components/home/sparkline"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+
+
 import { apiFetch, ApiError } from "@/lib/api"
 import type { Deployment } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
@@ -150,16 +151,16 @@ export function SiteRepository() {
         />
         <ErrorBand message={error} />
         {notConnected ? (
-          <p className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <GithubIcon className="size-4" />
             {t("github.connectFirst")}
-            <Link href={`${base}/servers/${app.server_id}/github`} className="text-grid-brand underline-offset-4 hover:underline">
+            <Link href={`${base}/servers/${app.server_id}/github`} className="text-nq-brand underline-offset-4 hover:underline">
               {t("github.openServer")}
             </Link>
           </p>
         ) : null}
         {summary ? (
-          <dl className="grid grid-cols-1 gap-px border-b border-line bg-line sm:grid-cols-3">
+          <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-3">
             <Fact label={t("lists.branch")} icon={<GitBranchIcon />}>
               <span dir="ltr" className="font-mono text-sm">
                 {summary.repo.branch}
@@ -177,7 +178,7 @@ export function SiteRepository() {
                   : summary.ahead_by === 0
                     ? t("site.repo.upToDate")
                     : t("site.repo.ahead", { n: summary.ahead_by })}
-                {summary.behind_by ? <span className="ms-2 text-xs text-grid-danger">{t("site.repo.behind", { n: summary.behind_by })}</span> : null}
+                {summary.behind_by ? <span className="ms-2 text-xs text-nq-danger-text">{t("site.repo.behind", { n: summary.behind_by })}</span> : null}
               </span>
             </Fact>
           </dl>
@@ -190,26 +191,26 @@ export function SiteRepository() {
           {commits === null ? (
             <LoadingRows rows={4} />
           ) : commits.length === 0 ? (
-            <p className="border-b border-line px-6 py-6 text-sm text-grid-muted">{t("site.repo.noCommits")}</p>
+            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.repo.noCommits")}</p>
           ) : (
             <>
               <ListSearch value={q} onChange={setQ} placeholder={t("site.repo.search")} shown={shown.length} total={commits.length} />
-              <ol className="flex flex-col divide-y divide-line border-b border-line" data-testid="site-commits">
+              <ol className="flex flex-col divide-y divide-border border-b border-border" data-testid="site-commits">
                 {shown.map((c) => (
-                  <li key={c.sha} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-3", c.is_live && "bg-grid-soft")}>
+                  <li key={c.sha} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-3", c.is_live && "bg-secondary")}>
                     {c.author_avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.author_avatar_url} alt="" className="size-7 shrink-0 border border-line" referrerPolicy="no-referrer" />
+                      <img src={c.author_avatar_url} alt="" className="size-7 shrink-0 border border-border" referrerPolicy="no-referrer" />
                     ) : (
-                      <span className="flex size-7 shrink-0 items-center justify-center border border-line text-grid-muted">
+                      <span className="flex size-7 shrink-0 items-center justify-center border border-border text-muted-foreground">
                         <GitCommitHorizontalIcon className="size-4" />
                       </span>
                     )}
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span dir="auto" className="truncate text-sm font-medium text-grid-fg" title={c.message}>
+                      <span dir="auto" className="truncate text-sm font-medium text-foreground" title={c.message}>
                         {c.message}
                       </span>
-                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-grid-muted">
+                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                         <a dir="ltr" href={c.url} target="_blank" rel="noreferrer" className="font-mono hover:underline">
                           {c.short_sha}
                         </a>
@@ -217,9 +218,9 @@ export function SiteRepository() {
                         {c.committed_at ? <span>{ago(c.committed_at)}</span> : null}
                       </span>
                     </span>
-                    {c.is_live ? <Badge>{t("site.repo.live")}</Badge> : null}
+                    {c.is_live ? <Badge variant="brand">{t("site.repo.live")}</Badge> : null}
                     {c.deployed && !c.is_live ? (
-                      <span className="flex items-center gap-1.5 text-xs text-grid-muted">
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <span dir="ltr" className="font-mono">
                           #{c.deployed.number}
                         </span>
@@ -261,43 +262,43 @@ export function SiteRepository() {
             title={t("site.repo.changes")}
             hint={t("site.repo.changesHint", { commits: compare.total_commits, files: compare.files.length })}
           />
-          <ul className="flex max-h-96 flex-col divide-y divide-line overflow-y-auto border-b border-line">
+          <ul className="flex max-h-96 flex-col divide-y divide-border overflow-y-auto border-b border-border">
             {compare.files.map((f) => (
               <li key={f.filename} className="flex items-center gap-3 px-6 py-2 text-xs">
-                <FileDiffIcon className="size-3.5 shrink-0 text-grid-muted" />
-                <span dir="ltr" className="min-w-0 flex-1 truncate text-start font-mono text-grid-fg" title={f.filename}>
+                <FileDiffIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span dir="ltr" className="min-w-0 flex-1 truncate text-start font-mono text-foreground" title={f.filename}>
                   {f.filename}
                 </span>
-                <span className="text-grid-muted">{f.status}</span>
+                <span className="text-muted-foreground">{f.status}</span>
                 <span dir="ltr" className="shrink-0 font-mono tabular-nums">
-                  <span className="text-[var(--grid-ok,#3fb950)]">+{f.additions}</span> <span className="text-grid-danger">−{f.deletions}</span>
+                  <span className="text-nq-success">+{f.additions}</span> <span className="text-nq-danger-text">−{f.deletions}</span>
                 </span>
               </li>
             ))}
           </ul>
-          {compare.truncated ? <p className="border-b border-line px-6 py-2 text-xs text-grid-muted">{t("site.repo.truncated")}</p> : null}
+          {compare.truncated ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.repo.truncated")}</p> : null}
         </section>
       ) : null}
 
       {pulls.length ? (
         <section aria-labelledby="pulls-h">
           <SectionTitle id="pulls-h" title={t("site.repo.pulls")} />
-          <ul className="flex flex-col divide-y divide-line border-b border-line">
+          <ul className="flex flex-col divide-y divide-border border-b border-border">
             {pulls.map((p) => (
               <li key={p.number}>
-                <a href={p.url} target="_blank" rel="noreferrer" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 hover:bg-grid-soft">
-                  <GitPullRequestIcon className="size-4 shrink-0 text-grid-brand" />
-                  <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                <a href={p.url} target="_blank" rel="noreferrer" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 hover:bg-secondary">
+                  <GitPullRequestIcon className="size-4 shrink-0 text-nq-brand" />
+                  <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                     #{p.number}
                   </span>
-                  <span dir="auto" className="min-w-0 flex-1 truncate text-sm font-medium text-grid-fg">
+                  <span dir="auto" className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                     {p.title}
                   </span>
                   {p.draft ? <Badge variant="outline">{t("site.repo.draft")}</Badge> : null}
-                  <span dir="ltr" className="font-mono text-xs text-grid-muted">
+                  <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                     {p.head_ref} → {p.base_ref}
                   </span>
-                  {p.updated_at ? <span className="text-xs text-grid-muted">{ago(p.updated_at)}</span> : null}
+                  {p.updated_at ? <span className="text-xs text-muted-foreground">{ago(p.updated_at)}</span> : null}
                 </a>
               </li>
             ))}
@@ -310,8 +311,8 @@ export function SiteRepository() {
 
 function Fact({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 bg-grid-bg px-6 py-4">
-      <dt className="grid-micro inline-flex items-center gap-1.5 [&_svg]:size-3.5">
+    <div className="flex min-w-0 flex-col gap-2 bg-background px-6 py-4">
+      <dt className="eyebrow inline-flex items-center gap-1.5 [&_svg]:size-3.5">
         {icon}
         {label}
       </dt>

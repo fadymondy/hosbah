@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BlocksIcon, BoxIcon, ExternalLinkIcon, LayersIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -10,14 +11,14 @@ import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { isImported } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
@@ -125,7 +126,7 @@ export function SiteStacks() {
         {installs === null ? (
           <LoadingRows rows={2} />
         ) : installs.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-line px-6 py-6 text-sm text-grid-muted">
+          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
             <BoxIcon className="size-4" />
             {t("site.stacks.none")}
           </p>
@@ -148,19 +149,19 @@ export function SiteStacks() {
                       <span dir="ltr" className="font-medium">
                         {i.name}
                       </span>
-                      <div dir="ltr" className="text-start text-xs text-grid-muted">
+                      <div dir="ltr" className="text-start text-xs text-muted-foreground">
                         {i.recipe_name} · {i.recipe_version}
                       </div>
                     </TableCell>
                     <TableCell>
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant={i.status === "ready" ? "default" : i.status === "failed" ? "destructive" : "secondary"}>{t(`site.storage.status.${i.status}`)}</Badge>
+                        <Badge variant={i.status === "ready" ? "brand" : i.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${i.status}`)}</Badge>
                         {i.status === "ready" && i.running != null ? (
-                          <Badge variant={i.running ? "secondary" : "outline"}>{i.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
+                          <Badge variant={i.running ? "neutral" : "outline"}>{i.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
                         ) : null}
                       </span>
                       {i.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-grid-danger">
+                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
                           {i.error}
                         </p>
                       ) : null}
@@ -175,12 +176,12 @@ export function SiteStacks() {
                         "—"
                       )}
                       {i.extra_host_port ? (
-                        <div className="mt-1 text-grid-muted">
+                        <div className="mt-1 text-muted-foreground">
                           {t("site.stacks.extraPort", { name: extraPortName(recipes, i.recipe), port: String(i.extra_host_port) })}
                         </div>
                       ) : null}
                     </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-muted-foreground">
                       {i.env_injected.join(" ")}
                     </TableCell>
                     {manage ? (
@@ -206,22 +207,22 @@ export function SiteStacks() {
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("site.stacks.search")} shown={shown.length} total={recipes.length} />
             {shown.length === 0 ? (
-              <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("home.noMatch")}</p>
+              <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p>
             ) : (
-              <ul className="grid gap-4 border-b border-line px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
+              <ul className="grid gap-4 border-b border-border px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
                 {shown.map((r) => (
-                  <li key={r.id} className="flex min-w-0 flex-col border border-line bg-grid-card">
+                  <li key={r.id} className="flex min-w-0 flex-col border border-border bg-card">
                     <div className="flex items-start gap-3 px-4 pt-4 pb-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center border border-line bg-background text-grid-brand [&_svg]:size-4">
+                      <span className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-nq-brand [&_svg]:size-4">
                         {r.kind === "stack" ? <LayersIcon /> : <BlocksIcon />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span dir="auto" className="font-medium text-grid-fg">
+                          <span dir="auto" className="font-medium text-foreground">
                             {r.name}
                           </span>
                           <Badge variant="outline">{t(`site.stacks.kinds.${r.kind}`)}</Badge>
-                          {!r.verified ? <Badge variant="secondary">{t("site.stacks.unverified")}</Badge> : null}
+                          {!r.verified ? <Badge variant="neutral">{t("site.stacks.unverified")}</Badge> : null}
                           {r.needs.postgres ? (
                             <Badge variant="outline" dir="ltr">
                               {t("site.stacks.needs", { service: "Postgres" })}
@@ -238,12 +239,12 @@ export function SiteStacks() {
                             </Badge>
                           ) : null}
                         </span>
-                        <span dir="auto" className="block text-xs text-grid-muted">
+                        <span dir="auto" className="block text-xs text-muted-foreground">
                           {r.summary}
                         </span>
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-4 py-2 text-xs text-grid-muted">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-xs text-muted-foreground">
                       <span dir="ltr">{r.licence}</span>
                       <span dir="ltr">v{r.version}</span>
                       <a href={r.homepage} target="_blank" rel="noreferrer" className="ms-auto inline-flex items-center gap-1 hover:underline">
@@ -251,9 +252,9 @@ export function SiteStacks() {
                         <ExternalLinkIcon className="size-3" />
                       </a>
                     </div>
-                    <div className="mt-auto border-t border-line px-4 py-3">
+                    <div className="mt-auto border-t border-border px-4 py-3">
                       {r.kind === "stack" ? (
-                        <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`${base}/apps/new?stack=${encodeURIComponent(r.id)}`} />}>
+                        <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/apps/new?stack=${encodeURIComponent(r.id)}`} />}>
                           <PlusIcon />
                           {t("site.stacks.newSite")}
                         </Button>
@@ -267,7 +268,7 @@ export function SiteStacks() {
             )}
           </>
         )}
-        <p className="border-b border-line px-6 py-3 text-xs text-grid-muted">{t("site.stacks.publishLater")}</p>
+        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.stacks.publishLater")}</p>
       </section>
     </>
   )
@@ -332,7 +333,7 @@ export function InstallDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" />}>
+        <DialogTrigger render={<Button variant="primary" size="sm" />}>
           <PlusIcon />
           {t("site.stacks.install")}
         </DialogTrigger>
@@ -343,7 +344,7 @@ export function InstallDialog({
             <DialogTitle>{recipe.name}</DialogTitle>
             <DialogDescription>{t("site.stacks.installHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="in-name">{t("site.monitors.name")}</FieldLabel>
               <Input id="in-name" dir="ltr" required pattern="[a-z][a-z0-9\-]{0,30}" value={name} onChange={(e) => setName(e.target.value)} />
@@ -353,7 +354,7 @@ export function InstallDialog({
             ) : null}
             {recipe.needs.mysql ? (
               my.length === 0 ? (
-                <p className="text-sm text-grid-danger">
+                <p className="text-sm text-nq-danger-text">
                   {t("site.stacks.needsMySQL")}{" "}
                   <Link href={databasesHref} className="underline underline-offset-4 hover:no-underline">
                     {t("nav.databases")}
@@ -374,13 +375,13 @@ export function InstallDialog({
             {(recipe.needs.postgres && pg.length === 0) || (recipe.needs.redis && rd.length === 0) ? (
               <FormError message={t("site.stacks.needsService")} />
             ) : null}
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button
+            <Button variant="primary"
               type="submit"
               disabled={busy || missing || (recipe.needs.postgres && !postgres) || (recipe.needs.mysql && !mysql) || (recipe.needs.redis && !redis)}
             >
@@ -446,7 +447,7 @@ export function RemoveInstall({ path, install, onRemoved, ...controlled }: { pat
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        <DialogTrigger render={<Button size="sm" variant="secondary" />}>
           <Trash2Icon />
           {t("site.storage.remove")}
         </DialogTrigger>
@@ -457,7 +458,7 @@ export function RemoveInstall({ path, install, onRemoved, ...controlled }: { pat
             <DialogTitle dir="ltr">{name}</DialogTitle>
             <DialogDescription>{t("site.stacks.removeHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={data} onCheckedChange={(v) => setData(v === true)} />
               {t("site.storage.deleteData")}
@@ -466,13 +467,13 @@ export function RemoveInstall({ path, install, onRemoved, ...controlled }: { pat
               <FieldLabel htmlFor="rmi-confirm">{t("site.storage.typeName", { name })}</FieldLabel>
               <Input id="rmi-confirm" dir="ltr" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
             </Field>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="destructive" disabled={busy || typed !== name}>
+            <Button type="submit" variant="danger" disabled={busy || typed !== name}>
               {busy ? t("common.working") : t("site.storage.remove")}
             </Button>
           </DialogFooter>

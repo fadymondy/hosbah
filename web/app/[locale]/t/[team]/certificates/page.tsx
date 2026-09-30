@@ -1,15 +1,16 @@
 "use client"
 
+import { Badge, Button, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { RefreshCwIcon, ShieldCheckIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 import type { SSLCertificate } from "@/lib/servers"
@@ -62,7 +63,7 @@ export default function CertificatesPage() {
       title={t("nav.certificates")}
       description={t("certificates.description")}
       actions={
-        <Button variant="outline" onClick={() => void checkNow()} disabled={checking}>
+        <Button variant="secondary" onClick={() => void checkNow()} disabled={checking}>
           <RefreshCwIcon className={checking ? "animate-spin" : ""} />
           {checking ? t("common.working") : t("certificates.checkNow")}
         </Button>
@@ -73,15 +74,7 @@ export default function CertificatesPage() {
       {certs === null ? (
         <LoadingRows />
       ) : certs.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldCheckIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("certificates.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("certificates.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={ShieldCheckIcon} title={t("certificates.emptyTitle")} description={t("certificates.emptyHint")} />
       ) : (
         <TableBand>
           <Table>
@@ -104,7 +97,7 @@ export default function CertificatesPage() {
                     </span>
                     <div className="text-xs text-muted-foreground">{t(`certificates.sources.${c.source}`)}</div>
                   </TableCell>
-                  <TableCell className="text-sm text-grid-body">{c.issuer || "—"}</TableCell>
+                  <TableCell className="text-sm text-nq-fg-body">{c.issuer || "—"}</TableCell>
                   <TableCell>
                     {c.not_after ? (
                       <div className="flex flex-col gap-1">
@@ -119,23 +112,23 @@ export default function CertificatesPage() {
                   </TableCell>
                   <TableCell>
                     {c.not_after ? (
-                      <Badge variant="outline" className={c.san_match ? "text-grid-ok" : "text-grid-danger"}>
+                      <Badge variant="outline" className={c.san_match ? "text-nq-success-text" : "text-nq-danger-text"}>
                         {c.san_match ? t("certificates.sanMatch") : t("certificates.sanMismatch")}
                       </Badge>
                     ) : (
                       "—"
                     )}
                   </TableCell>
-                  <TableCell dir="ltr" className="text-start text-sm text-grid-muted">
+                  <TableCell dir="ltr" className="text-start text-sm text-muted-foreground">
                     {fmt(c.last_checked_at)}
                   </TableCell>
                   <TableCell className="text-end">
                     {c.ok ? (
-                      <Badge variant="outline" className="text-grid-ok">
+                      <Badge variant="outline" className="text-nq-success-text">
                         {t("certificates.ok")}
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-grid-danger" title={c.error}>
+                      <Badge variant="outline" className="text-nq-danger-text" title={c.error}>
                         {c.error ? t("certificates.error") : t("certificates.unknown")}
                       </Badge>
                     )}
@@ -154,7 +147,7 @@ export default function CertificatesPage() {
 function DaysLeftBadge({ daysLeft, ok }: { daysLeft: number | undefined; ok: boolean }) {
   const { t } = useI18n()
   if (daysLeft === undefined) return null
-  const tone = !ok || daysLeft <= 7 ? "text-grid-danger" : daysLeft <= 14 ? "text-grid-warn" : "text-grid-ok"
+  const tone = !ok || daysLeft <= 7 ? "text-nq-danger-text" : daysLeft <= 14 ? "text-nq-warning-text" : "text-nq-success-text"
   return (
     <Badge variant="outline" className={cn("w-fit", tone)}>
       {daysLeft >= 0 ? t("certificates.daysLeft", { n: daysLeft }) : t("certificates.expired")}

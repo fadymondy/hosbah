@@ -1,12 +1,12 @@
 "use client"
 
+import { Button, EmptyState } from "@fadymondy/nasaq/web"
 import { useEffect, useRef, useState } from "react"
 import { RefreshCwIcon, SquareTerminalIcon } from "lucide-react"
 import type { Terminal as XTerm } from "@xterm/xterm"
 
 import { SectionTitle } from "@/components/states"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -76,9 +76,9 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
         fontSize: 13,
         fontFamily: "var(--font-mono, ui-monospace, monospace)",
         theme: {
-          background: styles.getPropertyValue("--grid-bg").trim() || undefined,
-          foreground: styles.getPropertyValue("--grid-fg").trim() || undefined,
-          cursor: styles.getPropertyValue("--grid-fg").trim() || undefined,
+          background: styles.getPropertyValue("--nq-bg").trim() || undefined,
+          foreground: styles.getPropertyValue("--nq-fg").trim() || undefined,
+          cursor: styles.getPropertyValue("--nq-fg").trim() || undefined,
         },
       })
       const fit = new FitAddon()
@@ -144,15 +144,7 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
     return (
       <section aria-labelledby="terminal-h" data-testid="terminal">
         <SectionTitle id="terminal-h" title={t("servers.terminal.title")} hint={t("servers.terminal.hint")} />
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <SquareTerminalIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("servers.terminal.noAccessTitle")}</EmptyTitle>
-            <EmptyDescription>{t("servers.terminal.noAccessHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={SquareTerminalIcon} title={t("servers.terminal.noAccessTitle")} description={t("servers.terminal.noAccessHint")} />
       </section>
     )
   }
@@ -166,7 +158,7 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
         action={
           <div className="flex items-center gap-3">
             <StatusDot status={status} />
-            <Button size="sm" variant="outline" onClick={() => setAttempt((n) => n + 1)}>
+            <Button size="sm" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
               <RefreshCwIcon />
               {t("servers.terminal.reconnect")}
             </Button>
@@ -174,7 +166,7 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
         }
       />
       {status === "closed" && reason ? (
-        <p className="border-b border-line px-6 py-2 text-sm text-grid-muted">{t("servers.terminal.closedNotice", { reason })}</p>
+        <p className="border-b border-border px-6 py-2 text-sm text-muted-foreground">{t("servers.terminal.closedNotice", { reason })}</p>
       ) : null}
       <div className="min-h-[28rem] flex-1 px-6 py-4" dir="ltr">
         <div ref={hostRef} className="h-full min-h-[28rem] w-full" />
@@ -185,9 +177,9 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
 
 function StatusDot({ status }: { status: Status }) {
   const { t } = useI18n()
-  const color = status === "connected" ? "bg-emerald-500" : status === "connecting" ? "bg-amber-500" : "bg-grid-muted"
+  const color = status === "connected" ? "bg-emerald-500" : status === "connecting" ? "bg-amber-500" : "bg-nq-fg-muted"
   return (
-    <span className="flex items-center gap-1.5 text-xs text-grid-muted">
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className={`size-2 rounded-full ${color}`} aria-hidden />
       {t(`servers.terminal.${status}`)}
     </span>

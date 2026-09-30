@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ExternalLinkIcon, GaugeIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
@@ -7,15 +9,15 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+
+
+
+
+
+
+
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -119,16 +121,16 @@ export function StatusPagesSection({ team, manage }: { team: string; manage: boo
                         {p.title}
                       </span>
                     </TableCell>
-                    <TableCell dir="ltr" className="text-start font-mono text-xs text-grid-muted">
+                    <TableCell dir="ltr" className="text-start font-mono text-xs text-muted-foreground">
                       /status/{p.slug}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={p.published ? "default" : "outline"}>{p.published ? t("statusPages.published") : t("statusPages.unpublished")}</Badge>
+                      <Badge variant={p.published ? "brand" : "outline"}>{p.published ? t("statusPages.published") : t("statusPages.unpublished")}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
                         {p.published ? (
-                          <Button size="sm" variant="outline" nativeButton={false} render={<a href={`/${locale}/status/${p.slug}`} target="_blank" rel="noreferrer" />}>
+                          <Button size="sm" variant="secondary" nativeButton={false} render={<a href={`/${locale}/status/${p.slug}`} target="_blank" rel="noreferrer" />}>
                             <ExternalLinkIcon />
                             {t("statusPages.view")}
                           </Button>
@@ -223,7 +225,7 @@ function StatusPageDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {fromCaller ? null : (
-        <DialogTrigger render={<Button size="sm" variant={page ? "outline" : "default"} />}>
+        <DialogTrigger render={<Button size="sm" variant={page ? "secondary" : "primary"} />}>
           {page ? <PencilIcon /> : <PlusIcon />}
           {page ? t("lists.edit") : t("statusPages.add")}
         </DialogTrigger>
@@ -234,7 +236,7 @@ function StatusPageDialog({
             <DialogTitle>{page ? page.title : t("statusPages.add")}</DialogTitle>
             <DialogDescription>{t("statusPages.monitorsHint")}</DialogDescription>
           </DialogHeader>
-          <FieldGroup>
+          <div className="flex w-full flex-col gap-5">
             <Field>
               <FieldLabel htmlFor="sp-title">{t("statusPages.title")}</FieldLabel>
               <Input id="sp-title" dir="auto" required maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -275,13 +277,13 @@ function StatusPageDialog({
               <Checkbox checked={published} onCheckedChange={(v) => setPublished(v === true)} />
               {t("statusPages.published")}
             </label>
-          </FieldGroup>
+          </div>
           <FormError message={error} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={busy || !title.trim() || !slug.trim()}>
+            <Button variant="primary" type="submit" disabled={busy || !title.trim() || !slug.trim()}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </DialogFooter>

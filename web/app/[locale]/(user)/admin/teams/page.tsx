@@ -1,11 +1,12 @@
 "use client"
 
+import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 
 import { ListEmpty, ListError, ListToolbar, LoadingRows, Pager } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
 import { useAdminList, type AdminTeam } from "@/lib/admin"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
 
@@ -26,7 +27,7 @@ export default function AdminTeamsPage() {
       ) : items.length === 0 ? (
         <ListEmpty title={list.q ? t("admin.list.noMatch") : t("admin.teams.empty")} />
       ) : (
-        <div className="border-b border-line">
+        <div className="border-b border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -47,12 +48,12 @@ export default function AdminTeamsPage() {
                       {team.name}
                     </Link>
                   </TableCell>
-                  <TableCell className="font-mono text-grid-muted" dir="ltr">
+                  <TableCell className="font-mono text-muted-foreground" dir="ltr">
                     {team.slug}
                   </TableCell>
                   <TableCell>
                     {team.suspended ? (
-                      <Badge variant="destructive">{t("admin.teams.suspended")}</Badge>
+                      <Badge variant="danger">{t("admin.teams.suspended")}</Badge>
                     ) : (
                       <Badge variant="outline">{t("admin.users.active")}</Badge>
                     )}
@@ -60,7 +61,7 @@ export default function AdminTeamsPage() {
                   <TableCell className="text-end font-mono tabular-nums">{team.members}</TableCell>
                   <TableCell className="text-end font-mono tabular-nums">{team.servers}</TableCell>
                   <TableCell className="text-end font-mono tabular-nums">{team.apps}</TableCell>
-                  <TableCell className="pe-6 text-end text-grid-muted" dir="ltr">
+                  <TableCell className="pe-6 text-end text-muted-foreground" dir="ltr">
                     {fmt(team.created_at)}
                   </TableCell>
                 </TableRow>

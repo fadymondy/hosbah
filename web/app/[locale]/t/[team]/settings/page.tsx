@@ -1,5 +1,6 @@
 "use client"
 
+import { Button, Input } from "@fadymondy/nasaq/web"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
@@ -12,8 +13,8 @@ import { LogDrainsCard } from "@/components/log-drains"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
 import { StatusPagesSection } from "@/components/status-pages"
 import { TeamQuotasCard } from "@/components/team-quotas"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
+
 import { apiFetch, type Team } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
@@ -67,8 +68,8 @@ export default function SettingsPage() {
           <Input id="team-slug" dir="ltr" className="font-mono" value={team.slug} readOnly disabled />
         </SettingsRow>
         {manage ? (
-          <div className="flex justify-end border-b border-line px-6 py-4">
-            <Button type="submit" disabled={busy || !name.trim() || name.trim() === team.name}>
+          <div className="flex justify-end border-b border-border px-6 py-4">
+            <Button variant="primary" type="submit" disabled={busy || !name.trim() || name.trim() === team.name}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
           </div>

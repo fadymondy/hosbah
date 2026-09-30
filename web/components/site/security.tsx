@@ -1,5 +1,7 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PlayIcon, ShieldAlertIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -7,20 +9,20 @@ import { toast } from "sonner"
 import { useTimeAgo } from "@/components/home/sparkline"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
 type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN"
 const SEVERITIES: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
-const SEVERITY_BADGE: Record<Severity, "destructive" | "secondary" | "outline"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "secondary",
+const SEVERITY_BADGE: Record<Severity, "danger" | "neutral" | "outline"> = {
+  CRITICAL: "danger",
+  HIGH: "danger",
+  MEDIUM: "neutral",
   LOW: "outline",
   UNKNOWN: "outline",
 }
@@ -95,7 +97,7 @@ export function SiteSecurity() {
 
   const latest = scans?.[0]
   const scanNowButton = manage ? (
-    <Button size="sm" disabled={busy} onClick={() => void scanNow()}>
+    <Button variant="primary" size="sm" disabled={busy} onClick={() => void scanNow()}>
       <PlayIcon />
       {busy ? t("common.working") : t("site.security.scanNow")}
     </Button>
@@ -121,13 +123,13 @@ export function SiteSecurity() {
       ) : (
         <>
           {latest ? (
-            <div className="flex flex-col gap-3 border-b border-line px-6 py-4">
+            <div className="flex flex-col gap-3 border-b border-border px-6 py-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={latest.status === "ok" ? "secondary" : latest.status === "failed" ? "destructive" : "outline"}>
+                <Badge variant={latest.status === "ok" ? "neutral" : latest.status === "failed" ? "danger" : "outline"}>
                   {t(`site.security.status.${latest.status}`)}
                 </Badge>
-                <span className="text-xs text-grid-muted">{ago(latest.created_at)}</span>
-                <span dir="ltr" className="max-w-md truncate text-xs text-grid-muted">
+                <span className="text-xs text-muted-foreground">{ago(latest.created_at)}</span>
+                <span dir="ltr" className="max-w-md truncate text-xs text-muted-foreground">
                   {latest.image}
                 </span>
               </div>
@@ -141,11 +143,11 @@ export function SiteSecurity() {
                     ) : null,
                   )}
                   {SEVERITIES.every((sev) => !latest.counts[sev]) ? (
-                    <span className="text-sm text-grid-muted">{t("site.security.clean")}</span>
+                    <span className="text-sm text-muted-foreground">{t("site.security.clean")}</span>
                   ) : null}
                 </div>
               ) : latest.status === "failed" ? (
-                <p dir="auto" className="text-sm text-grid-danger">
+                <p dir="auto" className="text-sm text-nq-danger-text">
                   {latest.error}
                 </p>
               ) : null}
@@ -176,7 +178,7 @@ export function SiteSecurity() {
                           <TableCell dir="ltr" className="font-mono text-xs">
                             {f.fixed_version || "—"}
                           </TableCell>
-                          <TableCell dir="ltr" className="font-mono text-xs text-grid-muted" title={f.title}>
+                          <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground" title={f.title}>
                             {f.id}
                           </TableCell>
                         </TableRow>
@@ -185,27 +187,27 @@ export function SiteSecurity() {
                   </Table>
                 </TableBand>
               ) : null}
-              {latest.truncated ? <p className="text-xs text-grid-muted">{t("site.security.truncated")}</p> : null}
+              {latest.truncated ? <p className="text-xs text-muted-foreground">{t("site.security.truncated")}</p> : null}
             </div>
           ) : null}
 
           {scans.length > 1 ? (
-            <div className="border-b border-line">
-              <p className="px-6 pt-4 text-xs font-medium text-grid-muted">{t("site.security.history")}</p>
-              <ol className="flex flex-col divide-y divide-line">
+            <div className="border-b border-border">
+              <p className="px-6 pt-4 text-xs font-medium text-muted-foreground">{t("site.security.history")}</p>
+              <ol className="flex flex-col divide-y divide-border">
                 {scans.slice(1).map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm">
-                    <Badge variant={s.status === "ok" ? "secondary" : s.status === "failed" ? "destructive" : "outline"}>
+                    <Badge variant={s.status === "ok" ? "neutral" : s.status === "failed" ? "danger" : "outline"}>
                       {t(`site.security.status.${s.status}`)}
                     </Badge>
-                    <span className="text-xs text-grid-muted">{t(`site.security.trigger.${s.triggered_by}`)}</span>
+                    <span className="text-xs text-muted-foreground">{t(`site.security.trigger.${s.triggered_by}`)}</span>
                     {s.status === "ok" ? (
-                      <span className="text-xs text-grid-muted">
+                      <span className="text-xs text-muted-foreground">
                         {SEVERITIES.filter((sev) => s.counts[sev]).map((sev) => `${t(`site.security.severity.${sev}`)} ${s.counts[sev]}`).join(" · ") ||
                           t("site.security.clean")}
                       </span>
                     ) : null}
-                    <span dir="ltr" className="ms-auto text-xs text-grid-muted">
+                    <span dir="ltr" className="ms-auto text-xs text-muted-foreground">
                       {fmt(s.created_at)}
                     </span>
                   </li>

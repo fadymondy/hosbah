@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircleIcon, CheckCircle2Icon, CircleSlashIcon, PlayIcon, RadarIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -7,11 +8,11 @@ import { toast } from "sonner"
 import { Facts } from "@/components/admin/admin-list"
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -63,17 +64,17 @@ type ImportItem = {
 
 const DECISIONS: Decision[] = ["app", "database", "shared_service", "ignore"]
 
-const OUTCOME_TONE: Record<ImportItem["outcome"], "default" | "secondary" | "outline" | "destructive"> = {
-  imported_app: "default",
-  imported_data_service: "default",
-  imported_shared_service: "default",
-  linked_guest: "default",
-  updated: "secondary",
+const OUTCOME_TONE: Record<ImportItem["outcome"], "success" | "neutral" | "outline" | "danger"> = {
+  imported_app: "success",
+  imported_data_service: "success",
+  imported_shared_service: "success",
+  linked_guest: "success",
+  updated: "neutral",
   missing: "outline",
   removed: "outline",
   skipped: "outline",
   ignored: "outline",
-  error: "destructive",
+  error: "danger",
 }
 
 const OUTCOME_ICON: Record<ImportItem["outcome"], typeof CheckCircle2Icon> = {
@@ -157,7 +158,7 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
         hint={t("servers.import.hint")}
         action={
           manage ? (
-            <Button size="sm" onClick={() => void runNow()} disabled={running}>
+            <Button variant="primary" size="sm" onClick={() => void runNow()} disabled={running}>
               {running ? <RefreshCwIcon className="animate-spin" /> : <PlayIcon />}
               {t("servers.import.runNow")}
             </Button>
@@ -169,7 +170,7 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
       {run === undefined ? (
         <LoadingRows />
       ) : run === null ? (
-        <p className="flex items-center gap-2 border-b border-line px-6 py-4 text-sm text-grid-muted">
+        <p className="flex items-center gap-2 border-b border-border px-6 py-4 text-sm text-muted-foreground">
           <RadarIcon className="size-4" />
           {t("servers.import.never")}
         </p>
@@ -182,11 +183,11 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
             [
               t("servers.import.status"),
               run.status === "ok" ? (
-                <Badge key="ok" variant="secondary">
+                <Badge key="ok" variant="neutral">
                   {t("servers.import.ok")}
                 </Badge>
               ) : (
-                <span key="err" className="text-grid-danger">
+                <span key="err" className="text-nq-danger-text">
                   {run.error ?? t("servers.import.errored")}
                 </span>
               ),
@@ -196,15 +197,7 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
       )}
 
       {run !== undefined && items.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <RadarIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("servers.import.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("servers.import.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={RadarIcon} title={t("servers.import.emptyTitle")} description={t("servers.import.emptyHint")} />
       ) : items.length ? (
         <TableBand>
           <Table>
@@ -222,10 +215,10 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
                 return (
                   <TableRow key={it.origin_key}>
                     <TableCell>
-                      <span dir="ltr" className="block truncate font-medium text-grid-fg" title={it.name}>
+                      <span dir="ltr" className="block truncate font-medium text-foreground" title={it.name}>
                         {it.name}
                       </span>
-                      <span className="text-xs text-grid-muted">
+                      <span className="text-xs text-muted-foreground">
                         {t(`servers.discovered.kinds.${it.origin_kind}`, undefined, it.origin_kind)}
                         {it.detected_kind ? ` · ${it.detected_kind}` : ""}
                       </span>
@@ -237,7 +230,7 @@ export function Import({ serverId, manage }: { serverId: string; manage: boolean
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs">
-                      <span className="block truncate text-xs text-grid-muted" title={it.error ?? it.reason ?? ""}>
+                      <span className="block truncate text-xs text-muted-foreground" title={it.error ?? it.reason ?? ""}>
                         {it.error ?? it.reason ?? "—"}
                       </span>
                     </TableCell>

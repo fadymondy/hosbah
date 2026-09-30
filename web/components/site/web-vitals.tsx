@@ -1,5 +1,6 @@
 "use client"
 
+import { Badge, Button, Checkbox, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { AlertTriangleIcon, GaugeIcon } from "lucide-react"
 
@@ -7,11 +8,11 @@ import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+
+
+
+
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -110,13 +111,13 @@ export function SiteWebVitals() {
         {settings?.snippet ? (
           <SettingsRow label={t("site.rum.snippet")} hint={manage ? t("site.rum.rotateHint") : undefined}>
             <CopyField value={settings.snippet} block />
-            <p className="flex items-start gap-2 text-xs text-grid-body">
-              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-grid-brand" />
+            <p className="flex items-start gap-2 text-xs text-nq-fg-body">
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-nq-brand" />
               {t("site.rum.once")}
             </p>
             {manage ? (
               <div>
-                <Button variant="outline" disabled={rotateBusy} onClick={rotate}>
+                <Button variant="secondary" disabled={rotateBusy} onClick={rotate}>
                   {rotateBusy ? t("common.working") : t("site.rum.rotate")}
                 </Button>
               </div>
@@ -124,10 +125,10 @@ export function SiteWebVitals() {
           </SettingsRow>
         ) : settings?.has_key ? (
           <SettingsRow label={t("site.rum.snippet")} hint={t("site.rum.snippetHiddenHint")}>
-            <p className="text-sm text-grid-muted">{t("site.rum.snippetHidden")}</p>
+            <p className="text-sm text-muted-foreground">{t("site.rum.snippetHidden")}</p>
             {manage ? (
               <div>
-                <Button variant="outline" disabled={rotateBusy} onClick={rotate}>
+                <Button variant="secondary" disabled={rotateBusy} onClick={rotate}>
                   {rotateBusy ? t("common.working") : t("site.rum.rotate")}
                 </Button>
               </div>
@@ -142,17 +143,17 @@ export function SiteWebVitals() {
 }
 
 function ratingTone(r: Rating) {
-  if (r === "good") return "text-grid-ok"
-  if (r === "needs-improvement") return "text-grid-warn"
-  if (r === "poor") return "text-grid-danger"
-  return "text-grid-muted"
+  if (r === "good") return "text-nq-success-text"
+  if (r === "needs-improvement") return "text-nq-warning-text"
+  if (r === "poor") return "text-nq-danger-text"
+  return "text-muted-foreground"
 }
 
 function ratingDot(r: Rating) {
-  if (r === "good") return "bg-grid-ok"
-  if (r === "needs-improvement") return "bg-grid-warn"
-  if (r === "poor") return "bg-grid-danger"
-  return "bg-grid-muted"
+  if (r === "good") return "bg-nq-success"
+  if (r === "needs-improvement") return "bg-nq-warning"
+  if (r === "poor") return "bg-nq-danger"
+  return "bg-nq-fg-muted"
 }
 
 function WebVitalsData({ base }: { base: string }) {
@@ -201,7 +202,7 @@ function WebVitalsData({ base }: { base: string }) {
         action={
           <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("site.rum.range")}>
             {WINDOWS.map((w) => (
-              <Button key={w} size="sm" variant={window_ === w ? "default" : "outline"} onClick={() => setWindow(w)}>
+              <Button key={w} size="sm" variant={window_ === w ? "primary" : "secondary"} onClick={() => setWindow(w)}>
                 {t(`site.rum.windows.${w}`)}
               </Button>
             ))}
@@ -212,19 +213,11 @@ function WebVitalsData({ base }: { base: string }) {
       {summary === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GaugeIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.rum.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.rum.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState className="border-b" icon={GaugeIcon} title={t("site.rum.emptyTitle")} description={t("site.rum.emptyHint")} />
       ) : (
         <>
           <MetricCards t={t} metrics={summary.metrics} />
-          <div className="border-b border-line px-6 py-6">
+          <div className="border-b border-border px-6 py-6">
             <TrendChart points={series ?? []} />
           </div>
           <PathsTable t={t} rows={paths ?? []} />
@@ -239,22 +232,22 @@ type TFunc = (key: string, vars?: Record<string, string | number>, fallback?: st
 function MetricCards({ t, metrics }: { t: TFunc; metrics: Metrics }) {
   const units: Record<(typeof METRIC_KEYS)[number], string> = { lcp: "ms", cls: "", inp: "ms", fcp: "ms", ttfb: "ms" }
   return (
-    <div className="grid grid-cols-2 divide-x divide-line border-b border-line rtl:divide-x-reverse sm:grid-cols-5">
+    <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse sm:grid-cols-5">
       {METRIC_KEYS.map((k) => {
         const m = metrics[k]
         const value = m.samples === 0 ? "—" : k === "cls" ? m.p75.toFixed(2) : `${Math.round(m.p75)} ${units[k]}`
         return (
           <div key={k} className="flex flex-col gap-1 px-6 py-4">
-            <span className="flex items-center gap-2 text-xs text-grid-muted">
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
               <span aria-hidden className={`size-2 rounded-full ${ratingDot(m.rating)}`} />
               {t(`site.rum.metrics.${k}`)}
             </span>
-            <span dir="ltr" className={`text-start text-xl font-semibold ${m.samples === 0 ? "text-grid-muted" : "text-grid-fg"}`}>
+            <span dir="ltr" className={`text-start text-xl font-semibold ${m.samples === 0 ? "text-muted-foreground" : "text-foreground"}`}>
               {value}
             </span>
             <span className="flex items-center gap-2 text-xs">
               <span className={ratingTone(m.rating)}>{t(`site.rum.rating.${m.rating}`)}</span>
-              <span className="text-grid-muted">
+              <span className="text-muted-foreground">
                 {t("site.rum.samples", { count: m.samples })}
               </span>
             </span>
@@ -293,17 +286,17 @@ function TrendChart({ points }: { points: Point[] }) {
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block h-56 w-full" role="img" aria-label="LCP p75 over time">
         <line x1={0} y1={pad.top + innerH / 2} x2={w} y2={pad.top + innerH / 2} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="4 4" />
         <line x1={0} y1={h - pad.bottom} x2={w} y2={h - pad.bottom} stroke="currentColor" strokeOpacity={0.15} />
-        {area ? <path d={area} fill="var(--grid-brand)" opacity={0.14} /> : null}
-        {points.length > 1 ? <path d={path} fill="none" stroke="var(--grid-brand)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
+        {area ? <path d={area} fill="var(--nq-brand)" opacity={0.14} /> : null}
+        {points.length > 1 ? <path d={path} fill="none" stroke="var(--nq-brand)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /> : null}
         {bars.map(({ x, y, p }, i) => (
-          <circle key={i} cx={x} cy={y} r={points.length > 60 ? 0 : 2} fill="var(--grid-brand)" vectorEffect="non-scaling-stroke">
+          <circle key={i} cx={x} cy={y} r={points.length > 60 ? 0 : 2} fill="var(--nq-brand)" vectorEffect="non-scaling-stroke">
             <title>
               {p.bucket}: {Math.round(p.metrics.lcp.p75)} ms
             </title>
           </circle>
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-xs text-grid-muted">
+      <div className="mt-1 flex justify-between text-xs text-muted-foreground">
         <time dateTime={first}>{first ? new Date(first).toLocaleString() : ""}</time>
         <span>max {Math.round(max).toLocaleString()} ms</span>
         <time dateTime={last}>{last ? new Date(last).toLocaleString() : ""}</time>
@@ -317,7 +310,7 @@ function PathsTable({ t, rows }: { t: TFunc; rows: PathBreakdown[] }) {
     <section aria-labelledby="rum-paths-h">
       <SectionTitle id="rum-paths-h" title={t("site.rum.paths")} />
       {rows.length === 0 ? (
-        <p className="border-b border-line px-6 py-4 text-sm text-grid-muted">{t("site.rum.noPaths")}</p>
+        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("site.rum.noPaths")}</p>
       ) : (
         <TableBand>
           <Table>

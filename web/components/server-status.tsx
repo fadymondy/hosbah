@@ -1,18 +1,19 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
+
+import { Badge } from "@fadymondy/nasaq/web"
 import { useI18n } from "@/lib/i18n"
 import { presenceOf, type CheckStatus, type OperationStatus, type Presence, type Server } from "@/lib/servers"
 
-type Variant = "default" | "secondary" | "outline" | "destructive"
+type Variant = "success" | "neutral" | "outline" | "danger"
 
 const presenceVariant: Record<Presence, Variant> = {
-  online: "default",
-  offline: "secondary",
+  online: "success",
+  offline: "neutral",
   pending: "outline",
   provisioning: "outline",
-  enrolled: "secondary",
-  failed: "destructive",
+  enrolled: "neutral",
+  failed: "danger",
 }
 
 /** Online / offline / waiting / provisioning / failed, with a dot that pulses while online. */
@@ -29,11 +30,11 @@ export function PresenceBadge({ server }: { server: Pick<Server, "status" | "onl
 
 const opVariant: Record<OperationStatus, Variant> = {
   pending: "outline",
-  sent: "secondary",
-  running: "secondary",
-  ok: "default",
-  failed: "destructive",
-  timeout: "destructive",
+  sent: "neutral",
+  running: "neutral",
+  ok: "success",
+  failed: "danger",
+  timeout: "danger",
 }
 
 export function OpStatusBadge({ status }: { status: OperationStatus }) {
@@ -45,7 +46,7 @@ export function OpStatusBadge({ status }: { status: OperationStatus }) {
   )
 }
 
-const checkVariant: Record<CheckStatus, Variant> = { pass: "secondary", warn: "outline", fail: "destructive" }
+const checkVariant: Record<CheckStatus, Variant> = { pass: "neutral", warn: "outline", fail: "danger" }
 
 export function CheckBadge({ status }: { status: CheckStatus }) {
   const { t } = useI18n()

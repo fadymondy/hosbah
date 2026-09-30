@@ -1,12 +1,14 @@
 "use client"
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Button, Input, Skeleton } from "@fadymondy/nasaq/web"
 import type { ReactNode } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, TriangleAlertIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
+
+
+
+
 import { ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -24,10 +26,10 @@ export function ListToolbar({
 }) {
   const { t } = useI18n()
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
+    <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
       {onQ ? (
         <div className="relative w-full max-w-xs">
-          <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
+          <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             value={q}
@@ -46,7 +48,7 @@ export function ListToolbar({
 /** Loading rows in the list's own shape, full width between hairlines. */
 export function LoadingRows({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="divide-y divide-line border-b border-line" aria-busy>
+    <div className="divide-y divide-border border-b border-border" aria-busy>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-4 px-6 py-4">
           <Skeleton className="h-4 w-48" />
@@ -63,9 +65,9 @@ export function ListError({ error }: { error: unknown }) {
   const message =
     error instanceof ApiError ? (error.status >= 500 ? t("admin.list.unavailable") : error.message) : t("admin.list.network")
   return (
-    <div role="alert" className="flex items-start gap-3 border-b border-line px-6 py-4 text-sm">
-      <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-grid-danger" />
-      <p className="text-grid-danger">{message}</p>
+    <div role="alert" className="flex items-start gap-3 border-b border-border px-6 py-4 text-sm">
+      <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-nq-danger-text" />
+      <p className="text-nq-danger-text">{message}</p>
     </div>
   )
 }
@@ -98,11 +100,11 @@ export function Pager({
   const from = total === 0 ? 0 : offset + 1
   const to = Math.min(offset + pageSize, total)
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-3 text-sm text-grid-muted">
+    <div className="flex items-center justify-between gap-4 border-b border-border px-6 py-3 text-sm text-muted-foreground">
       <span className="tabular-nums">{t("admin.list.range", { from, to, total })}</span>
       <div className="flex items-center gap-1">
         <Button
-          variant="outline"
+          variant="secondary"
           size="icon-sm"
           disabled={offset === 0}
           onClick={() => onOffset(Math.max(0, offset - pageSize))}
@@ -111,7 +113,7 @@ export function Pager({
           <ChevronLeftIcon className="rtl:-scale-x-100" />
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           size="icon-sm"
           disabled={to >= total}
           onClick={() => onOffset(offset + pageSize)}
@@ -127,11 +129,11 @@ export function Pager({
 /** A label/value grid for detail pages (Mahaam's overview facts row). */
 export function Facts({ items }: { items: [ReactNode, ReactNode][] }) {
   return (
-    <dl className="grid grid-cols-1 divide-y divide-line border-b border-line text-sm sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 [&>div]:sm:border-e [&>div]:border-line [&>div:last-child]:border-e-0">
+    <dl className="grid grid-cols-1 divide-y divide-border border-b border-border text-sm sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 [&>div]:sm:border-e [&>div]:border-border [&>div:last-child]:border-e-0">
       {items.map(([label, value], i) => (
         <div key={i} className="px-6 py-4">
-          <dt className="grid-micro mb-1">{label}</dt>
-          <dd className="text-grid-fg">{value}</dd>
+          <dt className="eyebrow mb-1">{label}</dt>
+          <dd className="text-foreground">{value}</dd>
         </div>
       ))}
     </dl>
@@ -167,7 +169,7 @@ export function FilterSelect({
       value={value}
       onChange={(e) => onValue(e.target.value)}
       aria-label={label}
-      className="h-8 border border-line bg-background px-2 text-sm text-grid-fg focus-visible:outline-2 focus-visible:outline-[var(--grid-action)]"
+      className="h-8 border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-[var(--nq-action)]"
     >
       {all.map((o) => (
         <option key={o.value} value={o.value}>
@@ -185,9 +187,9 @@ export function ServerStatus({ online, status }: { online: boolean; status: stri
     <span className="inline-flex items-center gap-2">
       <span
         aria-hidden
-        className={online ? "size-2 bg-[var(--grid-ok,#3fb950)]" : "size-2 bg-[var(--grid-muted,#8a97b8)] opacity-60"}
+        className={online ? "size-2 bg-nq-success" : "size-2 bg-nq-fg-muted opacity-60"}
       />
-      <span className={online ? "text-grid-fg" : "text-grid-muted"}>
+      <span className={online ? "text-foreground" : "text-muted-foreground"}>
         {online ? t("admin.servers.online") : t(`admin.servers.status.${status}`, undefined, status)}
       </span>
     </span>
