@@ -382,10 +382,18 @@ func fastCheckout(oc *OpContext, src agentproto.GitSource, dir string) (commit, 
 		if src.Token != "" {
 			return "", prevCommit, "", code, fmt.Errorf("git fetch failed: the team's GitHub App installation cannot read this repository, or it has no %q", src.Ref)
 		}
-		if ghRepo != "" {
+		kenv, kcfg, keyed := deployKeyGit()
+		switch {
+		case ghRepo != "" && helper == "" && keyed:
+			oc.Info("using this server's deploy key for %s", ghRepo)
+			if kcode, kerr := oc.RunEnv(kenv, "git", append(kcfg, gitArgs("-C", dir, "fetch", "--depth", "50", "--no-tags", "origin", src.Ref)...)...); kerr != nil {
+				return "", prevCommit, "", kcode, deployKeyFetchError(src.Ref)
+			}
+		case ghRepo != "":
 			return "", prevCommit, "", code, ghFetchError(helper != "", src.Ref)
+		default:
+			return "", prevCommit, "", code, errors.New("git fetch failed")
 		}
-		return "", prevCommit, "", code, errors.New("git fetch failed")
 	}
 	if code, err := oc.RunEnv(env, "git", gitArgs("-C", dir, "checkout", "--quiet", "--force", "--detach", "FETCH_HEAD")...); err != nil {
 		return "", prevCommit, "", code, errors.New("git checkout failed")

@@ -108,6 +108,15 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 			if argv[2] == "fetch" && src.Token != "" {
 				return "", "", code, fmt.Errorf("git fetch failed: the team's GitHub App installation cannot read this repository, or it has no %q", src.Ref)
 			}
+			if argv[2] == "fetch" && ghRepo != "" && helper == "" {
+				if kenv, kcfg, ok := deployKeyGit(); ok {
+					oc.Info("using this server's deploy key for %s", ghRepo)
+					if kcode, kerr := oc.RunEnv(kenv, "git", append(kcfg, gitArgs(argv...)...)...); kerr != nil {
+						return "", "", kcode, deployKeyFetchError(src.Ref)
+					}
+					continue
+				}
+			}
 			if argv[2] == "fetch" && ghRepo != "" {
 				return "", "", code, ghFetchError(helper != "", src.Ref)
 			}
@@ -122,6 +131,25 @@ func checkout(oc *OpContext, src agentproto.GitSource, dir string) (commit, mess
 	commit = strings.TrimSpace(out)
 	oc.Info("checked out %s at %s", src.Ref, commit)
 	return commit, strings.TrimSpace(msg), 0, nil
+}
+
+// deployKeyGit is the environment and leading -c options that fetch a github.com repository over
+// SSH with this server's deploy key; ok is false when no key was generated here. It is the last
+// resort of a clone: a repository whose owner has neither the GitHub App nor a gh login on this
+// server, but added the server's key to the repository.
+func deployKeyGit() (env, cfg []string, ok bool) {
+	priv, _, known := deployKeyPaths()
+	if _, err := os.Stat(priv); err != nil {
+		return nil, nil, false
+	}
+	ensureKnownHosts(known)
+	sshCmd := "ssh -i " + priv + " -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=" + known
+	env = append(append([]string{}, gitEnv...), "GIT_SSH_COMMAND="+sshCmd)
+	return env, []string{"-c", "protocol.ssh.allow=always", "-c", "url.ssh://git@github.com/.insteadOf=https://github.com/"}, true
+}
+
+func deployKeyFetchError(ref string) error {
+	return fmt.Errorf("git fetch failed: this server's deploy key cannot read this repository, or it has no %q — add the key to the repository's deploy keys", ref)
 }
 
 // appTokenEnv carries a GitHub App installation token to the one git fetch that needs it.

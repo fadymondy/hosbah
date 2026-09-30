@@ -46,8 +46,11 @@ LIMIT $3;
 -- name: ApprovalRequestInTeam :one
 SELECT * FROM approval_requests WHERE id = $1 AND team_id = $2;
 
--- ExpireApprovalRequests is swept by the same worker that times operations out.
--- name: ExpireApprovalRequests :execrows
+-- ExpireApprovalRequestsOfTeam marks this team's overdue requests expired. Nothing sweeps them in
+-- the background (pure system scope cannot read this table), so the gate and the queue page
+-- run it before they look: an overdue row left 'pending' would keep approval_requests_open_key
+-- occupied, and every retry would be handed the same dead request instead of a fresh one.
+-- name: ExpireApprovalRequestsOfTeam :execrows
 UPDATE approval_requests
 SET status = 'expired', updated_at = now()
-WHERE status IN ('pending', 'approved') AND expires_at <= now();
+WHERE team_id = $1 AND status IN ('pending', 'approved') AND expires_at <= now();
