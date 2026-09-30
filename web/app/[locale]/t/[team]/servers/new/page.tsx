@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Checkbox, Field, FieldDescription, FieldLabel, Input, Radio, RadioGroup, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@fadymondy/nasaq/web"
+import { Alert, Button, Checkbox, Field, FieldDescription, FieldLabel, Input, Radio, RadioGroup, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@fadymondy/nasaq/web"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -11,7 +11,6 @@ import { CopyField } from "@/components/copy-field";
 import { FormError, useErrorText } from "@/components/form-error";
 import { Notice } from "@/components/states";
 import { CheckBadge } from "@/components/server-status";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 
@@ -245,21 +244,16 @@ export default function NewServerPage() {
           </fieldset>
 
           {source === "proxmox" && proxmox && !proxmox.available ? (
-            <Alert data-testid="proxmox-not-configured">
-              <InfoIcon />
-              <AlertTitle>{t("servers.new.notConfiguredTitle")}</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>{t("servers.new.notConfiguredHint")}</span>
-                <Button
+            <Alert tone="info" title={t("servers.new.notConfiguredTitle")} data-testid="proxmox-not-configured">
+<div className="flex flex-col items-start gap-3"><span>{t("servers.new.notConfiguredHint")}</span><Button
                   size="sm"
                   variant="secondary"
                   nativeButton={false}
                   render={<Link href={`${base}/credentials`} />}
                 >
                   {t("servers.new.addCredential")}
-                </Button>
-              </AlertDescription>
-            </Alert>
+                </Button></div>
+</Alert>
           ) : (
             <div className="flex w-full flex-col gap-5">
               <Field>

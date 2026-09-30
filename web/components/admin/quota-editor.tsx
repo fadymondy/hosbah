@@ -1,8 +1,7 @@
 "use client"
 
-import { Button, Checkbox, Input } from "@fadymondy/nasaq/web"
+import { Button, Checkbox, Input, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState, type FormEvent } from "react"
-import { toast } from "sonner"
 
 import { ListError, LoadingRows } from "@/components/admin/admin-list"
 import { useErrorText } from "@/components/form-error"

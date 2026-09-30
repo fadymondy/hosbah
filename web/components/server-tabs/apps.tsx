@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Button, Checkbox, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Button, Checkbox, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { BoxesIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -73,16 +72,7 @@ export function ServerApps({ serverId }: { serverId: string }) {
       {apps === null ? (
         <LoadingRows />
       ) : apps.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BoxesIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("apps.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{manage ? t("apps.emptyHint") : t("common.readOnly")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={BoxesIcon} title={t("apps.emptyTitle")} description={manage ? t("apps.emptyHint") : t("common.readOnly")} actions={<>{add}</>} />
       ) : (
         <>
         <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchApps")} shown={shown.length} total={apps.length} />

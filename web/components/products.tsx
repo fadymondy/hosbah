@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Progress, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { ArchiveIcon, KeyRoundIcon, PackageIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -18,7 +16,6 @@ import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/st
 
 
 
-import { Progress, ProgressLabel, ProgressTrack, ProgressIndicator, ProgressValue } from "@/components/ui/progress"
 
 
 
@@ -87,16 +84,7 @@ export function TeamProducts() {
         {products === null ? (
           <LoadingRows rows={3} />
         ) : products.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <PackageIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("products.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("products.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {operate ? <ProductDialog path={base} onSaved={load} /> : null}
-          </Empty>
+          <EmptyState className="border-b" icon={PackageIcon} title={t("products.emptyTitle")} description={t("products.emptyHint")} actions={<>{operate ? <ProductDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("products.search")} shown={shown.length} total={products.length} />
@@ -415,15 +403,7 @@ function ProductDetailDialog({
 
         {upgrade ? (
           <div className="flex flex-col gap-2 border border-border p-3">
-            <Progress value={upgrade.total > 0 ? Math.round(((upgrade.completed + upgrade.failed) / upgrade.total) * 100) : 0}>
-              <div className="flex w-full items-center justify-between">
-                <ProgressLabel>{t("products.upgrade.progress")}</ProgressLabel>
-                <ProgressValue />
-              </div>
-              <ProgressTrack>
-                <ProgressIndicator />
-              </ProgressTrack>
-            </Progress>
+            <Progress value={upgrade.total > 0 ? Math.round(((upgrade.completed + upgrade.failed) / upgrade.total) * 100) : 0} label={t("products.upgrade.progress")} showValue />
             <p className="text-xs text-muted-foreground">
               {t("products.upgrade.counts", { completed: upgrade.completed, failed: upgrade.failed, total: upgrade.total })} ·{" "}
               <Badge variant={statusVariant(upgrade.status)}>{upgrade.status}</Badge>

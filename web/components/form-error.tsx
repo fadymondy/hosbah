@@ -1,8 +1,8 @@
 "use client"
 
+import { Alert } from "@fadymondy/nasaq/web"
 import { AlertCircleIcon } from "lucide-react"
 
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ApiError } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 
@@ -27,9 +27,8 @@ export function useErrorText() {
 export function FormError({ message }: { message: string | null }) {
   if (!message) return null
   return (
-    <Alert variant="destructive" role="alert">
-      <AlertCircleIcon />
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
+    <Alert tone="danger" role="alert">
+{message}
+</Alert>
   )
 }

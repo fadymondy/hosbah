@@ -5,10 +5,9 @@
 // edit it here. This file only supplies Hosbah's strings, its /api/feedback JSON transport and
 // the current team.
 
-import { Button } from "@fadymondy/nasaq/web"
+import { Button, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { MessageSquareWarningIcon } from "lucide-react"
-import { toast } from "sonner"
 
 
 import { ReportDialog, type FeedbackSubmission } from "@/lib/feedback/react"

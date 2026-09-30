@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { Button, Input, Skeleton } from "@fadymondy/nasaq/web"
+import { Button, EmptyState, Input, Skeleton } from "@fadymondy/nasaq/web"
 import type { ReactNode } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, TriangleAlertIcon } from "lucide-react"
 
@@ -74,12 +73,7 @@ export function ListError({ error }: { error: unknown }) {
 
 export function ListEmpty({ title, body }: { title: string; body?: string }) {
   return (
-    <Empty className="border-b">
-      <EmptyHeader>
-        <EmptyTitle>{title}</EmptyTitle>
-        {body ? <EmptyDescription>{body}</EmptyDescription> : null}
-      </EmptyHeader>
-    </Empty>
+    <EmptyState className="border-b" title={title} description={body ? body : undefined} />
   )
 }
 

@@ -1,13 +1,12 @@
 "use client"
 
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Alert, Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { InfoIcon, RefreshCwIcon, XIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { DbMetricsHistory } from "@/components/databases/metrics-history"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 
@@ -231,11 +230,9 @@ export function InsightsPanel({ teamSlug, serviceRef, serviceName }: { teamSlug:
         <span className="text-xs text-muted-foreground">{t("databases.insights.topStatementsHint")}</span>
       </div>
       {!data.stat_statements_available ? (
-        <Alert className="mx-6 my-4">
-          <InfoIcon />
-          <AlertTitle>{t("databases.insights.statStatementsUnavailableTitle")}</AlertTitle>
-          <AlertDescription dir="ltr">{data.stat_statements_hint}</AlertDescription>
-        </Alert>
+        <Alert tone="info" title={t("databases.insights.statStatementsUnavailableTitle")} className="mx-6 my-4">
+<div dir="ltr">{data.stat_statements_hint}</div>
+</Alert>
       ) : topStatements.length === 0 ? (
         <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("databases.insights.noLongRunning")}</p>
       ) : (

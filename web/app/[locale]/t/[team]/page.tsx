@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Button, Input } from "@fadymondy/nasaq/web"
+import { Button, EmptyState, Input } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PlusIcon, SearchIcon, ServerIcon } from "lucide-react"
@@ -236,21 +235,12 @@ export default function HomePage() {
       {servers === null ? (
         <LoadingRows rows={3} />
       ) : servers.length === 0 ? (
-        <Empty className="border-y">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ServerIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("overview.serversTitle")}</EmptyTitle>
-            <EmptyDescription>{manage ? t("overview.serversHint") : t("common.readOnly")}</EmptyDescription>
-          </EmptyHeader>
-          {manage ? (
+        <EmptyState className="border-y" icon={ServerIcon} title={t("overview.serversTitle")} description={manage ? t("overview.serversHint") : t("common.readOnly")} actions={<>{manage ? (
             <Button variant="primary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
               <PlusIcon />
               {t("servers.add")}
             </Button>
-          ) : null}
-        </Empty>
+          ) : null}</>} />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">

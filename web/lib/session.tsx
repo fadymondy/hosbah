@@ -1,4 +1,5 @@
 "use client"
+import { Button } from "@fadymondy/nasaq/web"
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { usePathname, useRouter } from "next/navigation"
@@ -60,9 +61,9 @@ function ApiUnavailable({ message, onRetry }: { message: string; onRetry: () => 
       <p className="text-sm text-muted-foreground" dir="ltr">
         {message}
       </p>
-      <button type="button" className="grid-btn" onClick={onRetry}>
+      <Button type="button" variant="primary" onClick={onRetry}>
         {t("common.retry")}
-      </button>
+      </Button>
     </div>
   )
 }

@@ -16,10 +16,9 @@ Two things on this page are deliberate and easy to get wrong later:
     something to fix by hiding it in the UI.
 */
 
-import { Badge, Button, Checkbox, EmptyState, Field, FieldDescription, FieldLabel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, EmptyState, Field, FieldDescription, FieldLabel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { ShieldCheckIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"

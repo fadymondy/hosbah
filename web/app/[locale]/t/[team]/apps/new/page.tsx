@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Collapsible, CollapsiblePanel, CollapsibleTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
+import { Alert, Button, Collapsible, CollapsiblePanel, CollapsibleTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useState, type FormEvent } from "react"
 import { AlertTriangleIcon, CheckCircle2Icon, ChevronDownIcon, InfoIcon, ScanSearchIcon } from "lucide-react"
@@ -12,7 +12,6 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { Notice } from "@/components/states"
 import { OperationLog } from "@/components/op-log"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 
@@ -168,10 +167,9 @@ export default function NewAppPage() {
             <h2 className="font-medium">{t("apps.hook.title")}</h2>
             <p className="text-sm text-muted-foreground">{t("apps.hook.hint")}</p>
             <CopyField value={created.deploy_hook_url} />
-            <Alert>
-              <AlertTriangleIcon />
-              <AlertDescription>{t("apps.hook.once")}</AlertDescription>
-            </Alert>
+            <Alert tone="warning">
+{t("apps.hook.once")}
+</Alert>
           </div>
           <div>
             <Button variant="primary" nativeButton={false} render={<Link href={`${base}/apps/${created.app.name}`} />}>
@@ -190,23 +188,16 @@ export default function NewAppPage() {
       <div className="grid gap-px border-b border-border bg-border lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <form onSubmit={submit} className="flex min-w-0 flex-col gap-6 bg-background px-6 py-6 [&>*]:max-w-2xl">
           {stack ? (
-            <Alert>
-              <InfoIcon />
-              <AlertTitle>{t("site.stacks.fromStack", { name: stack.name })}</AlertTitle>
-              {stack.stack.notes ? <AlertDescription>{stack.stack.notes}</AlertDescription> : null}
-            </Alert>
+            <Alert tone="info" title={<>{t("site.stacks.fromStack", { name: stack.name })}</>}>
+{stack.stack.notes ?? null}
+</Alert>
           ) : null}
           {noServers ? (
-            <Alert data-testid="no-servers">
-              <InfoIcon />
-              <AlertTitle>{t("apps.new.noServersTitle")}</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>{t("apps.new.noServersHint")}</span>
-                <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
+            <Alert tone="info" title={t("apps.new.noServersTitle")} data-testid="no-servers">
+<div className="flex flex-col items-start gap-3"><span>{t("apps.new.noServersHint")}</span><Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/new`} />}>
                   {t("servers.add")}
-                </Button>
-              </AlertDescription>
-            </Alert>
+                </Button></div>
+</Alert>
           ) : null}
           <div className="flex w-full flex-col gap-5">
             <Field>
@@ -416,12 +407,8 @@ export default function NewAppPage() {
             </Collapsible>
 
             {duplicateNotice ? (
-              <Alert data-testid="duplicate-imported">
-                <InfoIcon />
-                <AlertTitle>{duplicateNotice}</AlertTitle>
-                <AlertDescription className="flex flex-col items-start gap-3">
-                  <span>{t("apps.new.duplicateImportedHint")}</span>
-                  <Button
+              <Alert tone="info" title={duplicateNotice} data-testid="duplicate-imported">
+<div className="flex flex-col items-start gap-3"><span>{t("apps.new.duplicateImportedHint")}</span><Button
                     type="button"
                     size="sm"
                     variant="secondary"
@@ -429,9 +416,8 @@ export default function NewAppPage() {
                     onClick={() => createApp(true)}
                   >
                     {busy ? t("common.working") : t("apps.new.duplicateImportedOverride")}
-                  </Button>
-                </AlertDescription>
-              </Alert>
+                  </Button></div>
+</Alert>
             ) : null}
             <FormError message={error} />
             <div>

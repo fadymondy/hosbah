@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BellIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
@@ -90,16 +88,7 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
       {channels === null ? (
         <LoadingRows rows={2} />
       ) : channels.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BellIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("alerts.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("alerts.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={BellIcon} title={t("alerts.emptyTitle")} description={t("alerts.emptyHint")} actions={<>{add}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("alerts.search")} shown={shown.length} total={channels.length} />

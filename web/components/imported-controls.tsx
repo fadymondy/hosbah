@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Input, Skeleton } from "@fadymondy/nasaq/web"
+import { Button, Input, Skeleton, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useState, type FormEvent, type ReactNode } from "react"
 import {
   ArchiveIcon,
@@ -13,7 +13,6 @@ import {
   SquareIcon,
   Trash2Icon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { Facts } from "@/components/admin/admin-list"
 import { ConfirmButton } from "@/components/confirm-button"

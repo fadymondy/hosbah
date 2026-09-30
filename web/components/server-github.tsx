@@ -1,9 +1,8 @@
 "use client"
 
-import { Badge, Button, Input } from "@fadymondy/nasaq/web"
+import { Badge, Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckIcon, CopyIcon, ExternalLinkIcon, GithubIcon, LogOutIcon, RefreshCwIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"

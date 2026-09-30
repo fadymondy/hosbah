@@ -1,11 +1,10 @@
 "use client"
 
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { BanIcon, CheckCircle2Icon, ShieldIcon, ShieldOffIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { Facts, ListEmpty, ListError, LoadingRows, SectionTitle } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"

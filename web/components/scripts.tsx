@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { HistoryIcon, PencilIcon, PlayIcon, PlusIcon, TerminalSquareIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
@@ -101,16 +99,7 @@ export function TeamScripts() {
         {scripts === null ? (
           <LoadingRows rows={3} />
         ) : scripts.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <TerminalSquareIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("scripts.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("scripts.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {manage ? <ScriptDialog path={base} onSaved={load} /> : null}
-          </Empty>
+          <EmptyState className="border-b" icon={TerminalSquareIcon} title={t("scripts.emptyTitle")} description={t("scripts.emptyHint")} actions={<>{manage ? <ScriptDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("scripts.search")} shown={shown.length} total={scripts.length} />

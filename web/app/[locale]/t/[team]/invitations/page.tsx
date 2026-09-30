@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Alert, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { MailPlusIcon, PlusIcon } from "lucide-react"
 
@@ -10,7 +10,6 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 import { RoleSelect } from "@/components/role-select"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 
 
@@ -168,10 +167,9 @@ function InviteDialog({ slug, onInvited }: { slug: string; onInvited: () => void
               <DialogTitle>{t("invitations.createdTitle")}</DialogTitle>
               <DialogDescription>{t("invitations.createdHint")}</DialogDescription>
             </DialogHeader>
-            <Alert>
-              <AlertTitle>{t("invitations.noEmailTitle")}</AlertTitle>
-              <AlertDescription>{t("invitations.noEmailHint")}</AlertDescription>
-            </Alert>
+            <Alert tone="info" title={t("invitations.noEmailTitle")}>
+{t("invitations.noEmailHint")}
+</Alert>
             <CopyField value={acceptUrl} />
             <DialogFooter>
               <Button variant="primary" onClick={() => setOpen(false)}>{t("common.done")}</Button>

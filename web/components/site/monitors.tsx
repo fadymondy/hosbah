@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import {
   ActivityIcon,
@@ -16,7 +15,6 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -184,16 +182,7 @@ export function SiteMonitors() {
         {monitors === null ? (
           <LoadingRows rows={3} />
         ) : monitors.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <BellRingIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("site.monitors.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("site.monitors.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {add}
-          </Empty>
+          <EmptyState className="border-b" icon={BellRingIcon} title={t("site.monitors.emptyTitle")} description={t("site.monitors.emptyHint")} actions={<>{add}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("site.monitors.search")} shown={shown.length} total={monitors.length} />

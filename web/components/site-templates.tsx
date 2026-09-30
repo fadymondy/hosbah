@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckCircle2Icon, EyeIcon, LayoutTemplateIcon, PencilIcon, PlusIcon, RocketIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -100,16 +98,7 @@ export function TeamSiteTemplates() {
         {templates === null ? (
           <LoadingRows rows={3} />
         ) : templates.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LayoutTemplateIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("siteTemplates.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("siteTemplates.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {manage ? <TemplateDialog path={base} onSaved={load} /> : null}
-          </Empty>
+          <EmptyState className="border-b" icon={LayoutTemplateIcon} title={t("siteTemplates.emptyTitle")} description={t("siteTemplates.emptyHint")} actions={<>{manage ? <TemplateDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("siteTemplates.search")} shown={shown.length} total={templates.length} />

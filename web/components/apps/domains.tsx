@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CheckCircle2Icon, GlobeIcon, InfoIcon, ShieldCheckIcon } from "lucide-react"
 
@@ -16,7 +16,6 @@ import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow } from "@/com
 
 
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { apiFetch } from "@/lib/api"
 import type { Domain, Integrations, TLSMode } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
@@ -36,27 +35,19 @@ export function DomainsSummary({ domains }: { domains: Pick<Domain, "id" | "host
         <div key={d.id}>{d.hostname}</div>
       ))}
       {rest.length > 0 ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                dir="ltr"
-                aria-label={t("apps.domains.moreCount", { count: rest.length })}
-                className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              />
-            }
-          >
-            +{rest.length}
-          </TooltipTrigger>
-          <TooltipContent side="top" align="start" className="flex flex-col items-start gap-1">
+        <Tooltip side="top" content={<div className="flex flex-col items-start gap-1">
             {rest.map((d) => (
               <span key={d.id} dir="ltr">
                 {d.hostname}
               </span>
             ))}
-          </TooltipContent>
-        </Tooltip>
+          </div>}>
+<button
+                type="button"
+                dir="ltr"
+                aria-label={t("apps.domains.moreCount", { count: rest.length })}
+                className="rounded-full bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">+{rest.length}</button>
+</Tooltip>
       ) : null}
     </div>
   )

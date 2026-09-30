@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
@@ -20,7 +19,6 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { DomainsPanel } from "@/components/apps/domains"
 import { RuntimeLogsPanel } from "@/components/apps/runtime-logs"
@@ -542,19 +540,10 @@ export function SiteBackups() {
   return (
     <section aria-labelledby="bk-h">
       <SectionTitle id="bk-h" title={t("site.nav.backups")} hint={t("site.backupsHint")} />
-      <Empty className="border-b">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <ArchiveIcon />
-          </EmptyMedia>
-          <EmptyTitle>{t("site.backupsData")}</EmptyTitle>
-          <EmptyDescription>{t("site.backupsDataHint")}</EmptyDescription>
-        </EmptyHeader>
-        <Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} />}>
+      <EmptyState className="border-b" icon={ArchiveIcon} title={t("site.backupsData")} description={t("site.backupsDataHint")} actions={<><Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} />}>
           <DatabaseIcon />
           {t("nav.databases")}
-        </Button>
-      </Empty>
+        </Button></>} />
     </section>
   )
 }

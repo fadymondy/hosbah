@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import {
   CheckCircle2Icon,
@@ -14,7 +13,6 @@ import {
   Trash2Icon,
   UploadCloudIcon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
@@ -106,16 +104,7 @@ export function TeamMail() {
         {servers === null ? (
           <LoadingRows rows={2} />
         ) : servers.length === 0 ? (
-          <Empty className="border-b">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <MailIcon />
-              </EmptyMedia>
-              <EmptyTitle>{t("mail.servers.emptyTitle")}</EmptyTitle>
-              <EmptyDescription>{t("mail.servers.emptyHint")}</EmptyDescription>
-            </EmptyHeader>
-            {manage ? <InstallDialog base={base} servers={enrolledServers} onSaved={load} /> : null}
-          </Empty>
+          <EmptyState className="border-b" icon={MailIcon} title={t("mail.servers.emptyTitle")} description={t("mail.servers.emptyHint")} actions={<>{manage ? <InstallDialog base={base} servers={enrolledServers} onSaved={load} /> : null}</>} />
         ) : (
           <TableBand>
             <Table>

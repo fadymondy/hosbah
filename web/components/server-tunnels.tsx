@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { NetworkIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
@@ -100,21 +99,12 @@ export function ServerTunnels({ serverId, manage }: { serverId: string; manage: 
       <SectionTitle id="tunnels-h" title={t("tunnels.title")} hint={t("tunnels.hint")} />
       <ErrorBand message={error} />
       {rows.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <NetworkIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("lists.noTunnels")}</EmptyTitle>
-            {manage && creds.length === 0 ? <EmptyDescription>{t("lists.noTunnelCreds")}</EmptyDescription> : null}
-          </EmptyHeader>
-          {manage && creds.length === 0 ? (
+        <EmptyState className="border-b" icon={NetworkIcon} title={t("lists.noTunnels")} description={manage && creds.length === 0 ? t("lists.noTunnelCreds") : undefined} actions={<>{manage && creds.length === 0 ? (
             <Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/credentials`} />}>
               <PlusIcon />
               {t("lists.credentials")}
             </Button>
-          ) : null}
-        </Empty>
+          ) : null}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchTunnels")} shown={shown.length} total={rows.length} />

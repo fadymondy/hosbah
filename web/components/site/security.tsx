@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PlayIcon, ShieldAlertIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useTimeAgo } from "@/components/home/sparkline"
 import { useLoadedSite } from "@/components/site/context"
@@ -110,16 +108,7 @@ export function SiteSecurity() {
       {scans === null ? (
         <LoadingRows rows={3} />
       ) : scans.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldAlertIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("site.security.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("site.security.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {scanNowButton}
-        </Empty>
+        <EmptyState className="border-b" icon={ShieldAlertIcon} title={t("site.security.emptyTitle")} description={t("site.security.emptyHint")} actions={<>{scanNowButton}</>} />
       ) : (
         <>
           {latest ? (

@@ -1,10 +1,9 @@
 "use client"
 
-import { buttonVariants } from "@fadymondy/nasaq/web"
+import { buttonVariants, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { KeyRoundIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ProviderMark, oauthHref, useOAuthErrorText } from "@/components/auth/oauth"
 import { ConfirmButton } from "@/components/confirm-button"

@@ -1,8 +1,7 @@
 "use client"
 
-import { Button, Input, Textarea } from "@fadymondy/nasaq/web"
+import { Button, Input, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState, type FormEvent } from "react"
-import { toast } from "sonner"
 
 import { ListError, LoadingRows } from "@/components/admin/admin-list"
 import { PageBody } from "@/components/app-shell"

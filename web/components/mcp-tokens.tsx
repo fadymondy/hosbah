@@ -10,7 +10,7 @@ import { FormError, useErrorText } from "@/components/form-error"
 
 
 import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@fadymondy/nasaq/web"
 
 
 

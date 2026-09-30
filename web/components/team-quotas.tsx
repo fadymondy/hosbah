@@ -1,10 +1,10 @@
 "use client"
 
+import { Progress } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
-import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { percent } from "@/lib/servers"
@@ -66,7 +66,7 @@ function QuotaMeter({ label, used, max }: { label: string; used: number; max: nu
         <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
           {text}
         </span>
-        {max !== null ? <Progress value={percent(used, max)} aria-label={label} /> : null}
+        {max !== null ? <Progress value={percent(used, max)} aria-label={label} size="sm" /> : null}
       </dd>
     </div>
   )

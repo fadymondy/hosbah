@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button } from "@fadymondy/nasaq/web"
+import { Badge, Button, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
@@ -14,7 +14,6 @@ import {
   RefreshCwIcon,
   RocketIcon,
 } from "lucide-react"
-import { toast } from "sonner"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
 import { ConfirmButton } from "@/components/confirm-button"

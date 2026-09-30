@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Alert, Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { DatabaseIcon, DownloadIcon, HardDriveDownloadIcon, KeyRoundIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
@@ -11,7 +11,6 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ResourcesCard } from "@/components/resources-panel"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 
 
 
@@ -461,9 +460,9 @@ function ImportDatabaseDialog({
           </DialogHeader>
           <div className="flex w-full flex-col gap-5 py-4">
             {done ? (
-              <Alert>
-                <AlertDescription>{t("databases.importStarted")}</AlertDescription>
-              </Alert>
+              <Alert tone="info">
+{t("databases.importStarted")}
+</Alert>
             ) : (
               <>
                 <Field>
@@ -485,9 +484,9 @@ function ImportDatabaseDialog({
                   </FieldLabel>
                 </Field>
                 {replace ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{t("databases.importReplaceWarning", { name: database.name })}</AlertDescription>
-                  </Alert>
+                  <Alert tone="danger">
+{t("databases.importReplaceWarning", { name: database.name })}
+</Alert>
                 ) : null}
                 <FormError message={error} />
               </>
@@ -662,9 +661,9 @@ function PasswordResult({ service, databaseName, user, password }: { service: Da
   const connString = connectionStringFor(service, databaseName, user, password)
   return (
     <div className="flex flex-col gap-3">
-      <Alert>
-        <AlertDescription>{t("databases.passwordOnceHint")}</AlertDescription>
-      </Alert>
+      <Alert tone="info">
+{t("databases.passwordOnceHint")}
+</Alert>
       <div className="flex flex-col gap-1">
         <FieldLabel>{t("databases.passwordShownOnce")}</FieldLabel>
         <CopyField value={password} />
@@ -975,11 +974,9 @@ function ConnectionPanel({ teamSlug, serviceRef, canAttach }: { teamSlug: string
           </Button>
         </div>
         {attached ? (
-          <Alert>
-            <AlertDescription>
-              {t("databases.attachedDone", { variable: attached })}
-            </AlertDescription>
-          </Alert>
+          <Alert tone="info">
+{t("databases.attachedDone", { variable: attached })}
+</Alert>
         ) : null}
       </div>
       <FormError message={error} />

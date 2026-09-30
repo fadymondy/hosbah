@@ -1,9 +1,8 @@
 "use client"
 
-import { Badge, Button, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { CircleOffIcon, DatabaseIcon, RefreshCwIcon, ServerIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"

@@ -1,9 +1,8 @@
 "use client"
 
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fadymondy/nasaq/web"
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"

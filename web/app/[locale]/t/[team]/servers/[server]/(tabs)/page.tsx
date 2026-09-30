@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@fadymondy/nasaq/web"
+import { Button, Progress } from "@fadymondy/nasaq/web"
 import { useState } from "react"
 import { AlertCircleIcon, LoaderIcon } from "lucide-react"
 
@@ -10,7 +10,6 @@ import { useLoadedServer } from "@/components/server-tabs/context"
 import { CheckBadge } from "@/components/server-status"
 import { Notice, SectionTitle } from "@/components/states"
 
-import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { formatBytes, formatUptime, percent, platformOf, type Install } from "@/lib/servers"
@@ -172,7 +171,7 @@ function Meter({ label, value, text }: { label: string; value: number; text: str
         <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
           {text}
         </span>
-        <Progress value={value} aria-label={label} />
+        <Progress value={value} aria-label={label} size="sm" />
       </dd>
     </div>
   )

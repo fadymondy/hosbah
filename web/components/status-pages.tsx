@@ -1,7 +1,6 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ExternalLinkIcon, GaugeIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
@@ -90,16 +89,7 @@ export function StatusPagesSection({ team, manage }: { team: string; manage: boo
       {pages === null ? (
         <LoadingRows rows={2} />
       ) : pages.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <GaugeIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("statusPages.emptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("statusPages.emptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={GaugeIcon} title={t("statusPages.emptyTitle")} description={t("statusPages.emptyHint")} actions={<>{add}</>} />
       ) : (
         <>
           <ListSearch value={q} onChange={setQ} placeholder={t("statusPages.search")} shown={shown.length} total={pages.length} />

@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Skeleton } from "@fadymondy/nasaq/web"
+import { Button, DropdownMenu, SidebarGroup, useSidebarCollapsed, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
@@ -32,7 +32,7 @@ import {
 
 import { ServerMark } from "@/components/server-mark"
 import { SERVER_TABS, type ServerTab } from "@/components/server-tabs/header"
-import { GroupLabel, NavLink } from "@/components/shell/nav-link"
+import { NavLink } from "@/components/shell/nav-link"
 import { scopeOf, useShellScope } from "@/components/shell/scope"
 import { sectionsFor, SITE_GROUPS } from "@/components/site/sections"
 
@@ -91,25 +91,29 @@ function ScopeHead({
   subtitle?: ReactNode
   onNavigate?: () => void
 }) {
+  const collapsed = useSidebarCollapsed()
   return (
     <div className="border-b border-border pb-3">
       <Link
         href={back}
         onClick={onNavigate}
         title={backLabel}
-        className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0"
+        aria-label={backLabel}
+        className={`flex items-center gap-2 px-4 py-2 text-caption text-muted-foreground hover:text-foreground ${collapsed ? "justify-center px-0" : ""}`}
       >
         <ArrowLeftIcon className="size-3.5 shrink-0 rtl:-scale-x-100" />
-        <span className="truncate group-data-[collapsed=true]/nav:hidden">{backLabel}</span>
+        {collapsed ? null : <span className="truncate">{backLabel}</span>}
       </Link>
-      <div className="flex items-center gap-2.5 px-4 pt-1 group-data-[collapsed=true]/nav:justify-center group-data-[collapsed=true]/nav:px-0">
+      <div className={`flex items-center gap-2.5 px-4 pt-1 ${collapsed ? "justify-center px-0" : ""}`}>
         {mark}
-        <span className="min-w-0 group-data-[collapsed=true]/nav:hidden">
-          <span dir="auto" className="block truncate text-sm font-medium text-foreground">
-            {title}
+        {collapsed ? null : (
+          <span className="min-w-0">
+            <span dir="auto" className="block truncate text-label text-foreground">
+              {title}
+            </span>
+            {subtitle ? <span className="block truncate text-caption text-muted-foreground">{subtitle}</span> : null}
           </span>
-          {subtitle ? <span className="block truncate text-xs text-muted-foreground">{subtitle}</span> : null}
-        </span>
+        )}
       </div>
     </div>
   )
@@ -130,7 +134,7 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
   )
 
   return (
-    <nav className="flex flex-col pb-3" aria-label={t("servers.tabs.label")} data-testid="server-nav">
+    <div className="flex flex-col pb-3" data-testid="server-nav">
       <ScopeHead
         back={base}
         backLabel={team.name}
@@ -145,8 +149,7 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
         const items = tabs.filter((tab) => SERVER_ITEMS[tab].group === g)
         if (!items.length) return null
         return (
-          <div key={g || "top"} className="flex flex-col">
-            {g ? <GroupLabel>{t(`shell.scope.${g}`)}</GroupLabel> : <div className="h-2" />}
+          <SidebarGroup key={g || "top"} label={g ? t(`shell.scope.${g}`) : undefined}>
             {items.map((tab) => {
               const Icon = SERVER_ITEMS[tab].icon
               return (
@@ -155,10 +158,10 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
                 </NavLink>
               )
             })}
-          </div>
+          </SidebarGroup>
         )
       })}
-    </nav>
+    </div>
   )
 }
 
@@ -174,7 +177,7 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
   const serverName = loaded && server?.id === loaded.serverId ? server.name : ""
 
   return (
-    <nav className="flex flex-col pb-3" aria-label={t("site.nav.label")} data-testid="site-nav">
+    <div className="flex flex-col pb-3" data-testid="site-nav">
       <ScopeHead
         back={back}
         backLabel={serverName || t("nav.servers")}
@@ -194,8 +197,7 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
           const items = sectionsFor(loaded.imported).filter((s) => s.group === g)
           if (!items.length) return null
           return (
-            <div key={g} className="flex flex-col">
-              {g !== "site" ? <GroupLabel>{t(`site.groups.${g}`)}</GroupLabel> : <div className="h-2" />}
+            <SidebarGroup key={g} label={g !== "site" ? t(`site.groups.${g}`) : undefined}>
               {items.map((s) => (
                 <NavLink
                   key={s.key || "overview"}
@@ -207,7 +209,7 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
                   {t(`site.nav.${s.key || "overview"}`)}
                 </NavLink>
               ))}
-            </div>
+            </SidebarGroup>
           )
         })
       ) : (
@@ -217,7 +219,7 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
           ))}
         </div>
       )}
-    </nav>
+    </div>
   )
 }
 

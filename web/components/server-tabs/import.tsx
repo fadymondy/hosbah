@@ -1,9 +1,8 @@
 "use client"
 
-import { Badge, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { AlertCircleIcon, CheckCircle2Icon, CircleSlashIcon, PlayIcon, RadarIcon, RefreshCwIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { Facts } from "@/components/admin/admin-list"
 import { useErrorText } from "@/components/form-error"

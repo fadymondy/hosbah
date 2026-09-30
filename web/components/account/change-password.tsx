@@ -1,8 +1,7 @@
 "use client"
 
-import { Button, Input } from "@fadymondy/nasaq/web"
+import { Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useState, type FormEvent } from "react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"

@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Skeleton, useNasaq } from "@fadymondy/nasaq/web"
+import { Button, Skeleton, toast, useNasaq } from "@fadymondy/nasaq/web"
 import "@xyflow/react/dist/style.css"
 import "./canvas.css"
 
@@ -25,7 +25,6 @@ import {
   type NodeChange,
 } from "@xyflow/react"
 import { LayoutGridIcon, PlusIcon, RotateCcwIcon, ServerIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { RemoveDomain } from "@/components/apps/domains"
 import { RemoveEnvVar } from "@/components/apps/env"

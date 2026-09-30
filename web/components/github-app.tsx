@@ -1,10 +1,9 @@
 "use client"
 
-import { Badge, buttonVariants } from "@fadymondy/nasaq/web"
+import { Badge, buttonVariants, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ExternalLinkIcon, InfoIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { ProviderMark } from "@/components/auth/oauth"
 import { useErrorText } from "@/components/form-error"

@@ -1,13 +1,12 @@
 "use client"
 
-import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
+import { Alert, Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react"
 import { PlayIcon, SearchIcon, TableIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 
 
 
@@ -363,9 +362,9 @@ function SqlConsole({
         <span className="text-xs text-muted-foreground">{t("databases.data.runHint")}</span>
       </div>
       {allowWrites ? (
-        <Alert className="mt-3" variant="destructive">
-          <AlertDescription>{t("databases.data.allowWritesHint")}</AlertDescription>
-        </Alert>
+        <Alert tone="danger" className="mt-3">
+{t("databases.data.allowWritesHint")}
+</Alert>
       ) : null}
       <ConfirmButton
         open={confirmOpen}

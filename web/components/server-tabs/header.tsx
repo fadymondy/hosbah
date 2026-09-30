@@ -58,10 +58,10 @@ export function ServerHeader({ serverId }: { serverId: string }) {
           <ServerMark server={server} size={10} />
           <span className="min-w-0">
             <span className="eyebrow block">{team.name}</span>
-            <span dir="ltr" className="grid-title block truncate text-2xl">
+            <span dir="ltr" className="block truncate text-h2">
               {server.name}
             </span>
-            <span className="grid-body block text-sm">
+            <span className="block text-body-sm text-nq-fg-body">
               {t(`servers.providers.${server.provider}`)} · {t(`servers.kinds.${server.kind}`)}
             </span>
           </span>

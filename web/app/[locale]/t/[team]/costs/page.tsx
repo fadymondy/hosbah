@@ -1,10 +1,8 @@
 "use client"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Progress, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { ChevronDownIcon, ChevronRightIcon, CircleDollarSignIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
@@ -18,7 +16,6 @@ import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/st
 
 
 
-import { Progress } from "@/components/ui/progress"
 
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useFormatDate, useFormatMoney, useI18n } from "@/lib/i18n"
@@ -214,7 +211,7 @@ function UsageBar({ percent, label }: { percent: number | undefined; label: stri
   if (percent == null) return <span className="text-xs text-muted-foreground">—</span>
   return (
     <div className="flex w-28 flex-col gap-1">
-      <Progress value={percent} aria-label={label} />
+      <Progress value={percent} aria-label={label} size="sm" />
       <span dir="ltr" className="text-start font-mono text-[11px] tabular-nums text-muted-foreground">
         {percent}%
       </span>
@@ -553,16 +550,7 @@ function LineItemsSection({
     <section aria-labelledby="costs-lineitems-h">
       <SectionTitle id="costs-lineitems-h" title={t("costs.lineItemsTitle")} hint={t("costs.lineItemsHint")} action={add} />
       {items.length === 0 ? (
-        <Empty className="border-b">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CircleDollarSignIcon />
-            </EmptyMedia>
-            <EmptyTitle>{t("costs.lineItemsEmptyTitle")}</EmptyTitle>
-            <EmptyDescription>{t("costs.lineItemsEmptyHint")}</EmptyDescription>
-          </EmptyHeader>
-          {add}
-        </Empty>
+        <EmptyState className="border-b" icon={CircleDollarSignIcon} title={t("costs.lineItemsEmptyTitle")} description={t("costs.lineItemsEmptyHint")} actions={<>{add}</>} />
       ) : (
         <TableBand>
           <Table>

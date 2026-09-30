@@ -1,9 +1,8 @@
 "use client"
 
-import { Button, Input } from "@fadymondy/nasaq/web"
+import { Button, Input, toast } from "@fadymondy/nasaq/web"
 import { useRef, useState, type FormEvent } from "react"
 import { Trash2Icon, UploadIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import { useErrorText } from "@/components/form-error"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
