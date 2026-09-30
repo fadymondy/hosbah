@@ -402,7 +402,7 @@ export default function NewAppPage() {
                     />
                   </Field>
                 </div>
-                <FieldDescription className="pt-2">{t("apps.new.advancedHint")}</FieldDescription>
+                <p className="pt-2 text-caption text-muted-foreground">{t("apps.new.advancedHint")}</p>
               </CollapsiblePanel>
             </Collapsible>
 

@@ -1006,7 +1006,7 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
           </Field>
           {manage ? (
             <div className="sm:col-span-4">
-              <FieldDescription className="mb-2">{t("servers.security.fail2ban.installHint")}</FieldDescription>
+              <p className="mb-2 text-caption text-muted-foreground">{t("servers.security.fail2ban.installHint")}</p>
               <Button variant="primary" type="submit" size="sm" disabled={busy}>
                 {busy ? t("common.working") : t("servers.security.fail2ban.save")}
               </Button>

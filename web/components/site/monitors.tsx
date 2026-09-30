@@ -579,7 +579,7 @@ export function MonitorDialog({
                 </div>
               </Field>
             ) : (
-              <FieldDescription>{t("site.monitors.noChannels")}</FieldDescription>
+              <p className="text-caption text-muted-foreground">{t("site.monitors.noChannels")}</p>
             )}
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={enabled} onCheckedChange={(v) => setEnabled(v === true)} />

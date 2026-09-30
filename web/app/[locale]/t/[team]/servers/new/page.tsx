@@ -213,7 +213,7 @@ export default function NewServerPage() {
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-3 text-label">{t("servers.new.source")}</legend>
             <RadioGroup value={source} onValueChange={(v) => setSource(v as Source)}>
-              <FieldLabel htmlFor="src-byo">
+              <label htmlFor="src-byo" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
                 <Field className="flex-row items-center">
                   <Radio value="byo" id="src-byo" />
                   <div className="flex flex-1 flex-col gap-0.5">
@@ -221,8 +221,8 @@ export default function NewServerPage() {
                     <FieldDescription>{t("servers.new.byoHint")}</FieldDescription>
                   </div>
                 </Field>
-              </FieldLabel>
-              <FieldLabel htmlFor="src-connect">
+              </label>
+              <label htmlFor="src-connect" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
                 <Field className="flex-row items-center">
                   <Radio value="connect" id="src-connect" />
                   <div className="flex flex-1 flex-col gap-0.5">
@@ -230,8 +230,8 @@ export default function NewServerPage() {
                     <FieldDescription>{t("servers.new.connectHint")}</FieldDescription>
                   </div>
                 </Field>
-              </FieldLabel>
-              <FieldLabel htmlFor="src-proxmox">
+              </label>
+              <label htmlFor="src-proxmox" className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary">
                 <Field className="flex-row items-center">
                   <Radio value="proxmox" id="src-proxmox" />
                   <div className="flex flex-1 flex-col gap-0.5">
@@ -239,7 +239,7 @@ export default function NewServerPage() {
                     <FieldDescription>{t("servers.new.proxmoxHint")}</FieldDescription>
                   </div>
                 </Field>
-              </FieldLabel>
+              </label>
             </RadioGroup>
           </fieldset>
 
