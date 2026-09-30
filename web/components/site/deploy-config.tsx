@@ -212,7 +212,7 @@ export function SiteDeployConfig() {
   return (
     <>
       <SectionTitle
-        title={t("site.nav.deployScript")}
+        title={t("site.nav.deploy-script")}
         hint={t("site.deployScript.hint")}
         action={
           <Button
