@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, EmptyState, Input, Skeleton } from "@fadymondy/nasaq/web"
+import { Button, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@fadymondy/nasaq/web"
 import type { ReactNode } from "react"
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, TriangleAlertIcon } from "lucide-react"
 
@@ -159,18 +159,18 @@ export function FilterSelect({
   const { t } = useI18n()
   const all = [{ value: "", label: t("admin.list.all", { what: label }) }, ...options]
   return (
-    <select
-      value={value}
-      onChange={(e) => onValue(e.target.value)}
-      aria-label={label}
-      className="h-8 border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-[var(--nq-action)]"
-    >
-      {all.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={(v) => onValue((v as string) ?? "")}>
+      <SelectTrigger aria-label={label} className="h-8 w-auto gap-2 text-sm">
+        <SelectValue>{() => all.find((o) => o.value === value)?.label ?? all[0].label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {all.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

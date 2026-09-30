@@ -177,7 +177,7 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
 
 function StatusDot({ status }: { status: Status }) {
   const { t } = useI18n()
-  const color = status === "connected" ? "bg-emerald-500" : status === "connecting" ? "bg-amber-500" : "bg-nq-fg-muted"
+  const color = status === "connected" ? "bg-nq-success" : status === "connecting" ? "bg-nq-warning" : "bg-nq-fg-muted"
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className={`size-2 rounded-full ${color}`} aria-hidden />

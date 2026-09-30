@@ -202,7 +202,7 @@ function StatusBreakdown({ t, points }: { t: TFunc; points: Point[] }) {
           sums[c] > 0 ? (
             <div
               key={c}
-              className={c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-sky-500" : c === "4xx" ? "bg-amber-500" : "bg-nq-danger"}
+              className={c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-nq-info" : c === "4xx" ? "bg-nq-warning" : "bg-nq-danger"}
               style={{ width: `${(sums[c] / total) * 100}%` }}
               title={`${c}: ${sums[c]}`}
             />
@@ -214,7 +214,7 @@ function StatusBreakdown({ t, points }: { t: TFunc; points: Point[] }) {
           <div key={c} className="flex items-center gap-1.5">
             <span
               aria-hidden
-              className={`size-2 rounded-full ${c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-sky-500" : c === "4xx" ? "bg-amber-500" : "bg-nq-danger"}`}
+              className={`size-2 rounded-full ${c === "2xx" ? "bg-nq-success" : c === "3xx" ? "bg-nq-info" : c === "4xx" ? "bg-nq-warning" : "bg-nq-danger"}`}
             />
             <dt dir="ltr" className="text-muted-foreground">
               {c}

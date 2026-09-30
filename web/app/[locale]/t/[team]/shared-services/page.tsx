@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { CircleOffIcon, DatabaseIcon, RefreshCwIcon, ServerIcon } from "lucide-react"
 
@@ -126,7 +126,7 @@ export default function SharedServicesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
         <ListSearch value={q} onChange={setQ} placeholder={t("sharedServices.search")} shown={shown.length} total={visible.length} />
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />
+          <Checkbox checked={showHidden} onCheckedChange={(v) => setShowHidden(!!v)} />
           {t("sharedServices.showHidden")}
         </label>
       </div>

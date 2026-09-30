@@ -1,5 +1,5 @@
-import { Input } from "@fadymondy/nasaq/web"
 "use client"
+import { Input } from "@fadymondy/nasaq/web"
 
 
 

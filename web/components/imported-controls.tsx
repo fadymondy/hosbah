@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Input, Skeleton, toast } from "@fadymondy/nasaq/web"
+import { Button, Checkbox, Input, Skeleton, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useState, type FormEvent, type ReactNode } from "react"
 import {
   ArchiveIcon,
@@ -501,7 +501,7 @@ export function DangerZone({
         >
           <ErrorBand message={error} />
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={purge} onChange={(e) => setPurge(e.target.checked)} />
+            <Checkbox checked={purge} onCheckedChange={(v) => setPurge(!!v)} />
             {guest ? t("controls.purgeGuest") : t("controls.purgeContainer")}
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">

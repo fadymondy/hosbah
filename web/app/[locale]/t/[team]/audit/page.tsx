@@ -1,6 +1,6 @@
 "use client"
 
-import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ScrollTextIcon } from "lucide-react"
 
@@ -86,54 +86,48 @@ export default function AuditPage() {
   return (
     <PageBody title={t("nav.audit")} description={t("audit.description")} bleed>
       <ListToolbar q={q} onQ={setQ} placeholder={t("audit.filters.search")}>
-        <input
+        <Input
           value={actor}
           onChange={(e) => setActor(e.target.value)}
           placeholder={t("audit.filters.actor")}
           aria-label={t("audit.filters.actor")}
           dir="ltr"
-          className="h-8 w-36 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
-        />
-        <input
+          className="w-36 font-mono" />
+        <Input
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder={t("audit.filters.action")}
           aria-label={t("audit.filters.action")}
           dir="ltr"
-          className="h-8 w-32 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
-        />
-        <input
+          className="w-32 font-mono" />
+        <Input
           value={subjectType}
           onChange={(e) => setSubjectType(e.target.value)}
           placeholder={t("audit.filters.subjectType")}
           aria-label={t("audit.filters.subjectType")}
           dir="ltr"
-          className="h-8 w-28 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
-        />
-        <input
+          className="w-28 font-mono" />
+        <Input
           value={subjectId}
           onChange={(e) => setSubjectId(e.target.value)}
           placeholder={t("audit.filters.subjectId")}
           aria-label={t("audit.filters.subjectId")}
           dir="ltr"
-          className="h-8 w-28 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
-        />
-        <input
+          className="w-28 font-mono" />
+        <Input
           type="date"
           value={since}
           onChange={(e) => setSince(e.target.value)}
           aria-label={t("audit.filters.since")}
           dir="ltr"
-          className="h-8 border border-border bg-background px-2 text-sm text-foreground"
-        />
-        <input
+          />
+        <Input
           type="date"
           value={until}
           onChange={(e) => setUntil(e.target.value)}
           aria-label={t("audit.filters.until")}
           dir="ltr"
-          className="h-8 border border-border bg-background px-2 text-sm text-foreground"
-        />
+          />
       </ListToolbar>
       <ErrorBand message={error} />
       {entries === null ? (

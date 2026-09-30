@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -33,14 +33,13 @@ export default function AdminOperationsPage() {
   return (
     <PageBody eyebrow={t("nav.platform")} title={t("admin.nav.operations")} description={t("admin.operations.hint")} bleed>
       <ListToolbar>
-        <input
+        <Input
           value={kind}
           onChange={(e) => setKind(e.target.value)}
           placeholder={t("admin.operations.kind")}
           aria-label={t("admin.operations.kind")}
           dir="ltr"
-          className="h-8 w-44 border border-border bg-background px-2 font-mono text-sm text-foreground placeholder:font-sans placeholder:text-muted-foreground"
-        />
+          className="w-44 font-mono" />
         <FilterSelect
           value={status}
           onValue={setStatus}

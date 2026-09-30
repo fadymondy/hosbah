@@ -1,6 +1,6 @@
 "use client"
 
-import { Input, Skeleton } from "@fadymondy/nasaq/web"
+import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { GithubIcon, LockIcon, SearchIcon } from "lucide-react"
@@ -152,18 +152,18 @@ export function RepoPicker({
       {picked && branches?.length ? (
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           {t("github.branch")}
-          <select
-            value={branch}
-            onChange={(e) => onBranch(e.target.value)}
-            dir="ltr"
-            className="h-8 border border-border bg-background px-2 font-mono text-sm text-foreground"
-          >
-            {branches.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <Select value={branch} onValueChange={(v) => v && onBranch(v as string)}>
+            <SelectTrigger dir="ltr" className="h-8 w-auto gap-2 font-mono text-sm">
+              <SelectValue>{() => branch}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {branches.map((b) => (
+                <SelectItem key={b} value={b}>
+                  <span dir="ltr">{b}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       ) : null}
     </div>
