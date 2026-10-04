@@ -1100,6 +1100,35 @@ func (d *deps) registerApps(api huma.API) {
 			Domains []DomainOut `json:"domains"`
 		}
 	}
+	type teamDomain struct {
+		DomainOut
+		AppID    string `json:"app_id"`
+		AppName  string `json:"app_name"`
+		ServerID string `json:"server_id"`
+	}
+	type teamDomainsOut struct {
+		Body struct {
+			Domains []teamDomain `json:"domains"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-team-domains", Method: http.MethodGet, Path: "/api/teams/{team}/domains",
+		Summary: "Every app hostname of the team, with its app and server. Proxy hosts are listed by list-proxy-hosts. Any member.", Tags: tags,
+	}, func(ctx context.Context, in *TeamPath) (*teamDomainsOut, error) {
+		out := &teamDomainsOut{}
+		out.Body.Domains = []teamDomain{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			rows, err := q.TeamDomains(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list domains")
+			}
+			for _, r := range rows {
+				out.Body.Domains = append(out.Body.Domains, teamDomain{DomainOut: toDomainOut(r.Domain), AppID: r.Domain.AppID, AppName: r.AppName, ServerID: r.ServerID})
+			}
+			return nil
+		})
+		return out, err
+	})
+
 	huma.Register(api, huma.Operation{OperationID: "list-domains", Method: http.MethodGet, Path: "/api/teams/{team}/apps/{app}/domains",
 		Summary: "The app's hostnames", Tags: tags,
 	}, func(ctx context.Context, in *AppPath) (*domainsOut, error) {

@@ -281,6 +281,26 @@ func AppTools() []Tool {
 			},
 		},
 		{
+			Name: "list_team_domains", Scope: scopes.Read,
+			Description: "Every app hostname of the team: hostname → app, TLS mode, verified or not. Proxy hosts are in list_proxy_hosts.",
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				rows, err := env.Q.TeamDomains(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", errors.New("could not list domains")
+				}
+				if len(rows) == 0 {
+					return "No app has a domain. add_domain routes one.", nil
+				}
+				var b strings.Builder
+				for _, r := range rows {
+					fmt.Fprintf(&b, "  %s → %s  tls %s  %s\n", r.Domain.Hostname, r.AppName, r.Domain.Tls,
+						map[bool]string{true: "verified", false: "not verified"}[r.Domain.VerifiedAt != nil])
+				}
+				return b.String(), nil
+			},
+		},
+		{
 			Name: "list_domains", Scope: scopes.Read,
 			Description: "An app's hostnames, TLS mode and verification record.",
 			InputSchema: schema([]string{"app"}, map[string]any{"app": appArg}),

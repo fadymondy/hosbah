@@ -159,7 +159,7 @@ export function ServerProxy({ serverId }: { serverId: string }) {
   )
 }
 
-function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => Promise<void> }) {
+export function AddProxyHost({ servers, onSaved }: { servers: Server[]; onSaved: () => Promise<void> }) {
   const { t } = useI18n()
   const { team } = useTeam()
   const errorText = useErrorText()

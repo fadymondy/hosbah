@@ -595,6 +595,22 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "backups_overview", nil); res.IsError || !strings.Contains(res.Text, "1 backup(s)") {
 		t.Errorf("backups_overview as A should show the seeded backup: %+v", res)
 	}
+	// The team-wide domain list is B's own only.
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_team_domains", nil); res.IsError || strings.Contains(res.Text, domA.Hostname) {
+		t.Errorf("list_team_domains as B leaked team A's domain: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "list_team_domains", nil); res.IsError || !strings.Contains(res.Text, domA.Hostname) {
+		t.Errorf("list_team_domains as A should show its domain: %+v", res)
+	}
+	var domsB struct {
+		Domains []struct{ Hostname string } `json:"domains"`
+	}
+	ub.mustJSON("GET", "/api/teams/"+teamB.ID+"/domains", nil, 200, &domsB)
+	for _, d := range domsB.Domains {
+		if d.Hostname == domA.Hostname {
+			t.Errorf("GET domains as B leaked team A's domain")
+		}
+	}
 	// The team-wide storage list is B's own only.
 	seedVolume(t, teamA.ID, appA.App.ID, "secret-vol")
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_team_storage", nil); res.IsError || strings.Contains(res.Text, "secret-vol") {

@@ -62,3 +62,10 @@ SELECT a.* FROM apps a
 WHERE a.source = 'git' AND a.origin_kind IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM domains d WHERE d.app_id = a.id AND d.verify_token = 'platform')
 ORDER BY a.created_at;
+
+-- name: TeamDomains :many
+-- Team scope: every app domain of the team with its app, for the team Domains page.
+SELECT sqlc.embed(d), a.name AS app_name, a.server_id
+FROM domains d JOIN apps a ON a.id = d.app_id
+WHERE d.team_id = sqlc.arg('team_id')
+ORDER BY d.hostname;

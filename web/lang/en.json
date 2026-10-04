@@ -3771,5 +3771,31 @@
       "failed": "Failed",
       "removing": "Removing"
     }
+  },
+  "domains2": {
+    "lede": "Every hostname you serve: app domains and proxy hosts, their verification and certificates.",
+    "emptyTitle": "No domains yet",
+    "emptyBody": "Route a domain to an app from its Domains tab, or proxy a hostname to any upstream on one of your servers.",
+    "toApps": "Go to apps",
+    "attention": "{n} hostnames need attention: not verified yet, or a certificate failing or about to expire.",
+    "search": "Search hostnames",
+    "kind": "Kind",
+    "kinds": {
+      "app": "App domain",
+      "proxy": "Proxy host"
+    },
+    "needsAttention": "Needs attention",
+    "noMatch": "No hostname matches these filters.",
+    "routesTo": "Routes to",
+    "tls": "TLS",
+    "awaitingVerify": "Waiting for verification",
+    "certPending": "Certificate not checked yet",
+    "certFailing": "Certificate failing",
+    "certExpires": "Expires in {n} days",
+    "certOk": "Valid, {n} days left",
+    "showRecord": "Show the TXT record",
+    "recordHint": "Add this TXT record at your DNS provider, then press Verify.",
+    "manage": "Manage",
+    "addHint": "App domains are added on each app's Domains tab. Hostnames are unique across app domains and proxy hosts."
   }
 }
