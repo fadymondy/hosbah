@@ -3682,5 +3682,31 @@
     "lastDeploy": "Last deploy",
     "imported": "Imported workload",
     "lastFailed": "Last deploy failed"
+  },
+  "deploys2": {
+    "lede": "Every deployment across your apps and servers, newest first.",
+    "pipeline": "Deploy steps",
+    "emptyTitle": "Nothing deployed yet",
+    "emptyBody": "Deploy an app from a Git repository, a template or a one-click stack and its deployments show up here.",
+    "search": "Search app, commit, branch, person…",
+    "active": "In progress",
+    "allApps": "All apps",
+    "noMatch": "No deployment matches these filters.",
+    "failed": "The deployment failed",
+    "failedAt": "Failed while {step}",
+    "openLog": "View log",
+    "openFailedLog": "See why",
+    "older": "Load older",
+    "hint": {
+      "none": "Open the log to see the last lines before it stopped.",
+      "provision": "The server could not be prepared. Check that it is online and has free disk space.",
+      "build": "The build failed. The log shows the failing command — often a missing dependency or a build script error.",
+      "release": "The release command exited with an error — often a database migration. A release that was already live keeps serving.",
+      "start": "The new release did not become healthy. Check the port, the start command and the health check path. A release that was already live keeps serving.",
+      "switch": "Traffic could not be moved to the new release. A release that was already live keeps serving.",
+      "drain": "The old release did not stop cleanly. The new release is already serving.",
+      "rollback": "The rollback did not finish. Open the log, then try another release.",
+      "restart": "The restart did not finish. Open the log and check the app's processes."
+    }
   }
 }

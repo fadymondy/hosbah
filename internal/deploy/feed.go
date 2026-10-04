@@ -45,7 +45,10 @@ type FeedItem struct {
 	CommitMessage *string    `json:"commit_message" doc:"First line of the commit message, when the build knew it."`
 	Trigger       string     `json:"trigger" enum:"manual,hook,mcp,github,rollback,restart" doc:"What started it: rollback/restart for those kinds, else how the deploy was asked for."`
 	TriggeredBy   *FeedUser  `json:"triggered_by" doc:"The account that asked; null for a deploy hook or a GitHub push."`
+	Step          *string    `json:"step" doc:"The pipeline step it is on, or where it stopped."`
+	Error         *string    `json:"error" doc:"Why it failed, when it did."`
 	CreatedAt     time.Time  `json:"created_at"`
+	StartedAt     *time.Time `json:"started_at"`
 	FinishedAt    *time.Time `json:"finished_at"`
 }
 
@@ -103,7 +106,7 @@ func TeamFeed(ctx context.Context, q *db.Queries, teamID string, limit int, befo
 		}
 		it := FeedItem{ID: r.ID, Number: r.Number, App: FeedApp{ID: r.AppID, Name: r.AppName, Title: r.AppTitle, Description: r.AppDescription, Color: r.AppColor, Icon: r.AppIcon}, Server: FeedRef{ID: r.ServerID},
 			Status: r.Status, Kind: r.Kind, Branch: r.Ref, CommitSHA: r.CommitSha, CommitMessage: r.CommitMessage, Trigger: r.Trigger,
-			CreatedAt: r.CreatedAt, FinishedAt: r.FinishedAt}
+			Step: r.Step, Error: r.Error, CreatedAt: r.CreatedAt, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt}
 		if r.AppLogoEtag != nil {
 			it.App.LogoURL = AppLogoURL(teamID, r.AppID, *r.AppLogoEtag)
 		}

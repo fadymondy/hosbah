@@ -4,25 +4,30 @@ import Link from "next/link"
 import { CheckCircle2Icon, CircleDashedIcon, GitCommitHorizontalIcon, XCircleIcon } from "lucide-react"
 
 import { useTimeAgo } from "@/components/home/sparkline"
-import type { DeploymentStatus } from "@/lib/apps"
+import type { DeploymentKind, DeploymentStatus, DeploymentStep } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 
 /** One row of the team's deployment feed (GET /api/teams/{team}/deployments). */
 export type FeedItem = {
   id: string
   number: number
-  app: { id: string; name: string }
+  app: { id: string; name: string; title?: string | null; color?: string | null; icon?: string | null; logo_url?: string | null }
   server?: { id: string; name: string } | null
   status: DeploymentStatus
+  kind?: DeploymentKind
+  step?: DeploymentStep | null
+  error?: string | null
   branch?: string | null
   commit_sha?: string | null
   commit_message?: string | null
   trigger?: string | null
   triggered_by?: { email: string } | null
   created_at: string
+  started_at?: string | null
+  finished_at?: string | null
 }
 
-function StatusIcon({ status }: { status: DeploymentStatus }) {
+export function StatusIcon({ status }: { status: DeploymentStatus }) {
   const { t } = useI18n()
   const label = t(`apps.deploy.statuses.${status}`, undefined, status)
   if (status === "succeeded")

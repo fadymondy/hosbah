@@ -38,6 +38,16 @@ export function SiteDeployments() {
     if (deps[0]) setSelected((cur) => (pinned && cur ? cur : deps[0].id))
   }, [deps, pinned])
 
+  // ?d=<id> (from the team's deployment feed or search) opens that deployment and keeps it open.
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get("d")
+    if (want && deps.some((d) => d.id === want)) {
+      setSelected(want)
+      setPinned(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deps.length > 0])
+
   const live = detail.live_release
   const prev = detail.previous_release
   const shown = deps.filter((d) => matches(q, d.number, d.status, d.kind, d.trigger, d.commit_sha, d.commit_message, d.ref))
