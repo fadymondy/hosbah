@@ -16,7 +16,8 @@
     "refresh": "Refresh",
     "readOnly": "You can view this, but your role cannot change it.",
     "home": "Go home",
-    "close": "Close"
+    "close": "Close",
+    "next": "Next"
   },
   "prefs": {
     "switchLanguage": "Switch language",
@@ -901,7 +902,21 @@
       "how1": "The server's agent clones the repository at the branch you choose.",
       "how2": "It builds an image with the Dockerfile, or with Railpack when there is none.",
       "how3": "The new release starts next to the old one and must pass its health check.",
-      "how4": "Caddy switches traffic to it; the previous image is kept for a one-click rollback."
+      "how4": "Caddy switches traffic to it; the previous image is kept for a one-click rollback.",
+      "wizard": {
+        "steps": "Deploy steps",
+        "source": "Source",
+        "app": "Application",
+        "infra": "Infrastructure",
+        "review": "Review & deploy",
+        "sourceTitle": "What do you want to deploy?",
+        "sourceHint": "A Git repository or a ready-made stack continues here. Templates, products and something already running on a server have their own pages.",
+        "productsBody": "Run one app for many customers, each with its own hostname and settings.",
+        "serverHint": "The app builds and runs on this server. It must be connected and online.",
+        "detectAtBuild": "Detected when it builds",
+        "laterTitle": "Databases and domains come next",
+        "laterBody": "Once the app exists, add a database or cache from its Services, and a custom domain from its Domains page."
+      }
     },
     "hook": {
       "title": "Deploy hook",

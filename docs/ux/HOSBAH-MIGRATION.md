@@ -68,7 +68,8 @@ URLs are kept wherever possible so bookmarks, notifications and MCP links keep w
 
 ## Phases
 
-Each phase is a separate commit and is checked with `npm run typecheck && npm run build`.
+Each phase is a separate commit and is checked with `npm run typecheck && npm run build`. All twelve
+are done (October 2026).
 
 1. Shell and navigation: grouped sidebar, settings sub-nav, breadcrumb and server-only switcher,
    global search.
@@ -88,8 +89,12 @@ Each phase is a separate commit and is checked with `npm run typecheck && npm ru
 ## Not done (needs backend)
 
 - An app environment field (production/staging).
-- A team-wide domains endpoint with DNS state.
+- DNS state on the team-wide domains list. `GET /domains` (and the `list_team_domains` MCP tool)
+  exists and returns verification and certificate state, but not the live DNS answer.
 - Database size and connections on the list.
 - Batched app CPU/memory for the list.
 
-The UI shows these only where an existing endpoint provides them.
+The UI shows these only where an existing endpoint provides them. The deploy wizard has no Services
+or Domain step for the same reason: `create-app` takes neither, so its Review step says where to add
+them once the app exists. Docker image and CircleXO sources go through the catalogue stacks and
+Products.
