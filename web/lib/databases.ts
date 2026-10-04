@@ -17,6 +17,22 @@ export interface DataService extends Imported {
   has_credentials?: boolean
   credentials_required?: boolean
   created_at: string
+  /** The team list only: the newest backup and the schedule; absent when it has neither. */
+  backups?: BackupSummary
+}
+
+export interface BackupSummary {
+  last_status: "pending" | "running" | "succeeded" | "failed" | null
+  last_at: string | null
+  last_error: string | null
+  last_restore_status: string | null
+  last_ok_at: string | null
+  last_ok_size: number | null
+  count: number
+  schedule: string | null
+  schedule_paused: boolean
+  next_run_at: string | null
+  target: "local" | "minio" | "s3" | null
 }
 
 export interface DatabaseRow {

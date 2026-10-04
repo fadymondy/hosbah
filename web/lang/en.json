@@ -3708,5 +3708,20 @@
       "rollback": "The rollback did not finish. Open the log, then try another release.",
       "restart": "The restart did not finish. Open the log and check the app's processes."
     }
+  },
+  "dbs2": {
+    "lede": "{n} database services on {servers} servers.",
+    "emptyTitle": "No databases yet",
+    "emptyBody": "Create a Postgres, MySQL or Redis service on one of your servers, or import one that is already running there.",
+    "emptyNoServer": "Connect a server first; databases run on your own servers.",
+    "noMatch": "No database matches these filters.",
+    "unprotected": "{n} databases have no backup and no schedule.",
+    "backupFailed": "Last backup failed {when}",
+    "backupRunning": "Backing up…",
+    "lastGood": "Backed up {when}",
+    "never": "Never backed up",
+    "scheduled": "Schedule {cron}",
+    "schedulePaused": "Schedule paused",
+    "storageHint": "{n} object storage services are under Storage"
   }
 }

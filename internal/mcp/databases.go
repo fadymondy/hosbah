@@ -119,6 +119,67 @@ func DatabaseTools() []Tool {
 				return b.String(), nil
 			},
 		},
+		{
+			Name: "backups_overview", Scope: scopes.Read,
+			Description: "Backups across every data service of the team at a glance: per service its newest backup (status, when, error), the newest successful one (when, size, restore test) and its schedule. Services with neither are listed as unprotected.",
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				svcs, err := env.Q.ListDataServicesOfTeam(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", errors.New("could not list data services")
+				}
+				sums, err := env.Q.TeamBackupSummaries(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", errors.New("could not list backups")
+				}
+				if len(svcs) == 0 {
+					return "No data services yet. create_database provisions one.", nil
+				}
+				by := make(map[string]db.TeamBackupSummariesRow, len(sums))
+				for _, r := range sums {
+					by[r.DataServiceID] = r
+				}
+				now := time.Now()
+				var b, none strings.Builder
+				for _, s := range svcs {
+					r, ok := by[s.ID]
+					if !ok {
+						fmt.Fprintf(&none, "  %s (%s)\n", s.Name, s.Kind)
+						continue
+					}
+					last := "never"
+					if r.LastStatus != nil {
+						last = *r.LastStatus + " " + ago(r.LastCreatedAt, now)
+						if r.LastError != nil && *r.LastError != "" {
+							last += " — " + *r.LastError
+						}
+					}
+					good := "none"
+					if r.LastOkAt != nil {
+						good = ago(r.LastOkAt, now)
+						if r.LastOkSize != nil {
+							good += ", " + humanBytes(*r.LastOkSize)
+						}
+						good += ", restore " + orDash(r.LastRestoreStatus)
+					}
+					sched := "manual only"
+					if r.ScheduleCron != nil {
+						sched = *r.ScheduleCron + " to " + orDash(r.ScheduleTarget)
+						if r.SchedulePaused.Valid && r.SchedulePaused.Bool {
+							sched += " (paused)"
+						} else if r.ScheduleNextRunAt != nil {
+							sched += ", next " + r.ScheduleNextRunAt.UTC().Format(time.RFC3339)
+						}
+					}
+					fmt.Fprintf(&b, "  %s (%s): %d backup(s); last %s; last good %s; schedule %s\n", s.Name, s.Kind, r.BackupCount, last, good, sched)
+				}
+				out := b.String()
+				if none.Len() > 0 {
+					out += "No backups and no schedule (backup_now or a schedule on the database page):\n" + none.String()
+				}
+				return out, nil
+			},
+		},
 
 		// ---- write ----
 		{

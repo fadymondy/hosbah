@@ -147,7 +147,7 @@ export function ServerDatabases({ serverId }: { serverId: string }) {
   )
 }
 
-function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; serverId: string; onCreated: () => void | Promise<void> }) {
+export function CreateDialog({ teamSlug, serverId, onCreated }: { teamSlug: string; serverId: string; onCreated: () => void | Promise<void> }) {
   const { t } = useI18n()
   const errorText = useErrorText()
   const [open, setOpen] = useState(false)

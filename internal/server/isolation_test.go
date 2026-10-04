@@ -587,6 +587,14 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_apps", nil); strings.Contains(res.Text, appA.App.Name) || strings.Contains(res.Text, "imp-site") {
 		t.Errorf("list_apps as B leaked team A's app: %s", res.Text)
 	}
+	// The team-wide backups overview (and the data-service list's backup summary) is B's own only.
+	seedBackup(t, teamA.ID, impSvcID)
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "backups_overview", nil); res.IsError || strings.Contains(res.Text, "imp-pg") || strings.Contains(res.Text, impSvcID) {
+		t.Errorf("backups_overview as B leaked team A's data service: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "backups_overview", nil); res.IsError || !strings.Contains(res.Text, "1 backup(s)") {
+		t.Errorf("backups_overview as A should show the seeded backup: %+v", res)
+	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_scripts", nil); strings.Contains(res.Text, scriptA.Name) {
 		t.Errorf("list_scripts as B leaked team A's script: %s", res.Text)
 	}

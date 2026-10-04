@@ -40,6 +40,28 @@ type DataServiceOut struct {
 	HasCredentials      bool             `json:"has_credentials" doc:"Whether Hosbah holds credentials for it (always for a managed service). An imported one gets them through POST …/credentials; until then databases, users and backups answer 409 credentials_required."`
 	CredentialsRequired bool             `json:"credentials_required" doc:"Whether the credentials form must be filled in before databases, users and backups work. False for a managed service and for an imported native Proxmox LXC guest (it authenticates as the matching OS user instead — no stored credential needed), even when has_credentials is also false there."`
 	CreatedAt           time.Time        `json:"created_at"`
+	Backups             *BackupSummary   `json:"backups,omitempty" doc:"The team list only: its newest backup and schedule; absent when it has neither."`
+}
+
+// BackupSummary is a data service's backup state at a glance (the team-wide lists).
+type BackupSummary struct {
+	LastStatus        *string    `json:"last_status" enum:"pending,running,succeeded,failed" doc:"The newest backup's status; null if none was taken."`
+	LastAt            *time.Time `json:"last_at" doc:"When the newest backup was started."`
+	LastError         *string    `json:"last_error"`
+	LastRestoreStatus *string    `json:"last_restore_status" doc:"untested, testing, pass or fail: whether the newest backup was restored into a throwaway container."`
+	LastOkAt          *time.Time `json:"last_ok_at" doc:"When the newest successful backup was taken."`
+	LastOkSize        *int64     `json:"last_ok_size"`
+	Count             int64      `json:"count"`
+	Schedule          *string    `json:"schedule" doc:"The schedule's cron, or null when backups are manual only."`
+	SchedulePaused    bool       `json:"schedule_paused"`
+	NextRunAt         *time.Time `json:"next_run_at"`
+	Target            *string    `json:"target" enum:"local,minio,s3"`
+}
+
+func toBackupSummary(r db.TeamBackupSummariesRow) *BackupSummary {
+	return &BackupSummary{LastStatus: r.LastStatus, LastAt: r.LastCreatedAt, LastError: r.LastError, LastRestoreStatus: r.LastRestoreStatus,
+		LastOkAt: r.LastOkAt, LastOkSize: r.LastOkSize, Count: r.BackupCount, Schedule: r.ScheduleCron,
+		SchedulePaused: r.SchedulePaused.Valid && r.SchedulePaused.Bool, NextRunAt: r.ScheduleNextRunAt, Target: r.ScheduleTarget}
 }
 
 // DatabaseOut / DatabaseUserOut / BackupOut / ScheduleOut are the detail page's rows.
@@ -238,8 +260,18 @@ func (d *deps) registerDatabases(api huma.API) {
 			if err != nil {
 				return huma.Error500InternalServerError("could not list data services")
 			}
+			sums, err := q.TeamBackupSummaries(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list backups")
+			}
+			byService := make(map[string]*BackupSummary, len(sums))
+			for _, r := range sums {
+				byService[r.DataServiceID] = toBackupSummary(r)
+			}
 			for _, r := range rows {
-				out.Body.Services = append(out.Body.Services, toDataServiceOut(r))
+				o := toDataServiceOut(r)
+				o.Backups = byService[r.ID]
+				out.Body.Services = append(out.Body.Services, o)
 			}
 			return nil
 		})

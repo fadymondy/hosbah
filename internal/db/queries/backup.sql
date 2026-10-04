@@ -38,3 +38,20 @@ WHERE id = $1 AND team_id = $2;
 
 -- name: SetBackupRestoreTesting :exec
 UPDATE backups SET restore_status = 'testing', updated_at = now() WHERE id = $1 AND team_id = $2;
+
+-- name: TeamBackupSummaries :many
+-- Team scope: per data service, its newest backup (any status), its newest successful one and
+-- its schedule, for the team-wide Databases and Backups lists. One row per service that has
+-- either a backup or a schedule.
+SELECT s.id AS data_service_id,
+    lb.status AS last_status, lb.created_at AS last_created_at, lb.error AS last_error, lb.restore_status AS last_restore_status,
+    ok.taken_at AS last_ok_at, ok.size_bytes AS last_ok_size,
+    bs.cron AS schedule_cron, bs.paused AS schedule_paused, bs.next_run_at AS schedule_next_run_at, bs.target AS schedule_target,
+    (SELECT count(*) FROM backups c WHERE c.data_service_id = s.id AND c.team_id = s.team_id)::bigint AS backup_count
+FROM data_services s
+LEFT JOIN backups lb ON lb.id = (
+    SELECT b.id FROM backups b WHERE b.data_service_id = s.id AND b.team_id = s.team_id ORDER BY b.created_at DESC LIMIT 1)
+LEFT JOIN backups ok ON ok.id = (
+    SELECT b.id FROM backups b WHERE b.data_service_id = s.id AND b.team_id = s.team_id AND b.status = 'succeeded' ORDER BY b.created_at DESC LIMIT 1)
+LEFT JOIN backup_schedules bs ON bs.data_service_id = s.id AND bs.team_id = s.team_id
+WHERE s.team_id = $1 AND (lb.id IS NOT NULL OR bs.id IS NOT NULL);
