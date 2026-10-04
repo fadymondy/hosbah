@@ -32,3 +32,10 @@ RETURNING *;
 
 -- name: DeleteAppVolumeInTeam :execrows
 DELETE FROM app_volumes WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: TeamVolumes :many
+-- Team scope: every volume of the team's apps with its app and server, for the team Storage page.
+SELECT v.id, v.name, v.mount_path, v.created_at, a.id AS app_id, a.name AS app_name, a.server_id
+FROM app_volumes v JOIN apps a ON a.id = v.app_id
+WHERE v.team_id = sqlc.arg('team_id')
+ORDER BY a.name, v.name;

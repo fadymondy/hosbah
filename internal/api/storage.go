@@ -47,6 +47,36 @@ func (d *deps) registerStorage(api huma.API) {
 	tags := []string{"Storage"}
 	base := "/api/teams/{team}/apps/{app}/storage"
 
+	type teamStorageOut struct {
+		Body struct {
+			Volumes []db.TeamVolumesRow `json:"volumes" doc:"Every app volume of the team, with its app and server. No bytes: an app's storage asks its server."`
+			Buckets []db.TeamBucketsRow `json:"buckets" doc:"Every app bucket of the team, with its app and MinIO service. Never a secret."`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-team-storage", Method: http.MethodGet, Path: "/api/teams/{team}/storage", Tags: tags,
+		Summary: "Every persistent volume and S3 bucket of the team's apps, from the database only (no server is asked). Any member.",
+	}, func(ctx context.Context, in *TeamPath) (*teamStorageOut, error) {
+		out := &teamStorageOut{}
+		out.Body.Volumes, out.Body.Buckets = []db.TeamVolumesRow{}, []db.TeamBucketsRow{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			vols, err := q.TeamVolumes(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list the volumes")
+			}
+			buckets, err := q.TeamBuckets(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list the buckets")
+			}
+			out.Body.Volumes = append(out.Body.Volumes, vols...)
+			out.Body.Buckets = append(out.Body.Buckets, buckets...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
+	})
+
 	type storageOut struct{ Body StorageOut }
 	huma.Register(api, huma.Operation{OperationID: "get-app-storage", Method: http.MethodGet, Path: base, Tags: tags,
 		Summary: "The app's persistent volumes and S3 buckets. A volume's mounted says whether the live release runs with it; bytes is " +

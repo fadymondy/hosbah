@@ -22,6 +22,40 @@ func StorageTools() []Tool {
 
 	return []Tool{
 		{
+			Name: "list_team_storage", Scope: scopes.Read,
+			Description: "Every persistent volume and S3 bucket across the team's apps: app, volume name and mount path; bucket, " +
+				"MinIO service and status. From the database only, so no sizes (get_app_storage asks the server). Never a secret.",
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				vols, err := env.Q.TeamVolumes(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", err
+				}
+				buckets, err := env.Q.TeamBuckets(ctx, env.Caller.TeamID)
+				if err != nil {
+					return "", err
+				}
+				var b strings.Builder
+				if len(vols) == 0 {
+					b.WriteString("No volumes.\n")
+				}
+				for _, v := range vols {
+					fmt.Fprintf(&b, "volume %s  app %s  %s\n", v.Name, v.AppName, v.MountPath)
+				}
+				if len(buckets) == 0 {
+					b.WriteString("No buckets.\n")
+				}
+				for _, k := range buckets {
+					fmt.Fprintf(&b, "bucket %s on %s  app %s  %s", k.Bucket, k.ServiceName, k.AppName, k.Status)
+					if k.Error != nil {
+						fmt.Fprintf(&b, "  error: %s", *k.Error)
+					}
+					b.WriteString("\n")
+				}
+				return b.String(), nil
+			},
+		},
+		{
 			Name: "get_app_storage", Scope: scopes.Read,
 			Description: "An app's persistent volumes (name, mount path, Docker volume, whether the live release mounts it, bytes when the " +
 				"server reports them) and its S3 buckets (service, bucket, access key id, the variables it set, status). Never a secret.",

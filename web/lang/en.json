@@ -3723,5 +3723,53 @@
     "scheduled": "Schedule {cron}",
     "schedulePaused": "Schedule paused",
     "storageHint": "{n} object storage services are under Storage"
+  },
+  "backups2": {
+    "lede": "Every data service's backups: what is failing, what was never backed up, and when each last succeeded.",
+    "emptyTitle": "Nothing to back up yet",
+    "emptyBody": "Backups protect your databases. Create or import a database first.",
+    "search": "Search services",
+    "noMatch": "No service matches these filters.",
+    "lastGood": "Last good backup",
+    "schedule": "Schedule",
+    "actions": "Actions",
+    "count": "{n} in total",
+    "next": "Next {when}",
+    "addSchedule": "Add a schedule",
+    "restoreFailed": "The last restore test failed",
+    "guestHint": "Not supported inside a Proxmox guest",
+    "health": {
+      "failing": "Failing",
+      "unprotected": "Not protected",
+      "running": "Backing up",
+      "ok": "Protected",
+      "unsupported": "Unsupported"
+    }
+  },
+  "storage2": {
+    "lede": "Object storage and persistent volumes across your apps.",
+    "emptyTitle": "No storage yet",
+    "emptyBody": "Create a MinIO service for S3 buckets, or add a persistent volume on an app's Storage tab.",
+    "search": "Search buckets and volumes",
+    "services": "Object storage services",
+    "noServices": "No MinIO service. Create one to give apps S3 buckets.",
+    "bucketCount": "{n} buckets",
+    "buckets": "Buckets",
+    "noBuckets": "No app has a bucket yet.",
+    "bucket": "Bucket",
+    "app": "App",
+    "service": "Service",
+    "volumes": "Volumes",
+    "noVolumes": "No app has a persistent volume yet.",
+    "volume": "Volume",
+    "created": "Created",
+    "noMatch": "Nothing matches this search.",
+    "addHint": "Buckets and volumes are added and removed on each app's Storage tab, and apply from its next deploy.",
+    "bucketStatus": {
+      "creating": "Creating",
+      "ready": "Ready",
+      "failed": "Failed",
+      "removing": "Removing"
+    }
   }
 }

@@ -80,7 +80,7 @@ export default function DatabasesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [services, q, kind, server, servers])
 
-  const unprotected = services.filter((s) => s.source !== "imported" && !s.backups?.last_ok_at && !s.backups?.schedule).length
+  const unprotected = services.filter((s) => s.origin_kind !== "guest" && !s.backups?.last_ok_at && !s.backups?.schedule).length
   const create =
     manage && servers.length > 0 ? <CreateDialog teamSlug={team.slug} serverId={servers[0].id} onCreated={load} /> : null
 
@@ -192,7 +192,7 @@ export default function DatabasesPage() {
                             {b.last_ok_size ? <span className="text-grid-muted"> · {humanBytes(b.last_ok_size)}</span> : null}
                           </span>
                         ) : b?.last_status !== "failed" ? (
-                          <span className="block text-grid-muted">{s.source === "imported" ? "—" : t("dbs2.never")}</span>
+                          <span className="block text-grid-muted">{s.origin_kind === "guest" ? "—" : t("dbs2.never")}</span>
                         ) : null}
                         <span dir="auto" className="block text-grid-muted">
                           {b?.schedule ? (b.schedule_paused ? t("dbs2.schedulePaused") : t("dbs2.scheduled", { cron: b.schedule })) : null}

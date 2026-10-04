@@ -595,6 +595,23 @@ func TestIsolationSweep(t *testing.T) {
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "backups_overview", nil); res.IsError || !strings.Contains(res.Text, "1 backup(s)") {
 		t.Errorf("backups_overview as A should show the seeded backup: %+v", res)
 	}
+	// The team-wide storage list is B's own only.
+	seedVolume(t, teamA.ID, appA.App.ID, "secret-vol")
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_team_storage", nil); res.IsError || strings.Contains(res.Text, "secret-vol") {
+		t.Errorf("list_team_storage as B leaked team A's volume: %+v", res)
+	}
+	if res := mcpCall(t, ts.URL, "/api/mcp", tokA.Token, "list_team_storage", nil); res.IsError || !strings.Contains(res.Text, "secret-vol") {
+		t.Errorf("list_team_storage as A should show the seeded volume: %+v", res)
+	}
+	var stB struct {
+		Volumes []struct{ Name string } `json:"volumes"`
+	}
+	ub.mustJSON("GET", "/api/teams/"+teamB.ID+"/storage", nil, 200, &stB)
+	for _, v := range stB.Volumes {
+		if v.Name == "secret-vol" {
+			t.Errorf("GET storage as B leaked team A's volume")
+		}
+	}
 	if res := mcpCall(t, ts.URL, "/api/mcp", tokB.Token, "list_scripts", nil); strings.Contains(res.Text, scriptA.Name) {
 		t.Errorf("list_scripts as B leaked team A's script: %s", res.Text)
 	}

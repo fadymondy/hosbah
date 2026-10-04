@@ -43,6 +43,18 @@ func seedAppServiceLink(t *testing.T, teamID, appID, sharedServiceID, variable s
 }
 
 // seedBackup records a finished backup of a data service directly, as the worker would.
+func seedVolume(t *testing.T, teamID, appID, name string) {
+	t.Helper()
+	db := testDB(t)
+	err := tenancy.Tx(context.Background(), db, tenancy.Scope{System: true, TeamID: teamID}, func(_ *db2.Queries, tx *sql.Tx) error {
+		_, err := tx.Exec(`INSERT INTO app_volumes (team_id, app_id, name, mount_path) VALUES ($1, $2, $3, '/'||$3)`, teamID, appID, name)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed a volume: %v", err)
+	}
+}
+
 func seedBackup(t *testing.T, teamID, dataServiceID string) {
 	t.Helper()
 	db := testDB(t)

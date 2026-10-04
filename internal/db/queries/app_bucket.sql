@@ -45,3 +45,11 @@ WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND status = sqlc.ar
 
 -- name: DeleteAppBucketInTeam :execrows
 DELETE FROM app_buckets WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id');
+
+-- name: TeamBuckets :many
+-- Team scope: every bucket of the team's apps with its app and MinIO service, for the team Storage page.
+SELECT b.id, b.bucket, b.env_prefix, b.status, b.error, b.created_at, b.service_id, s.name AS service_name,
+       a.id AS app_id, a.name AS app_name
+FROM app_buckets b JOIN apps a ON a.id = b.app_id JOIN data_services s ON s.id = b.service_id
+WHERE b.team_id = sqlc.arg('team_id')
+ORDER BY s.name, b.bucket;
