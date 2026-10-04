@@ -3,21 +3,18 @@
 import { Button, Skeleton } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useState, type ReactNode } from "react"
-import { AlertCircleIcon, ExternalLinkIcon, RocketIcon } from "lucide-react"
+import { type ReactNode } from "react"
+import { AlertCircleIcon, ExternalLinkIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge } from "@/components/app-status"
-import { useErrorText } from "@/components/form-error"
 import { ImportedBadge, originSummary } from "@/components/imported"
 import { ServerMark } from "@/components/server-mark"
 import { useProvideSiteScope } from "@/components/shell/scope"
 import { SiteProvider, useSite } from "@/components/site/context"
+import { DeployButton } from "@/components/site/deploy-dialog"
 import { ErrorBand, LoadingRows, Notice } from "@/components/states"
-
-
-import { apiFetch } from "@/lib/api"
-import { isImported, type Deployment } from "@/lib/apps"
+import { isImported } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
@@ -36,10 +33,8 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 function Frame({ children }: { children: ReactNode }) {
   const { t, locale } = useI18n()
   const { team } = useTeam()
-  const errorText = useErrorText()
   const operate = canOperate(team.role)
-  const { detail, missing, error, setError, connected, path, pushDeployment } = useSite()
-  const [busy, setBusy] = useState(false)
+  const { detail, missing, error, connected } = useSite()
   const app = detail?.app
   useProvideSiteScope(
     app
@@ -69,18 +64,6 @@ function Frame({ children }: { children: ReactNode }) {
   const base = `/${locale}/t/${team.slug}`
   const host = detail.domains[0]
 
-  async function deploy() {
-    setBusy(true)
-    setError(null)
-    try {
-      pushDeployment(await apiFetch<Deployment>(`${path}/deployments`, { method: "POST", body: {} }))
-    } catch (err) {
-      setError(errorText(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <PageBody
       eyebrow={
@@ -108,10 +91,7 @@ function Frame({ children }: { children: ReactNode }) {
             </Button>
           ) : null}
           {operate && !imported ? (
-            <Button variant="primary" disabled={busy} onClick={() => void deploy()}>
-              <RocketIcon />
-              {t("apps.actions.deploy")}
-            </Button>
+            <DeployButton />
           ) : null}
         </>
       }

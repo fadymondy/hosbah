@@ -3606,7 +3606,8 @@
         "stack": "Stack"
       },
       "fromStack": "Prefilled from the {name} stack."
-    }
+    },
+    "deployNow": "Deployment #{n}"
   },
   "resources": {
     "title": "Resources",
@@ -3815,5 +3816,20 @@
       "log-drains": "Log drains",
       "github": "GitHub"
     }
+  },
+  "deployDialog": {
+    "title": "Deploy {app}?",
+    "hint": "Hosbah builds the latest commit, starts it next to the live release and switches traffic only once it passes the health check. If anything fails, the live release keeps serving.",
+    "repo": "Repository",
+    "branch": "Branch",
+    "server": "Server",
+    "live": "Live now",
+    "nothingLive": "Nothing live yet",
+    "alreadyRunning": "Deployment #{n} is still in progress; a new one waits for it.",
+    "confirm": "Deploy now",
+    "starting": "Starting…",
+    "progressTitle": "Deployment #{n}",
+    "progressHint": "You can close this window; the deployment keeps going and shows up under Deployments.",
+    "done": "The new release is live."
   }
 }

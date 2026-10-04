@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
+import { isActive, Pipeline } from "@/components/deploy/pipeline"
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { ImportedNotice, OriginFacts } from "@/components/imported"
@@ -138,8 +139,6 @@ export function SiteOverview() {
           </div>
         </Notice>
       ) : null}
-      <SiteCanvas />
-
       {imported ? (
         <>
           {operate && app.imported_state !== "missing" ? <WorkloadStats path={path} /> : null}
@@ -184,8 +183,20 @@ export function SiteOverview() {
               </span>
             </Stat>
           </dl>
+          {last && (isActive(last) || last.status === "failed") ? (
+            <div className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3">
+              <span className="text-xs text-muted-foreground">
+                {t("site.deployNow", { n: last.number })}
+              </span>
+              <Pipeline d={last} />
+              <Link href={`${root}/deployments?d=${last.id}`} className="ms-auto text-xs text-grid-action hover:underline">
+                {last.status === "failed" ? t("deploys2.openFailedLog") : t("deploys2.openLog")}
+              </Link>
+            </div>
+          ) : null}
         </section>
       )}
+      <SiteCanvas />
     </>
   )
 }

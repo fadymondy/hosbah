@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckIcon, GitBranchIcon, GitCommitHorizontalIcon, RocketIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import { GitBranchIcon, GitCommitHorizontalIcon, RocketIcon, TriangleAlertIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
+import { duration, isActive as active, Pipeline } from "@/components/deploy/pipeline"
 import { useErrorText } from "@/components/form-error"
 import { StatusIcon, type FeedItem } from "@/components/home/deployments-feed"
 import { useTimeAgo } from "@/components/home/sparkline"
@@ -13,80 +14,13 @@ import { ServerMark } from "@/components/server-mark"
 import { ErrorBand, LoadingRows } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { apiFetch } from "@/lib/api"
-import { shortSha, type DeploymentStep } from "@/lib/apps"
+import { shortSha } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 type Page = { deployments: FeedItem[]; next_cursor: string | null }
 type StatusFilter = "" | "active" | "succeeded" | "failed"
-
-/** The steps a deploy walks through, in order (rollback and restart are one step each). */
-const PIPELINE: DeploymentStep[] = ["provision", "build", "release", "start", "switch", "drain"]
-
-const active = (d: FeedItem) => d.status === "queued" || d.status === "running"
-
-/** "1m 42s" from two instants. */
-function duration(from: string, to: string | null | undefined) {
-  const ms = (to ? new Date(to).getTime() : Date.now()) - new Date(from).getTime()
-  if (!(ms > 0)) return null
-  const s = Math.round(ms / 1000)
-  if (s < 60) return `${s}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ${s % 60}s`
-  return `${Math.floor(m / 60)}h ${m % 60}m`
-}
-
-/**
- * The deploy pipeline as a row of steps: done ones ticked, the current one pulsing, the one it
- * failed on crossed out in red. A rollback or restart shows its single step.
- */
-function Pipeline({ d }: { d: FeedItem }) {
-  const { t } = useI18n()
-  const steps: DeploymentStep[] = d.kind === "rollback" || d.kind === "restart" ? [d.kind] : PIPELINE
-  const at = d.step ? steps.indexOf(d.step) : -1
-  return (
-    <ol className="flex flex-wrap items-center gap-x-1 gap-y-1.5" aria-label={t("deploys2.pipeline")}>
-      {steps.map((s, i) => {
-        const state =
-          d.status === "succeeded"
-            ? "done"
-            : at < 0
-              ? d.status === "queued"
-                ? "todo"
-                : "unknown"
-              : i < at
-                ? "done"
-                : i > at
-                  ? "todo"
-                  : d.status === "failed"
-                    ? "failed"
-                    : d.status === "cancelled"
-                      ? "cancelled"
-                      : "current"
-        return (
-          <li key={s} className="flex items-center gap-1">
-            {i > 0 ? <span aria-hidden className={cn("h-px w-3", state === "done" || state === "current" || state === "failed" ? "bg-grid-muted" : "bg-line")} /> : null}
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 border px-1.5 py-0.5 text-[11px] whitespace-nowrap",
-                state === "done" && "border-line text-grid-body",
-                state === "current" && "border-grid-brand text-grid-fg",
-                state === "failed" && "border-grid-danger bg-grid-danger/10 text-grid-danger",
-                (state === "todo" || state === "unknown" || state === "cancelled") && "border-dashed border-line text-grid-muted",
-              )}
-            >
-              {state === "done" ? <CheckIcon className="size-3 text-grid-ok" /> : null}
-              {state === "current" ? <span aria-hidden className="size-1.5 animate-pulse rounded-full bg-grid-brand" /> : null}
-              {state === "failed" ? <XIcon className="size-3" /> : null}
-              {t(`apps.deploy.steps.${s}`, undefined, s)}
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
 
 /**
  * Every deployment of the team, newest first, across apps and servers: what shipped, where, who
