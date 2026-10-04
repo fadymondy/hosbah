@@ -19,6 +19,9 @@ import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useSession } from "@/lib/session"
 import { useTeam } from "@/lib/team"
 
+/** The sections of General, in page order; each is an anchor the jump row links to. */
+const SECTIONS = ["general", "quotas", "notifications", "status-pages", "log-drains", "github"] as const
+
 export default function SettingsPage() {
   const { t, locale } = useI18n()
   const { team, manage, refresh } = useTeam()
@@ -49,7 +52,16 @@ export default function SettingsPage() {
 
   return (
     <PageBody title={t("nav.settings")} description={manage ? t("settings.description") : t("common.readOnly")} bleed>
-      <SectionTitle title={t("settings.general")} hint={t("settings.renameHint")} />
+      <nav aria-label={t("settings2.onThisPage")} className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-line bg-grid-bg/95 px-6 py-2 backdrop-blur">
+        {SECTIONS.map((id) => (
+          <a key={id} href={`#${id}`} className="shrink-0 rounded-full px-3 py-1 text-xs text-grid-muted hover:bg-grid-soft hover:text-grid-fg">
+            {t(`settings2.sections.${id}`)}
+          </a>
+        ))}
+      </nav>
+      <div id="general" className="scroll-mt-14">
+        <SectionTitle title={t("settings.general")} hint={t("settings.renameHint")} />
+      </div>
       <form onSubmit={submit}>
         <ErrorBand message={error} />
         <SettingsRow label={t("onboarding.teamName")} htmlFor="team-name" hint={!manage ? t("settings.viewerNote") : undefined}>
@@ -74,13 +86,21 @@ export default function SettingsPage() {
           </div>
         ) : null}
       </form>
-      <TeamQuotasCard team={team.slug} />
-      <div id="notifications" className="scroll-mt-16">
+      <div id="quotas" className="scroll-mt-14">
+        <TeamQuotasCard team={team.slug} />
+      </div>
+      <div id="notifications" className="scroll-mt-14">
         <NotificationChannelsSection team={team.slug} manage={manage} />
       </div>
-      <StatusPagesSection team={team.slug} manage={manage} />
-      <LogDrainsCard team={team.slug} manage={manage} />
-      <GitHubAppSection team={team.slug} />
+      <div id="status-pages" className="scroll-mt-14">
+        <StatusPagesSection team={team.slug} manage={manage} />
+      </div>
+      <div id="log-drains" className="scroll-mt-14">
+        <LogDrainsCard team={team.slug} manage={manage} />
+      </div>
+      <div id="github" className="scroll-mt-14">
+        <GitHubAppSection team={team.slug} />
+      </div>
     </PageBody>
   )
 }

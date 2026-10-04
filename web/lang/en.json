@@ -3804,5 +3804,16 @@
     "noApps": "No apps on this server yet.",
     "noDatabases": "No databases on this server.",
     "noProxy": "No proxy hosts on this server."
+  },
+  "settings2": {
+    "onThisPage": "On this page",
+    "sections": {
+      "general": "General",
+      "quotas": "Quotas",
+      "notifications": "Notifications",
+      "status-pages": "Status pages",
+      "log-drains": "Log drains",
+      "github": "GitHub"
+    }
   }
 }

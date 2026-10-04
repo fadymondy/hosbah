@@ -3804,5 +3804,16 @@
     "noApps": "لا توجد تطبيقات على هذا الخادم بعد.",
     "noDatabases": "لا توجد قواعد بيانات على هذا الخادم.",
     "noProxy": "لا توجد مضيفات وكيلة على هذا الخادم."
+  },
+  "settings2": {
+    "onThisPage": "في هذه الصفحة",
+    "sections": {
+      "general": "عام",
+      "quotas": "الحصص",
+      "notifications": "الإشعارات",
+      "status-pages": "صفحات الحالة",
+      "log-drains": "تصريف السجلات",
+      "github": "GitHub"
+    }
   }
 }
