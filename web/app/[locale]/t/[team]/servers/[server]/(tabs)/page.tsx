@@ -8,6 +8,7 @@ import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { CheckBadge } from "@/components/server-status"
+import { RunningHere } from "@/components/server-tabs/running-here"
 import { Notice, SectionTitle } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
@@ -75,6 +76,8 @@ export default function ServerOverview() {
           <span dir="auto">{server.error}</span>
         </Notice>
       ) : null}
+
+      {enrolled ? <RunningHere serverId={server.id} /> : null}
 
       {enrolled ? (
         <section aria-labelledby="metrics-h">

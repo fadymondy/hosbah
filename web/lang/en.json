@@ -3797,5 +3797,12 @@
     "recordHint": "Add this TXT record at your DNS provider, then press Verify.",
     "manage": "Manage",
     "addHint": "App domains are added on each app's Domains tab. Hostnames are unique across app domains and proxy hosts."
+  },
+  "serverHere": {
+    "title": "Running here",
+    "more": "{n} more",
+    "noApps": "No apps on this server yet.",
+    "noDatabases": "No databases on this server.",
+    "noProxy": "No proxy hosts on this server."
   }
 }
