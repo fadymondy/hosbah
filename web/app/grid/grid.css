@@ -273,13 +273,19 @@
   display: grid;
   grid-template-columns: 15rem minmax(0, 1fr);
   min-height: 100dvh;
+  transition: grid-template-columns 160ms ease;
+}
+/* The sidebar collapsed to an icon rail (workspace-shell.tsx sets data-nav). */
+.grid-shell[data-nav="mini"] {
+  grid-template-columns: 3.5rem minmax(0, 1fr);
 }
 .grid-shell > .grid-shell-nav {
   border-inline-end: 1px solid var(--grid-line);
   background: var(--grid-card);
 }
 @media (max-width: 767px) {
-  .grid-shell {
+  .grid-shell,
+  .grid-shell[data-nav="mini"] {
     grid-template-columns: minmax(0, 1fr);
   }
   .grid-shell > .grid-shell-nav {
