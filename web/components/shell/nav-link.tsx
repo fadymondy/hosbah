@@ -15,17 +15,21 @@ export function NavLink({
   icon,
   children,
   exact = false,
+  also,
   onNavigate,
 }: {
   href: string
   icon: ReactNode
   children: string
   exact?: boolean
+  /** Other paths (and their children) that count as this item, e.g. the pages of a settings group. */
+  also?: string[]
   onNavigate?: () => void
 }) {
   const pathname = usePathname() ?? ""
   const router = useRouter()
-  const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + "/")
+  const under = (p: string) => pathname === p || pathname.startsWith(p + "/")
+  const active = (exact ? pathname === href : under(href)) || (also ?? []).some(under)
   return (
     <SidebarItem
       href={href}

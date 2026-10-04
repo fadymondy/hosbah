@@ -157,7 +157,11 @@
       "switchServer": "Switch server",
       "switchSite": "Switch site",
       "allServers": "All servers",
-      "allSites": "All sites on this server"
+      "allSites": "All sites on this server",
+      "allApps": "All apps",
+      "tools": "Tools",
+      "running": "Running here",
+      "import": "Import"
     }
   },
   "nav": {
@@ -185,7 +189,21 @@
     "approvals": "Approvals",
     "proxyHosts": "Proxy hosts",
     "teamSettings": "Team settings",
-    "costs": "Costs"
+    "costs": "Costs",
+    "home": "Home",
+    "deployments": "Deployments",
+    "domains": "Domains",
+    "networking": "Networking",
+    "storage": "Storage",
+    "backups": "Backups",
+    "general": "General",
+    "security": "Security",
+    "billing": "Billing",
+    "notifications": "Notifications",
+    "groups": {
+      "infrastructure": "Infrastructure",
+      "automation": "Automation"
+    }
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -527,9 +545,16 @@
         "addTitle": "Add a firewall rule",
         "addHint": "Not applied to the server until you press Apply.",
         "action": "Action",
-        "actions": { "allow": "Allow", "deny": "Deny" },
+        "actions": {
+          "allow": "Allow",
+          "deny": "Deny"
+        },
         "proto": "Protocol",
-        "protos": { "tcp": "TCP", "udp": "UDP", "any": "Any" },
+        "protos": {
+          "tcp": "TCP",
+          "udp": "UDP",
+          "any": "Any"
+        },
         "portStart": "From port",
         "portEnd": "To port",
         "portRangeInvalid": "Ports must be 1-65535, and the end of a range must not be before its start.",
@@ -3596,5 +3621,12 @@
     "usesBase": "Uses the base limit",
     "saved": "Resource limits saved",
     "importedHint": "This service was imported; Hosbah does not manage its resources."
+  },
+  "search": {
+    "open": "Search apps, servers, domains…",
+    "placeholder": "Search apps, servers, domains…",
+    "title": "Search",
+    "none": "Nothing matches. Try an app name, a hostname or a server.",
+    "hint": "↑↓ to move · Enter to open"
   }
 }

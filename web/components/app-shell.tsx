@@ -25,10 +25,15 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
-  BadgeCheckIcon,
+  AppWindowIcon,
+  ArchiveIcon,
+  DatabaseIcon,
+  HardDriveIcon,
+  HouseIcon,
+  NetworkIcon,
+  RocketIcon,
   BellIcon,
   CircleDollarSignIcon,
-  FingerprintIcon,
   GlobeIcon,
   KeyRoundIcon,
   LayoutGridIcon,
@@ -56,7 +61,9 @@ import {
 import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
 import { LanguageMenu, ThemeToggle } from "@/components/preferences"
+import { GlobalSearch } from "@/components/shell/global-search"
 import { NavLink } from "@/components/shell/nav-link"
+import { SECURITY_PAGES } from "@/components/shell/sub-nav"
 import { ShellScopeProvider } from "@/components/shell/scope"
 import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
 
@@ -86,6 +93,7 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
           <Brand />
           <ScopeCrumbs />
           <div className="ms-auto flex items-center gap-1">
+            <GlobalSearch />
             <ReportProblem />
             <NotificationsBell />
             <LanguageMenu />
@@ -163,7 +171,7 @@ function ShellNav() {
   const { me } = useSession()
   const pathname = usePathname() ?? ""
   const scope = useScope()
-  const L = (props: { href: string; icon: ReactNode; children: string; exact?: boolean }) => <NavLink {...props} />
+  const L = (props: { href: string; icon: ReactNode; children: string; exact?: boolean; also?: string[] }) => <NavLink {...props} />
   const base = teamCtx ? `/${locale}/t/${teamCtx.team.slug}` : null
   const admin = `/${locale}/admin`
 
@@ -210,61 +218,70 @@ function ShellNav() {
       {base ? (
         <>
           <SidebarGroup>
-            <L href={base} exact icon={<LayoutGridIcon />}>
-              {t("nav.overview")}
+            <L href={base} exact icon={<HouseIcon />}>
+              {t("nav.home")}
+            </L>
+            <L href={`${base}/apps`} icon={<AppWindowIcon />}>
+              {t("nav.apps")}
+            </L>
+            <L href={`${base}/deployments`} icon={<RocketIcon />}>
+              {t("nav.deployments")}
+            </L>
+            <L href={`${base}/servers`} icon={<ServerIcon />}>
+              {t("nav.servers")}
+            </L>
+            <L href={`${base}/databases`} icon={<DatabaseIcon />}>
+              {t("nav.databases")}
+            </L>
+            <L href={`${base}/domains`} icon={<GlobeIcon />} also={[`${base}/proxy-hosts`]}>
+              {t("nav.domains")}
+            </L>
+          </SidebarGroup>
+          <SidebarGroup label={t("nav.groups.infrastructure")}>
+            <L href={`${base}/dns`} icon={<NetworkIcon />}>
+              {t("nav.networking")}
+            </L>
+            <L href={`${base}/storage`} icon={<HardDriveIcon />}>
+              {t("nav.storage")}
+            </L>
+            <L href={`${base}/backups`} icon={<ArchiveIcon />}>
+              {t("nav.backups")}
             </L>
             <L href={`${base}/shared-services`} icon={<WorkflowIcon />}>
               {t("nav.sharedServices")}
             </L>
-            <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
-              {t("nav.scripts")}
-            </L>
             <L href={`${base}/mail`} icon={<MailIcon />}>
               {t("nav.mail")}
             </L>
+          </SidebarGroup>
+          <SidebarGroup label={t("nav.groups.automation")}>
             <L href={`${base}/templates`} icon={<LayoutTemplateIcon />}>
               {t("nav.templates")}
+            </L>
+            <L href={`${base}/scripts`} icon={<TerminalSquareIcon />}>
+              {t("nav.scripts")}
             </L>
             <L href={`${base}/products`} icon={<PackageIcon />}>
               {t("nav.products")}
             </L>
-            <L href={`${base}/members`} icon={<UsersIcon />}>
+          </SidebarGroup>
+          <SidebarGroup label={t("nav.team")}>
+            <L href={`${base}/members`} icon={<UsersIcon />} also={[`${base}/invitations`]}>
               {t("nav.members")}
-            </L>
-            <L href={`${base}/invitations`} icon={<MailPlusIcon />}>
-              {t("nav.invitations")}
             </L>
             <L href={`${base}/approvals`} icon={<ShieldCheckIcon />}>
               {t("nav.approvals")}
             </L>
-            <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
-              {t("nav.costs")}
-            </L>
-            <L href={`${base}/audit`} icon={<ScrollTextIcon />}>
-              {t("nav.audit")}
-            </L>
           </SidebarGroup>
           <SidebarGroup label={t("nav.settings")}>
-            <L href={`${base}/tokens`} icon={<KeyRoundIcon />}>
-              {t("nav.tokens")}
+            <L href={`${base}/settings`} icon={<SettingsIcon />} also={[`${base}/audit`]}>
+              {t("nav.general")}
             </L>
-            <L href={`${base}/ssh-keys`} icon={<FingerprintIcon />}>
-              {t("nav.sshKeys")}
+            <L href={`${base}/tokens`} icon={<LockKeyholeIcon />} also={SECURITY_PAGES.map((p) => `${base}/${p}`)}>
+              {t("nav.security")}
             </L>
-            <L href={`${base}/certificates`} icon={<BadgeCheckIcon />}>
-              {t("nav.certificates")}
-            </L>
-            <L href={`${base}/dns`} icon={<GlobeIcon />}>
-              {t("nav.dns")}
-            </L>
-            {/* Credentials are owner/admin only (the API answers 403 to anyone else). */}
-            {teamCtx?.manage ? (
-              <L href={`${base}/credentials`} icon={<LockKeyholeIcon />}>
-                {t("nav.credentials")}
-              </L>
-            ) : null}
-            <L href={`${base}/settings`} icon={<SettingsIcon />}>
-              {t("nav.teamSettings")}
+            <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
+              {t("nav.billing")}
             </L>
           </SidebarGroup>
         </>

@@ -75,7 +75,9 @@ export default function SettingsPage() {
         ) : null}
       </form>
       <TeamQuotasCard team={team.slug} />
-      <NotificationChannelsSection team={team.slug} manage={manage} />
+      <div id="notifications" className="scroll-mt-16">
+        <NotificationChannelsSection team={team.slug} manage={manage} />
+      </div>
       <StatusPagesSection team={team.slug} manage={manage} />
       <LogDrainsCard team={team.slug} manage={manage} />
       <GitHubAppSection team={team.slug} />
