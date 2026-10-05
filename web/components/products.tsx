@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Progress, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Progress, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { ArchiveIcon, KeyRoundIcon, PackageIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
@@ -8,9 +8,9 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -50,7 +50,6 @@ export function TeamProducts() {
 
   const [products, setProducts] = useState<Product[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
   const [openProduct, setOpenProduct] = useState<Product | null>(null)
 
   const load = useCallback(async () => {
@@ -69,7 +68,61 @@ export function TeamProducts() {
     void load()
   }, [load])
 
-  const shown = (products ?? []).filter((p) => matches(q, p.name, p.title ?? "", p.description ?? ""))
+  const columns = useMemo<DataTableColumn<Product>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("products.name"),
+        label: t("products.name"),
+        sortValue: (p) => p.title || p.name,
+        searchValue: (p) => `${p.name} ${p.title ?? ""} ${p.description ?? ""}`,
+        cell: (p) => (
+          <span className="flex min-w-0 items-center gap-3">
+            <PackageIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0">
+              <span dir="auto" className="block truncate font-medium">
+                {p.title || p.name}
+              </span>
+              {p.description ? (
+                <span dir="auto" className="block max-w-96 truncate text-caption text-muted-foreground">
+                  {p.description}
+                </span>
+              ) : null}
+            </span>
+          </span>
+        ),
+      },
+      {
+        id: "source",
+        header: t("products.source"),
+        label: t("products.source"),
+        sortValue: (p) => p.source_kind || "repo",
+        className: "max-md:hidden",
+        headerClassName: "max-md:hidden",
+        cell: (p) => <Badge variant="outline">{p.source_kind || "repo"}</Badge>,
+      },
+      {
+        id: "status",
+        header: t("products.status"),
+        label: t("products.status"),
+        sortValue: (p) => p.status,
+        filterValue: (p) => p.status,
+        cell: (p) => <Badge variant={statusVariant(p.status)}>{p.status}</Badge>,
+      },
+      {
+        id: "actions",
+        header: <span className="sr-only">{t("common.actions")}</span>,
+        label: t("common.actions"),
+        cell: (p) =>
+          manage ? (
+            <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+              <ArchiveProduct path={`${base}/${p.id}`} product={p} onArchived={load} />
+            </div>
+          ) : null,
+      },
+    ],
+    [t, manage, base, load],
+  )
 
   return (
     <>
@@ -86,51 +139,17 @@ export function TeamProducts() {
         ) : products.length === 0 ? (
           <EmptyState className="border-b" icon={PackageIcon} title={t("products.emptyTitle")} description={t("products.emptyHint")} actions={<>{operate ? <ProductDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
-          <>
-            <ListSearch value={q} onChange={setQ} placeholder={t("products.search")} shown={shown.length} total={products.length} />
-            <TableBand>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("products.name")}</TableHead>
-                    <TableHead>{t("products.source")}</TableHead>
-                    <TableHead>{t("products.status")}</TableHead>
-                    <TableHead className="text-end">{t("common.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <button type="button" className="font-medium underline-offset-4 hover:underline" dir="auto" onClick={() => setOpenProduct(p)}>
-                          {p.title || p.name}
-                        </button>
-                        {p.description ? (
-                          <div dir="auto" className="max-w-72 truncate text-xs text-muted-foreground">
-                            {p.description}
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{p.source_kind || "repo"}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(p.status)}>{p.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => setOpenProduct(p)}>
-                            {t("products.open")}
-                          </Button>
-                          {manage ? <ArchiveProduct path={`${base}/${p.id}`} product={p} onArchived={load} /> : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableBand>
-          </>
+          <NasaqTable
+            data={products}
+            columns={columns}
+            rowId={(p) => p.id}
+            label={t("products.title")}
+            rowLabel={(p) => p.title || p.name}
+            search={t("products.search")}
+            facets={[{ column: "status", title: t("products.status"), options: [...new Set(products.map((p) => p.status))].map((v) => ({ value: v, label: v })) }]}
+            onRowClick={setOpenProduct}
+            empty={t("home.noMatch")}
+          />
         )}
       </section>
 

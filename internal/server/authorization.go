@@ -8,6 +8,7 @@ import (
 	"github.com/togo-framework/auth"
 	"github.com/togo-framework/togo"
 
+	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/app"
 )
 
@@ -130,6 +131,11 @@ func isPublic(r *http.Request) bool {
 	}
 	// The public status page (internal/api/public.go): a published page by its slug, filtered so
 	// deeply (PublicStatusPageBySlug, PublicMonitorsByIDs) that anonymous access is the point.
+	// A server user's white-label panel (internal/api/panel.go, MH-1141): its brand, sign-in and
+	// session check. Each route authenticates its own panel-session cookie, never a Hosbah session.
+	if strings.HasPrefix(p, "/api/panel/") {
+		return true
+	}
 	if strings.HasPrefix(p, "/api/public/status/") {
 		return true
 	}
@@ -152,6 +158,12 @@ func isPublic(r *http.Request) bool {
 	// scoped, inside the handler, to exactly that key's team and product — never a browser
 	// session, so it is public here the same way RUM and OTLP ingest are.
 	if strings.HasPrefix(p, "/api/products/") {
+		return true
+	}
+	// The integration API (internal/api/integrations.go, MH-1153): each route authenticates its own
+	// bearer, a team user token (hbu_) or an app token (hba_), never a browser session; the panel
+	// link (GET /api/integrations/panel/{link}) is its own one-time credential.
+	if strings.HasPrefix(p, api.IntegrationsPathPrefix) {
 		return true
 	}
 	// A desktop browser's own forward_auth target (internal/deploy/browserauth.go): dialled by Caddy
@@ -207,6 +219,7 @@ var memberPrefixes = []string{
 	"/api/auth/me",              // plugin: who am I
 	"/api/auth/change-password", // plugin: needs the current password
 	"/api/github",               // the GitHub App's setup callback: the state names the team and the user
+	"/api/oauth/authorize",      // the OAuth consent page (MH-1153): your own apps, owner/admin-checked
 }
 
 func isMemberAllowed(r *http.Request) bool {

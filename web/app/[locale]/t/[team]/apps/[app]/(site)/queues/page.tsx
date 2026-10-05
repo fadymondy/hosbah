@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteQueues } from "@/components/site/queues"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteQueues />
+  return <SectionRedirect section="queues" />
 }

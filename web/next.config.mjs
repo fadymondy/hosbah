@@ -4,10 +4,21 @@ const nextConfig = {
   agentRules: false,
   // In a git worktree, web/node_modules is a junction into the main checkout: tell Turbopack the
   // real project root so it doesn't refuse to follow that symlink out of the worktree.
-  ...(process.env.HOSBAH_TURBOPACK_ROOT ? { turbopack: { root: process.env.HOSBAH_TURBOPACK_ROOT } } : {}),
+  // Editing Nasaq itself: node_modules/@fadymondy/nasaq is a junction to the local Nasaq repo (docs/ux/NASAQ-LOCAL.md).
+  // Turbopack needs a root above both, and one React (Nasaq has its own copy).
+  ...(process.env.HOSBAH_NASAQ_LOCAL
+    ? {
+        turbopack: {
+          root: process.env.HOSBAH_NASAQ_LOCAL,
+          resolveAlias: { react: "./node_modules/react", "react-dom": "./node_modules/react-dom" },
+        },
+      }
+    : process.env.HOSBAH_TURBOPACK_ROOT
+      ? { turbopack: { root: process.env.HOSBAH_TURBOPACK_ROOT } }
+      : {}),
   // cloudy-app.fadymondy.com is the progress preview: Cloudflare → NPM → SSH reverse tunnel → this dev
   // server. Next 16 dev won't hydrate a page served to an origin that isn't listed here.
-  allowedDevOrigins: ["127.0.0.1", "localhost", "cloudy-app.fadymondy.com", "dev.hosbah.com"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", ...(process.env.DEV_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean)],
   // The browser only talks to this origin: /api/* is proxied to the Go API, so
   // the togo session cookie (HttpOnly) and CSRF cookie are first-party.
   async rewrites() {
@@ -20,6 +31,8 @@ const nextConfig = {
       // origin, so they are the API's, rewritten there. Off (404) unless CIRCLEXO_ISSUER is set.
       { source: "/auth/circlexo/:path*", destination: `${origin}/auth/circlexo/:path*` },
       { source: "/sso/circlexo", destination: `${origin}/sso/circlexo` },
+      // The OAuth token endpoint for integrations (MH-1153); /oauth/authorize is the web's own page.
+      { source: "/oauth/token", destination: `${origin}/oauth/token` },
       // The real-user-monitoring beacon (internal/rum); its ingest endpoint is under /api/rum/.
       { source: "/rum.js", destination: `${origin}/rum.js` },
     ]

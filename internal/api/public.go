@@ -61,6 +61,7 @@ type PublicStatusPageOut struct {
 func MountPublic(r chi.Router, a *app.App, svc *ops.Service) {
 	d := &deps{a: a, ops: svc}
 	r.Get(PublicPathPrefix+"{slug}", d.handlePublicStatusPage)
+	d.mountPanel(r)
 }
 
 func writeJSONError(w http.ResponseWriter, status int, msg string) {

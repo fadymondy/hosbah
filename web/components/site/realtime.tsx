@@ -20,7 +20,7 @@ import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/
 
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase } from "@/lib/team"
 
 type Kind = "reverb" | "socketio" | "ws" | "go" | "custom"
 type Config = { enabled: boolean; kind: Kind; process: string; port: number; path: string; whole_site?: boolean }
@@ -51,8 +51,9 @@ const DEFAULTS: Record<Kind, { port: number; path: string }> = {
  * environment variables, so they are set there, not stored twice.
  */
 export function SiteRealtime() {
-  const { t, locale } = useI18n()
-  const { team, manage } = useTeam()
+  const { t } = useI18n()
+  const { manage } = useTeam()
+  const teamBase = useTeamBase()
   const errorText = useErrorText()
   const { app, path } = useLoadedSite()
   const [st, setSt] = useState<RealtimeStatus | null>(null)
@@ -72,7 +73,7 @@ export function SiteRealtime() {
     void load()
   }, [load])
 
-  const base = `/${locale}/t/${team.slug}/apps/${encodeURIComponent(app.name)}`
+  const base = `${teamBase}/apps/${encodeURIComponent(app.name)}`
   const sg = st?.suggestion
 
   return (
@@ -97,7 +98,7 @@ export function SiteRealtime() {
         ) : (
           <>
             {!st.config && sg && sg.confidence !== "unknown" ? (
-              <p className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-6 py-3 text-sm">
+              <p className="flex flex-wrap items-center gap-2 nq-band bg-card py-3 text-sm">
                 <SparklesIcon className="size-4 text-nq-brand" />
                 {t("site.realtime.suggested", { kind: t(`site.realtime.kinds.${sg.kind}`) })}
                 <span dir="ltr" className="font-mono text-xs text-muted-foreground">
@@ -106,7 +107,7 @@ export function SiteRealtime() {
               </p>
             ) : null}
             {st.hostnames.length && st.config ? (
-              <div className="flex flex-col gap-2 border-b border-border px-6 py-4">
+              <div className="flex flex-col gap-2 nq-band py-4">
                 <span className="eyebrow">{t("site.realtime.endpoints")}</span>
                 {st.hostnames.map((h) => (
                   <CopyField key={h} value={h} />
@@ -120,7 +121,7 @@ export function SiteRealtime() {
 
       <section aria-labelledby="rtn-h">
         <SectionTitle id="rtn-h" title={t("site.realtime.notes")} />
-        <ul className="flex flex-col gap-2 border-b border-border px-6 py-4 text-sm text-nq-fg-body">
+        <ul className="flex flex-col gap-2 nq-band py-4 text-sm text-nq-fg-body">
           <li className="flex items-start gap-2">
             <RadioIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             {t("site.realtime.noteListen")}
@@ -304,7 +305,7 @@ export function RealtimeForm({
       <fieldset disabled={!manage || busy} className="contents">
         {layout === "dialog" ? <div className="flex w-full flex-col gap-5">{fields}</div> : fields}
         {manage ? (
-          <div className={layout === "section" ? "flex flex-wrap justify-end gap-2 border-b border-border px-6 py-4" : "flex flex-wrap justify-end gap-2"}>
+          <div className={layout === "section" ? "flex flex-wrap justify-end gap-2 nq-band py-4" : "flex flex-wrap justify-end gap-2"}>
             {onCancel ? (
               <Button type="button" variant="secondary" onClick={onCancel}>
                 {t("common.cancel")}

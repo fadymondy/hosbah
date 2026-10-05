@@ -1,0 +1,411 @@
+package api
+
+/*
+Hosbah's OAuth authorization server for integrations (MH-1153), so Mahaam (or any registered
+client) can connect one Hosbah app without the person copying a token by hand:
+
+	GET  /oauth/authorize?response_type=code&client_id&redirect_uri&state
+	     &code_challenge&code_challenge_method=S256&scope=app&ui_locales=en|ar
+	     The web app's consent page (/{locale}/oauth/authorize). It needs a signed-in person
+	     (CircleXO or local), lists the apps they can manage and sends them back with ?code&state,
+	     or ?error&error_description&state. It talks to the two session routes below.
+	GET  /api/oauth/authorize   the client's name and the person's apps, for that page
+	POST /api/oauth/authorize   their answer: a redirect URL carrying the code (or the error)
+	POST /oauth/token           grant_type=authorization_code, code, redirect_uri, code_verifier,
+	                            client_id, client_secret (form, or HTTP Basic for the client) →
+	                            {access_token: "hba_…", token_type: "Bearer", app}; RFC 6749 errors.
+
+A code is one-time, lives five minutes, is bound to its client, redirect URI and PKCE challenge
+(S256 only), and names exactly one app. Clients are registered by a platform admin
+(go run ./cmd/admin oauth-client add <name> <redirect_uri>...); only the secret's hash is kept.
+An unknown client or a redirect URI it did not register is never redirected to: the page shows
+the error instead (RFC 6749 §4.1.2.1).
+*/
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5"
+	"github.com/togo-framework/auth"
+
+	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/tenancy"
+	"github.com/fadymondy/hosbah/internal/tokens"
+)
+
+const (
+	// OAuthTokenPath is the token endpoint, public (the client authenticates with its secret).
+	OAuthTokenPath = "/oauth/token"
+	oauthCodeTTL   = 5 * time.Minute
+	oauthScopeApp  = "app"
+	oauthPerMin    = 60
+)
+
+var oauthTokenCalls = newRateWindow(oauthPerMin, time.Minute)
+
+// OAuthApp is one app the person may connect, on the consent page.
+type OAuthApp struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Title      string  `json:"title"`
+	Status     string  `json:"status"`
+	ServerName string  `json:"server_name"`
+	TeamSlug   string  `json:"team_slug"`
+	TeamName   string  `json:"team_name"`
+	LogoURL    *string `json:"logo_url"`
+}
+
+// oauthClient finds an active client and checks the redirect URI is one it registered, exactly.
+func (d *deps) oauthClient(ctx context.Context, clientID, redirectURI string) (db.OauthClient, error) {
+	var c db.OauthClient
+	err := d.tx(ctx, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
+		var err error
+		c, err = q.OAuthClientByClientID(ctx, clientID)
+		return err
+	})
+	if err != nil {
+		return c, errors.New("unknown client")
+	}
+	if redirectURI == "" || !oauthRedirectAllowed(c, redirectURI) {
+		return c, errors.New("this redirect URI is not registered for the client")
+	}
+	return c, nil
+}
+
+func oauthRedirectAllowed(c db.OauthClient, redirectURI string) bool {
+	for _, u := range strings.Split(c.RedirectUris, "\n") {
+		if strings.TrimSpace(u) == redirectURI {
+			return true
+		}
+	}
+	return false
+}
+
+// oauthRedirect is redirectURI with params added to its query.
+func oauthRedirect(redirectURI string, params map[string]string) string {
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		return redirectURI
+	}
+	q := u.Query()
+	for k, v := range params {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// pkceS256 is the S256 code challenge of a verifier (RFC 7636 §4.2).
+func pkceS256(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func validVerifier(v string) bool {
+	if len(v) < 43 || len(v) > 128 {
+		return false
+	}
+	for _, r := range v {
+		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || strings.ContainsRune("-._~", r)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (d *deps) registerOAuth(api huma.API) {
+	tags := []string{"OAuth"}
+
+	type oauthConsentOut struct {
+		Body struct {
+			Client struct {
+				Name string `json:"name"`
+			} `json:"client"`
+			Apps []OAuthApp `json:"apps"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "oauth-consent", Method: http.MethodGet, Path: "/api/oauth/authorize",
+		Summary: "The consent page's data: the client's name and the apps you can connect (owner or admin of their team)", Tags: tags,
+	}, func(ctx context.Context, in *struct {
+		ClientID    string `query:"client_id" maxLength:"200"`
+		RedirectURI string `query:"redirect_uri" maxLength:"2000"`
+	}) (*oauthConsentOut, error) {
+		id, err := current(ctx)
+		if err != nil {
+			return nil, err
+		}
+		c, err := d.oauthClient(ctx, in.ClientID, in.RedirectURI)
+		if err != nil {
+			return nil, huma.Error400BadRequest(err.Error())
+		}
+		out := &oauthConsentOut{}
+		out.Body.Client.Name = c.Name
+		out.Body.Apps = []OAuthApp{}
+		var teams []db.ListTeamsForUserRow
+		if err := d.tx(ctx, tenancy.Scope{UserID: id.ID}, func(q *db.Queries, _ *sql.Tx) error {
+			teams, err = q.ListTeamsForUser(ctx, id.ID)
+			return err
+		}); err != nil {
+			return nil, huma.Error500InternalServerError("could not list your teams")
+		}
+		for _, t := range teams {
+			m := &tenancy.Membership{TeamID: t.ID, UserID: id.ID, Role: t.Role}
+			if t.SuspendedAt != nil || !tenancy.Can(ctx, m, tenancy.AbilityManageApps) {
+				continue
+			}
+			err := d.tx(ctx, tenancy.Scope{UserID: id.ID, TeamID: t.ID}, func(q *db.Queries, _ *sql.Tx) error {
+				rows, err := q.ListAppsOfTeam(ctx, t.ID)
+				if err != nil {
+					return err
+				}
+				logos := make([]AppOut, len(rows))
+				for i, r := range rows {
+					logos[i] = AppOut{ID: r.ID}
+				}
+				attachAppLogos(ctx, q, t.ID, logos)
+				for i, r := range rows {
+					title := r.Name
+					if r.Title != nil && strings.TrimSpace(*r.Title) != "" {
+						title = *r.Title
+					}
+					out.Body.Apps = append(out.Body.Apps, OAuthApp{ID: r.ID, Name: r.Name, Title: title, Status: r.Status,
+						ServerName: r.ServerName, TeamSlug: t.Slug, TeamName: t.Name, LogoURL: logos[i].LogoURL})
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, huma.Error500InternalServerError("could not list apps")
+			}
+		}
+		return out, nil
+	})
+
+	type oauthDecisionOut struct {
+		Body struct {
+			Redirect string `json:"redirect" doc:"Where to send the browser: the client's redirect URI with code and state, or error"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "oauth-authorize", Method: http.MethodPost, Path: "/api/oauth/authorize",
+		Summary: "Answer a client's authorization request: allow it one app (owner or admin), or deny", Tags: tags,
+	}, func(ctx context.Context, in *struct {
+		Body struct {
+			ResponseType        string `json:"response_type" maxLength:"40"`
+			ClientID            string `json:"client_id" maxLength:"200"`
+			RedirectURI         string `json:"redirect_uri" maxLength:"2000"`
+			State               string `json:"state,omitempty" maxLength:"1000"`
+			CodeChallenge       string `json:"code_challenge,omitempty" maxLength:"200"`
+			CodeChallengeMethod string `json:"code_challenge_method,omitempty" maxLength:"20"`
+			Scope               string `json:"scope,omitempty" maxLength:"200"`
+			Team                string `json:"team,omitempty" maxLength:"64" doc:"The app's team (id or slug)"`
+			App                 string `json:"app,omitempty" maxLength:"64" doc:"The app to connect (id)"`
+			Allow               bool   `json:"allow"`
+		}
+	}) (*oauthDecisionOut, error) {
+		id, err := current(ctx)
+		if err != nil {
+			return nil, err
+		}
+		b := in.Body
+		if _, err := d.oauthClient(ctx, b.ClientID, b.RedirectURI); err != nil {
+			return nil, huma.Error400BadRequest(err.Error())
+		}
+		out := &oauthDecisionOut{}
+		fail := func(code, desc string) (*oauthDecisionOut, error) {
+			out.Body.Redirect = oauthRedirect(b.RedirectURI, map[string]string{"error": code, "error_description": desc, "state": b.State})
+			return out, nil
+		}
+		switch {
+		case b.ResponseType != "code":
+			return fail("unsupported_response_type", "only response_type=code is supported")
+		case b.CodeChallenge == "" || b.CodeChallengeMethod != "S256":
+			return fail("invalid_request", "PKCE is required: code_challenge with code_challenge_method=S256")
+		case b.Scope != "" && b.Scope != oauthScopeApp:
+			return fail("invalid_scope", "the only scope is \"app\"")
+		case !b.Allow:
+			return fail("access_denied", "the person declined")
+		case b.Team == "" || b.App == "":
+			return nil, huma.Error422UnprocessableEntity("pick an app")
+		}
+		var client db.OauthClient
+		client, _ = d.oauthClient(ctx, b.ClientID, b.RedirectURI)
+		plain, hash := tokens.New(tokens.PrefixOAuthCode)
+		err = d.inTeam(ctx, b.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: b.App, TeamID: m.TeamID})
+			if err != nil {
+				return huma.Error404NotFound("no such app in this team")
+			}
+			if _, err := q.InsertOAuthCode(ctx, db.InsertOAuthCodeParams{CodeHash: hash, ClientID: client.ID, TeamID: m.TeamID, AppID: a.ID,
+				UserID: id.ID, RedirectUri: b.RedirectURI, CodeChallenge: b.CodeChallenge, ExpiresAt: time.Now().Add(oauthCodeTTL)}); err != nil {
+				return huma.Error500InternalServerError("could not issue the code")
+			}
+			return tenancy.Record(ctx, q, m.TeamID, id.ID, "oauth.authorized", "app", a.ID, map[string]any{"client": client.Name, "client_id": client.ClientID})
+		})
+		if err != nil {
+			return nil, err
+		}
+		out.Body.Redirect = oauthRedirect(b.RedirectURI, map[string]string{"code": plain, "state": b.State})
+		return out, nil
+	})
+}
+
+// oauthError writes an RFC 6749 §5.2 error.
+func oauthError(w http.ResponseWriter, status int, code, desc string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if status == http.StatusUnauthorized {
+		w.Header().Set("WWW-Authenticate", `Basic realm="hosbah"`)
+	}
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": desc})
+}
+
+// mountOAuthToken registers POST /oauth/token (see the top of this file).
+func mountOAuthToken(r chi.Router, d *deps) {
+	r.Post(OAuthTokenPath, d.handleOAuthToken)
+}
+
+func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if d.a == nil || d.a.SQLDB == nil {
+		oauthError(w, http.StatusServiceUnavailable, "temporarily_unavailable", "the server is not ready")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+	if err := r.ParseForm(); err != nil {
+		oauthError(w, http.StatusBadRequest, "invalid_request", "send the parameters as application/x-www-form-urlencoded")
+		return
+	}
+	f := r.PostForm
+	clientID, secret := f.Get("client_id"), f.Get("client_secret")
+	if u, p, ok := r.BasicAuth(); ok {
+		clientID, _ = url.QueryUnescape(u)
+		secret, _ = url.QueryUnescape(p)
+	}
+	if !oauthTokenCalls.allow(panelClientIP(r) + "|" + clientID) {
+		oauthError(w, http.StatusTooManyRequests, "slow_down", "too many requests, try again in a minute")
+		return
+	}
+	if f.Get("grant_type") != "authorization_code" {
+		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "only grant_type=authorization_code is supported")
+		return
+	}
+	var client db.OauthClient
+	err := d.tx(ctx, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
+		var err error
+		client, err = q.OAuthClientByClientID(ctx, clientID)
+		return err
+	})
+	if err != nil || secret == "" || subtle.ConstantTimeCompare([]byte(tokens.Hash(secret)), []byte(client.SecretHash)) != 1 {
+		oauthError(w, http.StatusUnauthorized, "invalid_client", "unknown client or wrong client secret")
+		return
+	}
+	code, redirectURI, verifier := f.Get("code"), f.Get("redirect_uri"), f.Get("code_verifier")
+	if code == "" || redirectURI == "" || verifier == "" {
+		oauthError(w, http.StatusBadRequest, "invalid_request", "code, redirect_uri and code_verifier are required")
+		return
+	}
+	if !validVerifier(verifier) {
+		oauthError(w, http.StatusBadRequest, "invalid_request", "code_verifier must be 43 to 128 unreserved characters")
+		return
+	}
+	invalid := func() { oauthError(w, http.StatusBadRequest, "invalid_grant", "the code is invalid, expired or already used") }
+
+	hash := tokens.Hash(code)
+	var plain string
+	var out IntegrationApp
+	err = d.tx(ctx, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
+		c, err := q.OAuthCodeByHash(ctx, hash)
+		if err != nil || c.ClientID != client.ID {
+			return errOAuthGrant
+		}
+		if err := tenancy.SetTeam(ctx, tx, c.TeamID); err != nil {
+			return err
+		}
+		// Spent first, so a code that fails any check below is still gone.
+		if n, err := q.UseOAuthCode(ctx, db.UseOAuthCodeParams{ID: c.ID, TeamID: c.TeamID}); err != nil || n != 1 {
+			return errOAuthGrant
+		}
+		if c.RedirectUri != redirectURI ||
+			subtle.ConstantTimeCompare([]byte(pkceS256(verifier)), []byte(c.CodeChallenge)) != 1 {
+			return errOAuthGrantSpent
+		}
+		// The person must still be able to connect the app now, not just when they consented.
+		m, err := q.MembershipFor(ctx, db.MembershipForParams{TeamID: c.TeamID, UserID: c.UserID})
+		if err != nil || !tenancy.Can(ctx, &tenancy.Membership{TeamID: c.TeamID, UserID: c.UserID, Role: m.Role}, tenancy.AbilityManageApps) {
+			return errOAuthGrantSpent
+		}
+		if u, err := q.UserByID(ctx, c.UserID); err != nil || u.DisabledAt != nil {
+			return errOAuthGrantSpent
+		}
+		if at, err := q.TeamSuspendedAt(ctx, c.TeamID); err != nil || at != nil {
+			return errOAuthGrantSpent
+		}
+		a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: c.AppID, TeamID: c.TeamID})
+		if err != nil {
+			return errOAuthGrantSpent
+		}
+		var h string
+		plain, h = tokens.New(tokens.PrefixApp)
+		t, err := q.InsertAppToken(ctx, db.InsertAppTokenParams{TeamID: c.TeamID, AppID: a.ID, Label: client.Name, TokenHash: h, CreatedBy: c.UserID})
+		if err != nil {
+			return err
+		}
+		if err := tenancy.Record(ctx, q, c.TeamID, c.UserID, "app_token.created", "app", a.ID,
+			map[string]any{"token_id": t.ID, "label": client.Name, "via": "oauth", "client_id": client.ClientID}); err != nil {
+			return err
+		}
+		out = integrationApp(ctx, q, a, "")
+		return nil
+	})
+	switch {
+	case errors.Is(err, errOAuthGrant):
+		invalid()
+		return
+	case errors.Is(err, errOAuthGrantSpent):
+		// The code was spent in its own transaction step above, but the whole transaction rolls
+		// back on error: spend it again, outside, so a failed exchange still burns the code.
+		d.burnOAuthCode(ctx, hash)
+		invalid()
+		return
+	case err != nil:
+		oauthError(w, http.StatusInternalServerError, "server_error", "could not issue the token")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": plain, "token_type": "Bearer", "app": out})
+}
+
+var (
+	errOAuthGrant      = errors.New("invalid grant")
+	errOAuthGrantSpent = errors.New("invalid grant (spend the code)")
+)
+
+// burnOAuthCode spends a code whose exchange failed after it was found, so it cannot be retried.
+func (d *deps) burnOAuthCode(ctx context.Context, hash string) {
+	_ = d.tx(ctx, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
+		c, err := q.OAuthCodeByHash(ctx, hash)
+		if err != nil {
+			return err
+		}
+		if err := tenancy.SetTeam(ctx, tx, c.TeamID); err != nil {
+			return err
+		}
+		_, err = q.UseOAuthCode(ctx, db.UseOAuthCodeParams{ID: c.ID, TeamID: c.TeamID})
+		return err
+	})
+}

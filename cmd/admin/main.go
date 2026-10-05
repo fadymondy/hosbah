@@ -4,12 +4,16 @@
 //	go run ./cmd/admin promote <email>              grant platform admin (takes effect at next sign-in)
 //	go run ./cmd/admin demote <email>               remove platform admin
 //	go run ./cmd/admin mint-admin-token <email> [name]   print a 30-day admin MCP token, once
+//	go run ./cmd/admin oauth-client add <name> <redirect_uri>...   register an OAuth client (MH-1153);
+//	                                                               prints client_id and the secret, once
+//	go run ./cmd/admin oauth-client list | revoke <client_id>
 package main
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -26,7 +30,7 @@ import (
 func main() {
 	config.LoadDotEnv()
 	if len(os.Args) < 3 {
-		fail("usage: admin promote|demote|mint-admin-token <email> [name]")
+		fail("usage: admin promote|demote|mint-admin-token <email> [name] | oauth-client add|list|revoke ...")
 	}
 	sqlDB, err := sql.Open("pgx", togo.LoadConfig().DatabaseURL)
 	if err != nil {
@@ -35,6 +39,11 @@ func main() {
 	defer sqlDB.Close()
 	ctx := context.Background()
 	q := db.New(sqlDB)
+
+	if os.Args[1] == "oauth-client" {
+		oauthClient(ctx, sqlDB, os.Args[2:])
+		return
+	}
 
 	u, err := q.UserByEmail(ctx, os.Args[2])
 	if err != nil {
@@ -76,6 +85,61 @@ func main() {
 		fmt.Println(plain)
 	default:
 		fail("unknown command %q", os.Args[1])
+	}
+}
+
+// oauthClient manages the OAuth authorization server's clients (internal/api/oauth.go).
+func oauthClient(ctx context.Context, sqlDB *sql.DB, args []string) {
+	err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{PlatformAdmin: true}, func(q *db.Queries, _ *sql.Tx) error {
+		switch args[0] {
+		case "add":
+			if len(args) < 3 {
+				fail("usage: admin oauth-client add <name> <redirect_uri>...")
+			}
+			for _, u := range args[2:] {
+				p, err := url.Parse(u)
+				if err != nil || p.Fragment != "" || (p.Scheme != "https" && !(p.Scheme == "http" && (p.Hostname() == "localhost" || p.Hostname() == "127.0.0.1"))) {
+					fail("%s is not a valid redirect URI (https, or http on localhost; no fragment)", u)
+				}
+			}
+			clientID, _ := tokens.New("hbc_")
+			secret, hash := tokens.New(tokens.PrefixOAuthSecret)
+			if _, err := q.InsertOAuthClient(ctx, db.InsertOAuthClientParams{ClientID: clientID, Name: args[1], SecretHash: hash,
+				RedirectUris: strings.Join(args[2:], "\n")}); err != nil {
+				return err
+			}
+			fmt.Printf("client_id:     %s\nclient_secret: %s\n(the secret is shown once; only its hash is kept)\n", clientID, secret)
+		case "list":
+			rows, err := q.ListOAuthClients(ctx)
+			if err != nil {
+				return err
+			}
+			for _, c := range rows {
+				state := "active"
+				if c.RevokedAt != nil {
+					state = "revoked"
+				}
+				fmt.Printf("%s  %s  %s  %s\n", c.ClientID, state, c.Name, strings.ReplaceAll(c.RedirectUris, "\n", " "))
+			}
+		case "revoke":
+			if len(args) < 2 {
+				fail("usage: admin oauth-client revoke <client_id>")
+			}
+			n, err := q.RevokeOAuthClient(ctx, args[1])
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				fail("no active client %s", args[1])
+			}
+			fmt.Println("revoked; its app tokens stay until revoked on each app's settings")
+		default:
+			fail("usage: admin oauth-client add|list|revoke")
+		}
+		return nil
+	})
+	if err != nil {
+		fail("oauth-client: %v", err)
 	}
 }
 

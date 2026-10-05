@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteDatabases } from "@/components/site/panels"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteDatabases />
+  return <SectionRedirect section="databases" />
 }

@@ -1,9 +1,10 @@
 "use client"
 
-import { Button } from "@fadymondy/nasaq/web"
+import { Button, StatCard, StatGrid } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useState } from "react"
+import { CpuIcon, HeartPulseIcon, HistoryIcon, RocketIcon } from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
 import { isActive, Pipeline } from "@/components/deploy/pipeline"
@@ -12,22 +13,25 @@ import { useErrorText } from "@/components/form-error"
 import { ImportedNotice, OriginFacts } from "@/components/imported"
 import { WorkloadStats } from "@/components/imported-controls"
 import { AdoptDialog } from "@/components/site/adopt-dialog"
-import { SiteCanvas } from "@/components/site/canvas/canvas"
 import { useLoadedSite } from "@/components/site/context"
 import { Notice, SectionTitle } from "@/components/states"
+import { SITE_TABS } from "@/components/site/sections"
+import { SiteViews } from "@/components/site/views"
 
 import { apiFetch } from "@/lib/api"
 import { isImported, runtimeLabel, shortSha } from "@/lib/apps"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase } from "@/lib/team"
 
 /**
  * The site's overview: an interactive canvas of how a request reaches it and everything it is
  * joined to (canvas/canvas.tsx), then live usage and the facts about what is running.
  */
+const OVERVIEW_VIEWS = SITE_TABS[0].views ?? []
+
 export function SiteOverview() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team } = useTeam()
   const fmt = useFormatDate()
   const errorText = useErrorText()
@@ -36,7 +40,7 @@ export function SiteOverview() {
   const { detail, app, deployments, path, reload } = useLoadedSite()
   const imported = isImported(app)
   const operate = canOperate(team.role)
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
   const root = `${base}/apps/${encodeURIComponent(app.name)}`
   const live = detail.live_release
   const last = deployments[0]
@@ -147,44 +151,60 @@ export function SiteOverview() {
       ) : (
         <section aria-labelledby="details-h">
           <SectionTitle id="details-h" title={t("site.details")} />
-          <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-4" data-testid="app-summary">
-            <Stat label={t("apps.liveRelease")}>
-              {live ? (
-                <span dir="ltr" className="font-mono text-sm">
-                  v{live.version} · {shortSha(live.commit_sha)}
+          <StatGrid data-testid="app-summary">
+            <StatCard
+              icon={<RocketIcon />}
+              label={t("apps.liveRelease")}
+              value={
+                live ? (
+                  <span dir="ltr" className="font-mono text-base">
+                    v{live.version} · {shortSha(live.commit_sha)}
+                  </span>
+                ) : (
+                  <span className="text-base text-muted-foreground">{t("apps.noLive")}</span>
+                )
+              }
+            />
+            <StatCard
+              icon={<HistoryIcon />}
+              label={t("apps.latestDeploy")}
+              value={
+                last ? (
+                  <Link href={`${root}/deployments`} className="flex flex-wrap items-center gap-2 text-base hover:underline">
+                    <span dir="ltr" className="font-mono">
+                      #{last.number}
+                    </span>
+                    <DeploymentStatusBadge status={last.status} />
+                    <span dir="ltr" className="text-xs text-muted-foreground">
+                      {fmt(last.created_at)}
+                    </span>
+                  </Link>
+                ) : (
+                  <span className="text-base text-muted-foreground">{t("apps.neverDeployed")}</span>
+                )
+              }
+            />
+            <StatCard
+              icon={<CpuIcon />}
+              label={t("apps.runtime")}
+              value={
+                <span dir="ltr" className="font-mono text-base">
+                  {runtimeLabel(app.runtime) ?? t("apps.runtimeUnknown")} · :{app.port}
                 </span>
-              ) : (
-                <span className="text-sm text-muted-foreground">{t("apps.noLive")}</span>
-              )}
-            </Stat>
-            <Stat label={t("apps.latestDeploy")}>
-              {last ? (
-                <Link href={`${root}/deployments`} className="flex flex-wrap items-center gap-2 hover:underline">
-                  <span dir="ltr" className="font-mono text-sm">
-                    #{last.number}
-                  </span>
-                  <DeploymentStatusBadge status={last.status} />
-                  <span dir="ltr" className="text-xs text-muted-foreground">
-                    {fmt(last.created_at)}
-                  </span>
-                </Link>
-              ) : (
-                <span className="text-sm text-muted-foreground">{t("apps.neverDeployed")}</span>
-              )}
-            </Stat>
-            <Stat label={t("apps.runtime")}>
-              <span dir="ltr" className="font-mono text-sm">
-                {runtimeLabel(app.runtime) ?? t("apps.runtimeUnknown")} · :{app.port}
-              </span>
-            </Stat>
-            <Stat label={t("site.health")}>
-              <span dir="ltr" className="font-mono text-sm">
-                {app.healthcheck_path || "/"} · {app.healthcheck_timeout}s
-              </span>
-            </Stat>
-          </dl>
+              }
+            />
+            <StatCard
+              icon={<HeartPulseIcon />}
+              label={t("site.health")}
+              value={
+                <span dir="ltr" className="font-mono text-base">
+                  {app.healthcheck_path || "/"} · {app.healthcheck_timeout}s
+                </span>
+              }
+            />
+          </StatGrid>
           {last && (isActive(last) || last.status === "failed") ? (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3">
+            <div className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-card px-4 py-3 shadow-xs">
               <span className="text-xs text-muted-foreground">
                 {t("site.deployNow", { n: last.number })}
               </span>
@@ -196,16 +216,10 @@ export function SiteOverview() {
           ) : null}
         </section>
       )}
-      <SiteCanvas />
+      <section aria-labelledby="traffic-h" className="flex flex-col gap-3">
+        <SectionTitle id="traffic-h" title={t("site.traffic")} />
+        <SiteViews views={OVERVIEW_VIEWS} />
+      </section>
     </>
-  )
-}
-
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-2 bg-background px-6 py-4">
-      <dt className="eyebrow">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
-    </div>
   )
 }

@@ -283,6 +283,28 @@ export type SFTPUser = {
   updated_at: string
 }
 
+/** A shell login Hosbah created on a server (GET .../servers/{server}/ssh-access). */
+export type SSHUser = {
+  username: string
+  sudo: boolean
+  status: "ready" | "failed"
+  last_error?: string
+  created_at: string
+  updated_at: string
+}
+
+/** A team library key installed on a server, for one unix user. */
+export type ServerSSHKey = {
+  key_id: string
+  name: string
+  key_type: string
+  fingerprint: string
+  unix_user: string
+  status: "installed" | "removed" | "failed"
+  last_error?: string
+  installed_at?: string
+}
+
 /** A proxy host of the Caddy proxy manager (GET /api/teams/{team}/proxy-hosts). */
 export type ProxyHost = {
   id: string

@@ -44,7 +44,7 @@ func (d *deps) registerBrowsers(api huma.API) {
 	huma.Register(api, huma.Operation{OperationID: "list-app-browsers", Method: http.MethodGet, Path: base, Tags: tags,
 		Summary: "The app's headless browsers. running, restarts and memory_bytes are best effort — the server is asked (up to 8 s), and an " +
 			"offline or silent server leaves them null, still 200. A browser's token is never returned. Any member.",
-	}, func(ctx context.Context, in *AppPath) (*browsersOut, error) {
+	}, func(ctx context.Context, in *AppListPath) (*browsersOut, error) {
 		out := &browsersOut{Body: BrowsersOut{Browsers: []dbsvc.Browser{}}}
 		var op db.Operation
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
@@ -55,7 +55,9 @@ func (d *deps) registerBrowsers(api huma.API) {
 			if out.Body.Browsers, err = dbsvc.ListBrowsers(ctx, q, m.TeamID, a); err != nil {
 				return huma.Error500InternalServerError("could not list the browsers")
 			}
-			op = d.dbs().QueueBrowserStatus(ctx, q, m.TeamID, webActor(id), a, out.Body.Browsers)
+			if !in.NoStatus {
+				op = d.dbs().QueueBrowserStatus(ctx, q, m.TeamID, webActor(id), a, out.Body.Browsers)
+			}
 			return nil
 		})
 		if err != nil {

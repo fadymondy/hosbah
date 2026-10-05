@@ -7,7 +7,7 @@ import { AlertTriangleIcon, InfoIcon } from "lucide-react"
 
 import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
-import { ErrorBand, Notice, SectionTitle, SettingsRow } from "@/components/states"
+import { ErrorBand, Notice, SectionTitle, SettingsFooter, SettingsRow } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
 import type { App, AppDetail, Integrations } from "@/lib/apps"
@@ -84,7 +84,7 @@ export function SettingsPanel({
   }
 
   return (
-    <div data-testid="settings">
+    <div data-testid="settings" data-stack>
       <form onSubmit={save}>
         <SectionTitle title={t("apps.settings.title")} hint={!manage ? t("common.readOnly") : undefined} />
         <SettingsRow label={t("apps.branch")} htmlFor="set-branch">
@@ -127,9 +127,8 @@ export function SettingsPanel({
         <SettingsRow label={t("apps.settings.pause")} htmlFor="set-paused" hint={t("apps.settings.pauseHint")}>
           <Checkbox id="set-paused" checked={paused} disabled={!manage} onCheckedChange={(v) => setPaused(!!v)} />
         </SettingsRow>
-        <ErrorBand message={error} />
         {manage ? (
-          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-border px-6 py-4">
+          <SettingsFooter>
             {saved ? (
               <p role="status" className="text-sm text-muted-foreground">
                 {t("apps.settings.saved")}
@@ -138,8 +137,9 @@ export function SettingsPanel({
             <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
-          </div>
+          </SettingsFooter>
         ) : null}
+        <ErrorBand message={error} />
       </form>
 
       <section data-testid="deploy-hook">
@@ -170,7 +170,7 @@ export function SettingsPanel({
       <section data-testid="integrations">
         <SectionTitle title={t("apps.settings.github")} />
         {integrations === null ? null : integrations.github_app.configured ? (
-          <p className="border-b border-border px-6 py-4 text-sm">
+          <p className="nq-band py-4 text-sm">
             {t("apps.settings.githubConfigured")}{" "}
             {integrations.github_app.install_url ? (
               <a href={integrations.github_app.install_url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
@@ -184,7 +184,7 @@ export function SettingsPanel({
           </Notice>
         )}
         {integrations ? (
-          <p dir="ltr" className="border-b border-border px-6 py-3 text-start font-mono text-xs text-muted-foreground">
+          <p dir="ltr" className="nq-band py-3 text-start font-mono text-xs text-muted-foreground">
             railpack {integrations.railpack_version} · caddy {integrations.caddy_version}
           </p>
         ) : null}

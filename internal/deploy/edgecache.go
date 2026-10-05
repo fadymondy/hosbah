@@ -39,7 +39,7 @@ type EdgeCacheInput struct {
 func EdgeCacheOfApp(ctx context.Context, q *db.Queries, teamID, appID string) (db.AppEdgeCache, error) {
 	row, err := q.AppEdgeCacheOfApp(ctx, db.AppEdgeCacheOfAppParams{TeamID: teamID, AppID: appID})
 	if errors.Is(err, sql.ErrNoRows) {
-		return db.AppEdgeCache{AppID: appID, TeamID: teamID, Status: "off", BypassPaths: "[]"}, nil
+		return db.AppEdgeCache{AppID: appID, TeamID: teamID, Status: "off", TtlSeconds: 60, BypassPaths: "[]"}, nil
 	}
 	return row, err
 }

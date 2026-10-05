@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, EmptyState, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, Input, Textarea, toast, useConfirm, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
@@ -8,6 +8,7 @@ import {
   ArchiveIcon,
   CogIcon,
   DatabaseIcon,
+  ExternalLinkIcon,
   LinkIcon,
   PlayIcon,
   PlusIcon,
@@ -23,7 +24,6 @@ import {
 import { DomainsPanel } from "@/components/apps/domains"
 import { RuntimeLogsPanel } from "@/components/apps/runtime-logs"
 import { SettingsPanel } from "@/components/apps/settings"
-import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
 import {
@@ -38,11 +38,13 @@ import {
 } from "@/components/imported-controls"
 import { ResourcesCard } from "@/components/resources-panel"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
+import { SiteAppTokens } from "@/components/site/app-tokens"
 import { SiteBuildConfig } from "@/components/site/build-config"
 import { SitePHPConfig } from "@/components/site/php-config"
-import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { RowMenu, RowWithActions, type RowAction } from "@/components/lists/row-actions"
+import { ErrorBand, LoadingRows, SectionTitle, SettingsFooter, SettingsRow } from "@/components/states"
 
 
 
@@ -53,7 +55,7 @@ import { isImported, type App, type EnvVar } from "@/lib/apps"
 import { humanBytes, type DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase, useServerHref } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 /** The first published host port of a container ("0.0.0.0:8081->80/tcp" → 8081). */
@@ -84,14 +86,14 @@ export async function attachDataService(team: string, service: DataService, app:
 
 /** Connected databases: the data services on the site's server, attached with one click. */
 export function SiteDatabases() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
   const errorText = useErrorText()
   const { app, path } = useLoadedSite()
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
   const [services, setServices] = useState<DataService[] | null>(null)
   const [vars, setVars] = useState<string[]>([])
-  const [q, setQ] = useState("")
+  const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -119,7 +121,12 @@ export function SiteDatabases() {
     }
   }
 
-  const shown = (services ?? []).filter((s) => matches(q, s.name, s.kind, s.version, s.status))
+  const rowActions = (s: DataService): DataTableRowAction[] => [
+    { id: "manage", label: t("lists.manage"), icon: ExternalLinkIcon, onSelect: () => router.push(`${base}/databases/${s.name}`) },
+    ...(manage && !isImported(s) && s.kind !== "minio"
+      ? [{ id: "attach", label: t("site.attach"), icon: LinkIcon, disabled: busy === s.id || !attachable(s), onSelect: () => void attach(s) }]
+      : []),
+  ]
   const injected = vars.filter((v) => /(DATABASE|REDIS|MYSQL|POSTGRES|S3|MINIO)_?URL$/.test(v))
 
   return (
@@ -139,7 +146,7 @@ export function SiteDatabases() {
       />
       <ErrorBand message={error} />
       {injected.length ? (
-        <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3 text-xs text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-2 nq-band py-3 text-xs text-muted-foreground">
           <LinkIcon className="size-3.5" />
           {t("site.injected")}
           {injected.map((v) => (
@@ -152,53 +159,46 @@ export function SiteDatabases() {
       {services === null ? (
         <LoadingRows rows={2} />
       ) : services.length === 0 ? (
-        <EmptyState className="border-b" icon={DatabaseIcon} title={t("databases.emptyTitle")} description={t("site.databasesEmpty")} />
+        <EmptyState className="nq-empty" icon={DatabaseIcon} title={t("databases.emptyTitle")} description={t("site.databasesEmpty")} />
       ) : (
-        <>
-          <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchDatabases")} shown={shown.length} total={services.length} />
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("databases.name")}</TableHead>
-                  <TableHead>{t("databases.kind")}</TableHead>
-                  <TableHead>{t("databases.status")}</TableHead>
-                  <TableHead className="text-end">{t("common.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell>
-                      <Link href={`${base}/databases/${s.name}`} className="font-medium hover:underline" dir="ltr">
-                        {s.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell dir="ltr">
-                      {s.kind} {s.version}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={s.status === "running" ? "brand" : "outline"}>{t(`databases.statuses.${s.status}`, undefined, s.status)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Button size="sm" variant="secondary" nativeButton={false} render={<Link href={`${base}/databases/${s.name}`} />}>
-                          {t("lists.manage")}
-                        </Button>
-                        {manage && !isImported(s) && s.kind !== "minio" ? (
-                          <Button variant="primary" size="sm" disabled={busy === s.id || !attachable(s)} onClick={() => void attach(s)}>
-                            <LinkIcon />
-                            {t("site.attach")}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
-        </>
+        <NasaqTable
+          data={services}
+          rowId={(s) => s.id}
+          rowLabel={(s) => s.name}
+          label={t("site.nav.databases")}
+          search={t("lists.searchDatabases")}
+          rowActions={rowActions}
+          onRowClick={(s) => router.push(`${base}/databases/${s.name}`)}
+          columns={[
+            {
+              id: "name",
+              header: t("databases.name"),
+              cell: (s) => (
+                <Link href={`${base}/databases/${s.name}`} className="font-medium hover:underline" dir="ltr">
+                  {s.name}
+                </Link>
+              ),
+              sortValue: (s) => s.name,
+              searchValue: (s) => [s.name, s.kind, s.version, s.status].join(" "),
+            },
+            {
+              id: "kind",
+              header: t("databases.kind"),
+              cell: (s) => (
+                <span dir="ltr">
+                  {s.kind} {s.version}
+                </span>
+              ),
+              sortValue: (s) => s.kind,
+            },
+            {
+              id: "status",
+              header: t("databases.status"),
+              cell: (s) => <Badge variant={s.status === "running" ? "brand" : "outline"}>{t(`databases.statuses.${s.status}`, undefined, s.status)}</Badge>,
+              sortValue: (s) => s.status,
+            },
+          ]}
+        />
       )}
       <ConnectedServices />
     </section>
@@ -308,17 +308,59 @@ const PROCESS_BADGE: Record<string, "success" | "neutral" | "outline"> = {
 export function SiteWorkers() {
   const { t, locale } = useI18n()
   const { team } = useTeam()
+  const teamBase = useTeamBase()
   const operate = canOperate(team.role)
   const ago = useTimeAgo(locale)
   const errorText = useErrorText()
   const { detail, app, path } = useLoadedSite()
-  const logsBase = `/${locale}/t/${team.slug}/apps/${encodeURIComponent(app.name)}/logs`
+  const logsBase = `${teamBase}/apps/${encodeURIComponent(app.name)}/logs`
   const [items, setItems] = useState<ProcessStatus[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const commands = new Map(detail.processes.map((p) => [p.name, p.command]))
+  const router = useRouter()
+  const confirm = useConfirm()
+  const processActions = (p: ProcessStatus): RowAction[] => {
+    const isWeb = p.process === "web"
+    return [
+      { id: "logs", label: t("site.workers.viewLogs"), icon: ScrollTextIcon, onSelect: () => router.push(`${logsBase}?process=${encodeURIComponent(p.process)}`) },
+      {
+        id: "restart",
+        label: t("site.workers.restart"),
+        icon: RotateCwIcon,
+        group: "run",
+        disabled: busy !== null,
+        onSelect: () => void act(p.process, "restart").catch(() => {}),
+      },
+      ...(!isWeb && p.state !== "running"
+        ? [{ id: "start", label: t("site.workers.start"), icon: PlayIcon, group: "run", disabled: busy !== null, onSelect: () => void act(p.process, "start").catch(() => {}) }]
+        : []),
+      ...(!isWeb && p.state === "running"
+        ? [
+            {
+              id: "stop",
+              label: t("site.workers.stop"),
+              icon: SquareIcon,
+              danger: true,
+              group: "danger",
+              disabled: busy !== null,
+              onSelect: async () => {
+                if (
+                  await confirm({
+                    title: t("site.workers.stopTitle", { name: p.process }),
+                    description: t("site.workers.stopBody"),
+                    confirmLabel: t("site.workers.stop"),
+                  })
+                )
+                  await act(p.process, "stop").catch(() => {})
+              },
+            },
+          ]
+        : []),
+    ]
+  }
 
   const load = useCallback(
     async (quiet?: boolean) => {
@@ -372,8 +414,8 @@ export function SiteWorkers() {
     return (
       <section aria-labelledby="wk-h">
         <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
-        <EmptyState className="border-b" icon={CogIcon} title={t("site.workersEmpty")} description={t("site.workersEmptyHint")} />
-        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
+        <EmptyState className="nq-empty" icon={CogIcon} title={t("site.workersEmpty")} description={t("site.workersEmptyHint")} />
+        <p className="nq-band py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
       </section>
     )
 
@@ -381,7 +423,7 @@ export function SiteWorkers() {
     return (
       <section aria-labelledby="wk-h">
         <SectionTitle id="wk-h" title={t("site.nav.workers")} hint={t("site.workersHint")} />
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.workers.needsDeployer")}</p>
+        <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.workers.needsDeployer")}</p>
       </section>
     )
 
@@ -398,30 +440,28 @@ export function SiteWorkers() {
         }
       />
       <ErrorBand message={error} />
-      {note ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{note}</p> : null}
+      {note ? <p className="nq-band py-4 text-sm text-muted-foreground">{note}</p> : null}
       {items === null ? (
         note || error ? null : (
           <LoadingRows rows={detail.processes.length} />
         )
       ) : items.length === 0 ? (
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.workers.notLive")}</p>
+        <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.workers.notLive")}</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border border-b border-border">
+        <ul className="flex flex-col divide-y divide-border nq-box">
           {items.map((p) => {
-            const isWeb = p.process === "web"
             const badge = PROCESS_BADGE[p.state] ?? "outline"
-            const restarting = busy === `${p.process}:restart`
-            const stopping = busy === `${p.process}:stop`
-            const starting = busy === `${p.process}:start`
+            const working = busy?.startsWith(`${p.process}:`)
             const command = commands.get(p.process)
             return (
-              <li key={p.process} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4">
+              <RowWithActions key={p.process} actions={processActions(p)} render={<li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4" />}>
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-2">
                     <span dir="ltr" className="text-sm font-medium text-foreground">
                       {p.process}
                     </span>
                     <Badge variant={badge}>{t(`site.workers.states.${p.state}`, undefined, p.state)}</Badge>
+                    {working ? <RotateCwIcon aria-hidden className="size-3.5 animate-spin text-muted-foreground" /> : null}
                   </span>
                   <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {p.started_at ? <span dir="ltr">{t("site.workers.started", { time: ago(p.started_at) })}</span> : null}
@@ -444,40 +484,13 @@ export function SiteWorkers() {
                     </span>
                   ) : null}
                 </span>
-                <span className="flex flex-wrap items-center gap-2">
-                  <Link href={`${logsBase}?process=${encodeURIComponent(p.process)}`}>
-                    <Button size="sm" variant="ghost">
-                      <ScrollTextIcon />
-                      {t("site.workers.viewLogs")}
-                    </Button>
-                  </Link>
-                  <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void act(p.process, "restart").catch(() => {})}>
-                    <RotateCwIcon className={restarting ? "animate-spin" : ""} />
-                    {t("site.workers.restart")}
-                  </Button>
-                  {!isWeb && p.state === "running" ? (
-                    <ConfirmButton
-                      icon={<SquareIcon className={stopping ? "animate-pulse" : ""} />}
-                      label={t("site.workers.stop")}
-                      title={t("site.workers.stopTitle", { name: p.process })}
-                      description={t("site.workers.stopBody")}
-                      confirmLabel={t("site.workers.stop")}
-                      onConfirm={() => act(p.process, "stop")}
-                    />
-                  ) : null}
-                  {!isWeb && p.state !== "running" ? (
-                    <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void act(p.process, "start").catch(() => {})}>
-                      <PlayIcon className={starting ? "animate-pulse" : ""} />
-                      {t("site.workers.start")}
-                    </Button>
-                  ) : null}
-                </span>
-              </li>
+                <RowMenu actions={processActions(p)} label={p.process} />
+              </RowWithActions>
             )
           })}
         </ul>
       )}
-      <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
+      <p className="nq-band py-3 text-xs text-muted-foreground">{t("site.workersNote")}</p>
     </section>
   )
 }
@@ -496,7 +509,7 @@ export function SiteLogs() {
       {operate && app.origin_kind === "container" && app.imported_state !== "missing" ? (
         <WorkloadLogs run={run} busy={busy} />
       ) : (
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.logsGuest")}</p>
+        <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.logsGuest")}</p>
       )}
       {log}
     </>
@@ -511,8 +524,10 @@ export function SiteProxy() {
   const imported = isImported(app)
   return (
     <section aria-labelledby="px-h">
-      <SectionTitle id="px-h" title={t("site.nav.proxy")} hint={t("site.proxyHint")} />
       <DomainsPanel
+        titleId="px-h"
+        title={t("site.nav.proxy")}
+        hint={t("site.proxyHint")}
         team={team.slug}
         path={path}
         manage={manage}
@@ -523,8 +538,9 @@ export function SiteProxy() {
 }
 
 export function SiteBackups() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
+  const serverHref = useServerHref()
   const operate = canOperate(team.role)
   const { app, path } = useLoadedSite()
   const { run, busy, error, log } = useWorkloadActions(path, app.server_id)
@@ -540,7 +556,7 @@ export function SiteBackups() {
   return (
     <section aria-labelledby="bk-h">
       <SectionTitle id="bk-h" title={t("site.nav.backups")} hint={t("site.backupsHint")} />
-      <EmptyState className="border-b" icon={ArchiveIcon} title={t("site.backupsData")} description={t("site.backupsDataHint")} actions={<><Button variant="secondary" nativeButton={false} render={<Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} />}>
+      <EmptyState className="nq-empty" icon={ArchiveIcon} title={t("site.backupsData")} description={t("site.backupsDataHint")} actions={<><Button variant="secondary" nativeButton={false} render={<Link href={serverHref(app.server_id, "databases")} />}>
           <DatabaseIcon />
           {t("nav.databases")}
         </Button></>} />
@@ -550,8 +566,9 @@ export function SiteBackups() {
 
 /** Settings: how the site looks, what it builds with, its resources and actions, and the danger zone. */
 export function SiteSettings() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
+  const serverHref = useServerHref()
   const router = useRouter()
   const errorText = useErrorText()
   const operate = canOperate(team.role)
@@ -560,7 +577,7 @@ export function SiteSettings() {
   const imported = isImported(app)
   const guest = app.origin_kind === "guest"
   const missing = app.imported_state === "missing"
-  const home = `/${locale}/t/${team.slug}/servers/${app.server_id}/apps`
+  const home = serverHref(app.server_id, "apps")
 
   return (
     <>
@@ -571,6 +588,7 @@ export function SiteSettings() {
           <ResourcesCard path={`${path}/resources`} manage={manage} processes={detail.processes.map((p) => p.name)} />
           <SitePHPConfig />
           <SiteBuildConfig />
+          {manage ? <SiteAppTokens /> : null}
         </>
       ) : (
         <>
@@ -578,7 +596,7 @@ export function SiteSettings() {
           {operate && !missing ? (
             <section aria-labelledby="power-h">
               <SectionTitle id="power-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-              <div className="border-b border-border px-6 py-4">
+              <div className="nq-band py-4">
                 <PowerControls item={app} run={(k, s, i) => run(k, s, i).then(reload)} busy={busy} guest={guest} />
               </div>
             </section>
@@ -660,7 +678,6 @@ function SiteAppearance({ manage }: { manage: boolean }) {
       <SectionTitle
         title={t("servers.appearance.title")}
         hint={t("site.appearanceHint")}
-        action={<ServerMark server={{ color, icon: icon || "globe", logo_url: logo }} size={10} />}
       />
       <ErrorBand message={error} />
       <fieldset disabled={!manage || busy} className="contents">
@@ -668,15 +685,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
           <Input id="site-title" dir="auto" maxLength={80} placeholder={app.name} value={title} onChange={(e) => setTitle(e.target.value)} />
         </SettingsRow>
         <SettingsRow label={t("site.description")} htmlFor="site-desc">
-          <textarea
-            id="site-desc"
-            dir="auto"
-            rows={3}
-            maxLength={280}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-nq-brand"
-          />
+          <Textarea id="site-desc" dir="auto" rows={3} maxLength={280} value={description} onChange={(e) => setDescription(e.target.value)} />
         </SettingsRow>
         <SettingsRow label={t("servers.appearance.color")}>
           <div className="flex flex-wrap items-center gap-2" role="radiogroup">
@@ -686,7 +695,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
               aria-checked={!color}
               aria-label={t("servers.appearance.none")}
               onClick={() => setColor("")}
-              className={cn("size-7 border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
+              className={cn("size-7 rounded-md border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
             />
             {SERVER_COLORS.map((c) => (
               <button
@@ -696,7 +705,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
                 aria-checked={color === c}
                 aria-label={c}
                 onClick={() => setColor(c)}
-                className={cn("size-7 border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
+                className={cn("size-7 rounded-md border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
                 style={{ background: c }}
               />
             ))}
@@ -705,7 +714,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.custom")}
               value={color || "#3B82F6"}
               onChange={(e) => setColor(e.target.value.toUpperCase())}
-              className="h-7 w-10 cursor-pointer border border-border bg-transparent"
+              className="h-7 w-10 cursor-pointer overflow-hidden rounded-md border border-border bg-transparent p-0.5"
             />
           </div>
         </SettingsRow>
@@ -721,7 +730,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
                 title={key}
                 onClick={() => setIcon(icon === key ? "" : key)}
                 className={cn(
-                  "flex size-8 items-center justify-center border border-border [&_svg]:size-4",
+                  "flex size-8 items-center justify-center rounded-md border border-border [&_svg]:size-4",
                   icon === key ? "bg-secondary text-foreground ring-1 ring-nq-brand" : "text-muted-foreground hover:bg-secondary",
                 )}
               >
@@ -732,7 +741,7 @@ function SiteAppearance({ manage }: { manage: boolean }) {
         </SettingsRow>
         <SettingsRow label={t("servers.appearance.logo")} hint={t("servers.appearance.logoHint")}>
           <div
-            className="flex flex-wrap items-center gap-3 border border-dashed border-border px-4 py-3"
+            className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -763,11 +772,11 @@ function SiteAppearance({ manage }: { manage: boolean }) {
           </div>
         </SettingsRow>
         {manage ? (
-          <div className="flex justify-end border-b border-border px-6 py-4">
+          <SettingsFooter>
             <Button variant="primary" type="submit" disabled={busy}>
               {busy ? t("common.working") : t("common.save")}
             </Button>
-          </div>
+          </SettingsFooter>
         ) : null}
       </fieldset>
     </form>

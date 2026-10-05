@@ -173,7 +173,7 @@ export function ServerCard({
 
       {guests && guests.total > 0 ? (
         <Link
-          href={`${href}/guests`}
+          href={`${href}/settings#import`}
           className="flex items-center gap-2 border-t border-border px-5 py-2.5 text-xs hover:bg-secondary"
           data-testid="node-guests"
         >

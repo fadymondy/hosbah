@@ -1,11 +1,7 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { useLoadedServer } from "@/components/server-tabs/context"
-import { Import } from "@/components/server-tabs/import"
-import { useTeam } from "@/lib/team"
-
-export default function Page() {
-  const { manage } = useTeam()
-  const { server } = useLoadedServer()
-  return <Import serverId={server.id} manage={manage} />
+/** Folded into Settings: an import sync pushes guests and discovered workloads into the apps list. */
+export default async function Page({ params }: { params: Promise<{ locale: string; team: string; server: string }> }) {
+  const { locale, team, server } = await params
+  redirect(`/${locale}/t/${team}/servers/${server}/settings#import`)
 }

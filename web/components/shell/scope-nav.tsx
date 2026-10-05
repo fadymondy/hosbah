@@ -14,18 +14,17 @@ import {
   ChevronsUpDownIcon,
   CogIcon,
   DatabaseIcon,
-  DownloadIcon,
   FolderIcon,
   GithubIcon,
   KeyRoundIcon,
-  LayersIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
   NetworkIcon,
-  RadarIcon,
   SettingsIcon,
   ShieldIcon,
   SquareTerminalIcon,
+  TerminalIcon,
+  UsersIcon,
   WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -34,7 +33,7 @@ import { ServerMark } from "@/components/server-mark"
 import { SERVER_TABS, type ServerTab } from "@/components/server-tabs/header"
 import { NavLink } from "@/components/shell/nav-link"
 import { scopeOf, useShellScope } from "@/components/shell/scope"
-import { sectionsFor, SITE_GROUPS } from "@/components/site/sections"
+import { tabsFor } from "@/components/site/sections"
 
 
 
@@ -46,24 +45,23 @@ import { useOptionalTeam } from "@/lib/team"
 /** Each server section's icon, and the group it sits in on the server's sidebar: what runs here
  * first, then the hands-on tools, then its own settings, and importing (which the deploy flows
  * link to) last. */
-const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "running" | "tools" | "manage" | "import" }> = {
+export const SERVER_ITEMS: Record<ServerTab, { icon: LucideIcon; group: "" | "running" | "tools" | "manage" | "import" }> = {
   "": { icon: LayoutDashboardIcon, group: "" },
   metrics: { icon: ChartNoAxesColumnIcon, group: "" },
+  users: { icon: UsersIcon, group: "running" },
   apps: { icon: AppWindowIcon, group: "running" },
   databases: { icon: DatabaseIcon, group: "running" },
-  guests: { icon: LayersIcon, group: "running" },
   proxy: { icon: NetworkIcon, group: "running" },
   tunnels: { icon: CableIcon, group: "running" },
   files: { icon: FolderIcon, group: "tools" },
   terminal: { icon: SquareTerminalIcon, group: "tools" },
   sftp: { icon: KeyRoundIcon, group: "tools" },
+  ssh: { icon: TerminalIcon, group: "tools" },
   operations: { icon: WorkflowIcon, group: "tools" },
   services: { icon: CogIcon, group: "tools" },
   security: { icon: ShieldIcon, group: "manage" },
   settings: { icon: SettingsIcon, group: "manage" },
   github: { icon: GithubIcon, group: "import" },
-  discovered: { icon: RadarIcon, group: "import" },
-  import: { icon: DownloadIcon, group: "import" },
 }
 const SERVER_GROUPS = ["", "running", "tools", "manage", "import"] as const
 
@@ -129,8 +127,7 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
   const root = `${base}/servers/${serverId}`
   const loaded = server?.id === serverId ? server : null
   const enrolled = loaded?.status === "enrolled"
-  const isNode = Boolean(loaded?.facts?.proxmox?.installed)
-  const tabs = SERVER_TABS.filter((tab) => tab !== "guests" || isNode).filter(
+  const tabs = SERVER_TABS.filter(
     (tab) => enrolled || tab === "" || tab === "operations" || tab === "settings",
   )
 
@@ -166,10 +163,11 @@ export function ServerNav({ serverId, onNavigate }: { serverId: string; onNaviga
   )
 }
 
-/** A site's sidebar: its sections, grouped (code, services, observe, network, manage). */
-export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?: () => void }) {
+/** A site's sidebar: its tabs (related sections share one; see SITE_TABS). */
+export function SiteNav({ site: name, base: baseOverride, onNavigate }: { site: string; base?: string; onNavigate?: () => void }) {
   const { t } = useI18n()
-  const { base } = useScope()
+  const scope = useScope()
+  const base = baseOverride ?? scope.base
   const { site } = useShellScope()
   if (!base) return null
   const loaded = site?.name === name ? site : null
@@ -192,25 +190,13 @@ export function SiteNav({ site: name, onNavigate }: { site: string; onNavigate?:
         subtitle={loaded?.title ? <span dir="ltr">{loaded.name}</span> : undefined}
       />
       {loaded ? (
-        SITE_GROUPS.map((g) => {
-          const items = sectionsFor(loaded.imported).filter((s) => s.group === g)
-          if (!items.length) return null
-          return (
-            <SidebarGroup key={g} label={g !== "site" ? t(`site.groups.${g}`) : undefined}>
-              {items.map((s) => (
-                <NavLink
-                  key={s.key || "overview"}
-                  href={s.key ? `${root}/${s.key}` : root}
-                  exact={!s.key}
-                  icon={<s.icon />}
-                  onNavigate={onNavigate}
-                >
-                  {t(`site.nav.${s.key || "overview"}`)}
-                </NavLink>
-              ))}
-            </SidebarGroup>
-          )
-        })
+        <SidebarGroup>
+          {tabsFor(loaded.imported).map((s) => (
+            <NavLink key={s.key || "overview"} href={s.key ? `${root}/${s.key}` : root} exact={!s.key} icon={<s.icon />} onNavigate={onNavigate}>
+              {t(`site.nav.${s.key || "overview"}`)}
+            </NavLink>
+          ))}
+        </SidebarGroup>
       ) : (
         <div className="flex flex-col gap-2 px-4 pt-4">
           {Array.from({ length: 6 }, (_, i) => (

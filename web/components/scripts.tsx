@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsList, TabsPanel, TabsTab, Textarea, toast, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
 import { HistoryIcon, PencilIcon, PlayIcon, PlusIcon, TerminalSquareIcon, Trash2Icon } from "lucide-react"
 
@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 import { OpStatusBadge } from "@/components/server-status"
 import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
 
@@ -46,7 +46,6 @@ export function TeamScripts() {
   const [servers, setServers] = useState<Server[] | null>(null)
   const [runs, setRuns] = useState<ScriptRun[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
   const [runTarget, setRunTarget] = useState<{ scriptId?: string; builtinName?: string } | null>(null)
   const [openRun, setOpenRun] = useState<{ run: ScriptRun; rows: ScriptRunServer[] } | null>(null)
 
@@ -83,7 +82,78 @@ export function TeamScripts() {
     await load()
   }
 
-  const shown = (scripts ?? []).filter((s) => matches(q, s.name, s.description))
+  const scriptColumns = useMemo<DataTableColumn<Script>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("scripts.name"),
+        label: t("scripts.name"),
+        sortValue: (s) => s.name,
+        searchValue: (s) => `${s.name} ${s.description ?? ""}`,
+        cell: (s) => (
+          <span className="block min-w-0">
+            <span dir="auto" className="block truncate font-medium">
+              {s.name}
+            </span>
+            {s.description ? (
+              <span dir="auto" className="block max-w-96 truncate text-caption text-muted-foreground">
+                {s.description}
+              </span>
+            ) : null}
+          </span>
+        ),
+      },
+      { id: "run_as", header: t("scripts.runAs"), label: t("scripts.runAs"), sortValue: (s) => s.run_as, cell: (s) => <Badge variant="outline">{s.run_as}</Badge> },
+      {
+        id: "timeout",
+        header: t("scripts.timeout"),
+        label: t("scripts.timeout"),
+        sortValue: (s) => s.timeout_seconds,
+        className: "max-md:hidden",
+        headerClassName: "max-md:hidden",
+        cell: (s) => (
+          <span dir="ltr" className="text-caption text-muted-foreground">
+            {s.timeout_seconds}s
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: <span className="sr-only">{t("common.actions")}</span>,
+        label: t("common.actions"),
+        cell: (s) =>
+          manage ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="primary" size="sm" onClick={() => setRunTarget({ scriptId: s.id })}>
+                <PlayIcon />
+                {t("scripts.run")}
+              </Button>
+              <ScriptDialog path={base} script={s} onSaved={load} />
+              <DeleteScript path={base} script={s} onDeleted={load} />
+            </div>
+          ) : null,
+      },
+    ],
+    [t, manage, base, load],
+  )
+  const builtinColumns = useMemo<DataTableColumn<BuiltinScript>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("scripts.name"),
+        label: t("scripts.name"),
+        sortValue: (b) => b.name,
+        searchValue: (b) => `${b.name} ${b.description ?? ""}`,
+        cell: (b) => (
+          <span className="block min-w-0">
+            <span className="block truncate font-medium">{b.name}</span>
+            <span className="block max-w-[40rem] truncate text-caption text-muted-foreground">{b.description}</span>
+          </span>
+        ),
+      },
+    ],
+    [t],
+  )
   const enrolledServers = (servers ?? []).filter((s) => s.status === "enrolled")
 
   return (
@@ -101,55 +171,15 @@ export function TeamScripts() {
         ) : scripts.length === 0 ? (
           <EmptyState className="border-b" icon={TerminalSquareIcon} title={t("scripts.emptyTitle")} description={t("scripts.emptyHint")} actions={<>{manage ? <ScriptDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
-          <>
-            <ListSearch value={q} onChange={setQ} placeholder={t("scripts.search")} shown={shown.length} total={scripts.length} />
-            <TableBand>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("scripts.name")}</TableHead>
-                    <TableHead>{t("scripts.runAs")}</TableHead>
-                    <TableHead>{t("scripts.timeout")}</TableHead>
-                    <TableHead className="text-end">{t("common.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        <span dir="auto" className="font-medium">
-                          {s.name}
-                        </span>
-                        {s.description ? (
-                          <div dir="auto" className="max-w-72 truncate text-xs text-muted-foreground">
-                            {s.description}
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{s.run_as}</Badge>
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
-                        {s.timeout_seconds}s
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {manage ? (
-                            <Button variant="primary" size="sm" onClick={() => setRunTarget({ scriptId: s.id })}>
-                              <PlayIcon />
-                              {t("scripts.run")}
-                            </Button>
-                          ) : null}
-                          {manage ? <ScriptDialog path={base} script={s} onSaved={load} /> : null}
-                          {manage ? <DeleteScript path={base} script={s} onDeleted={load} /> : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableBand>
-          </>
+          <NasaqTable
+            data={scripts}
+            columns={scriptColumns}
+            rowId={(s) => s.id}
+            label={t("scripts.title")}
+            rowLabel={(s) => s.name}
+            search={t("scripts.search")}
+            empty={t("home.noMatch")}
+          />
         )}
       </section>
 
@@ -158,24 +188,16 @@ export function TeamScripts() {
         {builtins === null ? (
           <LoadingRows rows={3} />
         ) : (
-          <div className="grid gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-3">
-            {builtins.map((b) => (
-              <div key={b.id} className="flex flex-col gap-2 bg-background p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{b.description}</p>
-                  </div>
-                  {manage ? (
-                    <Button size="sm" variant="secondary" onClick={() => setRunTarget({ builtinName: b.id })}>
-                      <PlayIcon />
-                      {t("scripts.run")}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
+          <NasaqTable
+            data={builtins}
+            columns={builtinColumns}
+            rowId={(b) => b.id}
+            label={t("scripts.builtins.title")}
+            rowLabel={(b) => b.name}
+            search={t("scripts.search")}
+            rowActions={manage ? (b) => [{ id: "run", label: t("scripts.run"), icon: PlayIcon, onSelect: () => setRunTarget({ builtinName: b.id }) }] : undefined}
+            empty={t("home.noMatch")}
+          />
         )}
       </section>
 

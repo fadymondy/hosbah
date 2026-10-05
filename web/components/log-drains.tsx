@@ -1,12 +1,13 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, type DataTableColumn, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { PencilIcon, PlusIcon, ScrollTextIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -149,81 +150,98 @@ export function LogDrainsCard({ team, manage }: { team: string; manage: boolean 
       ) : rows.length === 0 ? (
         <EmptyState className="border-b" icon={ScrollTextIcon} title={t("settings.logDrains.empty")} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("settings.logDrains.name")}</TableHead>
-                <TableHead>{t("settings.logDrains.kind")}</TableHead>
-                <TableHead>{t("settings.logDrains.scope")}</TableHead>
-                <TableHead>{t("settings.logDrains.status")}</TableHead>
-                {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((d) => {
-                const res = testing[d.id]
-                const scope = d.app_id ? (apps.find((a) => a.id === d.app_id)?.name ?? d.app_id) : t("settings.logDrains.scopeAll")
-                return (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium">
-                      <span dir="auto">{d.name}</span>
-                      {!d.enabled ? (
-                        <Badge variant="neutral" className="ms-2">
-                          {t("settings.logDrains.disabled")}
+        <div className="px-6 py-6">
+          <NasaqTable
+            data={rows}
+            rowId={(d) => d.id}
+            label={t("settings.logDrains.title")}
+            rowLabel={(d) => d.name}
+            search={t("settings.logDrains.name")}
+            empty={t("home.noMatch")}
+            columns={[
+              {
+                id: "name",
+                header: t("settings.logDrains.name"),
+                label: t("settings.logDrains.name"),
+                sortValue: (d) => d.name,
+                searchValue: (d) => `${d.name} ${d.kind}`,
+                cell: (d) => (
+                  <span className="flex items-center gap-2">
+                    <span dir="auto" className="font-medium">
+                      {d.name}
+                    </span>
+                    {!d.enabled ? <Badge variant="neutral">{t("settings.logDrains.disabled")}</Badge> : null}
+                  </span>
+                ),
+              },
+              { id: "kind", header: t("settings.logDrains.kind"), label: t("settings.logDrains.kind"), sortValue: (d) => d.kind, cell: (d) => t(`settings.logDrains.kinds.${d.kind}`) },
+              {
+                id: "scope",
+                header: t("settings.logDrains.scope"),
+                label: t("settings.logDrains.scope"),
+                className: "max-md:hidden",
+                headerClassName: "max-md:hidden",
+                cell: (d) => (
+                  <span dir="auto" className="block max-w-40 truncate text-caption text-muted-foreground">
+                    {d.app_id ? (apps.find((a) => a.id === d.app_id)?.name ?? d.app_id) : t("settings.logDrains.scopeAll")}
+                  </span>
+                ),
+              },
+              {
+                id: "status",
+                header: t("settings.logDrains.status"),
+                label: t("settings.logDrains.status"),
+                cell: (d) => {
+                  const res = testing[d.id]
+                  return (
+                    <div className="flex flex-col gap-0.5 text-caption">
+                      <span dir="ltr" className="tabular-nums text-muted-foreground">
+                        {t("settings.logDrains.shipped")}: {d.shipped} · {t("settings.logDrains.dropped")}: {d.dropped}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {t("settings.logDrains.lastSuccess")}: {when(d.last_success_at, t)}
+                      </span>
+                      {d.last_error ? (
+                        <span dir="auto" className="text-nq-danger-text">
+                          {d.last_error}
+                        </span>
+                      ) : null}
+                      {res && res !== "busy" ? (
+                        <Badge variant={res.ok ? "brand" : "danger"} className="w-fit">
+                          {res.ok ? t("settings.logDrains.testOk") : (res.detail ?? t("settings.logDrains.testFailed"))}
                         </Badge>
                       ) : null}
-                    </TableCell>
-                    <TableCell>{t(`settings.logDrains.kinds.${d.kind}`)}</TableCell>
-                    <TableCell dir="auto" className="max-w-40 truncate text-xs text-muted-foreground">
-                      {scope}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <div className="flex flex-col gap-0.5">
-                        <span dir="ltr" className="tabular-nums text-muted-foreground">
-                          {t("settings.logDrains.shipped")}: {d.shipped} · {t("settings.logDrains.dropped")}: {d.dropped}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {t("settings.logDrains.lastSuccess")}: {when(d.last_success_at, t)}
-                        </span>
-                        {d.last_error ? (
-                          <span dir="auto" className="text-nq-danger-text">
-                            {d.last_error}
-                          </span>
-                        ) : null}
-                        {res && res !== "busy" ? (
-                          <Badge variant={res.ok ? "brand" : "danger"} className="w-fit">
-                            {res.ok ? t("settings.logDrains.testOk") : (res.detail ?? t("settings.logDrains.testFailed"))}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="secondary" disabled={res === "busy"} onClick={() => test(d)}>
-                            {res === "busy" ? t("common.working") : t("settings.logDrains.test")}
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setEditing(d)}>
-                            <PencilIcon />
-                          </Button>
-                          <ConfirmButton
-                            icon={<Trash2Icon />}
-                            label={t("settings.logDrains.delete")}
-                            title={t("settings.logDrains.delete")}
-                            description={t("settings.logDrains.deleteConfirm", { name: d.name })}
-                            confirmLabel={t("settings.logDrains.delete")}
-                            onConfirm={() => remove(d)}
-                          />
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </TableBand>
+                    </div>
+                  )
+                },
+              },
+              {
+                id: "actions",
+                header: <span className="sr-only">{t("common.actions")}</span>,
+                label: t("common.actions"),
+                cell: (d) =>
+                  manage ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button size="sm" variant="secondary" disabled={testing[d.id] === "busy"} onClick={() => test(d)}>
+                        {testing[d.id] === "busy" ? t("common.working") : t("settings.logDrains.test")}
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditing(d)}>
+                        <PencilIcon />
+                      </Button>
+                      <ConfirmButton
+                        icon={<Trash2Icon />}
+                        label={t("settings.logDrains.delete")}
+                        title={t("settings.logDrains.delete")}
+                        description={t("settings.logDrains.deleteConfirm", { name: d.name })}
+                        confirmLabel={t("settings.logDrains.delete")}
+                        onConfirm={() => remove(d)}
+                      />
+                    </div>
+                  ) : null,
+              },
+            ] satisfies DataTableColumn<LogDrain>[]}
+          />
+        </div>
       )}
       {editing ? (
         <LogDrainDialog

@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteRepository } from "@/components/site/repository"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteRepository />
+  return <SectionRedirect section="repository" />
 }

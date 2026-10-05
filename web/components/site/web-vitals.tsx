@@ -1,13 +1,14 @@
 "use client"
 
-import { Badge, Button, Checkbox, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, EmptyState, StatCard, StatGrid } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { AlertTriangleIcon, GaugeIcon } from "lucide-react"
 
 import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
 
 
 
@@ -88,7 +89,7 @@ export function SiteWebVitals() {
   }
 
   return (
-    <div data-testid="web-vitals">
+    <div data-testid="web-vitals" data-stack>
       <section aria-labelledby="rum-settings-h">
         <SectionTitle
           id="rum-settings-h"
@@ -213,11 +214,11 @@ function WebVitalsData({ base }: { base: string }) {
       {summary === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <EmptyState className="border-b" icon={GaugeIcon} title={t("site.rum.emptyTitle")} description={t("site.rum.emptyHint")} />
+        <EmptyState className="nq-empty" icon={GaugeIcon} title={t("site.rum.emptyTitle")} description={t("site.rum.emptyHint")} />
       ) : (
         <>
           <MetricCards t={t} metrics={summary.metrics} />
-          <div className="border-b border-border px-6 py-6">
+          <div className="nq-band py-6">
             <TrendChart points={series ?? []} />
           </div>
           <PathsTable t={t} rows={paths ?? []} />
@@ -232,29 +233,30 @@ type TFunc = (key: string, vars?: Record<string, string | number>, fallback?: st
 function MetricCards({ t, metrics }: { t: TFunc; metrics: Metrics }) {
   const units: Record<(typeof METRIC_KEYS)[number], string> = { lcp: "ms", cls: "", inp: "ms", fcp: "ms", ttfb: "ms" }
   return (
-    <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse sm:grid-cols-5">
+    <StatGrid className="nq-stats">
       {METRIC_KEYS.map((k) => {
         const m = metrics[k]
         const value = m.samples === 0 ? "—" : k === "cls" ? m.p75.toFixed(2) : `${Math.round(m.p75)} ${units[k]}`
         return (
-          <div key={k} className="flex flex-col gap-1 px-6 py-4">
-            <span className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span aria-hidden className={`size-2 rounded-full ${ratingDot(m.rating)}`} />
-              {t(`site.rum.metrics.${k}`)}
-            </span>
-            <span dir="ltr" className={`text-start text-xl font-semibold ${m.samples === 0 ? "text-muted-foreground" : "text-foreground"}`}>
-              {value}
-            </span>
-            <span className="flex items-center gap-2 text-xs">
-              <span className={ratingTone(m.rating)}>{t(`site.rum.rating.${m.rating}`)}</span>
-              <span className="text-muted-foreground">
-                {t("site.rum.samples", { count: m.samples })}
+          <StatCard
+            key={k}
+            icon={<span aria-hidden className={`size-2.5 rounded-full ${ratingDot(m.rating)}`} />}
+            label={t(`site.rum.metrics.${k}`)}
+            value={
+              <span className="flex flex-col gap-1">
+                <span dir="ltr" className={`text-start ${m.samples === 0 ? "text-muted-foreground" : ""}`}>
+                  {value}
+                </span>
+                <span className="flex items-center gap-2 text-xs font-normal">
+                  <span className={ratingTone(m.rating)}>{t(`site.rum.rating.${m.rating}`)}</span>
+                  <span className="text-muted-foreground">{t("site.rum.samples", { count: m.samples })}</span>
+                </span>
               </span>
-            </span>
-          </div>
+            }
+          />
         )
       })}
-    </div>
+    </StatGrid>
   )
 }
 
@@ -310,42 +312,67 @@ function PathsTable({ t, rows }: { t: TFunc; rows: PathBreakdown[] }) {
     <section aria-labelledby="rum-paths-h">
       <SectionTitle id="rum-paths-h" title={t("site.rum.paths")} />
       {rows.length === 0 ? (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("site.rum.noPaths")}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{t("site.rum.noPaths")}</p>
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("site.rum.path")}</TableHead>
-                <TableHead className="text-end">{t("site.rum.samplesHeader")}</TableHead>
-                <TableHead className="text-end">LCP</TableHead>
-                <TableHead className="text-end">CLS</TableHead>
-                <TableHead className="text-end">INP</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.path}>
-                  <TableCell dir="ltr" className="max-w-md truncate font-mono text-xs">
-                    {r.path}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <Badge variant="outline">{r.samples.toLocaleString()}</Badge>
-                  </TableCell>
-                  <TableCell dir="ltr" className={`text-end text-xs ${ratingTone(r.metrics.lcp.rating)}`}>
-                    {r.metrics.lcp.samples ? `${Math.round(r.metrics.lcp.p75)} ms` : "—"}
-                  </TableCell>
-                  <TableCell dir="ltr" className={`text-end text-xs ${ratingTone(r.metrics.cls.rating)}`}>
-                    {r.metrics.cls.samples ? r.metrics.cls.p75.toFixed(2) : "—"}
-                  </TableCell>
-                  <TableCell dir="ltr" className={`text-end text-xs ${ratingTone(r.metrics.inp.rating)}`}>
-                    {r.metrics.inp.samples ? `${Math.round(r.metrics.inp.p75)} ms` : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <NasaqTable
+          data={rows}
+          rowId={(r) => r.path}
+          rowLabel={(r) => r.path}
+          label={t("site.rum.paths")}
+          defaultSort={{ id: "samples", direction: "desc" }}
+          columns={[
+            {
+              id: "path",
+              header: t("site.rum.path"),
+              cell: (r) => (
+                <span dir="ltr" className="block max-w-md truncate font-mono text-xs">
+                  {r.path}
+                </span>
+              ),
+              searchValue: (r) => r.path,
+            },
+            {
+              id: "samples",
+              header: t("site.rum.samplesHeader"),
+              align: "end",
+              cell: (r) => <Badge variant="outline">{r.samples.toLocaleString()}</Badge>,
+              sortValue: (r) => r.samples,
+            },
+            {
+              id: "lcp",
+              header: "LCP",
+              align: "end",
+              cell: (r) => (
+                <span dir="ltr" className={`text-xs ${ratingTone(r.metrics.lcp.rating)}`}>
+                  {r.metrics.lcp.samples ? `${Math.round(r.metrics.lcp.p75)} ms` : "—"}
+                </span>
+              ),
+              sortValue: (r) => r.metrics.lcp.p75,
+            },
+            {
+              id: "cls",
+              header: "CLS",
+              align: "end",
+              cell: (r) => (
+                <span dir="ltr" className={`text-xs ${ratingTone(r.metrics.cls.rating)}`}>
+                  {r.metrics.cls.samples ? r.metrics.cls.p75.toFixed(2) : "—"}
+                </span>
+              ),
+              sortValue: (r) => r.metrics.cls.p75,
+            },
+            {
+              id: "inp",
+              header: "INP",
+              align: "end",
+              cell: (r) => (
+                <span dir="ltr" className={`text-xs ${ratingTone(r.metrics.inp.rating)}`}>
+                  {r.metrics.inp.samples ? `${Math.round(r.metrics.inp.p75)} ms` : "—"}
+                </span>
+              ),
+              sortValue: (r) => r.metrics.inp.p75,
+            },
+          ]}
+        />
       )}
     </section>
   )

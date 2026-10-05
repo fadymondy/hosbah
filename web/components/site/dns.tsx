@@ -1,13 +1,13 @@
 "use client"
 
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, toast, useConfirm, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { CloudIcon, LockIcon, RefreshCwIcon, ShieldCheckIcon, Trash2Icon, WrenchIcon } from "lucide-react"
 
-import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -63,6 +63,7 @@ export function SiteDNS() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const confirm = useConfirm()
 
   const loadDNS = useCallback(async () => {
     try {
@@ -115,6 +116,67 @@ export function SiteDNS() {
     }
   }
 
+  // Create or repair, take over a record someone else made, switch the Cloudflare proxy, delete: behind each row's ⋯ menu.
+  function rowActions(r: Row): DataTableRowAction[] {
+    const foreign = !!r.record && !r.record.managed_by_hosbah
+    const actions: DataTableRowAction[] = []
+    if (r.managed && (r.status === "missing" || (r.status === "mismatch" && !foreign))) {
+      actions.push({
+        id: "repair",
+        label: r.status === "missing" ? t("site.dns.create") : t("site.dns.repair"),
+        icon: WrenchIcon,
+        disabled: busy === r.hostname,
+        onSelect: () => void put(r.hostname, {}).catch(() => {}),
+      })
+    }
+    if (r.managed && r.status === "mismatch" && foreign) {
+      actions.push({
+        id: "takeover",
+        label: t("site.dns.takeover"),
+        icon: WrenchIcon,
+        disabled: busy === r.hostname,
+        onSelect: async () => {
+          const ok = await confirm({
+            title: t("site.dns.takeoverTitle", { host: r.hostname }),
+            description: t("site.dns.takeoverBody", { old: `${r.record?.type} ${r.record?.content}`, next: `${r.expected.type} ${r.expected.content}` }),
+            confirmLabel: t("site.dns.takeover"),
+          })
+          if (ok) await put(r.hostname, { takeover: true }).catch(() => {})
+        },
+      })
+    }
+    if (r.record && r.managed) {
+      actions.push({
+        id: "proxy",
+        label: r.record.proxied ? t("site.dns.dnsOnly") : t("site.dns.proxy"),
+        icon: CloudIcon,
+        disabled: busy === r.hostname,
+        onSelect: () => void put(r.hostname, { proxied: !r.record?.proxied }).catch(() => {}),
+      })
+    }
+    if (r.record?.managed_by_hosbah) {
+      actions.push({
+        id: "delete",
+        label: t("common.delete"),
+        icon: Trash2Icon,
+        danger: true,
+        group: "danger",
+        onSelect: async () => {
+          const ok = await confirm({ title: t("site.dns.deleteTitle", { host: r.hostname }), description: t("site.dns.deleteBody"), confirmLabel: t("common.delete") })
+          if (!ok) return
+          setError(null)
+          try {
+            await apiFetch(`${path}/dns/${encodeURIComponent(r.hostname)}`, { method: "DELETE" })
+            await loadDNS()
+          } catch (err) {
+            setError(errorText(err))
+          }
+        },
+      })
+    }
+    return actions
+  }
+
   return (
     <>
       <section aria-labelledby="dns-h">
@@ -132,170 +194,124 @@ export function SiteDNS() {
         {rows === null ? (
           <LoadingRows rows={2} />
         ) : rows.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <CloudIcon className="size-4" />
             {t("site.dns.none")}
           </p>
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("proxy.hostname")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead>{t("site.dns.record")}</TableHead>
-                  <TableHead>{t("site.dns.proxied")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => {
-                  const foreign = !!r.record && !r.record.managed_by_hosbah
-                  return (
-                    <TableRow key={r.hostname}>
-                      <TableCell>
-                        <span dir="ltr" className="font-medium">
-                          {r.hostname}
-                        </span>
-                        <div className="text-xs text-muted-foreground">{r.credential ? `${r.zone} · ${r.credential.name}` : t("site.dns.noZone")}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={TONE[r.status]}>{t(`site.dns.status.${r.status}`)}</Badge>
-                        {r.error ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
-                            {r.error}
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-start font-mono text-xs">
-                        {r.record ? `${r.record.type} ${r.record.content}` : "—"}
-                        {r.status === "mismatch" && r.expected.content ? (
-                          <div className="text-muted-foreground">
-                            → {r.expected.type} {r.expected.content}
-                          </div>
-                        ) : null}
-                        {foreign ? <div className="font-sans text-muted-foreground">{t("site.dns.notOurs")}</div> : null}
-                      </TableCell>
-                      <TableCell>{r.record ? (r.record.proxied ? t("site.dns.proxiedOn") : t("site.dns.proxiedOff")) : "—"}</TableCell>
-                      {manage ? (
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {r.managed && (r.status === "missing" || (r.status === "mismatch" && !foreign)) ? (
-                              <Button variant="primary" size="sm" disabled={busy === r.hostname} onClick={() => void put(r.hostname, {}).catch(() => {})}>
-                                <WrenchIcon />
-                                {r.status === "missing" ? t("site.dns.create") : t("site.dns.repair")}
-                              </Button>
-                            ) : null}
-                            {r.managed && r.status === "mismatch" && foreign ? (
-                              <ConfirmButton
-                                icon={<WrenchIcon />}
-                                label={t("site.dns.takeover")}
-                                title={t("site.dns.takeoverTitle", { host: r.hostname })}
-                                description={t("site.dns.takeoverBody", { old: `${r.record?.type} ${r.record?.content}`, next: `${r.expected.type} ${r.expected.content}` })}
-                                confirmLabel={t("site.dns.takeover")}
-                                onConfirm={async () => {
-                                  try {
-                                    await put(r.hostname, { takeover: true })
-                                  } catch (err) {
-                                    throw new Error(errorText(err))
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            {r.record && r.managed ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy === r.hostname}
-                                onClick={() => void put(r.hostname, { proxied: !r.record?.proxied }).catch(() => {})}
-                              >
-                                <CloudIcon />
-                                {r.record.proxied ? t("site.dns.dnsOnly") : t("site.dns.proxy")}
-                              </Button>
-                            ) : null}
-                            {r.record?.managed_by_hosbah ? (
-                              <ConfirmButton
-                                icon={<Trash2Icon />}
-                                label={t("common.delete")}
-                                title={t("site.dns.deleteTitle", { host: r.hostname })}
-                                description={t("site.dns.deleteBody")}
-                                confirmLabel={t("common.delete")}
-                                onConfirm={async () => {
-                                  try {
-                                    await apiFetch(`${path}/dns/${encodeURIComponent(r.hostname)}`, { method: "DELETE" })
-                                  } catch (err) {
-                                    throw new Error(errorText(err))
-                                  }
-                                  await loadDNS()
-                                }}
-                              />
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </TableBand>
+          <NasaqTable
+            data={rows}
+            rowId={(r) => r.hostname}
+            rowLabel={(r) => r.hostname}
+            label={t("site.dns.records")}
+            search={rows.length > 8 ? t("proxy.hostname") : undefined}
+            rowActions={manage ? rowActions : undefined}
+            columns={[
+              {
+                id: "host",
+                header: t("proxy.hostname"),
+                cell: (r) => (
+                  <>
+                    <span dir="ltr" className="font-medium">
+                      {r.hostname}
+                    </span>
+                    <div className="text-xs text-muted-foreground">{r.credential ? `${r.zone} · ${r.credential.name}` : t("site.dns.noZone")}</div>
+                  </>
+                ),
+                sortValue: (r) => r.hostname,
+                searchValue: (r) => r.hostname,
+              },
+              {
+                id: "status",
+                header: t("lists.status"),
+                cell: (r) => (
+                  <>
+                    <Badge variant={TONE[r.status]}>{t(`site.dns.status.${r.status}`)}</Badge>
+                    {r.error ? (
+                      <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
+                        {r.error}
+                      </p>
+                    ) : null}
+                  </>
+                ),
+                sortValue: (r) => r.status,
+              },
+              {
+                id: "record",
+                header: t("site.dns.record"),
+                cell: (r) => (
+                  <div dir="ltr" className="text-start font-mono text-xs">
+                    {r.record ? `${r.record.type} ${r.record.content}` : "—"}
+                    {r.status === "mismatch" && r.expected.content ? (
+                      <div className="text-muted-foreground">
+                        → {r.expected.type} {r.expected.content}
+                      </div>
+                    ) : null}
+                    {r.record && !r.record.managed_by_hosbah ? <div className="font-sans text-muted-foreground">{t("site.dns.notOurs")}</div> : null}
+                  </div>
+                ),
+              },
+              { id: "proxied", header: t("site.dns.proxied"), cell: (r) => (r.record ? (r.record.proxied ? t("site.dns.proxiedOn") : t("site.dns.proxiedOff")) : "—") },
+            ]}
+          />
         )}
       </section>
 
       <section aria-labelledby="ssl-h">
         <SectionTitle id="ssl-h" title={t("site.dns.certs")} hint={t("site.dns.certsHint")} />
-        {certNote ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{certNote}</p> : null}
+        {certNote ? <p className="nq-band py-4 text-sm text-muted-foreground">{certNote}</p> : null}
         {certs === null ? (
           <LoadingRows rows={2} />
         ) : certs.length === 0 ? (
-          certNote ? null : <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.dns.none")}</p>
+          certNote ? null : <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.dns.none")}</p>
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("proxy.hostname")}</TableHead>
-                  <TableHead>{t("site.dns.issuer")}</TableHead>
-                  <TableHead>{t("site.dns.expires")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {certs.map((c) => {
-                  const soon = c.days_left != null && c.days_left <= 14
-                  return (
-                    <TableRow key={c.hostname}>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-2 font-medium" dir="ltr">
-                          {c.found ? <ShieldCheckIcon className="size-4 text-nq-success" /> : <LockIcon className="size-4 text-muted-foreground" />}
-                          {c.hostname}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {c.found ? (
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span dir="ltr">{c.issuer ?? "—"}</span>
-                            <Badge variant={c.managed ? "neutral" : "outline"}>{c.managed ? t("site.dns.public") : t("site.dns.internal")}</Badge>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">{c.error ?? t("site.dns.noCert")}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {c.not_after ? (
-                          <span className={soon ? "text-nq-danger-text" : undefined}>
-                            <span dir="ltr">{fmt(c.not_after)}</span>
-                            {c.days_left != null ? <span className="ms-2 text-xs text-muted-foreground">{t("site.dns.daysLeft", { n: c.days_left })}</span> : null}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </TableBand>
+          <NasaqTable
+            data={certs}
+            rowId={(c) => c.hostname}
+            rowLabel={(c) => c.hostname}
+            label={t("site.dns.certs")}
+            defaultSort={{ id: "expires", direction: "asc" }}
+            columns={[
+              {
+                id: "host",
+                header: t("proxy.hostname"),
+                cell: (c) => (
+                  <span className="inline-flex items-center gap-2 font-medium" dir="ltr">
+                    {c.found ? <ShieldCheckIcon className="size-4 text-nq-success" /> : <LockIcon className="size-4 text-muted-foreground" />}
+                    {c.hostname}
+                  </span>
+                ),
+                sortValue: (c) => c.hostname,
+              },
+              {
+                id: "issuer",
+                header: t("site.dns.issuer"),
+                cell: (c) =>
+                  c.found ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span dir="ltr">{c.issuer ?? "—"}</span>
+                      <Badge variant={c.managed ? "neutral" : "outline"}>{c.managed ? t("site.dns.public") : t("site.dns.internal")}</Badge>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">{c.error ?? t("site.dns.noCert")}</span>
+                  ),
+              },
+              {
+                id: "expires",
+                header: t("site.dns.expires"),
+                cell: (c) =>
+                  c.not_after ? (
+                    <span className={c.days_left != null && c.days_left <= 14 ? "text-nq-danger-text" : undefined}>
+                      <span dir="ltr">{fmt(c.not_after)}</span>
+                      {c.days_left != null ? <span className="ms-2 text-xs text-muted-foreground">{t("site.dns.daysLeft", { n: c.days_left })}</span> : null}
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+                sortValue: (c) => c.days_left ?? Number.MAX_SAFE_INTEGER,
+              },
+            ]}
+          />
         )}
       </section>
     </>

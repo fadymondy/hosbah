@@ -74,7 +74,7 @@ func Timeout(kind string) time.Duration {
 	case agentproto.KindDBCreate, agentproto.KindDBRemove, agentproto.KindDBDrop, agentproto.KindBucketCreate, agentproto.KindBucketRemove, agentproto.KindVolumeRemove,
 		agentproto.KindBrowserRemove, agentproto.KindRecipeRemove:
 		return 5 * time.Minute
-	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
+	case agentproto.KindWorkloadStats, agentproto.KindDBProbe, agentproto.KindVolumeUsage, agentproto.KindObjectBrowse, agentproto.KindVolumeFiles, agentproto.KindBrowserStatus, agentproto.KindRecipeStatus,
 		agentproto.KindLogDrainStatus, agentproto.KindLogDrainTest:
 		return 2 * time.Minute
 	case agentproto.KindAppLogsSearch:
@@ -118,7 +118,7 @@ func Timeout(kind string) time.Duration {
 		return 30 * time.Minute
 	case agentproto.KindPkgAutoupdateSet:
 		return 3 * time.Minute
-	case agentproto.KindSSHKeyInstall, agentproto.KindSSHKeyUninstall:
+	case agentproto.KindSSHKeyInstall, agentproto.KindSSHKeyUninstall, agentproto.KindSSHUserSet, agentproto.KindSSHUserRemove:
 		return time.Minute
 	case agentproto.KindGuestEnrol:
 		return agentproto.GuestEnrolTimeoutSeconds*time.Second + 30*time.Second

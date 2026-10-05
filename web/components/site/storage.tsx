@@ -1,14 +1,16 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { ArchiveIcon, HardDriveIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { ArchiveIcon, FolderOpenIcon, HardDriveIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -21,7 +23,7 @@ import { apiFetch } from "@/lib/api"
 import { isImported } from "@/lib/apps"
 import { humanBytes, type DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useInPanel, useTeam, useTeamBase, useServerHref } from "@/lib/team"
 
 export type Volume = { id: string; name: string; mount_path: string; volume: string; mounted: boolean; bytes: number | null }
 export type Bucket = { id: string; service: string; bucket: string; access_key: string; env_prefix: string; env: string[]; status: "creating" | "ready" | "failed" | "removing"; error: string | null }
@@ -32,14 +34,23 @@ export type Bucket = { id: string; service: string; bucket: string; access_key: 
  * key limited to that one bucket, injected as sealed S3_* variables.
  */
 export function SiteStorage() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
+  const teamBase = useTeamBase()
+  const serverHref = useServerHref()
+  // The file browsers are team pages; a server user's panel has none, so its rows do not link.
+  const browse = !useInPanel()
   const errorText = useErrorText()
   const { app, path } = useLoadedSite()
   const [volumes, setVolumes] = useState<Volume[] | null>(null)
   const [buckets, setBuckets] = useState<Bucket[]>([])
   const [minio, setMinio] = useState<DataService[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [removingVolume, setRemovingVolume] = useState<Volume | null>(null)
+  const [removingBucket, setRemovingBucket] = useState<Bucket | null>(null)
+  const router = useRouter()
+  const volumeHref = (v: Volume) => `${teamBase}/storage/volumes/${encodeURIComponent(app.name)}/${encodeURIComponent(v.name)}`
+  const bucketHref = (b: Bucket) => `${teamBase}/storage/${encodeURIComponent(b.service)}?bucket=${encodeURIComponent(b.bucket)}`
 
   const load = useCallback(async () => {
     try {
@@ -81,49 +92,63 @@ export function SiteStorage() {
         {volumes === null ? (
           <LoadingRows rows={2} />
         ) : volumes.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <HardDriveIcon className="size-4" />
             {t("site.storage.noVolumes")}
           </p>
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("site.monitors.name")}</TableHead>
-                  <TableHead>{t("site.storage.mountPath")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead>{t("site.storage.size")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {volumes.map((v) => (
-                  <TableRow key={v.id}>
-                    <TableCell dir="ltr" className="text-start font-medium">
+          <NasaqTable
+            data={volumes}
+            rowId={(v) => v.id}
+            rowLabel={(v) => v.name}
+            label={t("site.storage.volumes")}
+            onRowClick={browse ? (v) => router.push(volumeHref(v)) : undefined}
+            rowActions={(v) => [
+              ...(browse ? [{ id: "browse", label: t("site.storage.browse"), icon: FolderOpenIcon, onSelect: () => router.push(volumeHref(v)) }] : []),
+              ...(manage ? [{ id: "remove", label: t("site.storage.remove"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setRemovingVolume(v) }] : []),
+            ]}
+            columns={[
+              {
+                id: "name",
+                header: t("site.monitors.name"),
+                cell: (v) =>
+                  browse ? (
+                    <Link dir="ltr" href={volumeHref(v)} className="font-medium hover:underline">
                       {v.name}
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start font-mono text-xs">
-                      {v.mount_path}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={v.mounted ? "brand" : "outline"}>{v.mounted ? t("site.storage.mounted") : t("site.storage.nextDeploy")}</Badge>
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start text-xs tabular-nums">
-                      {v.bytes == null ? "—" : `≈ ${humanBytes(v.bytes)}`}
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <RemoveVolume path={path} volume={v} onRemoved={load} />
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
+                    </Link>
+                  ) : (
+                    <span dir="ltr" className="font-medium">
+                      {v.name}
+                    </span>
+                  ),
+                sortValue: (v) => v.name,
+              },
+              {
+                id: "mount",
+                header: t("site.storage.mountPath"),
+                cell: (v) => (
+                  <span dir="ltr" className="font-mono text-xs">
+                    {v.mount_path}
+                  </span>
+                ),
+              },
+              {
+                id: "status",
+                header: t("lists.status"),
+                cell: (v) => <Badge variant={v.mounted ? "brand" : "outline"}>{v.mounted ? t("site.storage.mounted") : t("site.storage.nextDeploy")}</Badge>,
+              },
+              {
+                id: "size",
+                header: t("site.storage.size"),
+                cell: (v) => (
+                  <span dir="ltr" className="text-xs tabular-nums">
+                    {v.bytes == null ? "—" : `≈ ${humanBytes(v.bytes)}`}
+                  </span>
+                ),
+                sortValue: (v) => v.bytes ?? -1,
+              },
+            ]}
+          />
         )}
       </section>
 
@@ -135,62 +160,73 @@ export function SiteStorage() {
           action={manage && minio.length ? <AddBucket path={path} services={minio} onSaved={load} /> : null}
         />
         {minio.length === 0 && buckets.length === 0 ? (
-          <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <ArchiveIcon className="size-4" />
             {t("site.storage.noMinio")}
-            <Link href={`/${locale}/t/${team.slug}/servers/${app.server_id}/databases`} className="text-nq-brand underline-offset-4 hover:underline">
+            <Link href={serverHref(app.server_id, "databases")} className="text-nq-brand underline-offset-4 hover:underline">
               {t("nav.databases")}
             </Link>
           </p>
         ) : buckets.length === 0 ? (
-          <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.storage.noBuckets")}</p>
+          <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.storage.noBuckets")}</p>
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("site.storage.bucket")}</TableHead>
-                  <TableHead>{t("site.storage.service")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead>{t("site.storage.variables")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {buckets.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell dir="ltr" className="text-start font-medium">
+          <NasaqTable
+            data={buckets}
+            rowId={(b) => b.id}
+            rowLabel={(b) => b.bucket}
+            label={t("site.storage.buckets")}
+            onRowClick={browse ? (b) => router.push(bucketHref(b)) : undefined}
+            rowActions={(b) => [
+              ...(browse ? [{ id: "browse", label: t("site.storage.browse"), icon: FolderOpenIcon, onSelect: () => router.push(bucketHref(b)) }] : []),
+              ...(manage ? [{ id: "remove", label: t("site.storage.remove"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setRemovingBucket(b) }] : []),
+            ]}
+            columns={[
+              {
+                id: "bucket",
+                header: t("site.storage.bucket"),
+                cell: (b) =>
+                  browse ? (
+                    <Link dir="ltr" href={bucketHref(b)} className="font-medium hover:underline">
                       {b.bucket}
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start">
-                      {b.service}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
-                      {b.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
-                          {b.error}
-                        </p>
-                      ) : null}
-                    </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-muted-foreground">
-                      {b.env.join(" ")}
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <RemoveBucket path={path} bucket={b} onRemoved={load} />
-                        </div>
-                      </TableCell>
+                    </Link>
+                  ) : (
+                    <span dir="ltr" className="font-medium">
+                      {b.bucket}
+                    </span>
+                  ),
+                sortValue: (b) => b.bucket,
+              },
+              { id: "service", header: t("site.storage.service"), cell: (b) => <span dir="ltr">{b.service}</span>, sortValue: (b) => b.service },
+              {
+                id: "status",
+                header: t("lists.status"),
+                cell: (b) => (
+                  <>
+                    <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
+                    {b.error ? (
+                      <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
+                        {b.error}
+                      </p>
                     ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
+                  </>
+                ),
+              },
+              {
+                id: "vars",
+                header: t("site.storage.variables"),
+                cell: (b) => (
+                  <span dir="ltr" className="block max-w-64 text-start font-mono text-xs text-muted-foreground">
+                    {b.env.join(" ")}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
-        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.storage.noBrowser")}</p>
+        <p className="nq-band py-3 text-xs text-muted-foreground">{t("site.storage.noBrowser")}</p>
       </section>
+      {removingVolume ? <RemoveVolume open onOpenChange={(v) => !v && setRemovingVolume(null)} path={path} volume={removingVolume} onRemoved={load} /> : null}
+      {removingBucket ? <RemoveBucket open onOpenChange={(v) => !v && setRemovingBucket(null)} path={path} bucket={removingBucket} onRemoved={load} /> : null}
     </>
   )
 }

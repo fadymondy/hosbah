@@ -1,13 +1,16 @@
 "use client"
 
-import { Badge, Button, Checkbox, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, EmptyState, StatCard, StatGrid } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangleIcon, ArrowLeftIcon, BugIcon, ChevronDownIcon, ChevronUpIcon, WaypointsIcon } from "lucide-react"
+import { ActivityIcon, AlertTriangleIcon, ArrowLeftIcon, BugIcon, ChevronDownIcon, ChevronUpIcon, GaugeIcon, ListTreeIcon, TimerIcon, WaypointsIcon } from "lucide-react"
 
 import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
+import { LoadMore, useInfiniteLimit } from "@/components/lists/infinite"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { RowMenu, RowWithActions, type RowAction } from "@/components/lists/row-actions"
+import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
 
 
 
@@ -96,7 +99,7 @@ export function SiteApm() {
   }
 
   return (
-    <div data-testid="apm">
+    <div data-testid="apm" data-stack>
       <section aria-labelledby="apm-settings-h">
         <SectionTitle id="apm-settings-h" title={t("site.apm.title")} hint={t("site.apm.hint")} />
         {settings === null ? (
@@ -195,64 +198,87 @@ function ApmEndpoints({ base }: { base: string }) {
       ) : endpoints === null ? (
         <LoadingRows rows={4} />
       ) : endpoints.length === 0 ? (
-        <EmptyState className="border-b" icon={WaypointsIcon} title={t("site.apm.emptyEndpointsTitle")} description={t("site.apm.emptyEndpointsHint")} />
+        <EmptyState className="nq-empty" icon={WaypointsIcon} title={t("site.apm.emptyEndpointsTitle")} description={t("site.apm.emptyEndpointsHint")} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("site.apm.method")}</TableHead>
-                <TableHead>{t("site.apm.route")}</TableHead>
-                <TableHead className="text-end">{t("site.apm.samplesHeader")}</TableHead>
-                <TableHead className="text-end">p50</TableHead>
-                <TableHead className="text-end">p95</TableHead>
-                <TableHead className="text-end">p99</TableHead>
-                <TableHead className="text-end">{t("site.apm.errors")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {endpoints.map((e) => (
-                <TableRow
-                  key={`${e.method} ${e.route}`}
-                  className="cursor-pointer"
-                  onClick={() => setSelected({ method: e.method, route: e.route })}
-                >
-                  <TableCell dir="ltr" className="font-mono text-xs">
-                    {e.method}
-                  </TableCell>
-                  <TableCell dir="ltr" className="max-w-md truncate font-mono text-xs">
+        <>
+          <EndpointTotals endpoints={endpoints} />
+          <NasaqTable
+            data={endpoints}
+            rowId={(e) => `${e.method} ${e.route}`}
+            rowLabel={(e) => `${e.method} ${e.route}`}
+            label={t("site.apm.endpointsTitle")}
+            search={endpoints.length > 8 ? t("site.apm.route") : undefined}
+            defaultSort={{ id: "samples", direction: "desc" }}
+            onRowClick={(e) => setSelected({ method: e.method, route: e.route })}
+            rowActions={(e) => [{ id: "traces", label: t("site.apm.viewTraces"), icon: ListTreeIcon, onSelect: () => setSelected({ method: e.method, route: e.route }) }]}
+            columns={[
+              { id: "method", header: t("site.apm.method"), cell: (e) => <span dir="ltr" className="font-mono text-xs">{e.method}</span>, sortValue: (e) => e.method },
+              {
+                id: "route",
+                header: t("site.apm.route"),
+                cell: (e) => (
+                  <span dir="ltr" className="block max-w-md truncate font-mono text-xs">
                     {e.route}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <Badge variant="outline">{e.samples.toLocaleString()}</Badge>
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs">
-                    {Math.round(e.p50_ms)} ms
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs">
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
-                        <span
-                          className="block h-full rounded-full bg-nq-brand"
-                          style={{ width: `${Math.min(100, (e.p95_ms / maxP95) * 100)}%` }}
-                        />
-                      </span>
-                      {Math.round(e.p95_ms)} ms
-                    </div>
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs">
-                    {Math.round(e.p99_ms)} ms
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {e.errors > 0 ? <Badge variant="danger">{e.errors}</Badge> : <span className="text-xs text-muted-foreground">0</span>}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+                  </span>
+                ),
+                sortValue: (e) => e.route,
+                searchValue: (e) => e.route,
+              },
+              { id: "samples", header: t("site.apm.samplesHeader"), align: "end", cell: (e) => <Badge variant="outline">{e.samples.toLocaleString()}</Badge>, sortValue: (e) => e.samples },
+              { id: "p50", header: "p50", align: "end", cell: (e) => <span dir="ltr" className="text-xs">{Math.round(e.p50_ms)} ms</span>, sortValue: (e) => e.p50_ms },
+              {
+                id: "p95",
+                header: "p95",
+                align: "end",
+                cell: (e) => (
+                  <span dir="ltr" className="flex items-center justify-end gap-2 text-xs">
+                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
+                      <span className="block h-full rounded-full bg-nq-brand" style={{ width: `${Math.min(100, (e.p95_ms / maxP95) * 100)}%` }} />
+                    </span>
+                    {Math.round(e.p95_ms)} ms
+                  </span>
+                ),
+                sortValue: (e) => e.p95_ms,
+              },
+              { id: "p99", header: "p99", align: "end", cell: (e) => <span dir="ltr" className="text-xs">{Math.round(e.p99_ms)} ms</span>, sortValue: (e) => e.p99_ms },
+              {
+                id: "errors",
+                header: t("site.apm.errors"),
+                align: "end",
+                cell: (e) => (e.errors > 0 ? <Badge variant="danger">{e.errors}</Badge> : <span className="text-xs text-muted-foreground">0</span>),
+                sortValue: (e) => e.errors,
+              },
+            ]}
+          />
+        </>
       )}
     </section>
+  )
+}
+
+/** The window at a glance: requests, errors, and the slowest p95 and p99 across the endpoints. */
+function EndpointTotals({ endpoints }: { endpoints: Endpoint[] }) {
+  const { t } = useI18n()
+  const samples = endpoints.reduce((n, e) => n + e.samples, 0)
+  const errors = endpoints.reduce((n, e) => n + e.errors, 0)
+  const p95 = Math.max(0, ...endpoints.map((e) => e.p95_ms))
+  const p99 = Math.max(0, ...endpoints.map((e) => e.p99_ms))
+  return (
+    <StatGrid className="nq-stats">
+      <StatCard icon={<ActivityIcon />} label={t("site.apm.samplesHeader")} value={samples} />
+      <StatCard
+        icon={<BugIcon />}
+        label={t("site.apm.errors")}
+        value={
+          <span dir="ltr">
+            {errors.toLocaleString()}
+            {samples > 0 ? <span className="ms-2 text-xs font-normal text-muted-foreground">{((errors / samples) * 100).toFixed(1)}%</span> : null}
+          </span>
+        }
+      />
+      <StatCard icon={<GaugeIcon />} label="p95" value={<span dir="ltr">{Math.round(p95)} ms</span>} />
+      <StatCard icon={<TimerIcon />} label="p99" value={<span dir="ltr">{Math.round(p99)} ms</span>} />
+    </StatGrid>
   )
 }
 
@@ -277,7 +303,7 @@ function ApmTraces({ base, method, route, onBack }: { base: string; method: stri
 
   return (
     <div>
-      <div className="border-b border-border px-6 py-3">
+      <div className="nq-band py-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeftIcon className="rtl:rotate-180" />
           {t("site.apm.backToEndpoints")}
@@ -290,42 +316,49 @@ function ApmTraces({ base, method, route, onBack }: { base: string; method: stri
       {traces === null ? (
         <LoadingRows rows={4} />
       ) : traces.length === 0 ? (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("site.apm.noTraces")}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{t("site.apm.noTraces")}</p>
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("site.apm.traceId")}</TableHead>
-                <TableHead className="text-end">{t("site.apm.duration")}</TableHead>
-                <TableHead className="text-end">{t("site.apm.status")}</TableHead>
-                <TableHead className="text-end">{t("site.apm.startedAt")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {traces.map((tr) => (
-                <TableRow key={tr.trace_id} className="cursor-pointer" onClick={() => setTraceID(tr.trace_id)}>
-                  <TableCell dir="ltr" className="max-w-xs truncate font-mono text-xs">
-                    {tr.trace_id}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs">
-                    {Math.round(tr.duration_ms)} ms
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {tr.error ? (
-                      <Badge variant="danger">{tr.http_status ?? t("site.apm.error")}</Badge>
-                    ) : (
-                      <Badge variant="outline">{tr.http_status ?? "—"}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-end text-xs text-muted-foreground">
-                    {new Date(tr.start_time).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <NasaqTable
+          data={traces}
+          rowId={(tr) => tr.trace_id}
+          rowLabel={(tr) => tr.trace_id}
+          label={t("site.apm.traceId")}
+          defaultSort={{ id: "started", direction: "desc" }}
+          onRowClick={(tr) => setTraceID(tr.trace_id)}
+          rowActions={(tr) => [{ id: "open", label: t("site.apm.viewTrace"), icon: WaypointsIcon, onSelect: () => setTraceID(tr.trace_id) }]}
+          columns={[
+            {
+              id: "trace",
+              header: t("site.apm.traceId"),
+              cell: (tr) => (
+                <span dir="ltr" className="block max-w-xs truncate font-mono text-xs">
+                  {tr.trace_id}
+                </span>
+              ),
+              searchValue: (tr) => tr.trace_id,
+            },
+            { id: "duration", header: t("site.apm.duration"), align: "end", cell: (tr) => <span dir="ltr" className="text-xs">{Math.round(tr.duration_ms)} ms</span>, sortValue: (tr) => tr.duration_ms },
+            {
+              id: "status",
+              header: t("site.apm.status"),
+              align: "end",
+              cell: (tr) =>
+                tr.error ? <Badge variant="danger">{tr.http_status ?? t("site.apm.error")}</Badge> : <Badge variant="outline">{tr.http_status ?? "—"}</Badge>,
+              sortValue: (tr) => tr.http_status ?? 0,
+            },
+            {
+              id: "started",
+              header: t("site.apm.startedAt"),
+              align: "end",
+              cell: (tr) => (
+                <span dir="ltr" className="text-xs text-muted-foreground">
+                  {new Date(tr.start_time).toLocaleString()}
+                </span>
+              ),
+              sortValue: (tr) => tr.start_time,
+            },
+          ]}
+        />
       )}
     </div>
   )
@@ -351,7 +384,7 @@ function ApmWaterfall({ base, traceID, onBack }: { base: string; traceID: string
 
   return (
     <div>
-      <div className="border-b border-border px-6 py-3">
+      <div className="nq-band py-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeftIcon className="rtl:rotate-180" />
           {t("site.apm.backToTraces")}
@@ -364,7 +397,7 @@ function ApmWaterfall({ base, traceID, onBack }: { base: string; traceID: string
       {spans === null ? (
         <LoadingRows rows={3} />
       ) : (
-        <div className="space-y-2 border-b border-border px-6 py-4" dir="ltr">
+        <div className="space-y-2 nq-band py-4" dir="ltr">
           {spans.map((s) => {
             const offset = ((new Date(s.start_time).getTime() - min) / totalMs) * 100
             const width = Math.max(1, (s.duration_ms / totalMs) * 100)
@@ -402,6 +435,7 @@ function ApmErrors({ base }: { base: string }) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [stacktraces, setStacktraces] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const { limit, hasMore, more } = useInfiniteLimit(issues?.length ?? 0)
 
   const load = useCallback(() => {
     apiFetch<{ issues: Issue[] }>(`${base}/issues`)
@@ -455,10 +489,10 @@ function ApmErrors({ base }: { base: string }) {
       {issues === null ? (
         <LoadingRows rows={3} />
       ) : issues.length === 0 ? (
-        <EmptyState className="border-b" icon={BugIcon} title={t("site.apm.emptyErrorsTitle")} description={t("site.apm.emptyErrorsHint")} />
+        <EmptyState className="nq-empty" icon={BugIcon} title={t("site.apm.emptyErrorsTitle")} description={t("site.apm.emptyErrorsHint")} />
       ) : (
-        <div className="divide-y divide-border border-b border-border">
-          {issues.map((issue) => (
+        <div className="divide-y divide-border nq-box">
+          {issues.slice(0, limit).map((issue) => (
             <IssueRow
               key={issue.id}
               t={t}
@@ -471,6 +505,7 @@ function ApmErrors({ base }: { base: string }) {
               onStatus={(s) => setStatus(issue, s)}
             />
           ))}
+          <LoadMore hasMore={hasMore} onMore={more} />
         </div>
       )}
     </section>
@@ -502,52 +537,58 @@ function IssueRow({
   onToggle: () => void
   onStatus: (status: (typeof ISSUE_STATUSES)[number]) => void
 }) {
+  const actions: RowAction[] = [
+    { id: "toggle", label: t(expanded ? "site.apm.hideStacktrace" : "site.apm.showStacktrace"), icon: expanded ? ChevronUpIcon : ChevronDownIcon, onSelect: onToggle },
+    ...(manage
+      ? ISSUE_STATUSES.filter((s) => s !== issue.status).map((s) => ({
+          id: s,
+          label: t(`site.apm.setStatus.${s}`),
+          group: "status",
+          disabled: busy,
+          onSelect: () => onStatus(s),
+        }))
+      : []),
+  ]
   return (
-    <div className="px-6 py-4">
-      <button type="button" className="flex w-full items-start gap-3 text-start" onClick={onToggle}>
-        {expanded ? (
-          <ChevronUpIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={issueBadgeVariant(issue.status)}>{t(`site.apm.statuses.${issue.status}`)}</Badge>
-            <span dir="ltr" className="truncate font-mono text-sm font-medium">
-              {issue.type}
-            </span>
-            <Badge variant="outline">{t("site.apm.count", { count: issue.count })}</Badge>
-          </div>
-          <p dir="ltr" className="mt-1 truncate text-sm text-muted-foreground">
-            {issue.message}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("site.apm.lastSeen")} {new Date(issue.last_seen).toLocaleString()}
-          </p>
-        </div>
-      </button>
-      {expanded ? (
-        <div className="mt-3 ms-7 space-y-3">
-          {stacktrace === undefined ? (
-            <LoadingRows rows={1} />
-          ) : stacktrace ? (
-            <pre dir="ltr" className="overflow-x-auto rounded border border-border bg-secondary p-3 text-start font-mono text-xs">
-              {stacktrace}
-            </pre>
+    <RowWithActions actions={actions} render={<div className="flex items-start gap-2 px-6 py-4" />}>
+      <div className="min-w-0 flex-1">
+        <button type="button" className="flex w-full items-start gap-3 text-start" onClick={onToggle}>
+          {expanded ? (
+            <ChevronUpIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           ) : (
-            <p className="text-xs text-muted-foreground">{t("site.apm.noStacktrace")}</p>
+            <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           )}
-          {manage ? (
-            <div className="flex flex-wrap gap-2">
-              {ISSUE_STATUSES.filter((s) => s !== issue.status).map((s) => (
-                <Button key={s} size="sm" variant="secondary" disabled={busy} onClick={() => onStatus(s)}>
-                  {t(`site.apm.setStatus.${s}`)}
-                </Button>
-              ))}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={issueBadgeVariant(issue.status)}>{t(`site.apm.statuses.${issue.status}`)}</Badge>
+              <span dir="ltr" className="truncate font-mono text-sm font-medium">
+                {issue.type}
+              </span>
+              <Badge variant="outline">{t("site.apm.count", { count: issue.count })}</Badge>
             </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+            <p dir="ltr" className="mt-1 truncate text-sm text-muted-foreground">
+              {issue.message}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("site.apm.lastSeen")} {new Date(issue.last_seen).toLocaleString()}
+            </p>
+          </div>
+        </button>
+        {expanded ? (
+          <div className="mt-3 ms-7 space-y-3">
+            {stacktrace === undefined ? (
+              <LoadingRows rows={1} />
+            ) : stacktrace ? (
+              <pre dir="ltr" className="overflow-x-auto rounded border border-border bg-secondary p-3 text-start font-mono text-xs">
+                {stacktrace}
+              </pre>
+            ) : (
+              <p className="text-xs text-muted-foreground">{t("site.apm.noStacktrace")}</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+      <RowMenu actions={actions} label={issue.type} />
+    </RowWithActions>
   )
 }

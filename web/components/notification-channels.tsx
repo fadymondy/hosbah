@@ -1,13 +1,12 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, type DataTableColumn, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BellIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 
 
@@ -16,7 +15,8 @@ import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 
 
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -47,7 +47,6 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
   const [channels, setChannels] = useState<NotificationChannel[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [q, setQ] = useState("")
 
   const load = useCallback(async () => {
     try {
@@ -78,7 +77,6 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
     }
   }
 
-  const shown = (channels ?? []).filter((c) => matches(q, c.name, c.kind, c.url_hint, ...c.events))
   const add = manage ? <ChannelDialog team={team} onSaved={load} /> : null
 
   return (
@@ -90,57 +88,71 @@ export function NotificationChannelsSection({ team, manage }: { team: string; ma
       ) : channels.length === 0 ? (
         <EmptyState className="border-b" icon={BellIcon} title={t("alerts.emptyTitle")} description={t("alerts.emptyHint")} actions={<>{add}</>} />
       ) : (
-        <>
-          <ListSearch value={q} onChange={setQ} placeholder={t("alerts.search")} shown={shown.length} total={channels.length} />
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("alerts.name")}</TableHead>
-                  <TableHead>{t("alerts.kind")}</TableHead>
-                  <TableHead>{t("alerts.destination")}</TableHead>
-                  <TableHead>{t("alerts.events")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell>
-                      <span dir="auto" className="font-medium">
-                        {c.name}
-                      </span>
-                      {!c.enabled ? (
-                        <Badge variant="outline" className="ms-2">
-                          {t("site.monitors.paused")}
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{t(`alerts.kinds.${c.kind}`)}</TableCell>
-                    <TableCell dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-muted-foreground">
-                      {c.kind === "email" ? c.emails.join(", ") : c.url_hint}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {c.events.length ? c.events.map((e) => t(`alerts.eventNames.${e}`)).join(", ") : "—"}
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="secondary" disabled={busy === c.id} onClick={() => void test(c)}>
-                            <PlayIcon />
-                            {t("alerts.test")}
-                          </Button>
-                          <ChannelDialog team={team} channel={c} onSaved={load} />
-                          <DeleteChannel team={team} channel={c} onDeleted={load} />
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
-        </>
+        <div className="px-6 py-6">
+          <NasaqTable
+            data={channels}
+            rowId={(c) => c.id}
+            label={t("settings.alertsTitle")}
+            rowLabel={(c) => c.name}
+            search={t("alerts.search")}
+            empty={t("home.noMatch")}
+            facets={[{ column: "kind", title: t("alerts.kind"), options: [...new Set(channels.map((c) => c.kind))].map((k) => ({ value: k, label: t(`alerts.kinds.${k}`) })) }]}
+            columns={[
+              {
+                id: "name",
+                header: t("alerts.name"),
+                label: t("alerts.name"),
+                sortValue: (c) => c.name,
+                searchValue: (c) => [c.name, c.kind, c.url_hint, ...c.events].join(" "),
+                cell: (c) => (
+                  <span className="flex items-center gap-2">
+                    <span dir="auto" className="font-medium">
+                      {c.name}
+                    </span>
+                    {!c.enabled ? <Badge variant="outline">{t("site.monitors.paused")}</Badge> : null}
+                  </span>
+                ),
+              },
+              { id: "kind", header: t("alerts.kind"), label: t("alerts.kind"), sortValue: (c) => c.kind, filterValue: (c) => c.kind, cell: (c) => t(`alerts.kinds.${c.kind}`) },
+              {
+                id: "destination",
+                header: t("alerts.destination"),
+                label: t("alerts.destination"),
+                className: "max-md:hidden",
+                headerClassName: "max-md:hidden",
+                cell: (c) => (
+                  <span dir="ltr" className="block max-w-56 truncate font-mono text-caption text-muted-foreground">
+                    {c.kind === "email" ? c.emails.join(", ") : c.url_hint}
+                  </span>
+                ),
+              },
+              {
+                id: "events",
+                header: t("alerts.events"),
+                label: t("alerts.events"),
+                className: "max-lg:hidden",
+                headerClassName: "max-lg:hidden",
+                cell: (c) => <span className="text-caption text-muted-foreground">{c.events.length ? c.events.map((e) => t(`alerts.eventNames.${e}`)).join(", ") : "—"}</span>,
+              },
+              {
+                id: "actions",
+                header: <span className="sr-only">{t("common.actions")}</span>,
+                label: t("common.actions"),
+                cell: (c) =>
+                  manage ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button size="sm" variant="secondary" disabled={busy === c.id} onClick={() => void test(c)}>
+                        <PlayIcon />
+                        {t("alerts.test")}
+                      </Button>
+                      <ChannelDialog team={team} channel={c} onSaved={load} />
+                      <DeleteChannel team={team} channel={c} onDeleted={load} />
+                    </div>
+                  ) : null,
+              },
+            ] satisfies DataTableColumn<NotificationChannel>[]}
+          />
+        </div>
       )}
     </section>
   )

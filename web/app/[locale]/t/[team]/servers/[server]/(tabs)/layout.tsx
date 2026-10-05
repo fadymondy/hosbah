@@ -8,7 +8,7 @@ import { PageBody } from "@/components/app-shell"
 import { ServerProvider, useServerPage } from "@/components/server-tabs/context"
 import { ServerHeader } from "@/components/server-tabs/header"
 import { useProvideServerScope } from "@/components/shell/scope"
-import { ErrorBand, LoadingRows, Notice } from "@/components/states"
+import { CardPieces, ErrorBand, LoadingRows, Notice } from "@/components/states"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
 
@@ -43,8 +43,10 @@ function Frame({ serverId, children }: { serverId: string; children: ReactNode }
   return (
     <div className="flex flex-col">
       <ServerHeader serverId={serverId} />
-      <ErrorBand message={error} />
-      {server ? children : <LoadingRows rows={4} />}
+      <CardPieces>
+        <ErrorBand message={error} />
+        {server ? children : <LoadingRows rows={4} />}
+      </CardPieces>
     </div>
   )
 }

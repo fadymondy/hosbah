@@ -27,14 +27,15 @@ import { ImportedDatabaseControls, ImportedDatabaseView } from "@/components/imp
 import { DataConsole } from "@/components/databases/data-console"
 import { InsightsPanel } from "@/components/databases/insights-panel"
 import { useDocumentTitle, useFormatDate, useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase } from "@/lib/team"
 
 import { statusVariant } from "@/components/server-tabs/databases"
 
 export default function DataServicePage() {
   const { service: ref } = useParams<{ service: string }>()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
+  const base = useTeamBase()
   const router = useRouter()
   const fmt = useFormatDate()
   const errorText = useErrorText()
@@ -100,7 +101,7 @@ export default function DataServicePage() {
       icon={<Trash2Icon />}
       onConfirm={async () => {
         await apiFetch(`/api/teams/${team.slug}/data-services/${s.id}`, { method: "DELETE" })
-        router.push(`/${locale}/t/${team.slug}/databases`)
+        router.push(`${base}/databases`)
       }}
     />
   ) : null

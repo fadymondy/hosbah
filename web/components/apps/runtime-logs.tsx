@@ -65,10 +65,10 @@ export function RuntimeLogsPanel({
   }
 
   return (
-    <div data-testid="runtime-logs">
+    <div data-testid="runtime-logs" data-stack>
       {operate ? (
         <>
-          <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+          <div className="flex flex-wrap items-end gap-3 nq-band py-4">
             <div className="basis-full space-y-1">
               <p className="text-sm text-muted-foreground">{t("apps.logs.hint")}</p>
               {!live ? <p className="text-sm text-muted-foreground">{t("apps.logs.notLive")}</p> : null}
@@ -102,7 +102,7 @@ export function RuntimeLogsPanel({
             </Button>
           </div>
           <ErrorBand message={error} />
-          <div className="min-h-40 border-b border-border bg-card">
+          <div className="min-h-40 nq-box bg-card">
             {op ? (
               <OperationLog team={team} serverId={app.server_id} op={op} />
             ) : (
@@ -111,7 +111,7 @@ export function RuntimeLogsPanel({
           </div>
         </>
       ) : (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("apps.logs.readOnly")}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{t("apps.logs.readOnly")}</p>
       )}
       <LogSearchPanel path={path} processes={names} />
     </div>

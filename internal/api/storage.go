@@ -82,7 +82,7 @@ func (d *deps) registerStorage(api huma.API) {
 		Summary: "The app's persistent volumes and S3 buckets. A volume's mounted says whether the live release runs with it; bytes is " +
 			"best effort — the server is asked (up to 8 s) what Docker reports, and an offline or silent server leaves bytes null, " +
 			"still 200. A bucket's secret is never returned. Any member.",
-	}, func(ctx context.Context, in *AppPath) (*storageOut, error) {
+	}, func(ctx context.Context, in *AppListPath) (*storageOut, error) {
 		out := &storageOut{Body: StorageOut{Volumes: []storage.Volume{}, Buckets: []dbsvc.Bucket{}}}
 		var op db.Operation
 		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
@@ -96,7 +96,9 @@ func (d *deps) registerStorage(api huma.API) {
 			if out.Body.Buckets, err = dbsvc.ListBuckets(ctx, q, m.TeamID, a); err != nil {
 				return huma.Error500InternalServerError("could not list the buckets")
 			}
-			op = storage.QueueUsage(ctx, q, d.ops, m.TeamID, webActor(id), a, out.Body.Volumes)
+			if !in.NoStatus {
+				op = storage.QueueUsage(ctx, q, d.ops, m.TeamID, webActor(id), a, out.Body.Volumes)
+			}
 			return nil
 		})
 		if err != nil {
@@ -284,3 +286,205 @@ func (d *deps) registerStorage(api huma.API) {
 
 // storageErr maps a dbsvc error; an imported app is this section's 422.
 func storageErr(err error, fallback string) error { return dbErr(err, fallback) }
+
+// ---- object browser (MH-1113): a MinIO service's buckets and objects. Owner or admin only, like the
+// table browser (AbilityRevealSecrets): objects can hold anything an app stored.
+
+// ObjectOut is one bucket, folder or object.
+type ObjectOut struct {
+	Key      string `json:"key"`
+	Folder   bool   `json:"folder,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+	Modified string `json:"modified,omitempty"`
+}
+
+func (d *deps) registerObjects(api huma.API) {
+	tags := []string{"Storage"}
+	base := "/api/teams/{team}/data-services/{service}/objects"
+	run := func(ctx context.Context, team, service string, in dbsvc.ObjectInput, fallback string) (agentproto.ObjectBrowseResult, error) {
+		var res agentproto.ObjectBrowseResult
+		err := d.inTeam(ctx, team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			svc, err := serviceIn(ctx, q, m, service)
+			if err != nil {
+				return err
+			}
+			res, err = d.dbs().Objects(ctx, q, m.TeamID, webActor(id), svc, in)
+			return dbErr(err, fallback)
+		})
+		return res, err
+	}
+
+	type objectListOut struct {
+		Body struct {
+			Entries   []ObjectOut `json:"entries"`
+			Truncated bool        `json:"truncated"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-storage-objects", Method: http.MethodGet, Path: base, Tags: tags,
+		Summary: "Without bucket: the service's buckets. With bucket: the folders and objects under prefix (owner or admin).",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Bucket string `query:"bucket" maxLength:"63"`
+		Prefix string `query:"prefix" maxLength:"1024"`
+	}) (*objectListOut, error) {
+		mode := "list"
+		if in.Bucket == "" {
+			mode = "buckets"
+		}
+		res, err := run(ctx, in.Team, in.Service, dbsvc.ObjectInput{Mode: mode, Bucket: in.Bucket, Prefix: in.Prefix}, "could not list the storage")
+		if err != nil {
+			return nil, err
+		}
+		out := &objectListOut{}
+		out.Body.Entries = []ObjectOut{}
+		for _, e := range res.Entries {
+			out.Body.Entries = append(out.Body.Entries, ObjectOut{Key: e.Key, Folder: e.Folder, Size: e.Size, Modified: e.Modified})
+		}
+		out.Body.Truncated = res.Truncated
+		return out, nil
+	})
+
+	type objectGetOut struct {
+		Body struct {
+			Data string `json:"data" doc:"base64"`
+			Size int64  `json:"size"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "get-storage-object", Method: http.MethodGet, Path: base + "/content", Tags: tags,
+		Summary: "One object's bytes, base64 (at most 2 MiB; owner or admin).",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Bucket string `query:"bucket" maxLength:"63"`
+		Key    string `query:"key" maxLength:"1024"`
+	}) (*objectGetOut, error) {
+		res, err := run(ctx, in.Team, in.Service, dbsvc.ObjectInput{Mode: "get", Bucket: in.Bucket, Key: in.Key}, "could not read the object")
+		if err != nil {
+			return nil, err
+		}
+		out := &objectGetOut{}
+		out.Body.Data, out.Body.Size = res.Data, res.Size
+		return out, nil
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "put-storage-object", Method: http.MethodPut, Path: base + "/content", Tags: tags,
+		DefaultStatus: http.StatusNoContent, Summary: "Upload one object (base64, at most 2 MiB; owner or admin). Audited.",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Body struct {
+			Bucket string `json:"bucket" maxLength:"63"`
+			Key    string `json:"key" maxLength:"1024"`
+			Data   string `json:"data" doc:"base64" maxLength:"2796220"`
+		}
+	}) (*struct{}, error) {
+		_, err := run(ctx, in.Team, in.Service, dbsvc.ObjectInput{Mode: "put", Bucket: in.Body.Bucket, Key: in.Body.Key, Data: in.Body.Data}, "could not upload the object")
+		return nil, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "delete-storage-object", Method: http.MethodDelete, Path: base + "/content", Tags: tags,
+		DefaultStatus: http.StatusNoContent, Summary: "Delete one object, or with recursive a folder and everything under it (owner or admin). Audited.",
+	}, func(ctx context.Context, in *struct {
+		ServicePath
+		Bucket    string `query:"bucket" maxLength:"63"`
+		Key       string `query:"key" maxLength:"1024"`
+		Recursive bool   `query:"recursive"`
+	}) (*struct{}, error) {
+		_, err := run(ctx, in.Team, in.Service, dbsvc.ObjectInput{Mode: "delete", Bucket: in.Bucket, Key: in.Key, Recursive: in.Recursive}, "could not delete the object")
+		return nil, err
+	})
+}
+
+// ---- volume file browser: an app volume's files on its server. Owner or admin only.
+
+func (d *deps) registerVolumeFiles(api huma.API) {
+	tags := []string{"Storage"}
+	base := "/api/teams/{team}/apps/{app}/storage/volumes/{volume}/files"
+	run := func(ctx context.Context, in VolumePath, f dbsvc.VolumeFilesInput, fallback string) (agentproto.ObjectBrowseResult, error) {
+		var res agentproto.ObjectBrowseResult
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityRevealSecrets, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+			a, err := appIn(ctx, q, m, in.App)
+			if err != nil {
+				return err
+			}
+			v, err := storage.Find(ctx, q, m.TeamID, a, in.Volume)
+			if err != nil {
+				return errNotFound
+			}
+			res, err = d.dbs().VolumeFiles(ctx, q, m.TeamID, webActor(id), a, v, f)
+			return dbErr(err, fallback)
+		})
+		return res, err
+	}
+
+	type volumeListOut struct {
+		Body struct {
+			Entries   []ObjectOut `json:"entries"`
+			Truncated bool        `json:"truncated"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "list-volume-files", Method: http.MethodGet, Path: base, Tags: tags,
+		Summary: "The folders and files of an app volume under path (\"\" is the volume's root; a folder path ends in /). Owner or admin.",
+	}, func(ctx context.Context, in *struct {
+		VolumePath
+		Path string `query:"path" maxLength:"1024"`
+	}) (*volumeListOut, error) {
+		res, err := run(ctx, in.VolumePath, dbsvc.VolumeFilesInput{Mode: "list", Path: in.Path}, "could not list the volume")
+		if err != nil {
+			return nil, err
+		}
+		out := &volumeListOut{}
+		out.Body.Entries = []ObjectOut{}
+		for _, e := range res.Entries {
+			out.Body.Entries = append(out.Body.Entries, ObjectOut{Key: e.Key, Folder: e.Folder, Size: e.Size, Modified: e.Modified})
+		}
+		out.Body.Truncated = res.Truncated
+		return out, nil
+	})
+
+	type volumeGetOut struct {
+		Body struct {
+			Data string `json:"data" doc:"base64"`
+			Size int64  `json:"size"`
+		}
+	}
+	huma.Register(api, huma.Operation{OperationID: "get-volume-file", Method: http.MethodGet, Path: base + "/content", Tags: tags,
+		Summary: "One file's bytes, base64 (at most 2 MiB; owner or admin).",
+	}, func(ctx context.Context, in *struct {
+		VolumePath
+		Path string `query:"path" maxLength:"1024"`
+	}) (*volumeGetOut, error) {
+		res, err := run(ctx, in.VolumePath, dbsvc.VolumeFilesInput{Mode: "get", Path: in.Path}, "could not read the file")
+		if err != nil {
+			return nil, err
+		}
+		out := &volumeGetOut{}
+		out.Body.Data, out.Body.Size = res.Data, res.Size
+		return out, nil
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "put-volume-file", Method: http.MethodPut, Path: base + "/content", Tags: tags,
+		DefaultStatus: http.StatusNoContent, Summary: "Write one file (base64, at most 2 MiB), or with a path ending in / make a folder. Owner or admin. Audited.",
+	}, func(ctx context.Context, in *struct {
+		VolumePath
+		Body struct {
+			Path string `json:"path" minLength:"1" maxLength:"1024"`
+			Data string `json:"data,omitempty" doc:"base64" maxLength:"2796220"`
+		}
+	}) (*struct{}, error) {
+		mode := "put"
+		if len(in.Body.Path) > 0 && in.Body.Path[len(in.Body.Path)-1] == '/' {
+			mode = "mkdir"
+		}
+		_, err := run(ctx, in.VolumePath, dbsvc.VolumeFilesInput{Mode: mode, Path: in.Body.Path, Data: in.Body.Data}, "could not write the file")
+		return nil, err
+	})
+
+	huma.Register(api, huma.Operation{OperationID: "delete-volume-file", Method: http.MethodDelete, Path: base + "/content", Tags: tags,
+		DefaultStatus: http.StatusNoContent, Summary: "Delete one file, or a folder (path ending in /) and everything in it. Owner or admin. Audited.",
+	}, func(ctx context.Context, in *struct {
+		VolumePath
+		Path string `query:"path" maxLength:"1024"`
+	}) (*struct{}, error) {
+		_, err := run(ctx, in.VolumePath, dbsvc.VolumeFilesInput{Mode: "delete", Path: in.Path}, "could not delete")
+		return nil, err
+	})
+}

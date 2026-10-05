@@ -16,7 +16,7 @@ export function Planned({ section, icon: Icon }: { section: string; icon: Lucide
   return (
     <section aria-labelledby="planned-h">
       <SectionTitle id="planned-h" title={t(`site.nav.${section}`)} hint={t(`site.planned.${section}.hint`)} />
-      <div className="flex flex-col gap-5 border-b border-border px-6 py-8">
+      <div className="flex flex-col gap-5 nq-band py-8">
         <div className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center border border-border bg-card text-nq-brand">
             <Icon className="size-5" />

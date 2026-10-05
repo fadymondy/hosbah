@@ -85,7 +85,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindContainerRecreate, KindWorkloadDestroy, KindDBProbe, KindContainerInspect,
 	KindGitHubInstall, KindGitHubLogin, KindGitHubStatus, KindGitHubLogout, KindGitHubRepos, KindGitHubBranches,
 	KindGitHubCommits, KindGitHubCompare, KindGitHubPulls, KindCaddyCerts,
-	KindVolumeUsage, KindVolumeRemove, KindBucketCreate, KindBucketRemove, KindRealtimeRoute,
+	KindVolumeUsage, KindVolumeRemove, KindBucketCreate, KindBucketRemove, KindObjectBrowse, KindVolumeFiles, KindRealtimeRoute,
 	KindBrowserCreate, KindBrowserRemove, KindBrowserStatus,
 	KindRecipeInstall, KindRecipeRemove, KindRecipeStatus,
 	KindFSList, KindFSRead, KindFSWrite, KindFSMkdir, KindFSDelete, KindFSRename, KindTerminalOpen, KindSFTPUser,
@@ -95,7 +95,7 @@ var AgentKinds = []string{KindSystemInfo, KindDockerCheck, KindProvisionStep, Ki
 	KindFirewallApply, KindFirewallStatus, KindFail2banInstall, KindFail2banBanned, KindFail2banUnban,
 	KindMailInstall, KindMailDomain, KindMailbox, KindMailAlias,
 	KindPkgList, KindPkgUpgrade, KindPkgAutoupdateSet, KindSSHKeyInstall, KindSSHKeyUninstall,
-	KindPasswdSet, KindDeployKeyGenerate, KindAppScan, KindGuestEnrol}
+	KindPasswdSet, KindDeployKeyGenerate, KindAppScan, KindGuestEnrol, KindSSHUserSet, KindSSHUserRemove}
 
 // Provision steps (params.step of provision.step). Each is idempotent: it checks the current state
 // first and reports "already done" rather than re-applying.

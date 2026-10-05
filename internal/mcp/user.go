@@ -30,13 +30,23 @@ func UserServer() *Server {
 	return &Server{
 		Name:          "hosbah",
 		Version:       "0.1.0",
-		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), DNSZoneTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...), NotificationChannelTools()...), StatusPageTools()...), LogDrainTools()...), RumTools()...), ApmTools()...), EdgeCacheTools()...), HTTPRulesTools()...), CostTools()...), ScriptTools()...), ServiceTools()...), SiteTemplateTools()...), ProductTools()...), FirewallTools()...), Fail2banTools()...), MailTools()...), CertCheckTools()...), ServerUpdateTools()...), SSHKeyTools()...), AppScanTools()...), SecurityTools()...), 
+		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), DNSZoneTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...), NotificationChannelTools()...), StatusPageTools()...), LogDrainTools()...), RumTools()...), ApmTools()...), EdgeCacheTools()...), HTTPRulesTools()...), CostTools()...), ScriptTools()...), ServiceTools()...), SiteTemplateTools()...), ProductTools()...), FirewallTools()...), Fail2banTools()...), MailTools()...), CertCheckTools()...), ServerUpdateTools()...), SSHKeyTools()...), SSHUserTools()...), AppScanTools()...), SecurityTools()...), 
 		AllowedScopes: scopes.All,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {
 			return tenancy.Scope{UserID: c.UserID, TeamID: c.TeamID, TokenHash: c.TokenHash}
 		},
 	}
+}
+
+// AuthenticateUserToken resolves a team user token (hbu_…, legacy cld_…) for a REST caller: the
+// integration API (internal/api/integrations.go, MH-1153). Only Hosbah's own user tokens; a
+// CircleXO hub token is refused here.
+func AuthenticateUserToken(ctx context.Context, a *app.App, bearer string) (Caller, error) {
+	if !tokens.HasPrefix(bearer, tokens.UserMCP) {
+		return Caller{}, ErrUnauthorized
+	}
+	return authenticateUser(ctx, a, bearer)
 }
 
 func authenticateUser(ctx context.Context, a *app.App, bearer string) (Caller, error) {

@@ -1,19 +1,26 @@
 "use client"
 
-import { Badge, Button, Checkbox, EmptyState, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
-import { useCallback, useEffect, useState } from "react"
-import { CircleOffIcon, DatabaseIcon, RefreshCwIcon, ServerIcon } from "lucide-react"
+import {
+  Badge,
+  Button,
+  DataTable,
+  DataTableFacetFilter,
+  DataTablePagination,
+  DataTableSearch,
+  DataTableToolbar,
+  EmptyState,
+  Switch,
+  toast,
+  useDataTable,
+  type DataTableColumn,
+  type DataTableRowAction,
+} from "@fadymondy/nasaq/web"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { CircleOffIcon, DatabaseIcon, EyeIcon, RefreshCwIcon, ServerIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
-import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { ErrorBand, LoadingRows } from "@/components/states"
-
-
-
-
-
 import { apiFetch } from "@/lib/api"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
@@ -51,7 +58,9 @@ export type SharedService = {
   kind_manual: boolean
 }
 
-/** The team's directory of Proxmox guests classified as shared infrastructure. */
+type Patch = Partial<Pick<SharedService, "name" | "kind" | "hidden">>
+
+/** The team's directory of Proxmox guests classified as shared infrastructure. Name and kind edit in place. */
 export default function SharedServicesPage() {
   const { t } = useI18n()
   const { team, manage } = useTeam()
@@ -59,7 +68,6 @@ export default function SharedServicesPage() {
   const errorText = useErrorText()
   const [services, setServices] = useState<SharedService[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
   const [scanning, setScanning] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
 
@@ -92,21 +100,87 @@ export default function SharedServicesPage() {
     }
   }
 
-  async function update(s: SharedService, patch: Partial<Pick<SharedService, "name" | "kind" | "hidden">>) {
+  async function update(s: SharedService, patch: Patch): Promise<{ error: string } | void> {
     try {
       const updated = await apiFetch<SharedService>(`/api/teams/${team.slug}/shared-services/${s.id}`, { method: "PUT", body: patch })
       setServices((cur) => (cur ?? []).map((x) => (x.id === s.id ? updated : x)))
     } catch (err) {
-      setError(errorText(err))
+      return { error: errorText(err) }
     }
   }
 
-  const visible = (services ?? []).filter((s) => showHidden || !s.hidden)
-  const shown = visible.filter((s) => matches(q, s.name, s.kind, s.server_name, s.host ?? ""))
-  const grouped = shown.reduce<Record<string, SharedService[]>>((acc, s) => {
-    ;(acc[s.kind] ??= []).push(s)
-    return acc
-  }, {})
+  const visible = useMemo(() => (services ?? []).filter((s) => showHidden || !s.hidden), [services, showHidden])
+  const kindLabel = useCallback((k: string) => t(`sharedServices.kinds.${k}`, undefined, k), [t])
+
+  const columns = useMemo<DataTableColumn<SharedService>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("databases.name"),
+        label: t("databases.name"),
+        sortValue: (s) => s.name,
+        searchValue: (s) => [s.name, s.kind, s.server_name, s.host ?? ""].join(" "),
+        edit: manage ? { type: "text", validate: (v) => (String(v ?? "").trim() ? null : t("sharedServices.nameRequired")) } : undefined,
+        cell: (s) => (
+          <span className="flex min-w-0 items-center gap-3">
+            <DatabaseIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{s.name}</span>
+              <span className="flex items-center gap-1 text-caption text-muted-foreground">
+                <ServerIcon className="size-3" />
+                {s.server_name} · {s.guest_type === "qemu" ? "VM" : "CT"} {s.guest_vmid}
+              </span>
+            </span>
+          </span>
+        ),
+      },
+      {
+        id: "kind",
+        header: t("databases.kind"),
+        label: t("databases.kind"),
+        sortValue: (s) => kindLabel(s.kind),
+        filterValue: (s) => s.kind,
+        edit: manage ? { type: "select", value: (s) => s.kind, options: SHARED_SERVICE_KINDS.map((k) => ({ value: k, label: kindLabel(k) })) } : undefined,
+        cell: (s) => <Badge variant="neutral">{kindLabel(s.kind)}</Badge>,
+      },
+      {
+        id: "address",
+        header: t("databases.endpoint"),
+        label: t("databases.endpoint"),
+        sortValue: (s) => s.host ?? "",
+        className: "max-md:hidden",
+        headerClassName: "max-md:hidden",
+        cell: (s) => (
+          <span dir="ltr" className="font-mono text-caption text-muted-foreground">
+            {s.host ?? "—"}
+            {s.port ? `:${s.port}` : ""}
+          </span>
+        ),
+      },
+      {
+        id: "hidden",
+        header: <span className="sr-only">{t("sharedServices.hidden")}</span>,
+        label: t("sharedServices.hidden"),
+        sortValue: (s) => (s.hidden ? 1 : 0),
+        cell: (s) => (s.hidden ? <Badge variant="outline">{t("sharedServices.hidden")}</Badge> : null),
+      },
+    ],
+    [t, manage, kindLabel],
+  )
+  const table = useDataTable({ data: visible, columns, getRowId: (s) => s.id, pageSize: 25, defaultSort: { id: "kind", direction: "asc" } })
+  const kinds = useMemo(() => [...new Set(visible.map((s) => s.kind))], [visible])
+
+  const actions = (s: SharedService): DataTableRowAction[] =>
+    manage
+      ? [
+          {
+            id: "hide",
+            label: s.hidden ? t("sharedServices.unhide") : t("sharedServices.hide"),
+            icon: s.hidden ? EyeIcon : CircleOffIcon,
+            onSelect: () => void update(s, { hidden: !s.hidden }).then((r) => r && setError(r.error)),
+          },
+        ]
+      : []
 
   return (
     <PageBody
@@ -114,114 +188,52 @@ export default function SharedServicesPage() {
       description={t("sharedServices.description")}
       actions={
         manage ? (
-          <Button variant="primary" size="sm" onClick={() => void scan()} disabled={scanning}>
+          <Button variant="primary" onClick={() => void scan()} disabled={scanning}>
             <RefreshCwIcon className={scanning ? "animate-spin" : undefined} />
             {t("sharedServices.scan")}
           </Button>
         ) : null
       }
       bleed
+      divider={false}
     >
       <ErrorBand message={error} />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
-        <ListSearch value={q} onChange={setQ} placeholder={t("sharedServices.search")} shown={shown.length} total={visible.length} />
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Checkbox checked={showHidden} onCheckedChange={(v) => setShowHidden(!!v)} />
-          {t("sharedServices.showHidden")}
-        </label>
-      </div>
       {services === null ? (
         <LoadingRows />
-      ) : visible.length === 0 ? (
-        <EmptyState className="border-b" icon={DatabaseIcon} title={t("sharedServices.emptyTitle")} description={t("sharedServices.emptyHint")} />
+      ) : services.length === 0 ? (
+        <div className="px-6 pb-6">
+          <EmptyState icon={DatabaseIcon} title={t("sharedServices.emptyTitle")} description={t("sharedServices.emptyHint")} />
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 px-6 py-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(grouped).map(([kind, list]) => (
-            <div key={kind} className="col-span-full">
-              <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
-                {t(`sharedServices.kinds.${kind}`, undefined, kind)}
-              </h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {list.map((s) => (
-                  <SharedServiceCard key={s.id} service={s} manage={manage} onUpdate={(patch) => update(s, patch)} />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col gap-3 px-6 pb-6">
+          <DataTableToolbar>
+            <DataTableSearch table={table} placeholder={t("sharedServices.search")} />
+            {kinds.length > 1 ? (
+              <DataTableFacetFilter
+                table={table}
+                column="kind"
+                title={t("databases.kind")}
+                options={kinds.map((k) => ({ value: k, label: kindLabel(k) }))}
+              />
+            ) : null}
+            <label className="ms-auto flex items-center gap-2 text-caption text-muted-foreground">
+              <Switch checked={showHidden} onCheckedChange={(v) => setShowHidden(!!v)} />
+              {t("sharedServices.showHidden")}
+            </label>
+          </DataTableToolbar>
+          <DataTable
+            table={table}
+            label={t("nav.sharedServices")}
+            rowLabel={(s) => s.name}
+            rowActions={manage ? actions : undefined}
+            onCellEdit={(s, col, v) =>
+              col === "name" ? update(s, { name: String(v ?? "").trim() }) : col === "kind" ? update(s, { kind: String(v) }) : undefined
+            }
+            empty={t("home.noMatch")}
+          />
+          <DataTablePagination table={table} />
         </div>
       )}
     </PageBody>
-  )
-}
-
-function SharedServiceCard({
-  service: s,
-  manage,
-  onUpdate,
-}: {
-  service: SharedService
-  manage: boolean
-  onUpdate: (patch: Partial<Pick<SharedService, "name" | "kind" | "hidden">>) => Promise<void>
-}) {
-  const { t } = useI18n()
-  const [name, setName] = useState(s.name)
-  useEffect(() => setName(s.name), [s.name])
-
-  return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <ServerIcon className="size-3.5" />
-          {s.server_name} · CT {s.guest_vmid}
-        </div>
-        {s.hidden ? <Badge variant="outline">{t("sharedServices.hidden")}</Badge> : null}
-      </div>
-      {manage ? (
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => {
-            if (name.trim() && name !== s.name) void onUpdate({ name: name.trim() })
-          }}
-          className="font-medium"
-        />
-      ) : (
-        <p className="font-medium">{s.name}</p>
-      )}
-      {manage ? (
-        <Select value={s.kind} onValueChange={(v) => v && void onUpdate({ kind: v })}>
-          <SelectTrigger className="w-full">
-            <SelectValue>{(v: string) => t(`sharedServices.kinds.${v}`, undefined, v)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {SHARED_SERVICE_KINDS.map((k) => (
-              <SelectItem key={k} value={k}>
-                {t(`sharedServices.kinds.${k}`, undefined, k)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <Badge variant="neutral" className="w-fit">
-          {t(`sharedServices.kinds.${s.kind}`, undefined, s.kind)}
-        </Badge>
-      )}
-      <p dir="ltr" className="font-mono text-xs text-muted-foreground">
-        {s.host ?? "—"}
-        {s.port ? `:${s.port}` : ""}
-      </p>
-      {manage ? (
-        <div className="mt-1 flex justify-end">
-          <ConfirmButton
-            label={s.hidden ? t("sharedServices.unhide") : t("sharedServices.hide")}
-            icon={<CircleOffIcon />}
-            title={s.hidden ? t("sharedServices.unhide") : t("sharedServices.hide")}
-            description={s.hidden ? t("sharedServices.unhideConfirm", { name: s.name }) : t("sharedServices.hideConfirm", { name: s.name })}
-            confirmLabel={s.hidden ? t("sharedServices.unhide") : t("sharedServices.hide")}
-            onConfirm={() => onUpdate({ hidden: !s.hidden })}
-          />
-        </div>
-      ) : null}
-    </div>
   )
 }

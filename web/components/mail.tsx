@@ -25,7 +25,8 @@ import { FormError, useErrorText } from "@/components/form-error"
 
 
 
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -106,39 +107,56 @@ export function TeamMail() {
         ) : servers.length === 0 ? (
           <EmptyState className="border-b" icon={MailIcon} title={t("mail.servers.emptyTitle")} description={t("mail.servers.emptyHint")} actions={<>{manage ? <InstallDialog base={base} servers={enrolledServers} onSaved={load} /> : null}</>} />
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("mail.servers.hostname")}</TableHead>
-                  <TableHead>{t("mail.servers.onServer")}</TableHead>
-                  <TableHead>{t("mail.statusLabel")}</TableHead>
-                  <TableHead className="text-end">{t("common.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servers.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell dir="ltr" className="text-start font-medium">
+          <div className="px-6 py-4">
+            <NasaqTable
+              data={servers}
+              rowId={(s) => s.id}
+              label={t("mail.servers.title")}
+              rowLabel={(s) => s.hostname}
+              columns={[
+                {
+                  id: "hostname",
+                  header: t("mail.servers.hostname"),
+                  sortValue: (s) => s.hostname,
+                  cell: (s) => (
+                    <span dir="ltr" className="flex items-center gap-2 font-medium">
+                      <MailIcon className="size-4 text-muted-foreground" />
                       {s.hostname}
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
+                    </span>
+                  ),
+                },
+                {
+                  id: "server",
+                  header: t("mail.servers.onServer"),
+                  cell: (s) => (
+                    <span dir="ltr" className="text-caption text-muted-foreground">
                       {enrolledServers.find((hs) => hs.id === s.server_id)?.name ?? s.server_id.slice(0, 8)}
-                    </TableCell>
-                    <TableCell>
+                    </span>
+                  ),
+                },
+                {
+                  id: "status",
+                  header: t("mail.statusLabel"),
+                  cell: (s) => (
+                    <span className="flex flex-col items-start gap-1">
                       <Badge variant={mailStatusVariant(s.status)}>{t(`mail.status.${s.status}`, undefined, s.status)}</Badge>
-                      {s.error ? <p className="mt-1 max-w-64 text-xs text-nq-danger-text">{s.error}</p> : null}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        {manage ? <DeleteServer base={base} server={s} onDeleted={load} /> : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
+                      {s.error ? <span className="max-w-64 text-caption text-destructive">{s.error}</span> : null}
+                    </span>
+                  ),
+                },
+                ...(manage
+                  ? [
+                      {
+                        id: "actions",
+                        header: <span className="sr-only">{t("common.actions")}</span>,
+                        align: "end" as const,
+                        cell: (s: MailServer) => <DeleteServer base={base} server={s} onDeleted={load} />,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
         )}
       </section>
 
@@ -591,54 +609,55 @@ function DomainCard({
         ) : aliases.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("mail.aliases.empty")}</p>
         ) : (
-          <div className="border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("mail.aliases.email")}</TableHead>
-                  <TableHead>{t("mail.aliases.kind")}</TableHead>
-                  <TableHead>{t("mail.aliases.destinations")}</TableHead>
-                  <TableHead className="text-end">{t("common.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {aliases.map((al) => (
-                  <TableRow key={al.id}>
-                    <TableCell dir="ltr" className="text-start">
-                      {al.email}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{t(`mail.aliases.kinds.${al.kind}`, undefined, al.kind)}</Badge>
-                    </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 truncate text-start text-xs text-muted-foreground">
-                      {al.destinations.join(", ")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        {manage ? (
-                          <ConfirmButton
-                            icon={<Trash2Icon />}
-                            label={t("common.delete")}
-                            title={t("mail.aliases.deleteTitle", { name: al.email })}
-                            description={t("mail.aliases.deleteBody")}
-                            confirmLabel={t("common.delete")}
-                            onConfirm={async () => {
-                              try {
-                                await apiFetch(`${domBase}/aliases/${al.id}`, { method: "DELETE" })
-                              } catch (err) {
-                                throw new Error(errorText(err))
-                              }
-                              await load()
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <NasaqTable
+            data={aliases}
+            rowId={(al) => al.id}
+            label={t("mail.aliases.title")}
+            rowLabel={(al) => al.email}
+            columns={[
+              { id: "email", header: t("mail.aliases.email"), sortValue: (al) => al.email, cell: (al) => <span dir="ltr">{al.email}</span> },
+              {
+                id: "kind",
+                header: t("mail.aliases.kind"),
+                cell: (al) => <Badge variant="outline">{t(`mail.aliases.kinds.${al.kind}`, undefined, al.kind)}</Badge>,
+              },
+              {
+                id: "destinations",
+                header: t("mail.aliases.destinations"),
+                cell: (al) => (
+                  <span dir="ltr" className="block max-w-64 truncate text-caption text-muted-foreground">
+                    {al.destinations.join(", ")}
+                  </span>
+                ),
+              },
+              ...(manage
+                ? [
+                    {
+                      id: "actions",
+                      header: <span className="sr-only">{t("common.actions")}</span>,
+                      align: "end" as const,
+                      cell: (al: MailAlias) => (
+                        <ConfirmButton
+                          icon={<Trash2Icon />}
+                          label={t("common.delete")}
+                          title={t("mail.aliases.deleteTitle", { name: al.email })}
+                          description={t("mail.aliases.deleteBody")}
+                          confirmLabel={t("common.delete")}
+                          onConfirm={async () => {
+                            try {
+                              await apiFetch(`${domBase}/aliases/${al.id}`, { method: "DELETE" })
+                            } catch (err) {
+                              throw new Error(errorText(err))
+                            }
+                            await load()
+                          }}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         )}
       </div>
 

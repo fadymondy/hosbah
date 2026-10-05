@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteProxy } from "@/components/site/panels"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteProxy />
+  return <SectionRedirect section="proxy" />
 }

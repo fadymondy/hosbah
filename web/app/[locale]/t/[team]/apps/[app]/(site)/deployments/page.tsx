@@ -1,7 +1,8 @@
 "use client"
 
-import { SiteDeployments } from "@/components/site/deployments"
+import { SITE_TABS } from "@/components/site/sections"
+import { SiteViews } from "@/components/site/views"
 
 export default function Page() {
-  return <SiteDeployments />
+  return <SiteViews views={SITE_TABS.find((x) => x.key === "deployments")?.views ?? []} />
 }

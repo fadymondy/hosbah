@@ -9,15 +9,17 @@ import { AlertCircleIcon, ExternalLinkIcon } from "lucide-react"
 import { PageBody } from "@/components/app-shell"
 import { AppStatusBadge } from "@/components/app-status"
 import { ImportedBadge, originSummary } from "@/components/imported"
+import { usePanelViewer } from "@/components/panel/shell"
 import { ServerMark } from "@/components/server-mark"
+import { SiteCover } from "@/components/site/cover"
 import { useProvideSiteScope } from "@/components/shell/scope"
 import { SiteProvider, useSite } from "@/components/site/context"
 import { DeployButton } from "@/components/site/deploy-dialog"
-import { ErrorBand, LoadingRows, Notice } from "@/components/states"
+import { CardPieces, ErrorBand, LoadingRows, Notice } from "@/components/states"
 import { isImported } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useInPanel, useServerHref, useTeam, useTeamBase } from "@/lib/team"
 
 /** A site: its header and the section's own page. The sections are the shell's sidebar while a site is
  * open (components/shell/scope-nav.tsx), under the breadcrumb Team › Server › Site. */
@@ -31,10 +33,15 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
 }
 
 function Frame({ children }: { children: ReactNode }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team } = useTeam()
   const operate = canOperate(team.role)
   const { detail, missing, error, connected } = useSite()
+  const serverHref = useServerHref()
+  const inPanel = useInPanel()
+  // A customer from an app link has this one app: no way back to a list they cannot see.
+  const appOnly = usePanelViewer()?.kind === "app"
+  const base = useTeamBase()
   const app = detail?.app
   useProvideSiteScope(
     app
@@ -61,13 +68,49 @@ function Frame({ children }: { children: ReactNode }) {
   }
 
   const imported = isImported(app)
-  const base = `/${locale}/t/${team.slug}`
   const host = detail.domains[0]
+
+  const description = app.description || (imported ? originSummary(app, t) : <span dir="ltr" className="font-mono text-xs">{app.repo_url} · {app.branch}</span>)
+  const actions = (
+    <>
+      <span className="text-xs text-muted-foreground" aria-live="polite">
+        {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
+      </span>
+      {imported ? <ImportedBadge item={app} /> : <AppStatusBadge status={app.status} />}
+      {host ? (
+        <Button variant="secondary" nativeButton={false} render={<a href={`${host.tls === "off" ? "http" : "https"}://${host.hostname}`} target="_blank" rel="noreferrer" />}>
+          <ExternalLinkIcon />
+          {t("site.visit")}
+        </Button>
+      ) : null}
+      {operate && !imported ? <DeployButton /> : null}
+    </>
+  )
+
+  // A panel opens an app on its own cover with a tab per section (the console keeps them in the sidebar).
+  if (inPanel) {
+    return (
+      <>
+        <SiteCover
+          app={app}
+          imported={imported}
+          root={`${base}/apps/${encodeURIComponent(app.name)}`}
+          back={appOnly ? undefined : { href: `${base}/apps`, label: t("shell.scope.allApps") }}
+          description={description}
+          actions={actions}
+        />
+        <CardPieces>
+          <ErrorBand message={error} />
+          {children}
+        </CardPieces>
+      </>
+    )
+  }
 
   return (
     <PageBody
       eyebrow={
-        <Link href={`${base}/servers/${app.server_id}/apps`} className="hover:underline">
+        <Link href={serverHref(app.server_id, "apps")} className="hover:underline">
           <span dir="ltr">{app.server_name || t("nav.apps")}</span>
         </Link>
       }
@@ -77,28 +120,14 @@ function Frame({ children }: { children: ReactNode }) {
           <span dir="auto">{app.title || app.name}</span>
         </span>
       }
-      description={app.description || (imported ? originSummary(app, t) : <span dir="ltr" className="font-mono text-xs">{app.repo_url} · {app.branch}</span>)}
-      actions={
-        <>
-          <span className="text-xs text-muted-foreground" aria-live="polite">
-            {connected ? t("servers.detail.live") : t("servers.detail.reconnecting")}
-          </span>
-          {imported ? <ImportedBadge item={app} /> : <AppStatusBadge status={app.status} />}
-          {host ? (
-            <Button variant="secondary" nativeButton={false} render={<a href={`${host.tls === "off" ? "http" : "https"}://${host.hostname}`} target="_blank" rel="noreferrer" />}>
-              <ExternalLinkIcon />
-              {t("site.visit")}
-            </Button>
-          ) : null}
-          {operate && !imported ? (
-            <DeployButton />
-          ) : null}
-        </>
-      }
+      description={description}
+      actions={actions}
       bleed
     >
-      <ErrorBand message={error} />
-      {children}
+      <CardPieces>
+        <ErrorBand message={error} />
+        {children}
+      </CardPieces>
     </PageBody>
   )
 }

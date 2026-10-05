@@ -177,8 +177,8 @@ export function LogSearchPanel({ path, processes }: { path: string; processes: s
   }
 
   return (
-    <div data-testid="log-search">
-      <form onSubmit={search} className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+    <div data-testid="log-search" data-stack>
+      <form onSubmit={search} className="flex flex-wrap items-end gap-3 nq-band py-4">
         <Field className="min-w-56 flex-1 basis-64">
           <FieldLabel htmlFor="ls-q">{t("apps.logs.search.query")}</FieldLabel>
           <Input id="ls-q" dir="ltr" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("apps.logs.search.placeholder")} />
@@ -243,7 +243,7 @@ export function LogSearchPanel({ path, processes }: { path: string; processes: s
         </Button>
       </form>
       <ErrorBand message={error} />
-      <div className="min-h-40 border-b border-border bg-card">
+      <div className="min-h-40 nq-box bg-card">
         {!searched ? (
           <EmptyState icon={SearchIcon} title={t("apps.logs.search.empty")} />
         ) : result === null ? (
@@ -252,10 +252,10 @@ export function LogSearchPanel({ path, processes }: { path: string; processes: s
           <p className="px-6 py-6 text-sm text-muted-foreground">{t("apps.logs.search.noMatches")}</p>
         ) : (
           <>
-            {result.truncated ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("apps.logs.search.truncated")}</p> : null}
+            {result.truncated ? <p className="nq-band py-2 text-xs text-muted-foreground">{t("apps.logs.search.truncated")}</p> : null}
             <ul>
               {result.lines.map((l, idx) => (
-                <li key={idx} className="border-b border-border px-6 py-2 text-xs">
+                <li key={idx} className="nq-band py-2 text-xs">
                   <div className="flex items-start gap-3">
                     <span dir="ltr" className="shrink-0 pt-0.5 text-muted-foreground tabular-nums">
                       {clock(l.at)}

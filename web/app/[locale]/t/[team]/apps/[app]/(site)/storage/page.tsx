@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteStorage } from "@/components/site/storage"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteStorage />
+  return <SectionRedirect section="storage" />
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/togo-framework/auth"
 
+	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/app"
 	"github.com/fadymondy/hosbah/internal/circlexo"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
@@ -41,6 +42,23 @@ func activeAccount(a *app.App) func(http.Handler) http.Handler {
 			}
 			st, err := db.New(a.SQLDB).UserAccountState(r.Context(), id.ID)
 			if err != nil {
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+				return
+			}
+			// A panel account (MH-1141) only ever signs in to its server's panel, never the console.
+			// A customer signed in through an app's panel link (MH-1153) reaches that one app's
+			// routes and nothing else (api.PanelAppAllows); a panel-link session on any other kind
+			// of account is not honoured.
+			if id.Guard == api.PanelAppGuard {
+				if st.PanelServerID == nil {
+					writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+					return
+				}
+				if st.DisabledAt == nil && !api.PanelAppAllows(r.Context(), a, id, *st.PanelServerID, r.Method, r.URL.Path) {
+					writeJSONError(w, http.StatusForbidden, "forbidden")
+					return
+				}
+			} else if st.PanelServerID != nil {
 				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}

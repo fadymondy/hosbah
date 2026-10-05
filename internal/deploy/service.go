@@ -391,7 +391,17 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 		if err := q.SetAppState(ctx, db.SetAppStateParams{Status: appStatus, CurrentReleaseID: relID, ID: r.app.ID}); err != nil {
 			return err
 		}
-		if status != "failed" || r.app.ID == "" {
+		if r.app.ID == "" {
+			return nil
+		}
+		kind := strings.ToUpper(r.dep.Kind[:1]) + r.dep.Kind[1:]
+		if status == "succeeded" {
+			// The bell tells whoever is around that it shipped, not only when it broke.
+			return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: r.dep.TeamID, Kind: "deploy.succeeded",
+				Title:       fmt.Sprintf("%s #%d of %s is live", kind, r.dep.Number, r.app.Name),
+				SubjectType: ptr("deployment"), SubjectID: &r.dep.ID})
+		}
+		if status != "failed" {
 			return nil
 		}
 		body := errText
@@ -399,7 +409,7 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 			body += fmt.Sprintf("\nRelease v%d is still serving.", r.live.Version)
 		}
 		return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: r.dep.TeamID, Kind: "deploy.failed",
-			Title: fmt.Sprintf("%s #%d of %s failed", strings.ToUpper(r.dep.Kind[:1])+r.dep.Kind[1:], r.dep.Number, r.app.Name),
+			Title: fmt.Sprintf("%s #%d of %s failed", kind, r.dep.Number, r.app.Name),
 			Body:  &body, SubjectType: ptr("deployment"), SubjectID: &r.dep.ID})
 	})
 	if err != nil {

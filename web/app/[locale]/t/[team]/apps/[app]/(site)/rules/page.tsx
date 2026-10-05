@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteRules } from "@/components/site/rules"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteRules />
+  return <SectionRedirect section="rules" />
 }

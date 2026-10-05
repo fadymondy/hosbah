@@ -1,14 +1,14 @@
 "use client"
 
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -54,7 +54,8 @@ export function SiteBrowsers() {
   const { path } = useLoadedSite()
   const [items, setItems] = useState<Browser[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
+  const [removing, setRemoving] = useState<Browser | null>(null)
+  const opener = useOpenBrowser(path)
 
   const load = useCallback(async () => {
     try {
@@ -79,7 +80,12 @@ export function SiteBrowsers() {
     return () => clearInterval(id)
   }, [items, load])
 
-  const shown = (items ?? []).filter((b) => matches(q, b.name, b.status, b.env_prefix))
+  const rowActions = (b: Browser): DataTableRowAction[] => [
+    ...(b.kind === "desktop"
+      ? [{ id: "open", label: t("site.browsers.open"), icon: ExternalLinkIcon, disabled: !(b.status === "ready" && !!b.hostname) || opener.busy, onSelect: () => void opener.open(b) }]
+      : []),
+    ...(manage ? [{ id: "remove", label: t("site.storage.remove"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setRemoving(b) }] : []),
+  ]
   const add = manage ? <AddBrowser path={path} onSaved={load} /> : null
 
   return (
@@ -89,87 +95,95 @@ export function SiteBrowsers() {
       {items === null ? (
         <LoadingRows rows={2} />
       ) : items.length === 0 ? (
-        <EmptyState className="border-b" icon={GlobeIcon} title={t("site.browsers.emptyTitle")} description={t("site.browsers.emptyHint")} actions={<>{add}</>} />
+        <EmptyState className="nq-empty" icon={GlobeIcon} title={t("site.browsers.emptyTitle")} description={t("site.browsers.emptyHint")} actions={<>{add}</>} />
       ) : (
-        <>
-          <ListSearch value={q} onChange={setQ} placeholder={t("site.browsers.search")} shown={shown.length} total={items.length} />
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("site.monitors.name")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead>{t("site.browsers.limits")}</TableHead>
-                  <TableHead>{t("site.browsers.access")}</TableHead>
-                  <TableHead className="text-end">{t("common.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell>
-                      <span className="flex items-center gap-1.5">
-                        {b.kind === "desktop" ? <MonitorIcon className="size-3.5 shrink-0 text-muted-foreground" /> : null}
-                        <span dir="ltr" className="font-medium">
-                          {b.name}
-                        </span>
-                      </span>
-                      <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-muted-foreground" title={b.image}>
-                        {b.image}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
-                        {b.status === "ready" && b.running != null ? (
-                          <Badge variant={b.running ? "neutral" : "outline"}>{b.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
-                        ) : null}
-                      </span>
-                      {b.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
-                          {b.error}
-                        </p>
-                      ) : null}
-                      {b.restarts ? <p className="mt-1 text-xs text-muted-foreground">{t("site.browsers.restarts", { n: b.restarts })}</p> : null}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <span dir="ltr">
-                        {b.memory_bytes != null ? `${humanBytes(b.memory_bytes)} / ` : ""}
-                        {b.memory_mb} MB · {b.cpus} CPU
-                      </span>
-                      {b.kind === "headless" ? (
-                        <div className="text-muted-foreground">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="max-w-64 text-xs">
-                      {b.kind === "desktop" ? (
-                        b.hostname ? (
-                          <span dir="ltr" className="truncate font-mono text-muted-foreground" title={b.hostname}>
-                            {b.hostname}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">{t("site.browsers.noHostname")}</span>
-                        )
-                      ) : (
-                        <span dir="ltr" className="truncate text-start font-mono text-muted-foreground">
-                          {b.env.join(" ")}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-2">
-                        {b.kind === "desktop" ? <OpenBrowser path={path} browser={b} /> : null}
-                        {manage ? <RemoveBrowser path={path} browser={b} onRemoved={load} /> : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
-        </>
+        <NasaqTable
+          data={items}
+          rowId={(b) => b.id}
+          rowLabel={(b) => b.name}
+          label={t("site.nav.browsers")}
+          search={t("site.browsers.search")}
+          rowActions={rowActions}
+          onRowClick={(b) => (b.kind === "desktop" && b.status === "ready" && b.hostname ? void opener.open(b) : undefined)}
+          columns={[
+            {
+              id: "name",
+              header: t("site.monitors.name"),
+              cell: (b) => (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    {b.kind === "desktop" ? <MonitorIcon className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+                    <span dir="ltr" className="font-medium">
+                      {b.name}
+                    </span>
+                  </span>
+                  <div dir="ltr" className="max-w-56 truncate text-start font-mono text-xs text-muted-foreground" title={b.image}>
+                    {b.image}
+                  </div>
+                </>
+              ),
+              sortValue: (b) => b.name,
+              searchValue: (b) => [b.name, b.status, b.env_prefix].join(" "),
+            },
+            {
+              id: "status",
+              header: t("lists.status"),
+              cell: (b) => (
+                <>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant={b.status === "ready" ? "brand" : b.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${b.status}`)}</Badge>
+                    {b.status === "ready" && b.running != null ? (
+                      <Badge variant={b.running ? "neutral" : "outline"}>{b.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
+                    ) : null}
+                  </span>
+                  {b.error ? (
+                    <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
+                      {b.error}
+                    </p>
+                  ) : null}
+                  {b.restarts ? <p className="mt-1 text-xs text-muted-foreground">{t("site.browsers.restarts", { n: b.restarts })}</p> : null}
+                </>
+              ),
+              sortValue: (b) => b.status,
+            },
+            {
+              id: "limits",
+              header: t("site.browsers.limits"),
+              cell: (b) => (
+                <div className="text-xs">
+                  <span dir="ltr">
+                    {b.memory_bytes != null ? `${humanBytes(b.memory_bytes)} / ` : ""}
+                    {b.memory_mb} MB · {b.cpus} CPU
+                  </span>
+                  {b.kind === "headless" ? <div className="text-muted-foreground">{t("site.browsers.sessions", { n: b.max_sessions, idle: b.idle_timeout_seconds })}</div> : null}
+                </div>
+              ),
+            },
+            {
+              id: "access",
+              header: t("site.browsers.access"),
+              cell: (b) =>
+                b.kind === "desktop" ? (
+                  b.hostname ? (
+                    <span dir="ltr" className="block max-w-64 truncate font-mono text-xs text-muted-foreground" title={b.hostname}>
+                      {b.hostname}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("site.browsers.noHostname")}</span>
+                  )
+                ) : (
+                  <span dir="ltr" className="block max-w-64 truncate text-start font-mono text-xs text-muted-foreground">
+                    {b.env.join(" ")}
+                  </span>
+                ),
+            },
+          ]}
+        />
       )}
-      <ul className="flex flex-col gap-1.5 border-b border-border px-6 py-4 text-xs text-muted-foreground">
+      {removing ? (
+        <RemoveBrowser open onOpenChange={(v) => !v && setRemoving(null)} path={path} browser={removing} onRemoved={load} />
+      ) : null}
+      <ul className="flex flex-col gap-1.5 nq-band py-4 text-xs text-muted-foreground">
         <li>{t("site.browsers.noteConnect")}</li>
         <li>{t("site.browsers.notePrivate")}</li>
         <li>{t("site.browsers.noteDesktop")}</li>
@@ -332,13 +346,12 @@ export function AddBrowser({ path, onSaved, ...controlled }: { path: string; onS
  * link is exchanged automatically for a session on the browser's own hostname, so it must be used
  * immediately, not stored or shared.
  */
-export function OpenBrowser({ path, browser }: { path: string; browser: Browser }) {
-  const { t } = useI18n()
+/** Opens a desktop browser in a new tab, through a short-lived signed link. */
+function useOpenBrowser(path: string) {
   const errorText = useErrorText()
   const [busy, setBusy] = useState(false)
-  const ready = browser.status === "ready" && !!browser.hostname
 
-  async function open() {
+  async function open(browser: Browser) {
     setBusy(true)
     try {
       const r = await apiFetch<{ url: string }>(`${path}/browsers/${browser.id}/open`, { method: "POST" })
@@ -350,12 +363,7 @@ export function OpenBrowser({ path, browser }: { path: string; browser: Browser 
     }
   }
 
-  return (
-    <Button size="sm" variant="secondary" disabled={!ready || busy} onClick={open}>
-      <ExternalLinkIcon />
-      {busy ? t("common.working") : t("site.browsers.open")}
-    </Button>
-  )
+  return { busy, open }
 }
 
 /** Remove a browser: type its name. Also opened from the overview canvas. */

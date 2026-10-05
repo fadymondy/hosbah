@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
 import { PlayIcon } from "lucide-react"
 
@@ -8,6 +8,7 @@ import { useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
 import { useLoadedServer } from "@/components/server-tabs/context"
 import { OpStatusBadge } from "@/components/server-status"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 import { SectionTitle } from "@/components/states"
 
 
@@ -54,12 +55,12 @@ export function ServerOperations() {
 
         {!enrolled ? (
           server.status !== "provisioning" ? (
-            <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.notEnrolled")}</p>
+            <p className="mt-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{t("servers.ops.notEnrolled")}</p>
           ) : null
         ) : !operate ? (
-          <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.readOnly")}</p>
+          <p className="mt-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{t("servers.ops.readOnly")}</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3" data-testid="op-actions">
+          <Card className="mt-3 flex-row flex-wrap items-center gap-2 px-4 py-3" data-testid="op-actions">
             <Button variant="primary" size="sm" disabled={busy} onClick={() => run({ kind: "system.info" })}>
               <PlayIcon />
               {t("servers.ops.systemInfo")}
@@ -92,57 +93,68 @@ export function ServerOperations() {
                 ) : null}
               </>
             ) : null}
-          </div>
+          </Card>
         )}
         {enrolled && !server.online ? (
-          <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.ops.offlineHint")}</p>
+          <p className="mt-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{t("servers.ops.offlineHint")}</p>
         ) : null}
 
-        <div className="grid border-b border-border lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <div className="min-w-0 border-b border-border lg:border-e lg:border-b-0 [&_tr>*:first-child]:ps-6">
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="min-w-0">
             {ops.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-muted-foreground">{t("servers.ops.empty")}</p>
+              <Card className="px-5 py-8 text-center text-sm text-muted-foreground">{t("servers.ops.empty")}</Card>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("servers.ops.kind")}</TableHead>
-                    <TableHead>{t("servers.ops.status")}</TableHead>
-                    <TableHead>{t("servers.ops.started")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ops.map((o) => (
-                    <TableRow
-                      key={o.id}
-                      data-op={o.id}
-                      aria-selected={o.id === selected}
-                      className={cn("cursor-pointer", o.id === selected && "bg-secondary")}
-                      onClick={() => setSelected(o.id)}
-                    >
-                      <TableCell>
-                        <button type="button" className="text-start font-medium" onClick={() => setSelected(o.id)}>
-                          {t(`servers.ops.kinds.${opKey(o.kind)}`, undefined, o.kind)}
+              <NasaqTable
+                data={ops}
+                rowId={(o) => o.id}
+                label={t("servers.ops.title")}
+                rowLabel={(o) => t(`servers.ops.kinds.${opKey(o.kind)}`, undefined, o.kind)}
+                onRowClick={(o) => setSelected(o.id)}
+                pageSize={12}
+                facets={[
+                  {
+                    column: "status",
+                    title: t("servers.ops.status"),
+                    options: [...new Set(ops.map((o) => o.status))].map((v) => ({ value: v, label: t(`servers.ops.statuses.${v}`, undefined, v) })),
+                  },
+                ]}
+                columns={[
+                  {
+                    id: "kind",
+                    header: t("servers.ops.kind"),
+                    label: t("servers.ops.kind"),
+                    sortValue: (o) => o.kind,
+                    cell: (o) => (
+                      <span className={cn("flex items-center gap-2", o.id === selected && "text-nq-action")} data-op={o.id} aria-current={o.id === selected ? "true" : undefined}>
+                        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", o.id === selected ? "bg-nq-action" : "bg-transparent")} />
+                        <span>
+                          <span className="font-medium">{t(`servers.ops.kinds.${opKey(o.kind)}`, undefined, o.kind)}</span>
                           {o.kind === "provision.step" && typeof o.params.step === "string" ? (
-                            <span className="block text-xs font-normal text-muted-foreground">
-                              {t(`servers.ops.steps.${opKey(o.params.step)}`, undefined, o.params.step)}
-                            </span>
+                            <span className="block text-caption text-muted-foreground">{t(`servers.ops.steps.${opKey(o.params.step)}`, undefined, o.params.step)}</span>
                           ) : null}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <OpStatusBadge status={o.status} />
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-start text-xs">
+                        </span>
+                      </span>
+                    ),
+                  },
+                  { id: "status", header: t("servers.ops.status"), label: t("servers.ops.status"), filterValue: (o) => o.status, sortValue: (o) => o.status, cell: (o) => <OpStatusBadge status={o.status} /> },
+                  {
+                    id: "started",
+                    header: t("servers.ops.started"),
+                    label: t("servers.ops.started"),
+                    sortValue: (o) => o.created_at,
+                    cell: (o) => (
+                      <span dir="ltr" className="text-caption text-muted-foreground">
                         {fmt(o.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </span>
+                    ),
+                  },
+                ] satisfies DataTableColumn<Operation>[]}
+              />
             )}
           </div>
-          <OperationLog team={team.slug} serverId={server.id} op={selectedOp} />
+          <Card className="min-w-0 gap-0 overflow-hidden py-0">
+            <OperationLog team={team.slug} serverId={server.id} op={selectedOp} />
+          </Card>
         </div>
       </section>
 

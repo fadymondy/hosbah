@@ -28,6 +28,8 @@ export function proxy(request: NextRequest) {
     // The CircleXO sign-in round trip (rewritten to the API): no locale prefix.
     pathname.startsWith("/auth/circlexo/") ||
     pathname === "/sso/circlexo" ||
+    // The OAuth token endpoint (MH-1153), rewritten to the API: no locale prefix.
+    pathname === "/oauth/token" ||
     pathname.startsWith("/_next") ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {
@@ -37,7 +39,9 @@ export function proxy(request: NextRequest) {
   const [, first] = pathname.split("/")
   if (!isLocale(first)) {
     const url = request.nextUrl.clone()
-    url.pathname = `/${preferred(request)}${pathname === "/" ? "" : pathname}`
+    // An OAuth client names the consent page's language with ui_locales (space-separated, in order).
+    const asked = pathname === "/oauth/authorize" ? (url.searchParams.get("ui_locales") ?? "").split(" ").find(isLocale) : undefined
+    url.pathname = `/${asked ?? preferred(request)}${pathname === "/" ? "" : pathname}`
     return NextResponse.redirect(url)
   }
 

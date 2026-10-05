@@ -1,13 +1,13 @@
 "use client"
 
-import { Badge, Button, Checkbox, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, SettingRow, SettingsSection, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PackageIcon, RefreshCwIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useLoadedServer } from "@/components/server-tabs/context"
-import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
+import { ErrorBand, LoadingRows } from "@/components/states"
 
 
 
@@ -81,25 +81,37 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
   }
 
   return (
-    <>
-      <SectionTitle
-        title={t("servers.updates.title")}
-        hint={t("servers.updates.hint")}
-        action={
+    <SettingsSection
+      title={t("servers.updates.title")}
+      description={t("servers.updates.hint")}
+      action={
           <Button variant="secondary" size="sm" onClick={() => void checkNow()} disabled={checking}>
             <RefreshCwIcon className={checking ? "animate-spin" : ""} />
             {checking ? t("common.working") : t("servers.updates.checkNow")}
           </Button>
-        }
-      />
+      }
+      actions={
+        manage && status ? (
+          <ConfirmButton
+            label={t("servers.updates.upgrade")}
+            title={t("servers.updates.upgradeTitle")}
+            description={t("servers.updates.upgradeHint", { n: status.upgradable_count })}
+            confirmLabel={t("servers.updates.upgrade")}
+            onConfirm={upgrade}
+            icon={<PackageIcon />}
+          />
+        ) : undefined
+      }
+    >
       <ErrorBand message={error} />
       {status === null ? (
         <LoadingRows rows={2} />
       ) : (
-        <>
-          <SettingsRow
+        <div className="divide-y divide-border">
+          <SettingRow
+            id="srv-upgradable"
             label={t("servers.updates.upgradable")}
-            hint={status.last_checked_at ? t("servers.updates.lastChecked", { when: fmt(status.last_checked_at) }) : t("servers.updates.neverChecked")}
+            description={status.last_checked_at ? t("servers.updates.lastChecked", { when: fmt(status.last_checked_at) }) : t("servers.updates.neverChecked")}
           >
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={status.upgradable_count > 0 ? "neutral" : "outline"}>
@@ -116,8 +128,9 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
                 </span>
               ) : null}
             </div>
+          </SettingRow>
             {status.packages.length > 0 ? (
-              <div className="max-h-64 overflow-y-auto border border-border">
+              <div className="mb-3 max-h-64 overflow-y-auto rounded-md border border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -144,23 +157,10 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
                 </Table>
               </div>
             ) : null}
-            {manage ? (
-              <div className="flex justify-end">
-                <ConfirmButton
-                  label={t("servers.updates.upgrade")}
-                  title={t("servers.updates.upgradeTitle")}
-                  description={t("servers.updates.upgradeHint", { n: status.upgradable_count })}
-                  confirmLabel={t("servers.updates.upgrade")}
-                  onConfirm={upgrade}
-                  icon={<PackageIcon />}
-                />
-              </div>
-            ) : null}
-          </SettingsRow>
-          <SettingsRow
+          <SettingRow
+            id="srv-auto"
             label={t("servers.updates.autoTitle")}
-            hint={status.auto_supported ? t("servers.updates.autoHint") : t("servers.updates.autoUnsupported")}
-            htmlFor="srv-auto-updates"
+            description={status.auto_supported ? t("servers.updates.autoHint") : t("servers.updates.autoUnsupported")}
           >
             <div className="flex items-center gap-2">
               <Checkbox
@@ -177,9 +177,9 @@ export function ServerUpdates({ manage }: { manage: boolean }) {
                   : t("servers.updates.unsupported")}
               </label>
             </div>
-          </SettingsRow>
-        </>
+          </SettingRow>
+        </div>
       )}
-    </>
+    </SettingsSection>
   )
 }

@@ -11,11 +11,15 @@
 //	hbr_  RUM ingest key (public, not a secret — travels in page source)  new in MH-575 H5
 //	hbt_  APM ingest key (secret: bearer for OTLP traces/logs)             new in MH-575 H7
 //	hbk_  SaaS product key (product_keys), scoped to one product           new in MH-576 D7
+//	hba_  integration app token (app_tokens), scoped to one app            new in MH-1153
 //	(none) invitation link token        (invitations)
 //
 // New tokens get the hb*_ prefix. Tokens minted before the rename keep working: the prefix is
 // part of the hashed plaintext, so a stored hash only ever matches the exact token it was made
-// from, and the checks below accept either prefix of a family. No two prefixes share a family.
+// from, and the checks below accept either prefix of a family. No two prefixes share a family,
+// except one: the integration API's app token was specified as hba_, the admin MCP prefix. They
+// never cross: the admin MCP server looks a bearer up only in admin_mcp_tokens, and the integration
+// API only in app_tokens, each by the hash of the whole token.
 package tokens
 
 import (
@@ -26,14 +30,17 @@ import (
 )
 
 const (
-	PrefixUserMCP  = "hbu_"
-	PrefixAdminMCP = "hba_"
-	PrefixEnrol    = "hbe_"
-	PrefixHook     = "hbh_"
-	PrefixPing     = "hbp_"
-	PrefixRum      = "hbr_"
-	PrefixApm      = "hbt_"
-	PrefixProduct  = "hbk_"
+	PrefixUserMCP     = "hbu_"
+	PrefixAdminMCP    = "hba_"
+	PrefixEnrol       = "hbe_"
+	PrefixHook        = "hbh_"
+	PrefixPing        = "hbp_"
+	PrefixRum         = "hbr_"
+	PrefixApm         = "hbt_"
+	PrefixProduct     = "hbk_"
+	PrefixApp         = PrefixAdminMCP // see the package comment
+	PrefixOAuthSecret = "hbs_"         // an OAuth client secret (cmd/admin oauth-client)
+	PrefixOAuthCode   = "hbo_"         // a one-time OAuth authorization code
 
 	// Before the rename from Cloudy. Accepted, never minted.
 	LegacyPrefixUserMCP  = "cld_"
@@ -52,6 +59,7 @@ var (
 	Rum      = []string{PrefixRum}
 	Apm      = []string{PrefixApm}
 	Product  = []string{PrefixProduct}
+	App      = []string{PrefixApp}
 )
 
 // HasPrefix reports whether token starts with one of the family's prefixes.

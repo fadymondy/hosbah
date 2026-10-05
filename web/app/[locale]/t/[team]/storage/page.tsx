@@ -1,14 +1,26 @@
 "use client"
 
-import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
-import Link from "next/link"
+import {
+  Alert,
+  Badge,
+  DataTable,
+  DataTableFacetFilter,
+  DataTablePagination,
+  DataTableSearch,
+  DataTableToolbar,
+  EmptyState,
+  Status,
+  useDataTable,
+  type DataTableColumn,
+  type StatusTone,
+} from "@fadymondy/nasaq/web"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { BoxIcon, HardDriveIcon, PackageIcon } from "lucide-react"
+import { BoxIcon, ChevronRightIcon, ContainerIcon, HardDriveIcon, PackageIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
-import { appTone, ListBar, StatusDot } from "@/components/lists/list-bar"
 import { CreateDialog } from "@/components/server-tabs/databases"
 import { ErrorBand, LoadingRows } from "@/components/states"
 import { apiFetch } from "@/lib/api"
@@ -40,18 +52,6 @@ interface TeamBucket {
   app_name: string
 }
 
-function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-line">
-      <h2 className="flex items-center gap-2 border-b border-line px-6 py-3 text-sm font-semibold text-grid-fg">
-        {title}
-        {count !== undefined ? <span className="text-xs font-normal text-grid-muted">{count}</span> : null}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
 /**
  * Object storage and persistent volumes across the team: the MinIO services, every app bucket on
  * them and every app volume. Adding a bucket or a volume happens on the app's Storage tab.
@@ -69,7 +69,8 @@ export default function StoragePage() {
   const [buckets, setBuckets] = useState<TeamBucket[]>([])
   const [servers, setServers] = useState<Server[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
+  const router = useRouter()
+  const appLink = (app: string) => `${base}/apps/${encodeURIComponent(app)}/storage`
 
   const load = useCallback(async () => {
     try {
@@ -96,151 +97,234 @@ export default function StoragePage() {
     return () => clearInterval(id)
   }, [load])
 
-  const serverName = (id: string) => servers.find((s) => s.id === id)?.name ?? "—"
-  const needle = q.trim().toLowerCase()
-  const has = (...v: (string | null | undefined)[]) => !needle || v.some((x) => x?.toLowerCase().includes(needle))
-  const shownBuckets = useMemo(() => buckets.filter((b) => has(b.bucket, b.app_name, b.service_name)), [buckets, needle]) // eslint-disable-line react-hooks/exhaustive-deps
-  const shownVolumes = useMemo(() => volumes.filter((v) => has(v.name, v.app_name, v.mount_path)), [volumes, needle]) // eslint-disable-line react-hooks/exhaustive-deps
+  const serverName = useCallback((id: string) => servers.find((s) => s.id === id)?.name ?? "—", [servers])
 
-  const create = manage && servers.length > 0 ? <CreateDialog teamSlug={team.slug} serverId={servers[0].id} onCreated={load} /> : null
-  const empty = minio !== null && minio.length === 0 && volumes.length === 0 && buckets.length === 0
-  const appLink = (app: string) => `${base}/apps/${encodeURIComponent(app)}/storage`
+  // Buckets, volumes and the MinIO services behind them, in one list.
+  const items = useMemo<Item[]>(() => {
+    const svc = new Map((minio ?? []).map((s) => [s.id, s]))
+    return [
+      ...(minio ?? []).map<Item>((s) => {
+        const st = s.source === "imported" ? (s.imported_state ?? "stopped") : s.status
+        return {
+          id: `s-${s.id}`,
+          kind: "service",
+          name: s.name,
+          detail: `minio ${s.version}`.trim(),
+          serverId: s.server_id,
+          target: s.host && s.port ? `${s.host}:${s.port}` : "",
+          targetHref: "",
+          status: [stateTone(st), t(`databases.statuses.${st}`, undefined, st)],
+          statusKey: st,
+          createdAt: s.created_at,
+          href: `${base}/storage/${s.id}`,
+        }
+      }),
+      ...buckets.map<Item>((b) => ({
+        id: `b-${b.id}`,
+        kind: "bucket",
+        name: b.bucket,
+        detail: `${b.env_prefix}_*`,
+        serverId: svc.get(b.service_id)?.server_id ?? "",
+        via: b.service_name,
+        target: b.app_name,
+        targetHref: appLink(b.app_name),
+        status: [b.status === "ready" ? "success" : b.status === "failed" ? "danger" : "info", t(`storage2.bucketStatus.${b.status}`)],
+        statusKey: b.status,
+        createdAt: b.created_at,
+        href: `${base}/storage/${b.service_id}?bucket=${encodeURIComponent(b.bucket)}`,
+      })),
+      ...volumes.map<Item>((v) => ({
+        id: `v-${v.id}`,
+        kind: "volume",
+        name: v.name,
+        detail: v.mount_path,
+        serverId: v.server_id,
+        target: v.app_name,
+        targetHref: appLink(v.app_name),
+        status: ["success", t("storage2.mounted")],
+        statusKey: "ready",
+        createdAt: v.created_at,
+        href: `${base}/storage/volumes/${encodeURIComponent(v.app_name)}/${encodeURIComponent(v.name)}`,
+      })),
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minio, buckets, volumes, t, base])
+
+  const columns = useMemo<DataTableColumn<Item>[]>(
+    () => [
+      {
+        id: "name",
+        header: t("storage2.name"),
+        label: t("storage2.name"),
+        sortValue: (i) => i.name,
+        searchValue: (i) => [i.name, i.detail, i.target, i.via, serverName(i.serverId)].filter(Boolean).join(" "),
+        cell: (i) => {
+          const Icon = KIND_ICON[i.kind]
+          return (
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-control border border-border bg-secondary text-muted-foreground">
+                <Icon aria-hidden className="size-4" />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <bdi dir="ltr" className="truncate text-start font-medium text-foreground">
+                  {i.name}
+                </bdi>
+                <code dir="ltr" className="truncate text-start font-mono text-caption text-muted-foreground">
+                  {i.detail}
+                </code>
+              </span>
+            </span>
+          )
+        },
+      },
+      {
+        id: "kind",
+        header: t("storage2.type"),
+        label: t("storage2.type"),
+        sortValue: (i) => i.kind,
+        filterValue: (i) => i.kind,
+        className: "max-sm:hidden",
+        headerClassName: "max-sm:hidden",
+        cell: (i) => <Badge variant="neutral">{t(`storage2.kinds.${i.kind}`)}</Badge>,
+      },
+      {
+        id: "path",
+        header: t("domains2.connectedTo"),
+        label: t("domains2.connectedTo"),
+        sortValue: (i) => i.target,
+        filterValue: (i) => i.serverId,
+        cell: (i) => {
+          const sep = <ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground rtl:rotate-180" />
+          return (
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-body-sm">
+              <bdi dir="ltr" className="truncate text-muted-foreground">
+                {serverName(i.serverId)}
+              </bdi>
+              {i.via ? (
+                <>
+                  {sep}
+                  <bdi dir="ltr" className="truncate text-muted-foreground">
+                    {i.via}
+                  </bdi>
+                </>
+              ) : null}
+              {i.target ? (
+                <>
+                  {sep}
+                  <bdi
+                    dir="ltr"
+                    className={i.kind === "service" ? "truncate font-mono text-foreground" : "truncate font-medium text-foreground"}
+                  >
+                    {i.target}
+                  </bdi>
+                </>
+              ) : null}
+            </span>
+          )
+        },
+      },
+      {
+        id: "status",
+        header: t("databases.status"),
+        label: t("databases.status"),
+        sortValue: (i) => i.statusKey,
+        cell: (i) => <Status tone={i.status[0]}>{i.status[1]}</Status>,
+      },
+      {
+        id: "created",
+        header: t("storage2.created"),
+        label: t("storage2.created"),
+        sortValue: (i) => i.createdAt,
+        className: "max-md:hidden",
+        headerClassName: "max-md:hidden",
+        cell: (i) => <span className="text-caption text-muted-foreground">{ago(i.createdAt)}</span>,
+      },
+    ],
+    [t, ago, serverName],
+  )
+  const table = useDataTable({
+    data: items,
+    columns,
+    getRowId: (i) => i.id,
+    pageSize: 20,
+    defaultSort: { id: "created", direction: "desc" },
+  })
+  const onServers = useMemo(() => [...new Set(items.map((i) => i.serverId).filter(Boolean))], [items])
+
+  const create =
+    manage && servers.length > 0 ? (
+      <CreateDialog teamSlug={team.slug} serverId={servers[0].id} onCreated={load} kinds={["minio"]} storage />
+    ) : null
+  const counts = (k: Item["kind"]) => items.filter((i) => i.kind === k).length
 
   return (
-    <PageBody title={t("nav.storage")} description={t("storage2.lede")} actions={create} bleed>
+    <PageBody title={t("nav.storage")} description={t("storage2.lede")} actions={create} bleed divider={false}>
       <ErrorBand message={error} />
       {minio === null ? (
         <LoadingRows rows={4} />
-      ) : empty ? (
-        <EmptyState className="border-b" icon={HardDriveIcon} title={t("storage2.emptyTitle")} description={t("storage2.emptyBody")} actions={create} />
+      ) : items.length === 0 ? (
+        <div className="px-6 pb-6">
+          <EmptyState icon={HardDriveIcon} title={t("storage2.emptyTitle")} description={t("storage2.emptyBody")} actions={create} />
+        </div>
       ) : (
-        <>
-          <ListBar q={q} onQ={setQ} placeholder={t("storage2.search")} />
-
-          <Section title={t("storage2.services")} count={minio.length}>
-            {minio.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{t("storage2.noServices")}</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {minio.map((s) => {
-                  const st = s.source === "imported" ? (s.imported_state ?? "stopped") : s.status
-                  const n = buckets.filter((b) => b.service_id === s.id).length
-                  return (
-                    <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3">
-                      <Link href={`${base}/databases/${s.id}`} className="flex min-w-0 items-center gap-3 hover:underline">
-                        <span className="flex size-8 shrink-0 items-center justify-center border border-line bg-grid-soft text-grid-muted">
-                          <BoxIcon className="size-4" />
-                        </span>
-                        <span dir="ltr" className="truncate font-medium text-grid-fg">
-                          {s.name}
-                        </span>
-                      </Link>
-                      <StatusDot tone={appTone(st)} label={t(`databases.statuses.${st}`, undefined, st)} />
-                      <span className="text-xs text-grid-muted">{t("storage2.bucketCount", { n })}</span>
-                      <Link href={`${base}/servers/${s.server_id}/databases`} dir="ltr" className="ms-auto text-xs text-grid-muted hover:text-grid-fg hover:underline">
-                        {serverName(s.server_id)}
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </Section>
-
-          <Section title={t("storage2.buckets")} count={buckets.length}>
-            {shownBuckets.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{buckets.length ? t("storage2.noMatch") : t("storage2.noBuckets")}</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="ps-6">{t("storage2.bucket")}</TableHead>
-                    <TableHead>{t("storage2.app")}</TableHead>
-                    <TableHead className="max-md:hidden">{t("storage2.service")}</TableHead>
-                    <TableHead className="pe-6">{t("databases.status")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shownBuckets.map((b) => (
-                    <TableRow key={b.id}>
-                      <TableCell className="ps-6">
-                        <span dir="ltr" className="block font-medium text-grid-fg">
-                          {b.bucket}
-                        </span>
-                        <code dir="ltr" className="text-xs text-grid-muted">
-                          {b.env_prefix}_*
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={appLink(b.app_name)} dir="ltr" className="text-sm text-grid-body hover:text-grid-fg hover:underline">
-                          {b.app_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="max-md:hidden">
-                        <Link href={`${base}/databases/${b.service_id}`} dir="ltr" className="text-sm text-grid-body hover:underline">
-                          {b.service_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="pe-6">
-                        <StatusDot tone={appTone(b.status === "ready" ? "running" : b.status)} label={t(`storage2.bucketStatus.${b.status}`)} />
-                        {b.error ? (
-                          <p dir="ltr" className="mt-1 line-clamp-2 font-mono text-xs text-grid-danger">
-                            {b.error}
-                          </p>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Section>
-
-          <Section title={t("storage2.volumes")} count={volumes.length}>
-            {shownVolumes.length === 0 ? (
-              <p className="px-6 py-4 text-sm text-grid-muted">{volumes.length ? t("storage2.noMatch") : t("storage2.noVolumes")}</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="ps-6">{t("storage2.volume")}</TableHead>
-                    <TableHead>{t("storage2.app")}</TableHead>
-                    <TableHead className="max-md:hidden">{t("databases.server")}</TableHead>
-                    <TableHead className="pe-6 max-sm:hidden">{t("storage2.created")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shownVolumes.map((v) => (
-                    <TableRow key={v.id}>
-                      <TableCell className="ps-6">
-                        <span dir="ltr" className="block font-medium text-grid-fg">
-                          <PackageIcon className="me-1.5 inline size-3.5 text-grid-muted" />
-                          {v.name}
-                        </span>
-                        <code dir="ltr" className="text-xs text-grid-muted">
-                          {v.mount_path}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={appLink(v.app_name)} dir="ltr" className="text-sm text-grid-body hover:text-grid-fg hover:underline">
-                          {v.app_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="max-md:hidden">
-                        <Link href={`${base}/servers/${v.server_id}`} dir="ltr" className="text-sm text-grid-body hover:underline">
-                          {serverName(v.server_id)}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="pe-6 text-xs text-grid-muted max-sm:hidden">{ago(v.created_at)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </Section>
-          <p className="px-6 py-3 text-xs text-grid-muted">{t("storage2.addHint")}</p>
-        </>
+        <div className="flex flex-col gap-3 px-6 pb-6">
+          {counts("service") === 0 ? <Alert tone="info">{t("storage2.noServices")}</Alert> : null}
+          <DataTableToolbar>
+            <DataTableSearch table={table} placeholder={t("storage2.search")} />
+            <DataTableFacetFilter
+              table={table}
+              column="kind"
+              title={t("storage2.type")}
+              options={(["service", "bucket", "volume"] as const).map((k) => ({
+                value: k,
+                label: `${t(`storage2.kinds.${k}`)} (${counts(k)})`,
+              }))}
+            />
+            {onServers.length > 1 ? (
+              <DataTableFacetFilter
+                table={table}
+                column="path"
+                title={t("nav.servers")}
+                options={onServers.map((id) => ({ value: id, label: serverName(id) }))}
+              />
+            ) : null}
+          </DataTableToolbar>
+          <DataTable
+            table={table}
+            label={t("nav.storage")}
+            rowLabel={(i) => i.name}
+            onRowClick={(i) => router.push(i.href)}
+            empty={t("storage2.noMatch")}
+          />
+          <DataTablePagination table={table} />
+          <p className="text-caption text-muted-foreground">{t("storage2.addHint")}</p>
+        </div>
       )}
     </PageBody>
   )
+}
+
+const KIND_ICON = { service: ContainerIcon, bucket: BoxIcon, volume: PackageIcon } as const
+
+function stateTone(st: string): StatusTone {
+  if (st === "running") return "success"
+  if (st === "creating" || st === "provisioning" || st === "queued") return "info"
+  if (st === "failed" || st === "missing") return "danger"
+  return "neutral"
+}
+
+/** One row: a MinIO service, a bucket on it, or an app's persistent volume. */
+interface Item {
+  id: string
+  kind: "service" | "bucket" | "volume"
+  name: string
+  detail: string
+  serverId: string
+  via?: string
+  target: string
+  targetHref: string
+  status: [StatusTone, string]
+  statusKey: string
+  createdAt: string
+  href: string
 }

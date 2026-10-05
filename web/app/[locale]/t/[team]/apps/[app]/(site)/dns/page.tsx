@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteDNS } from "@/components/site/dns"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteDNS />
+  return <SectionRedirect section="dns" />
 }

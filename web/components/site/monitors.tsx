@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import {
   ActivityIcon,
@@ -22,9 +22,10 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
 import type { NotificationChannel } from "@/components/notification-channels"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { LoadMore } from "@/components/lists/infinite"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -97,7 +98,9 @@ export function SiteMonitors() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [q, setQ] = useState("")
+  const [editing, setEditing] = useState<Monitor | null>(null)
+  const [deleting, setDeleting] = useState<Monitor | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [pingURL, setPingURL] = useState<{ name: string; url: string } | null>(null)
 
   const load = useCallback(async () => {
@@ -124,13 +127,16 @@ export function SiteMonitors() {
   }, [load])
 
   async function more() {
-    if (!cursor) return
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
     try {
       const i = await apiFetch<{ incidents: Incident[]; next_cursor?: string | null }>(`${path}/incidents?limit=20&before=${encodeURIComponent(cursor)}`)
       setIncidents((cur) => [...cur, ...(i.incidents ?? [])])
       setCursor(i.next_cursor ?? null)
     } catch (err) {
       setError(errorText(err))
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -149,7 +155,13 @@ export function SiteMonitors() {
   }
 
   const hosts = detail.domains.map((d) => `${d.tls === "off" ? "http" : "https"}://${d.hostname}`)
-  const shown = (monitors ?? []).filter((m) => matches(q, m.name, m.kind, m.target, m.state))
+  const rowActions = (m: Monitor): DataTableRowAction[] => [
+    ...(m.kind === "heartbeat"
+      ? []
+      : [{ id: "check", label: t("site.monitors.checkNow"), icon: PlayIcon, disabled: busy === m.id || !m.enabled, onSelect: () => void check(m) }]),
+    { id: "edit", label: t("lists.edit"), icon: PencilIcon, onSelect: () => setEditing(m) },
+    { id: "delete", label: t("common.delete"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setDeleting(m) },
+  ]
 
   async function saved(created?: Monitor) {
     if (created?.ping_url_path && typeof window !== "undefined") {
@@ -166,7 +178,7 @@ export function SiteMonitors() {
         <SectionTitle id="mon-h" title={t("site.nav.monitors")} hint={t("site.planned.monitors.hint")} action={add} />
         <ErrorBand message={error} />
         {pingURL ? (
-          <div className="border-b border-border px-6 py-4">
+          <div className="nq-band py-4">
             <p dir="auto" className="mb-2 text-sm font-medium">
               {t("site.monitors.pingUrlTitle")} — {pingURL.name}
             </p>
@@ -182,106 +194,97 @@ export function SiteMonitors() {
         {monitors === null ? (
           <LoadingRows rows={3} />
         ) : monitors.length === 0 ? (
-          <EmptyState className="border-b" icon={BellRingIcon} title={t("site.monitors.emptyTitle")} description={t("site.monitors.emptyHint")} actions={<>{add}</>} />
+          <EmptyState className="nq-empty" icon={BellRingIcon} title={t("site.monitors.emptyTitle")} description={t("site.monitors.emptyHint")} actions={<>{add}</>} />
         ) : (
-          <>
-            <ListSearch value={q} onChange={setQ} placeholder={t("site.monitors.search")} shown={shown.length} total={monitors.length} />
-            <TableBand>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("site.monitors.name")}</TableHead>
-                    <TableHead>{t("lists.status")}</TableHead>
-                    <TableHead>{t("site.monitors.rule")}</TableHead>
-                    <TableHead>{t("site.monitors.checked")}</TableHead>
-                    <TableHead>{t("site.monitors.uptime24h")}</TableHead>
-                    {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-2 font-medium [&_svg]:size-4 [&_svg]:text-nq-brand">
-                          {KIND_ICON[m.kind]}
-                          <span dir="auto">{m.name}</span>
-                        </span>
-                        {m.kind === "http" ? (
-                          <div dir="ltr" className="max-w-64 truncate text-start font-mono text-xs text-muted-foreground">
-                            {m.target}
-                          </div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        {!m.enabled ? (
-                          <Badge variant="outline">{t("site.monitors.paused")}</Badge>
-                        ) : (
-                          <Badge variant={m.state === "failing" ? "danger" : m.state === "ok" ? "brand" : "neutral"}>
-                            {t(`site.monitors.state.${m.state}`)}
-                          </Badge>
-                        )}
-                        {m.open_incident ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
-                            {m.open_incident.reason} · {ago(m.open_incident.opened_at)}
-                          </p>
-                        ) : m.last_error ? (
-                          <p dir="auto" className="mt-1 max-w-xs text-xs text-muted-foreground">
-                            {m.last_error}
-                          </p>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {m.kind === "http"
-                          ? t("site.monitors.ruleHttp", { status: m.expected_status || "2xx/3xx", every: m.interval_seconds }) +
-                            (m.threshold ? ` · ≤ ${m.threshold} ms` : "")
-                          : m.kind === "heartbeat"
-                            ? t("site.monitors.ruleHeartbeat", { every: m.heartbeat_interval_seconds, grace: m.heartbeat_grace_seconds })
-                            : t("site.monitors.ruleResource", { kind: t(`site.monitors.kinds.${m.kind}`), pct: m.threshold, min: m.window_minutes })}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {m.kind === "heartbeat"
-                          ? m.last_ping_at
-                            ? ago(m.last_ping_at)
-                            : t("site.monitors.neverPinged")
-                          : m.last_checked_at
-                            ? ago(m.last_checked_at)
-                            : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <UptimeBadge path={path} monitor={m} />
-                      </TableCell>
-                      {manage ? (
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {m.kind === "heartbeat" ? null : (
-                              <Button size="sm" variant="secondary" disabled={busy === m.id || !m.enabled} onClick={() => void check(m)}>
-                                <PlayIcon />
-                                {t("site.monitors.checkNow")}
-                              </Button>
-                            )}
-                            <MonitorDialog path={path} hosts={hosts} monitor={m} onSaved={saved} />
-                            <DeleteMonitor path={path} monitor={m} onDeleted={load} />
-                          </div>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableBand>
-          </>
+          <NasaqTable
+            data={monitors}
+            rowId={(m) => m.id}
+            rowLabel={(m) => m.name}
+            label={t("site.nav.monitors")}
+            search={t("site.monitors.search")}
+            rowActions={manage ? rowActions : undefined}
+            onRowClick={manage ? (m) => setEditing(m) : undefined}
+            columns={[
+              {
+                id: "name",
+                header: t("site.monitors.name"),
+                cell: (m) => (
+                  <>
+                    <span className="inline-flex items-center gap-2 font-medium [&_svg]:size-4 [&_svg]:text-nq-brand">
+                      {KIND_ICON[m.kind]}
+                      <span dir="auto">{m.name}</span>
+                    </span>
+                    {m.kind === "http" ? (
+                      <div dir="ltr" className="max-w-64 truncate text-start font-mono text-xs text-muted-foreground">
+                        {m.target}
+                      </div>
+                    ) : null}
+                  </>
+                ),
+                sortValue: (m) => m.name,
+                searchValue: (m) => [m.name, m.kind, m.target, m.state].join(" "),
+              },
+              {
+                id: "status",
+                header: t("lists.status"),
+                cell: (m) => (
+                  <>
+                    {!m.enabled ? (
+                      <Badge variant="outline">{t("site.monitors.paused")}</Badge>
+                    ) : (
+                      <Badge variant={m.state === "failing" ? "danger" : m.state === "ok" ? "brand" : "neutral"}>{t(`site.monitors.state.${m.state}`)}</Badge>
+                    )}
+                    {m.open_incident ? (
+                      <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
+                        {m.open_incident.reason} · {ago(m.open_incident.opened_at)}
+                      </p>
+                    ) : m.last_error ? (
+                      <p dir="auto" className="mt-1 max-w-xs text-xs text-muted-foreground">
+                        {m.last_error}
+                      </p>
+                    ) : null}
+                  </>
+                ),
+                sortValue: (m) => (m.enabled ? m.state : "paused"),
+              },
+              {
+                id: "rule",
+                header: t("site.monitors.rule"),
+                cell: (m) => (
+                  <span className="text-xs">
+                    {m.kind === "http"
+                      ? t("site.monitors.ruleHttp", { status: m.expected_status || "2xx/3xx", every: m.interval_seconds }) + (m.threshold ? ` · ≤ ${m.threshold} ms` : "")
+                      : m.kind === "heartbeat"
+                        ? t("site.monitors.ruleHeartbeat", { every: m.heartbeat_interval_seconds, grace: m.heartbeat_grace_seconds })
+                        : t("site.monitors.ruleResource", { kind: t(`site.monitors.kinds.${m.kind}`), pct: m.threshold, min: m.window_minutes })}
+                  </span>
+                ),
+              },
+              {
+                id: "checked",
+                header: t("site.monitors.checked"),
+                cell: (m) => (
+                  <span className="text-xs text-muted-foreground">
+                    {m.kind === "heartbeat" ? (m.last_ping_at ? ago(m.last_ping_at) : t("site.monitors.neverPinged")) : m.last_checked_at ? ago(m.last_checked_at) : "—"}
+                  </span>
+                ),
+                sortValue: (m) => (m.kind === "heartbeat" ? m.last_ping_at : m.last_checked_at) ?? "",
+              },
+              { id: "uptime", header: t("site.monitors.uptime24h"), cell: (m) => <UptimeBadge path={path} monitor={m} /> },
+            ]}
+          />
         )}
       </section>
 
       <section aria-labelledby="inc-h">
         <SectionTitle id="inc-h" title={t("site.monitors.incidents")} hint={t("site.monitors.incidentsHint")} />
         {incidents.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <ActivityIcon className="size-4" />
             {t("site.monitors.noIncidents")}
           </p>
         ) : (
-          <ol className="flex flex-col divide-y divide-border border-b border-border">
+          <ol className="flex flex-col divide-y divide-border nq-box">
             {incidents.map((i) => (
               <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm">
                 <Badge variant={i.resolved_at ? "neutral" : "danger"}>{i.resolved_at ? t("site.monitors.resolved") : t("site.monitors.open")}</Badge>
@@ -300,14 +303,13 @@ export function SiteMonitors() {
             ))}
           </ol>
         )}
-        {cursor ? (
-          <div className="flex justify-center border-b border-border px-6 py-3">
-            <Button variant="ghost" size="sm" onClick={() => void more()}>
-              {t("site.monitors.more")}
-            </Button>
-          </div>
-        ) : null}
+        {incidents.length > 0 ? <LoadMore hasMore={!!cursor} onMore={() => void more()} loading={loadingMore} /> : null}
       </section>
+
+      {editing ? (
+        <MonitorDialog open onOpenChange={(v) => !v && setEditing(null)} path={path} hosts={hosts} monitor={editing} onSaved={saved} />
+      ) : null}
+      {deleting ? <DeleteMonitor open onOpenChange={(v) => !v && setDeleting(null)} path={path} monitor={deleting} onDeleted={load} /> : null}
     </>
   )
 }

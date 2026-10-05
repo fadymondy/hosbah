@@ -12,7 +12,7 @@ import { useSite } from "@/components/site/context"
 import { apiFetch } from "@/lib/api"
 import { shortSha, type Deployment } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useTeamBase } from "@/lib/team"
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -29,8 +29,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  * go hunting for it — the full log is one link away.
  */
 export function DeployButton() {
-  const { t, locale } = useI18n()
-  const { team } = useTeam()
+  const { t } = useI18n()
+  const teamBase = useTeamBase()
   const errorText = useErrorText()
   const { detail, deployments, path, pushDeployment } = useSite()
   const [open, setOpen] = useState(false)
@@ -42,7 +42,7 @@ export function DeployButton() {
   const live = detail.live_release
   const running = deployments.find((d) => isActive(d))
   const started = startedId ? deployments.find((d) => d.id === startedId) : undefined
-  const logHref = (id: string) => `/${locale}/t/${team.slug}/apps/${encodeURIComponent(app.name)}/deployments?d=${id}`
+  const logHref = (id: string) => `${teamBase}/apps/${encodeURIComponent(app.name)}/deployments?d=${id}`
 
   function change(next: boolean) {
     setOpen(next)

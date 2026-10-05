@@ -1,14 +1,12 @@
 "use client"
 
-import { Badge, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, EmptyState, useConfirm } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
-import { PackageIcon } from "lucide-react"
+import { PackageIcon, RotateCcwIcon } from "lucide-react"
 
-import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, Strip, TableBand } from "@/components/states"
-
-
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, Strip } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
 import { shortSha, type Deployment, type Release } from "@/lib/apps"
@@ -28,6 +26,7 @@ export function ReleasesPanel({
   const { t } = useI18n()
   const fmt = useFormatDate()
   const errorText = useErrorText()
+  const confirm = useConfirm()
   const [releases, setReleases] = useState<Release[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,8 +46,24 @@ export function ReleasesPanel({
     void load()
   }, [load, liveId])
 
+  async function rollback(r: Release) {
+    const ok = await confirm({
+      title: t("apps.actions.rollbackTitle", { version: r.version }),
+      description: t("apps.releases.rollbackHint", { version: r.version }),
+      confirmLabel: t("apps.actions.rollback"),
+    })
+    if (!ok) return
+    setError(null)
+    try {
+      const res = await apiFetch<{ deployment: Deployment }>(`${path}/rollback`, { method: "POST", body: { release: r.id } })
+      onRollback(res.deployment)
+    } catch (err) {
+      setError(errorText(err))
+    }
+  }
+
   return (
-    <div data-testid="releases">
+    <div data-testid="releases" data-stack>
       <Strip>
         <p className="text-sm text-muted-foreground">{t("apps.releases.hint")}</p>
       </Strip>
@@ -56,70 +71,77 @@ export function ReleasesPanel({
       {releases === null ? (
         <LoadingRows />
       ) : releases.length === 0 ? (
-        <EmptyState className="border-b" icon={PackageIcon} title={t("apps.releases.empty")} />
+        <EmptyState className="nq-empty" icon={PackageIcon} title={t("apps.releases.empty")} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("apps.releases.version")}</TableHead>
-                <TableHead>{t("apps.status")}</TableHead>
-                <TableHead>{t("apps.commit")}</TableHead>
-                <TableHead>{t("apps.releases.image")}</TableHead>
-                <TableHead>{t("apps.releases.activated")}</TableHead>
-                {operate ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {releases.map((r) => (
-                <TableRow key={r.id} data-release={r.version}>
-                  <TableCell dir="ltr" className="text-start font-mono text-sm">
-                    v{r.version}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={r.status === "live" ? "brand" : r.status === "standby" ? "neutral" : "outline"}>
-                      {t(`apps.releases.statuses.${r.status}`)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start font-mono text-xs">
-                    {shortSha(r.commit_sha)}
-                  </TableCell>
-                  <TableCell dir="ltr" className="max-w-64 truncate text-start font-mono text-xs" title={r.image}>
-                    {r.image}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start text-xs">
-                    {fmt(r.activated_at ?? r.created_at)}
-                  </TableCell>
-                  {operate ? (
-                    <TableCell className="text-end">
-                      {r.status === "standby" ? (
-                        <ConfirmButton
-                          label={t("apps.releases.rollbackTo")}
-                          title={t("apps.actions.rollbackTitle", { version: r.version })}
-                          description={t("apps.releases.rollbackHint", { version: r.version })}
-                          confirmLabel={t("apps.actions.rollback")}
-                          onConfirm={async () => {
-                            try {
-                              const res = await apiFetch<{ deployment: Deployment }>(`${path}/rollback`, {
-                                method: "POST",
-                                body: { release: r.id },
-                              })
-                              onRollback(res.deployment)
-                            } catch (err) {
-                              throw new Error(errorText(err))
-                            }
-                          }}
-                        />
-                      ) : r.status === "pruned" ? (
-                        <span className="text-xs text-muted-foreground">{t("apps.releases.prunedHint")}</span>
-                      ) : null}
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <NasaqTable
+          data={releases}
+          rowId={(r) => r.id}
+          rowLabel={(r) => `v${r.version}`}
+          label={t("site.nav.releases")}
+          defaultSort={{ id: "version", direction: "desc" }}
+          rowActions={
+            operate
+              ? (r) => [
+                  {
+                    id: "rollback",
+                    label: r.status === "pruned" ? t("apps.releases.prunedHint") : t("apps.releases.rollbackTo"),
+                    icon: RotateCcwIcon,
+                    disabled: r.status !== "standby",
+                    onSelect: () => void rollback(r),
+                  },
+                ]
+              : undefined
+          }
+          columns={[
+            {
+              id: "version",
+              header: t("apps.releases.version"),
+              cell: (r) => (
+                <span dir="ltr" className="font-mono text-sm">
+                  v{r.version}
+                </span>
+              ),
+              sortValue: (r) => r.version,
+              searchValue: (r) => `v${r.version} ${r.commit_sha ?? ""} ${r.image}`,
+            },
+            {
+              id: "status",
+              header: t("apps.status"),
+              cell: (r) => (
+                <Badge variant={r.status === "live" ? "brand" : r.status === "standby" ? "neutral" : "outline"}>{t(`apps.releases.statuses.${r.status}`)}</Badge>
+              ),
+              sortValue: (r) => r.status,
+            },
+            {
+              id: "commit",
+              header: t("apps.commit"),
+              cell: (r) => (
+                <span dir="ltr" className="font-mono text-xs">
+                  {shortSha(r.commit_sha)}
+                </span>
+              ),
+            },
+            {
+              id: "image",
+              header: t("apps.releases.image"),
+              cell: (r) => (
+                <span dir="ltr" className="block max-w-64 truncate text-start font-mono text-xs" title={r.image}>
+                  {r.image}
+                </span>
+              ),
+            },
+            {
+              id: "activated",
+              header: t("apps.releases.activated"),
+              cell: (r) => (
+                <span dir="ltr" className="text-xs">
+                  {fmt(r.activated_at ?? r.created_at)}
+                </span>
+              ),
+              sortValue: (r) => r.activated_at ?? r.created_at,
+            },
+          ]}
+        />
       )}
     </div>
   )

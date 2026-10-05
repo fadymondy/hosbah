@@ -1,13 +1,13 @@
 "use client"
 
-import { Button, Input, toast } from "@fadymondy/nasaq/web"
+import { Button, Input, SettingRow, SettingsSection, toast } from "@fadymondy/nasaq/web"
 import { useRef, useState, type FormEvent } from "react"
 import { Trash2Icon, UploadIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
 import { SERVER_COLORS, SERVER_ICONS, ServerMark } from "@/components/server-mark"
 import { useLoadedServer } from "@/components/server-tabs/context"
-import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
+import { ErrorBand } from "@/components/states"
 
 
 import { apiFetch } from "@/lib/api"
@@ -80,17 +80,24 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
 
   return (
     <form onSubmit={save}>
-      <SectionTitle
+      <SettingsSection
         title={t("servers.appearance.title")}
-        hint={t("servers.appearance.hint")}
+        description={t("servers.appearance.hint")}
         action={<ServerMark server={{ color, icon, logo_url: logo || null }} size={10} />}
-      />
+        actions={
+          manage ? (
+            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
+              {busy ? t("common.working") : t("servers.appearance.save")}
+            </Button>
+          ) : undefined
+        }
+      >
       <ErrorBand message={error} />
-      <fieldset disabled={!manage || busy} className="contents">
-        <SettingsRow label={t("servers.appearance.name")} htmlFor="srv-name">
+      <fieldset disabled={!manage || busy} className="divide-y divide-border">
+        <SettingRow id="srv-name" label={<label htmlFor="srv-name">{t("servers.appearance.name")}</label>}>
           <Input id="srv-name" dir="ltr" required maxLength={63} value={name} onChange={(e) => setName(e.target.value)} />
-        </SettingsRow>
-        <SettingsRow label={t("servers.appearance.color")}>
+        </SettingRow>
+        <SettingRow id="srv-color" label={t("servers.appearance.color")}>
           <div className="flex flex-wrap items-center gap-2" role="radiogroup">
             <button
               type="button"
@@ -98,7 +105,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               aria-checked={!color}
               aria-label={t("servers.appearance.none")}
               onClick={() => setColor("")}
-              className={cn("size-7 border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
+              className={cn("size-7 rounded-full border border-dashed border-border", !color && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
             />
             {SERVER_COLORS.map((c) => (
               <button
@@ -108,7 +115,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
                 aria-checked={color === c}
                 aria-label={c}
                 onClick={() => setColor(c)}
-                className={cn("size-7 border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
+                className={cn("size-7 rounded-full border border-border", color === c && "ring-2 ring-nq-brand ring-offset-2 ring-offset-background")}
                 style={{ background: c }}
               />
             ))}
@@ -117,11 +124,11 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               aria-label={t("servers.appearance.custom")}
               value={color || "#3B82F6"}
               onChange={(e) => setColor(e.target.value.toUpperCase())}
-              className="h-7 w-10 cursor-pointer border border-border bg-transparent"
+              className="h-7 w-10 cursor-pointer rounded-md border border-border bg-transparent"
             />
           </div>
-        </SettingsRow>
-        <SettingsRow label={t("servers.appearance.icon")}>
+        </SettingRow>
+        <SettingRow id="srv-icon" label={t("servers.appearance.icon")}>
           <div className="flex flex-wrap gap-1" role="radiogroup">
             {Object.entries(SERVER_ICONS).map(([key, Icon]) => (
               <button
@@ -133,7 +140,7 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
                 title={key}
                 onClick={() => setIcon(icon === key ? "" : key)}
                 className={cn(
-                  "flex size-8 items-center justify-center border border-border [&_svg]:size-4",
+                  "flex size-8 items-center justify-center rounded-md border border-border [&_svg]:size-4",
                   icon === key ? "bg-secondary text-foreground ring-1 ring-nq-brand" : "text-muted-foreground hover:bg-secondary",
                 )}
               >
@@ -141,10 +148,10 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               </button>
             ))}
           </div>
-        </SettingsRow>
-        <SettingsRow label={t("servers.appearance.logo")} hint={t("servers.appearance.logoHint")}>
+        </SettingRow>
+        <SettingRow id="srv-logo" label={t("servers.appearance.logo")} description={t("servers.appearance.logoHint")}>
           <div
-            className="flex flex-wrap items-center gap-3 border border-dashed border-border px-4 py-3"
+            className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault()
@@ -173,15 +180,9 @@ export function ServerAppearance({ manage }: { manage: boolean }) {
               <span className="text-xs text-muted-foreground">{t("servers.appearance.logoDrop")}</span>
             )}
           </div>
-        </SettingsRow>
-        {manage ? (
-          <div className="flex justify-end border-b border-border px-6 py-4">
-            <Button variant="primary" type="submit" disabled={busy || !name.trim()}>
-              {busy ? t("common.working") : t("servers.appearance.save")}
-            </Button>
-          </div>
-        ) : null}
+        </SettingRow>
       </fieldset>
+      </SettingsSection>
     </form>
   )
 }

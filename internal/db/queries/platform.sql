@@ -103,7 +103,7 @@ SELECT id, disabled_at FROM users WHERE roles ~ '(^|,)\s*admin\s*(,|$)' ORDER BY
 -- name: UserAccountState :one
 -- Runs outside any tenant scope (users has no RLS): the per-request "is this account still
 -- allowed in" check behind every session.
-SELECT disabled_at, sessions_revoked_at FROM users WHERE id = $1;
+SELECT disabled_at, sessions_revoked_at, panel_server_id FROM users WHERE id = $1;
 
 -- name: SoleOwnedTeams :many
 -- Teams where this user is an owner and no other member is.

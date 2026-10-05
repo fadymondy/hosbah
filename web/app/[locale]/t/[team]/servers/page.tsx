@@ -1,54 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PlusIcon, SearchIcon, ServerIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PlusIcon, ServerIcon } from "lucide-react";
 
 import { PageBody } from "@/components/app-shell";
-import { ServerCard, type Spark, type TunnelSummary } from "@/components/home/server-card";
-import { LoadingRows } from "@/components/states";
+import { DashboardServerCard } from "@/components/home/dashboard-cards";
+import { type Spark, type TunnelSummary } from "@/components/home/server-card";
+import { ServerCardSkeleton } from "@/components/home/skeletons";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CardListToolbar, useInfinite } from "@/components/lists/card-list";
 import { EmptyState } from "@fadymondy/nasaq/web";
 import { apiFetch } from "@/lib/api";
-import type { App, Deployment } from "@/lib/apps";
+import { serverActivity, type App } from "@/lib/apps";
 import { useDocumentTitle, useI18n } from "@/lib/i18n";
 import type { Server } from "@/lib/servers";
 import { useTeam } from "@/lib/team";
-
-const PAGE = 8;
-
-/** A small segmented control for one filter. */
-function FilterPills<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: [T, string][];
-}) {
-  return (
-    <div role="radiogroup" className="flex border border-line">
-      {options.map(([v, label]) => (
-        <button
-          key={v || "all"}
-          type="button"
-          role="radio"
-          aria-checked={value === v}
-          onClick={() => onChange(v)}
-          className={
-            value === v
-              ? "bg-grid-soft px-2.5 py-1 text-xs font-medium text-grid-fg"
-              : "px-2.5 py-1 text-xs text-grid-muted hover:bg-grid-soft hover:text-grid-fg"
-          }
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 type TunnelRow = { server_id: string; kind: string; status: string; address: string | null };
 
@@ -93,7 +60,9 @@ export default function ServersPage() {
 
   useEffect(() => {
     void load();
-    const id = setInterval(load, 30_000);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 5_000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -106,18 +75,6 @@ export default function ServersPage() {
     }
     return m;
   }, [tunnels]);
-
-  const lastDeployOf = useMemo(() => {
-    const m: Record<string, { app: App; deployment: Deployment }> = {};
-    for (const app of apps) {
-      const d = app.latest_deployment;
-      if (!d) continue;
-      const cur = m[app.server_id];
-      if (!cur || d.created_at > cur.deployment.created_at)
-        m[app.server_id] = { app, deployment: d };
-    }
-    return m;
-  }, [apps]);
 
   // Nodes and their enrolled guest servers (MH-574 A1): a guest with a parent that is also one of
   // the team's servers nests under its node instead of appearing as an unrelated row.
@@ -136,61 +93,49 @@ export default function ServersPage() {
     return m;
   }, [servers, byId]);
   const isNestedGuest = (s: Server) => Boolean(s.parent_server_id && byId[s.parent_server_id]);
-  // A node's guests (the ones it reports, plus any Hosbah is still creating on it) are a count on
-  // its card that opens its Guests tab: they are never servers of their own on the home page.
-  const guestsOf = (s: Server) => {
-    const reported = s.guests ?? [];
-    const ids = new Set(reported.map((g) => g.server_id).filter(Boolean));
-    const pending = (childrenOf[s.id] ?? []).filter((c) => !ids.has(c.id));
-    const total = reported.length + pending.length;
-    if (!total) return null;
-    const running =
-      reported.filter((g) => /^(running|active|up)/i.test(g.status)).length +
-      pending.filter((c) => c.online).length;
-    return { total, running };
-  };
 
-  // Search and filters over the servers; the list grows as you scroll (PAGE at a time).
+  // Hosbah has no server power control yet: the card's power menu says so instead of failing silently.
+  const noPower = async () => ({ error: t("home3.noPower") });
+
+  // Search, facets (state, provider, tunnel) and sort; the list grows 20 at a time as you scroll.
   const [q, setQ] = useState("");
-  const [state, setState] = useState<"" | "online" | "offline">("");
-  const [provider, setProvider] = useState<"" | "proxmox" | "byo">("");
-  const [tunnelled, setTunnelled] = useState(false);
-  const [shown, setShown] = useState(PAGE);
+  const [chosen, setChosen] = useState<Record<string, string[]>>({});
+  const [sort, setSort] = useState("recent");
   const matches = useCallback(
     (s: Server) => {
       const needle = q.trim().toLowerCase();
-      if (state === "online" && !s.online) return false;
-      if (state === "offline" && s.online) return false;
-      if (provider && s.provider !== provider) return false;
-      if (tunnelled && !tunnelOf[s.id]) return false;
+      const state = chosen.state ?? [];
+      if (state.length && !state.includes(s.online ? "online" : "offline")) return false;
+      const provider = chosen.provider ?? [];
+      if (provider.length && !provider.includes(s.provider === "proxmox" ? "proxmox" : "byo"))
+        return false;
+      const tunnel = chosen.tunnel ?? [];
+      if (tunnel.length && !tunnel.includes(tunnelOf[s.id] ? "yes" : "no")) return false;
       if (!needle) return true;
       return [s.name, s.ip_address, s.hostname, s.os, s.facts?.os_pretty].some((v) =>
         v?.toLowerCase().includes(needle),
       );
     },
-    [q, state, provider, tunnelled, tunnelOf],
+    [q, chosen, tunnelOf],
   );
+  const top = useMemo(() => (servers ?? []).filter((s) => !isNestedGuest(s)), [servers, byId]);
   const filtered = useMemo(() => {
     // Top-level rows only: a nested guest never shows up as its own row, only under its node — but
     // its node still shows if only the guest matches the filters.
-    return (servers ?? []).filter(
-      (s) => !isNestedGuest(s) && (matches(s) || (childrenOf[s.id] ?? []).some(matches)),
-    );
-  }, [servers, matches, childrenOf, byId]);
-  useEffect(() => setShown(PAGE), [q, state, provider, tunnelled]);
-  const sentinel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setShown((n) => n + PAGE);
-      },
-      { rootMargin: "400px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [filtered.length, shown]);
+    const active = serverActivity(servers ?? [], apps);
+    const seen = (s: Server) => active.get(s.id) ?? 0;
+    return top
+      .filter((s) => matches(s) || (childrenOf[s.id] ?? []).some(matches))
+      .sort((a, b) =>
+        sort === "name"
+          ? a.name.localeCompare(b.name)
+          : sort === "online"
+            ? Number(b.online) - Number(a.online) || a.name.localeCompare(b.name)
+            : seen(b) - seen(a) || a.name.localeCompare(b.name),
+      );
+  }, [top, matches, childrenOf, sort, apps]);
+  const { visible, more, sentinel } = useInfinite(filtered, JSON.stringify([q, chosen, sort]));
+  const count = (f: (s: Server) => boolean) => top.filter(f).length;
 
   return (
     <PageBody
@@ -215,9 +160,14 @@ export default function ServersPage() {
         </>
       }
       bleed
+      divider={false}
     >
       {servers === null ? (
-        <LoadingRows rows={3} />
+        <div className="grid items-start gap-4 px-6 pb-6 lg:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <ServerCardSkeleton key={i} />
+          ))}
+        </div>
       ) : servers.length === 0 ? (
         <EmptyState
           className="border-y"
@@ -234,70 +184,81 @@ export default function ServersPage() {
           }
         />
       ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-6 py-3">
-            <div className="relative w-full max-w-xs">
-              <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-grid-muted" />
-              <Input
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("home.search")}
-                aria-label={t("home.search")}
-                className="ps-8"
-              />
-            </div>
-            <div className="ms-auto flex flex-wrap items-center gap-2">
-              <FilterPills
-                value={state}
-                onChange={setState}
-                options={[
-                  ["", t("home.filterAll")],
-                  ["online", t("home.online")],
-                  ["offline", t("home.offline")],
-                ]}
-              />
-              <FilterPills
-                value={provider}
-                onChange={setProvider}
-                options={[
-                  ["", t("home.anyProvider")],
-                  ["proxmox", "Proxmox"],
-                  ["byo", t("home.ownServers")],
-                ]}
-              />
-              <Button
-                variant={tunnelled ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTunnelled((v) => !v)}
-                aria-pressed={tunnelled}
-              >
-                {t("home.withTunnel")}
-              </Button>
-            </div>
-          </div>
+        <div className="flex flex-col gap-4 px-6 pb-6">
+          <CardListToolbar
+            q={q}
+            onQ={setQ}
+            placeholder={t("home.search")}
+            chosen={chosen}
+            onChosen={setChosen}
+            facets={[
+              {
+                id: "state",
+                title: t("lists.status"),
+                options: [
+                  { value: "online", label: t("home.online"), count: count((s) => s.online) },
+                  { value: "offline", label: t("home.offline"), count: count((s) => !s.online) },
+                ],
+              },
+              {
+                id: "provider",
+                title: t("lists.provider"),
+                options: [
+                  {
+                    value: "proxmox",
+                    label: "Proxmox",
+                    count: count((s) => s.provider === "proxmox"),
+                  },
+                  {
+                    value: "byo",
+                    label: t("home.ownServers"),
+                    count: count((s) => s.provider !== "proxmox"),
+                  },
+                ],
+              },
+              {
+                id: "tunnel",
+                title: t("lists.tunnel"),
+                options: [
+                  {
+                    value: "yes",
+                    label: t("home.withTunnel"),
+                    count: count((s) => !!tunnelOf[s.id]),
+                  },
+                  { value: "no", label: t("lists.noTunnel"), count: count((s) => !tunnelOf[s.id]) },
+                ],
+              },
+            ]}
+            sort={sort}
+            onSort={setSort}
+            sorts={[
+              ["recent", t("lists.sortActivity")],
+              ["name", t("apps2.sortName")],
+              ["online", t("lists.sortOnline")],
+            ]}
+          />
           {filtered.length === 0 ? (
-            <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">
+            <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-body-sm text-muted-foreground">
               {t("home.noMatch")}
             </p>
           ) : (
-            <div className="flex flex-col gap-4 px-6 pt-6 pb-6">
-              {filtered.slice(0, shown).map((s) => (
-                <ServerCard
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              {visible.map((s) => (
+                <DashboardServerCard
                   key={s.id}
                   server={s}
                   base={base}
-                  tunnel={s.tunnel ?? tunnelOf[s.id] ?? null}
-                  spark={spark[s.id] ?? null}
-                  lastDeploy={lastDeployOf[s.id] ?? null}
-                  streamUrl={`${api}/servers/${s.id}/stream`}
-                  guests={guestsOf(s)}
+                  cpu={spark[s.id]?.cpu}
+                  onPower={noPower}
                 />
               ))}
             </div>
           )}
-          {shown < filtered.length ? <div ref={sentinel} className="h-8" aria-hidden /> : null}
-        </>
+          {more ? <div ref={sentinel} className="h-8" aria-hidden /> : null}
+          <p className="text-caption text-muted-foreground">
+            {t("lists.count", { shown: visible.length, total: top.length })}
+          </p>
+        </div>
       )}
     </PageBody>
   );

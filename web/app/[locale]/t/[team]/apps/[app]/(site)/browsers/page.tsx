@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteBrowsers } from "@/components/site/browsers"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteBrowsers />
+  return <SectionRedirect section="browsers" />
 }

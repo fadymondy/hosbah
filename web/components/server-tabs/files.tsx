@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@fadymondy/nasaq/web"
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Card, Input, Textarea, toast, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from "react"
 import {
   ArrowUpIcon,
@@ -15,7 +15,8 @@ import {
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -27,6 +28,7 @@ import { apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { formatBytes } from "@/lib/servers"
 import { useTeam } from "@/lib/team"
+import { cn } from "@/lib/utils"
 
 /*
 Files (MH-574 E10): a server's filesystem, browsed and edited through its agent (internal/agent/files.go,
@@ -223,7 +225,7 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
     return (
       <section aria-labelledby="files-h" data-testid="files">
         <SectionTitle id="files-h" title={t("servers.files.title")} hint={t("servers.files.hint")} />
-        <EmptyState className="border-b" icon={FolderIcon} title={t("servers.files.noAccessTitle")} description={t("servers.files.noAccessHint")} />
+        <EmptyState className="mt-3 rounded-lg border border-border bg-card" icon={FolderIcon} title={t("servers.files.noAccessTitle")} description={t("servers.files.noAccessHint")} />
       </section>
     )
   }
@@ -263,7 +265,7 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
+          <Card className="flex-row flex-wrap items-center gap-2 px-3 py-2">
             <Button
               size="icon-sm"
               variant="secondary"
@@ -296,80 +298,96 @@ export function ServerFiles({ serverId, manage }: { serverId: string; manage: bo
               aria-label={t("servers.files.pathInput")}
               placeholder="/"
             />
-          </div>
+          </Card>
 
           <ErrorBand message={error} />
 
           {loading && entries === null ? (
             <LoadingRows />
           ) : entries && entries.length === 0 ? (
-            <EmptyState className="border-b" icon={FolderIcon} title={t("servers.files.emptyTitle")} description={t("servers.files.emptyHint")} />
+            <EmptyState className="mt-3 rounded-lg border border-border bg-card" icon={FolderIcon} title={t("servers.files.emptyTitle")} description={t("servers.files.emptyHint")} />
           ) : entries ? (
-            <TableBand>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("servers.files.columns.name")}</TableHead>
-                    <TableHead>{t("servers.files.columns.size")}</TableHead>
-                    <TableHead>{t("servers.files.columns.modified")}</TableHead>
-                    <TableHead>{t("servers.files.columns.mode")}</TableHead>
-                    <TableHead className="text-end">{t("common.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {entries.map((e) => (
-                    <TableRow key={e.name}>
-                      <TableCell>
-                        {e.type === "dir" ? (
-                          <button
-                            type="button"
-                            onClick={() => navigate(joinPath(dir, e.name))}
-                            className="flex items-center gap-2 font-medium text-foreground hover:underline"
-                            dir="ltr"
-                          >
-                            <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
-                            <span className="truncate">{e.name}</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => void openFile(e)}
-                            className="flex items-center gap-2 text-foreground hover:underline"
-                            dir="ltr"
-                          >
-                            <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-                            <span className="truncate">{e.name}</span>
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground">
-                        {e.type === "dir" ? "—" : formatBytes(e.size)}
-                      </TableCell>
-                      <TableCell dir="ltr" className="text-xs text-muted-foreground">
-                        {fmt(e.mtime)}
-                      </TableCell>
-                      <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground">
-                        {e.mode}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <RenameButton entry={e} busy={busyName === e.name} onRename={(name) => rename(e, name)} />
-                          <ConfirmButton
-                            size="sm"
-                            icon={<Trash2Icon />}
-                            label={t("common.delete")}
-                            title={t(e.type === "dir" ? "servers.files.deleteFolderTitle" : "servers.files.deleteFileTitle", { name: e.name })}
-                            description={t(e.type === "dir" ? "servers.files.deleteFolderBody" : "servers.files.deleteFileBody", { name: e.name })}
-                            confirmLabel={t("common.delete")}
-                            onConfirm={() => remove(e)}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableBand>
+            <NasaqTable
+              data={entries}
+              rowId={(e) => e.name}
+              label={t("servers.files.title")}
+              rowLabel={(e) => e.name}
+              search={t("servers.files.columns.name")}
+              empty={t("home.noMatch")}
+              pageSize={50}
+              defaultSort={{ id: "name", direction: "asc" }}
+              onRowClick={(e) => (e.type === "dir" ? navigate(joinPath(dir, e.name)) : void openFile(e))}
+              columns={[
+                {
+                  id: "name",
+                  header: t("servers.files.columns.name"),
+                  label: t("servers.files.columns.name"),
+                  sortValue: (e) => `${e.type === "dir" ? 0 : 1}${e.name.toLowerCase()}`,
+                  searchValue: (e) => e.name,
+                  cell: (e) => (
+                    <span className={cn("flex min-w-0 items-center gap-2 text-foreground", e.type === "dir" && "font-medium")} dir="ltr">
+                      {e.type === "dir" ? <FolderIcon className="size-4 shrink-0 text-nq-action" /> : <FileIcon className="size-4 shrink-0 text-muted-foreground" />}
+                      <span className="truncate">{e.name}</span>
+                    </span>
+                  ),
+                },
+                {
+                  id: "size",
+                  header: t("servers.files.columns.size"),
+                  label: t("servers.files.columns.size"),
+                  sortValue: (e) => (e.type === "dir" ? -1 : e.size),
+                  cell: (e) => (
+                    <span dir="ltr" className="font-mono text-caption text-muted-foreground">
+                      {e.type === "dir" ? "—" : formatBytes(e.size)}
+                    </span>
+                  ),
+                },
+                {
+                  id: "modified",
+                  header: t("servers.files.columns.modified"),
+                  label: t("servers.files.columns.modified"),
+                  sortValue: (e) => e.mtime,
+                  className: "max-md:hidden",
+                  headerClassName: "max-md:hidden",
+                  cell: (e) => (
+                    <span dir="ltr" className="text-caption text-muted-foreground">
+                      {fmt(e.mtime)}
+                    </span>
+                  ),
+                },
+                {
+                  id: "mode",
+                  header: t("servers.files.columns.mode"),
+                  label: t("servers.files.columns.mode"),
+                  className: "max-lg:hidden",
+                  headerClassName: "max-lg:hidden",
+                  cell: (e) => (
+                    <span dir="ltr" className="font-mono text-caption text-muted-foreground">
+                      {e.mode}
+                    </span>
+                  ),
+                },
+                {
+                  id: "actions",
+                  header: <span className="sr-only">{t("common.actions")}</span>,
+                  label: t("common.actions"),
+                  cell: (e) => (
+                    <div className="flex flex-wrap justify-end gap-2" onClick={(ev) => ev.stopPropagation()}>
+                      <RenameButton entry={e} busy={busyName === e.name} onRename={(name) => rename(e, name)} />
+                      <ConfirmButton
+                        size="sm"
+                        icon={<Trash2Icon />}
+                        label={t("common.delete")}
+                        title={t(e.type === "dir" ? "servers.files.deleteFolderTitle" : "servers.files.deleteFileTitle", { name: e.name })}
+                        description={t(e.type === "dir" ? "servers.files.deleteFolderBody" : "servers.files.deleteFileBody", { name: e.name })}
+                        confirmLabel={t("common.delete")}
+                        onConfirm={() => remove(e)}
+                      />
+                    </div>
+                  ),
+                },
+              ] satisfies DataTableColumn<FSEntry>[]}
+            />
           ) : null}
         </>
       )}
@@ -400,8 +418,8 @@ function FileViewer({
   const dirty = !file.binary && !file.truncated && draft !== file.content
 
   return (
-    <div className="border-b border-border">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
         <span dir="ltr" className="min-w-0 truncate font-mono text-sm text-foreground" title={file.path}>
           {file.path}
         </span>

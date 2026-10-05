@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteCache } from "@/components/site/cache"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteCache />
+  return <SectionRedirect section="cache" />
 }

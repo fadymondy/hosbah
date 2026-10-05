@@ -57,6 +57,8 @@ export const STATUS_DOT: Record<Status, string> = {
 export type CanvasActions = {
   manage: boolean
   openPalette: () => void
+  /** Opens a box's section: in the side sheet when the architecture holds it, else on its tab. */
+  open: (href: string) => void
   remove: (removal: Removal) => void
   labels: { add: string; remove: string; disconnect: string }
 }
@@ -188,7 +190,7 @@ export function BoxCard({ data, selected }: NodeProps<BoxNode>) {
       {extra > 0 && expanded ? (
         <div className="nodrag nopan absolute start-0 top-full z-50 mt-1 max-h-56 w-[216px] overflow-y-auto border border-border bg-card shadow-lg">
           {stack.map((d) => (
-            <div key={d.id} className="flex items-center gap-2 border-b border-border px-3 py-2 last:border-b-0">
+            <div key={d.id} className="flex items-center gap-2 nq-box px-3 py-2 last:border-b-0">
               <StatusDot status={d.verified ? "ok" : "warn"} label={t(d.verified ? "apps.domains.verified" : "apps.domains.unverified")} />
               <span dir="ltr" className="min-w-0 flex-1 truncate font-mono text-xs" title={d.hostname}>
                 {d.hostname}

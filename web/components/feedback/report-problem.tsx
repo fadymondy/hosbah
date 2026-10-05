@@ -25,7 +25,7 @@ export function requestReport() {
 // The fields the Hosbah API contract names for POST /api/feedback.
 const CONTRACT_FIELDS = ["title", "body", "issue_type", "page_url", "route", "user_agent", "viewport"] as const
 
-export function ReportProblem() {
+export function ReportProblem({ launcher = true }: { launcher?: boolean }) {
   const { t, locale } = useI18n()
   const team = useOptionalTeam()?.team
   const [open, setOpen] = useState(false)
@@ -56,6 +56,7 @@ export function ReportProblem() {
 
   return (
     <>
+      {launcher ? (
       <Button
         variant="secondary"
         size="sm"
@@ -67,6 +68,7 @@ export function ReportProblem() {
         <MessageSquareWarningIcon />
         <span className="hidden lg:inline">{t("feedback.launcher")}</span>
       </Button>
+      ) : null}
       <ReportDialog
         open={open}
         onOpenChange={setOpen}

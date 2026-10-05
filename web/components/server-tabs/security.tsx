@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast, SettingsSection } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
 
@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { ErrorBand, LoadingRows, TableBand } from "@/components/states"
 
 
 
@@ -93,18 +93,17 @@ function AccessSection({ team, serverId }: { team: string; serverId: string }) {
   }
 
   return (
-    <section aria-labelledby="access-h">
-      <SectionTitle id="access-h" title={t("servers.security.access.title")} hint={t("servers.security.access.hint")} />
+    <SettingsSection title={t("servers.security.access.title")} description={t("servers.security.access.hint")}>
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="pb-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
-      <div className="border-b border-border px-6 py-4">
+      <div className="border-t border-border first:border-t-0 py-4">
         <h3 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.access.rootPassword")}</h3>
         <p className="mb-3 text-sm text-muted-foreground">{t("servers.security.access.rootPasswordHint")}</p>
         {manage ? <ResetPasswordDialog base={base} /> : null}
       </div>
 
-      <div className="px-6 py-4">
+      <div className="border-t border-border py-4">
         <h3 className="mb-2 text-sm font-medium text-foreground">{t("servers.security.access.deployKey")}</h3>
         <p className="mb-3 text-sm text-muted-foreground">{t("servers.security.access.deployKeyHint")}</p>
         {key === null ? (
@@ -135,7 +134,7 @@ function AccessSection({ team, serverId }: { team: string; serverId: string }) {
           </div>
         )}
       </div>
-    </section>
+    </SettingsSection>
   )
 }
 
@@ -387,25 +386,24 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
   ) : null
 
   return (
-    <section aria-labelledby="fw-h">
-      <SectionTitle
-        id="fw-h"
-        title={t("servers.security.firewall.title")}
-        hint={t("servers.security.firewall.hint")}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            {statusBadge}
-            <Button size="sm" variant="secondary" onClick={() => void loadStatus()}>
-              <RefreshCwIcon />
-              {t("common.refresh")}
-            </Button>
-          </div>
-        }
-      />
+    <SettingsSection
+      className="mt-4"
+      title={t("servers.security.firewall.title")}
+      description={t("servers.security.firewall.hint")}
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+        {statusBadge}
+        <Button size="sm" variant="secondary" onClick={() => void loadStatus()}>
+          <RefreshCwIcon />
+          {t("common.refresh")}
+        </Button>
+        </div>
+      }
+    >
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="pb-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
-      <div className="grid gap-4 border-b border-border px-6 py-4 sm:grid-cols-3">
+      <div className="grid gap-4 border-t border-border first:border-t-0 py-4 sm:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="fw-policy">{t("servers.security.firewall.defaultPolicy")}</FieldLabel>
           <Select value={policyDraft} onValueChange={(v) => manage && onPolicyChange(v as string)} disabled={!manage}>
@@ -472,7 +470,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
         <LoadingRows rows={3} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border first:border-t-0 py-3">
             <h3 className="me-auto text-sm font-medium text-foreground">{t("servers.security.firewall.rules")}</h3>
             {manage ? (
               <>
@@ -492,7 +490,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
           </div>
 
           {rules.length === 0 ? (
-            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("servers.security.firewall.empty")}</p>
+            <p className="border-t border-border first:border-t-0 py-6 text-sm text-muted-foreground">{t("servers.security.firewall.empty")}</p>
           ) : (
             <TableBand>
               <Table>
@@ -560,7 +558,7 @@ function FirewallSection({ team, serverId }: { team: string; serverId: string })
       {applyOpen && settings ? (
         <ApplyDialog base={base} settings={settings} rules={rules ?? []} onClose={() => setApplyOpen(false)} onApplied={async () => { await load(); await loadStatus() }} />
       ) : null}
-    </section>
+    </SettingsSection>
   )
 }
 
@@ -967,25 +965,24 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
   }
 
   return (
-    <section aria-labelledby="f2b-h">
-      <SectionTitle
-        id="f2b-h"
-        title={t("servers.security.fail2ban.title")}
-        hint={t("servers.security.fail2ban.hint")}
-        action={
-          <Button size="sm" variant="secondary" onClick={() => void loadBanned()}>
-            <RefreshCwIcon />
-            {t("servers.security.fail2ban.refresh")}
-          </Button>
-        }
-      />
+    <SettingsSection
+      className="mt-4"
+      title={t("servers.security.fail2ban.title")}
+      description={t("servers.security.fail2ban.hint")}
+      action={
+        <Button size="sm" variant="secondary" onClick={() => void loadBanned()}>
+        <RefreshCwIcon />
+        {t("servers.security.fail2ban.refresh")}
+        </Button>
+      }
+    >
       <ErrorBand message={error} />
-      {!manage ? <p className="border-b border-border px-6 py-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
+      {!manage ? <p className="pb-3 text-sm text-muted-foreground">{t("servers.security.readOnly")}</p> : null}
 
       {settings === null ? (
         <LoadingRows rows={2} />
       ) : (
-        <form onSubmit={save} className="grid gap-4 border-b border-border px-6 py-4 sm:grid-cols-4 sm:items-end">
+        <form onSubmit={save} className="grid gap-4 border-t border-border first:border-t-0 py-4 sm:grid-cols-4 sm:items-end">
           <Field className="flex-row items-center">
             <Checkbox id="f2b-enabled" disabled={!manage} checked={enabledDraft} onCheckedChange={(v) => setEnabledDraft(v === true)} />
             <FieldLabel htmlFor="f2b-enabled" className="font-normal">
@@ -1015,7 +1012,7 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
         </form>
       )}
 
-      <div className="border-b border-border px-6 py-4">
+      <div className="border-t border-border first:border-t-0 py-4">
         <h3 className="mb-3 text-sm font-medium text-foreground">{t("servers.security.fail2ban.banned")}</h3>
         {banned === null ? (
           <LoadingRows rows={2} />
@@ -1052,6 +1049,6 @@ function Fail2banSection({ team, serverId }: { team: string; serverId: string })
           </Table>
         )}
       </div>
-    </section>
+    </SettingsSection>
   )
 }

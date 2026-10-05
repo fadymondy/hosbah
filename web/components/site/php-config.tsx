@@ -112,7 +112,7 @@ export function SitePHPConfig() {
         <>
           {!canSave ? <Notice>{t("common.readOnly")}</Notice> : null}
           <fieldset disabled={!canSave || busy} className="contents">
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <label className="mb-1 block text-sm font-medium text-foreground">{t("site.php.version")}</label>
               <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.php.versionHint")}</p>
               <Select value={draft.version} onValueChange={(v) => v && setDraft((d) => (d ? { ...d, version: v } : d))} disabled={!canSave || busy}>

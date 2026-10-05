@@ -51,17 +51,29 @@ export function useDocumentTitle(title: string | null | undefined) {
   const { t } = useI18n()
   const brand = t("common.brand")
   useEffect(() => {
-    const wanted = title ? `${title} · ${brand}` : brand
-    document.title = wanted
+    const entry = { wanted: title ? `${title} · ${brand}` : brand }
+    titleStack.push(entry)
+    document.title = entry.wanted
     // Next's metadata <title> ("Hosbah") can be committed AFTER this effect — measured on /login
     // in the dark theme — so re-assert whenever something else rewrites the title while mounted.
+    // Only the latest title re-asserts: two mounted titles (a panel and its page) would otherwise
+    // rewrite each other forever and freeze the tab.
     const observer = new MutationObserver(() => {
-      if (document.title !== wanted) document.title = wanted
+      if (titleStack[titleStack.length - 1] === entry && document.title !== entry.wanted) document.title = entry.wanted
     })
     observer.observe(document.head, { subtree: true, childList: true, characterData: true })
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      const i = titleStack.indexOf(entry)
+      if (i >= 0) titleStack.splice(i, 1)
+      const top = titleStack[titleStack.length - 1]
+      if (i === titleStack.length && top) document.title = top.wanted
+    }
   }, [title, brand])
 }
+
+/** The mounted useDocumentTitle entries, latest last; the latest one owns document.title. */
+const titleStack: { wanted: string }[] = []
 
 /** Formats an ISO date for the current locale (the caller wraps it dir="ltr"). */
 export function useFormatDate() {

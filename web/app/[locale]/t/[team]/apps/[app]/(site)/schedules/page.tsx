@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteSchedules } from "@/components/site/schedules"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteSchedules />
+  return <SectionRedirect section="schedules" />
 }

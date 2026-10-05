@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteMonitors } from "@/components/site/monitors"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteMonitors />
+  return <SectionRedirect section="monitors" />
 }

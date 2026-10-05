@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteWorkers } from "@/components/site/panels"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteWorkers />
+  return <SectionRedirect section="workers" />
 }

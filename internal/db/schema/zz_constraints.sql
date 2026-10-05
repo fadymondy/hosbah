@@ -102,3 +102,9 @@ ALTER TABLE github_installations ADD CONSTRAINT github_installations_team_fk FOR
 
 -- A data service's metrics history goes with its service (MH-575 F6).
 ALTER TABLE data_service_metrics ADD CONSTRAINT data_service_metrics_service_fk FOREIGN KEY (service_id, team_id) REFERENCES data_services (id, team_id) ON DELETE CASCADE;
+ALTER TABLE server_ssh_users ADD CONSTRAINT server_ssh_users_server_fk FOREIGN KEY (server_id, team_id) REFERENCES servers (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_tokens ADD CONSTRAINT app_tokens_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_panel_links ADD CONSTRAINT app_panel_links_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE app_panel_links ADD CONSTRAINT app_panel_links_token_fk FOREIGN KEY (app_token_id) REFERENCES app_tokens (id) ON DELETE CASCADE;
+ALTER TABLE oauth_codes ADD CONSTRAINT oauth_codes_app_fk FOREIGN KEY (app_id, team_id) REFERENCES apps (id, team_id) ON DELETE CASCADE;
+ALTER TABLE oauth_codes ADD CONSTRAINT oauth_codes_client_fk FOREIGN KEY (client_id) REFERENCES oauth_clients (id) ON DELETE CASCADE;

@@ -5,7 +5,7 @@ import "@xyflow/react/dist/style.css"
 import "./canvas.css"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import {
   Background,
@@ -24,7 +24,7 @@ import {
   type Edge,
   type NodeChange,
 } from "@xyflow/react"
-import { LayoutGridIcon, PlusIcon, RotateCcwIcon, ServerIcon } from "lucide-react"
+import { PlusIcon, RotateCcwIcon, ServerIcon } from "lucide-react"
 
 import { RemoveDomain } from "@/components/apps/domains"
 import { RemoveEnvVar } from "@/components/apps/env"
@@ -35,6 +35,8 @@ import { buildGraph, layeredLayout, placeBoxes, type Box, type Link as GraphLink
 import { BoxCard, CanvasCtx, KIND_ICON, LinkLine, StatusDot, type BoxNode, type CanvasActions, type LinkEdge } from "@/components/site/canvas/node"
 import { AddForm, Palette, type Choice } from "@/components/site/canvas/palette"
 import { useLoadedSite } from "@/components/site/context"
+import { SITE_TABS, sectionHome } from "@/components/site/sections"
+import { SiteSectionSheet } from "@/components/site/views"
 import { DeleteMonitor } from "@/components/site/monitors"
 import { attachDataService } from "@/components/site/panels"
 import { RemoveRealtime } from "@/components/site/realtime"
@@ -46,7 +48,7 @@ import { SectionTitle } from "@/components/states"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { isImported } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useServerHref, useTeam, useTeamBase } from "@/lib/team"
 
 const nodeTypes = { box: BoxCard }
 const edgeTypes = { link: LinkLine }
@@ -64,19 +66,48 @@ const fitOptions = (mobile: boolean) => ({ padding: { top: "48px", bottom: "16px
  * saved. Below 768px the same components are also listed plainly under the canvas.
  */
 export function SiteCanvas() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
   const errorText = useErrorText()
   const { detail, app, deployments, path, reload: reloadSite } = useLoadedSite()
   const imported = isImported(app)
   const mobile = useIsMobile()
   const { data, reload } = useCanvasData(team.slug, path, app.server_id, imported)
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
+  const serverHref = useServerHref()
   const root = `${base}/apps/${encodeURIComponent(app.name)}`
   const editable = manage && !!data?.canSave
   const [palette, setPalette] = useState(false)
   const [adding, setAdding] = useState<Choice | null>(null)
   const [removing, setRemoving] = useState<Removal | null>(null)
+
+  // A box opens its section beside the flow (?open=…, so it can be linked and survives a reload); sections
+  // that live on another tab (domains, monitors, deployments …) go there.
+  const router = useRouter()
+  const pathname = usePathname() ?? ""
+  const params = useSearchParams()
+  const sheetable = useMemo(() => new Set(SITE_TABS.find((x) => x.key === "architecture")?.nodes ?? []), [])
+  const opened = params.get("open")
+  const sheet = opened && sheetable.has(opened) && !imported ? opened : null
+  const setOpen = useCallback(
+    (section: string | null) => {
+      const next = new URLSearchParams(params.toString())
+      if (section) next.set("open", section)
+      else next.delete("open")
+      const q = next.toString()
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false })
+    },
+    [params, pathname, router],
+  )
+  const open = useCallback(
+    (href: string) => {
+      const section = href.startsWith(`${root}/`) ? href.slice(root.length + 1).split(/[/?#]/)[0] : ""
+      if (section && sheetable.has(section) && !imported) return setOpen(section)
+      const home = section ? sectionHome(section) : null
+      router.push(home ? `${root}${home.tab ? `/${home.tab}` : ""}${home.query}` : href)
+    },
+    [root, sheetable, imported, setOpen, router],
+  )
 
   const graph = useMemo(
     () =>
@@ -127,10 +158,11 @@ export function SiteCanvas() {
     () => ({
       manage: editable,
       openPalette: () => setPalette(true),
+      open,
       remove: setRemoving,
       labels: { add: t("site.canvas.addComponent"), remove: t("site.storage.remove"), disconnect: t("site.canvas.disconnect") },
     }),
-    [editable, t],
+    [editable, open, t],
   )
 
   const hosts = detail.domains.map((d) => `${d.tls === "off" ? "http" : "https"}://${d.hostname}`)
@@ -146,15 +178,9 @@ export function SiteCanvas() {
         id="flow-h"
         title={t("site.flow.title")}
         hint={editable ? t("site.canvas.hint") : t("site.canvas.hintReadOnly")}
-        action={
-          <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/sites/${app.id}`} />}>
-            <LayoutGridIcon />
-            {t("sites.canvas")}
-          </Button>
-        }
       />
       <CanvasCtx.Provider value={actions}>
-        <div className="border-b border-border" data-testid="site-flow">
+        <div className="overflow-hidden rounded-card border border-border bg-card shadow-xs" data-testid="site-flow">
           {graph && data ? (
             <ReactFlowProvider>
               <Flow
@@ -175,12 +201,19 @@ export function SiteCanvas() {
       </CanvasCtx.Provider>
 
       {listed.length ? (
-        <ul className="flex flex-col divide-y divide-border border-b border-border md:hidden" aria-label={t("site.canvas.list")}>
+        <ul className="mt-3 flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-card md:hidden" aria-label={t("site.canvas.list")}>
           {listed.map((b) => {
             const Icon = KIND_ICON[b.data.kind]
             return (
               <li key={b.id}>
-                <Link href={b.data.href} className="flex items-center gap-3 px-6 py-3 hover:bg-secondary">
+                <Link
+                  href={b.data.href}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    open(b.data.href)
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-secondary"
+                >
                   <Icon aria-hidden className="size-4 shrink-0 text-nq-brand" />
                   <span className="min-w-0 flex-1">
                     <span dir="auto" className="eyebrow block truncate">
@@ -203,7 +236,10 @@ export function SiteCanvas() {
         </ul>
       ) : null}
 
-      <Link href={`${base}/servers/${app.server_id}`} className="flex items-center gap-2 border-b border-border px-6 py-3 text-sm text-nq-fg-body hover:bg-secondary">
+      <Link
+        href={serverHref(app.server_id)}
+        className="mt-3 flex items-center gap-2 rounded-card border border-border bg-card px-4 py-3 text-sm text-nq-fg-body shadow-xs hover:bg-secondary"
+      >
         <ServerIcon className="size-4 text-nq-brand" />
         {t("site.flow.runsOn")}
         <span dir="ltr" className="font-medium text-foreground">
@@ -237,9 +273,10 @@ export function SiteCanvas() {
           connected={new Set(data.connections.map((c) => c.service_id))}
           domainPort={imported ? (app.origin_kind === "guest" ? { required: true } : { required: false }) : undefined}
           serverId={app.server_id}
-          serversDatabases={`${base}/servers/${app.server_id}/databases`}
+          serversDatabases={serverHref(app.server_id, "databases")}
         />
       ) : null}
+      <SiteSectionSheet section={sheet} onClose={() => setOpen(null)} />
       {editable && removing ? <RemoveForm removal={removing} path={path} onClose={() => setRemoving(null)} onRemoved={refresh} /> : null}
     </section>
   )
@@ -318,7 +355,6 @@ function Flow({
   onConnectDb: (serviceId: string) => void
 }) {
   const { t } = useI18n()
-  const router = useRouter()
   const { resolvedTheme } = useNasaq()
   const rf = useReactFlow<BoxNode, LinkEdge>()
   const actions = useCanvas()
@@ -408,7 +444,7 @@ function Flow({
       if (!node) return
       if (e.key === "Enter") {
         e.preventDefault()
-        router.push(node.data.href)
+        actions.open(node.data.href)
       } else if (del && editable && node.data.removal) {
         e.preventDefault()
         actions.remove(node.data.removal)
@@ -433,7 +469,7 @@ function Flow({
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChangeSaving}
         onEdgesChange={onEdgesChange}
-        onNodeClick={(_, n) => router.push(n.data.href)}
+        onNodeClick={(_, n) => actions.open(n.data.href)}
         onMoveEnd={(e) => {
           if (e) scheduleSave()
         }}

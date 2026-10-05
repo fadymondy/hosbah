@@ -1,12 +1,14 @@
 "use client"
 
-import { Badge, Button, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, toast } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PlayIcon, ShieldAlertIcon } from "lucide-react"
 
 import { useTimeAgo } from "@/components/home/sparkline"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { LoadMore, useInfiniteLimit } from "@/components/lists/infinite"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -62,6 +64,7 @@ export function SiteSecurity() {
   const [scans, setScans] = useState<Scan[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const history = useInfiniteLimit(Math.max(0, (scans?.length ?? 0) - 1))
 
   const load = useCallback(async () => {
     try {
@@ -108,11 +111,11 @@ export function SiteSecurity() {
       {scans === null ? (
         <LoadingRows rows={3} />
       ) : scans.length === 0 ? (
-        <EmptyState className="border-b" icon={ShieldAlertIcon} title={t("site.security.emptyTitle")} description={t("site.security.emptyHint")} actions={<>{scanNowButton}</>} />
+        <EmptyState className="nq-empty" icon={ShieldAlertIcon} title={t("site.security.emptyTitle")} description={t("site.security.emptyHint")} actions={<>{scanNowButton}</>} />
       ) : (
         <>
           {latest ? (
-            <div className="flex flex-col gap-3 border-b border-border px-6 py-4">
+            <div className="flex flex-col gap-3 nq-band py-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={latest.status === "ok" ? "neutral" : latest.status === "failed" ? "danger" : "outline"}>
                   {t(`site.security.status.${latest.status}`)}
@@ -141,50 +144,79 @@ export function SiteSecurity() {
                 </p>
               ) : null}
               {latest.findings.length ? (
-                <TableBand className="mt-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("site.security.severityCol")}</TableHead>
-                        <TableHead>{t("site.security.package")}</TableHead>
-                        <TableHead>{t("site.security.installed")}</TableHead>
-                        <TableHead>{t("site.security.fixed")}</TableHead>
-                        <TableHead>{t("site.security.id")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {latest.findings.map((f) => (
-                        <TableRow key={f.id + f.package}>
-                          <TableCell>
-                            <Badge variant={SEVERITY_BADGE[f.severity]}>{t(`site.security.severity.${f.severity}`)}</Badge>
-                          </TableCell>
-                          <TableCell dir="ltr" className="font-mono text-xs">
-                            {f.package}
-                          </TableCell>
-                          <TableCell dir="ltr" className="font-mono text-xs">
-                            {f.installed_version}
-                          </TableCell>
-                          <TableCell dir="ltr" className="font-mono text-xs">
-                            {f.fixed_version || "—"}
-                          </TableCell>
-                          <TableCell dir="ltr" className="font-mono text-xs text-muted-foreground" title={f.title}>
-                            {f.id}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableBand>
+                <NasaqTable
+                  data={latest.findings}
+                  rowId={(f) => f.id + f.package}
+                  rowLabel={(f) => `${f.id} ${f.package}`}
+                  label={t("site.security.findings")}
+                  search={t("site.security.search")}
+                  defaultSort={{ id: "severity", direction: "asc" }}
+                  facets={[
+                    {
+                      column: "severity",
+                      title: t("site.security.severityCol"),
+                      options: SEVERITIES.filter((sev) => latest.counts[sev]).map((sev) => ({ value: sev, label: t(`site.security.severity.${sev}`) })),
+                    },
+                  ]}
+                  columns={[
+                    {
+                      id: "severity",
+                      header: t("site.security.severityCol"),
+                      label: t("site.security.severityCol"),
+                      cell: (f) => <Badge variant={SEVERITY_BADGE[f.severity]}>{t(`site.security.severity.${f.severity}`)}</Badge>,
+                      sortValue: (f) => SEVERITIES.indexOf(f.severity),
+                      filterValue: (f) => f.severity,
+                    },
+                    {
+                      id: "package",
+                      header: t("site.security.package"),
+                      cell: (f) => (
+                        <span dir="ltr" className="font-mono text-xs">
+                          {f.package}
+                        </span>
+                      ),
+                      sortValue: (f) => f.package,
+                      searchValue: (f) => `${f.package} ${f.id} ${f.title ?? ""}`,
+                    },
+                    {
+                      id: "installed",
+                      header: t("site.security.installed"),
+                      cell: (f) => (
+                        <span dir="ltr" className="font-mono text-xs">
+                          {f.installed_version}
+                        </span>
+                      ),
+                    },
+                    {
+                      id: "fixed",
+                      header: t("site.security.fixed"),
+                      cell: (f) => (
+                        <span dir="ltr" className="font-mono text-xs">
+                          {f.fixed_version || "—"}
+                        </span>
+                      ),
+                    },
+                    {
+                      id: "cve",
+                      header: t("site.security.id"),
+                      cell: (f) => (
+                        <span dir="ltr" className="font-mono text-xs text-muted-foreground" title={f.title}>
+                          {f.id}
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
               ) : null}
               {latest.truncated ? <p className="text-xs text-muted-foreground">{t("site.security.truncated")}</p> : null}
             </div>
           ) : null}
 
           {scans.length > 1 ? (
-            <div className="border-b border-border">
+            <div className="nq-box">
               <p className="px-6 pt-4 text-xs font-medium text-muted-foreground">{t("site.security.history")}</p>
               <ol className="flex flex-col divide-y divide-border">
-                {scans.slice(1).map((s) => (
+                {scans.slice(1, 1 + history.limit).map((s) => (
                   <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 text-sm">
                     <Badge variant={s.status === "ok" ? "neutral" : s.status === "failed" ? "danger" : "outline"}>
                       {t(`site.security.status.${s.status}`)}
@@ -202,6 +234,7 @@ export function SiteSecurity() {
                   </li>
                 ))}
               </ol>
+              <LoadMore hasMore={history.hasMore} onMore={history.more} />
             </div>
           ) : null}
         </>

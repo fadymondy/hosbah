@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
 
 
@@ -57,7 +57,6 @@ export function TeamSiteTemplates() {
   const [servers, setServers] = useState<Server[] | null>(null)
   const [services, setServices] = useState<DataService[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
   const [preview, setPreview] = useState<SiteTemplate | null>(null)
   const [createFrom, setCreateFrom] = useState<SiteTemplate | null>(null)
 
@@ -83,8 +82,6 @@ export function TeamSiteTemplates() {
     void load()
   }, [load])
 
-  const shown = (templates ?? []).filter((s) => matches(q, s.name, s.description, s.driver))
-
   return (
     <>
       <section aria-labelledby="templates-h">
@@ -100,45 +97,82 @@ export function TeamSiteTemplates() {
         ) : templates.length === 0 ? (
           <EmptyState className="border-b" icon={LayoutTemplateIcon} title={t("siteTemplates.emptyTitle")} description={t("siteTemplates.emptyHint")} actions={<>{manage ? <TemplateDialog path={base} onSaved={load} /> : null}</>} />
         ) : (
-          <>
-            <ListSearch value={q} onChange={setQ} placeholder={t("siteTemplates.search")} shown={shown.length} total={templates.length} />
-            <div className="grid gap-px border-b border-border bg-border sm:grid-cols-2 xl:grid-cols-3">
-              {shown.map((tpl) => (
-                <div key={tpl.id} className="flex flex-col gap-3 bg-background p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p dir="auto" className="font-medium text-foreground">
-                        {tpl.name}
-                      </p>
-                      {tpl.description ? (
-                        <p dir="auto" className="text-xs text-muted-foreground">
-                          {tpl.description}
-                        </p>
-                      ) : null}
-                    </div>
-                    {tpl.builtin ? <Badge variant="outline">{t("siteTemplates.builtin")}</Badge> : null}
-                  </div>
-                  <div>
-                    <Badge variant="neutral">{tpl.driver}</Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setPreview(tpl)}>
-                      <EyeIcon />
-                      {t("siteTemplates.preview")}
-                    </Button>
-                    {manage ? (
-                      <Button variant="primary" size="sm" onClick={() => setCreateFrom(tpl)}>
-                        <RocketIcon />
-                        {t("siteTemplates.createApp")}
-                      </Button>
-                    ) : null}
-                    {manage && !tpl.builtin ? <TemplateDialog path={base} template={tpl} onSaved={load} /> : null}
-                    {manage && !tpl.builtin ? <DeleteTemplate path={base} template={tpl} onDeleted={load} /> : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
+          <div className="px-6 py-4">
+            <NasaqTable
+              data={templates}
+              rowId={(tpl) => tpl.id}
+              label={t("siteTemplates.title")}
+              rowLabel={(tpl) => tpl.name}
+              search={t("siteTemplates.search")}
+              facets={[
+                {
+                  column: "driver",
+                  title: t("siteTemplates.driver"),
+                  options: [...new Set(templates.map((x) => x.driver))].map((d) => ({ value: d, label: d })),
+                },
+              ]}
+              onRowClick={(tpl) => setPreview(tpl)}
+              columns={[
+                {
+                  id: "name",
+                  header: t("databases.name"),
+                  sortValue: (tpl) => tpl.name,
+                  searchValue: (tpl) => `${tpl.name} ${tpl.description ?? ""} ${tpl.driver}`,
+                  cell: (tpl) => (
+                    <span className="flex min-w-0 items-center gap-3">
+                      <LayoutTemplateIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0">
+                        <span dir="auto" className="block truncate font-medium">
+                          {tpl.name}
+                        </span>
+                        {tpl.description ? (
+                          <span dir="auto" className="block max-w-xl truncate text-caption text-muted-foreground">
+                            {tpl.description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                  ),
+                },
+                {
+                  id: "driver",
+                  header: t("siteTemplates.driver"),
+                  sortValue: (tpl) => tpl.driver,
+                  filterValue: (tpl) => tpl.driver,
+                  cell: (tpl) => <Badge variant="neutral">{tpl.driver}</Badge>,
+                },
+                {
+                  id: "source",
+                  header: <span className="sr-only">{t("siteTemplates.builtin")}</span>,
+                  className: "max-md:hidden",
+                  headerClassName: "max-md:hidden",
+                  cell: (tpl) => (tpl.builtin ? <Badge variant="outline">{t("siteTemplates.builtin")}</Badge> : null),
+                },
+                {
+                  id: "actions",
+                  header: <span className="sr-only">{t("common.actions")}</span>,
+                  align: "end",
+                  cell: (tpl) => (
+                    <span className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      {manage ? (
+                        <Button variant="primary" size="sm" onClick={() => setCreateFrom(tpl)}>
+                          <RocketIcon />
+                          {t("siteTemplates.createApp")}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="secondary" onClick={() => setPreview(tpl)}>
+                          <EyeIcon />
+                          {t("siteTemplates.preview")}
+                        </Button>
+                      )}
+                      {manage && !tpl.builtin ? <TemplateDialog path={base} template={tpl} onSaved={load} /> : null}
+                      {manage && !tpl.builtin ? <DeleteTemplate path={base} template={tpl} onDeleted={load} /> : null}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
         )}
       </section>
 

@@ -28,7 +28,7 @@ import type { App } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useInPanel, useServerHref, useTeam, useTeamBase } from "@/lib/team"
 
 /** The first published host port of a container ("0.0.0.0:8081->80/tcp" → 8081). */
 function firstPort(ports?: string[]): number | undefined {
@@ -45,12 +45,14 @@ function firstPort(ports?: string[]): number | undefined {
  * for containers pull-and-recreate. Only deploying from git does not apply (there is no build).
  */
 export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath: string; onChanged?: () => void }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
   const router = useRouter()
   const errorText = useErrorText()
   const operate = canOperate(team.role)
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
+  const serverHref = useServerHref()
+  const inPanel = useInPanel()
   const guest = app.origin_kind === "guest"
   const container = app.origin_kind === "container"
   const { run, busy, error, log } = useWorkloadActions(apiPath, app.server_id)
@@ -64,10 +66,12 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
       actions={
         <>
           <ImportedBadge item={app} />
-          <Button variant="secondary" nativeButton={false} render={<Link href={`${base}/servers/${app.server_id}/sites/${app.id}`} />}>
-            <LayoutGridIcon />
-            {t("sites.canvas")}
-          </Button>
+          {inPanel ? null : (
+            <Button variant="secondary" nativeButton={false} render={<Link href={serverHref(app.server_id, `sites/${app.id}`)} />}>
+              <LayoutGridIcon />
+              {t("sites.canvas")}
+            </Button>
+          )}
         </>
       }
       bleed
@@ -78,7 +82,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
       {operate && !missing ? (
         <section aria-labelledby="power-h">
           <SectionTitle id="power-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-          <div className="border-b border-border px-6 py-4">
+          <div className="nq-band py-4">
             <PowerControls item={app} run={(k, s, i) => run(k, s, i).then(() => onChanged?.())} busy={busy} guest={guest} />
           </div>
         </section>
@@ -89,7 +93,7 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
         extra={[
           [
             t("apps.server"),
-            <Link key="srv" href={`${base}/servers/${app.server_id}`} className="inline-flex items-center gap-1.5 hover:underline">
+            <Link key="srv" href={serverHref(app.server_id)} className="inline-flex items-center gap-1.5 hover:underline">
               <ServerIcon className="size-3.5 text-muted-foreground" />
               <span dir="ltr">{app.server_name ?? app.server_id}</span>
             </Link>,
@@ -102,8 +106,10 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
       {log}
 
       <section aria-labelledby="domains-h">
-        <SectionTitle id="domains-h" title={t("apps.tabs.domains")} hint={t("controls.domainsHint")} className="border-t" />
         <DomainsPanel
+          titleId="domains-h"
+          title={t("apps.tabs.domains")}
+          hint={t("controls.domainsHint")}
           team={team.slug}
           path={apiPath}
           manage={manage}
@@ -152,11 +158,12 @@ export function ImportedAppView({ app, apiPath, onChanged }: { app: App; apiPath
  * then shows the full database tools, see databases/[service]).
  */
 export function ImportedDatabaseView({ service, onChanged }: { service: DataService; onChanged: () => void }) {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
   const router = useRouter()
   const errorText = useErrorText()
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
+  const serverHref = useServerHref()
   const apiPath = `/api/teams/${team.slug}/data-services/${service.id}`
 
   return (
@@ -174,7 +181,7 @@ export function ImportedDatabaseView({ service, onChanged }: { service: DataServ
         extra={[
           [
             t("apps.server"),
-            <Link key="srv" href={`${base}/servers/${service.server_id}`} className="inline-flex items-center gap-1.5 hover:underline">
+            <Link key="srv" href={serverHref(service.server_id)} className="inline-flex items-center gap-1.5 hover:underline">
               <ServerIcon className="size-3.5 text-muted-foreground" />
               <span dir="ltr">{service.server_id.slice(0, 8)}</span>
             </Link>,
@@ -230,7 +237,7 @@ export function ImportedDatabaseControls({ service, onChanged }: { service: Data
       <ErrorBand message={error} />
       <section aria-labelledby="dbpower-h">
         <SectionTitle id="dbpower-h" title={t("controls.power")} hint={t("controls.powerHint")} />
-        <div className="border-b border-border px-6 py-4">
+        <div className="nq-band py-4">
           <PowerControls item={service} run={(k, s, i) => run(k, s, i).then(() => onChanged())} busy={busy} guest={guest} />
         </div>
       </section>

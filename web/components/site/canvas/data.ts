@@ -50,9 +50,9 @@ export function useCanvasData(team: string, path: string, serverId: string, impo
     const [canvas, ds, storage, browsers, installs, realtime, monitors, schedules] = await Promise.all([
       get<CanvasResponse>(`${path}/canvas`),
       imported ? null : get<{ services: DataService[] }>(`/api/teams/${team}/data-services`),
-      imported ? null : get<{ volumes: Volume[]; buckets: Bucket[] }>(`${path}/storage`),
-      imported ? null : get<{ browsers: Browser[] }>(`${path}/browsers`),
-      imported ? null : get<{ installs: Install[] }>(`${path}/installs`),
+      imported ? null : get<{ volumes: Volume[]; buckets: Bucket[] }>(`${path}/storage?no_status=true`),
+      imported ? null : get<{ browsers: Browser[] }>(`${path}/browsers?no_status=true`),
+      imported ? null : get<{ installs: Install[] }>(`${path}/installs?no_status=true`),
       imported ? null : get<RealtimeStatus>(`${path}/realtime`),
       get<{ monitors: Monitor[] }>(`${path}/monitors`),
       imported ? null : get<{ schedules: Schedule[] }>(`${path}/schedules`),

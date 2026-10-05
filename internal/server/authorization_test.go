@@ -41,6 +41,10 @@ func TestEveryAPIRouteHasTheIntendedTier(t *testing.T) {
 			// bearer hbk_… key inside the handler (internal/api/product_keys_public.go),
 			// never a browser session, so the route tier itself must be public.
 			want = "public"
+		case strings.HasPrefix(op.Path, "/api/integrations/"):
+			// MH-1153: the integrations API is authenticated by its own bearer token (hbu_… user,
+			// hba_… app) inside the handler (internal/api/integrations.go), never a browser session.
+			want = "public"
 		}
 		if got != want {
 			t.Errorf("%s %s is in tier %s, want %s", op.Method, op.Path, got, want)

@@ -217,6 +217,13 @@ type AppPath struct {
 	App string `path:"app" maxLength:"64"`
 }
 
+// AppListPath is an app list that can also ask its server for live status (up to 8 s); no_status
+// skips that and answers from the database alone (the overview canvas only draws the items).
+type AppListPath struct {
+	AppPath
+	NoStatus bool `query:"no_status" doc:"Skip asking the server for live status; answer from the database only."`
+}
+
 // DeploymentPath addresses one deployment of an app (id or number).
 type DeploymentPath struct {
 	AppPath

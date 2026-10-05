@@ -127,11 +127,11 @@ export function Palette({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side={side} className={cn("gap-0 p-0", mobile ? "max-h-[80dvh]" : "w-full sm:max-w-sm")} initialFocus={search}>
-        <SheetHeader className="border-b border-border px-4 py-4">
+        <SheetHeader className="nq-box px-4 py-4">
           <SheetTitle>{t("site.canvas.addComponent")}</SheetTitle>
           <SheetDescription>{t("site.canvas.addHint")}</SheetDescription>
         </SheetHeader>
-        <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+        <div className="flex items-center gap-2 nq-box px-4 py-2">
           <SearchIcon aria-hidden className="size-4 text-muted-foreground" />
           <Input
             ref={search}

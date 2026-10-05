@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteAnalytics } from "@/components/site/analytics"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteAnalytics />
+  return <SectionRedirect section="analytics" />
 }

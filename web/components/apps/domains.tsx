@@ -2,13 +2,15 @@
 
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
-import { CheckCircle2Icon, GlobeIcon, InfoIcon, ShieldCheckIcon } from "lucide-react"
+import { CheckCircle2Icon, ExternalLinkIcon, GlobeIcon, InfoIcon, PlusIcon, ShieldCheckIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { CopyField } from "@/components/copy-field"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, Notice, SectionTitle, SettingsRow } from "@/components/states"
+import { LoadMore, useInfiniteLimit } from "@/components/lists/infinite"
+import { RowMenu, RowWithActions, type RowAction } from "@/components/lists/row-actions"
+import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
 
 
 
@@ -104,7 +106,7 @@ export function RemoveDomain({ path, domain: d, onRemoved, ...controlled }: { pa
   )
 }
 
-/** The add-a-domain form as a dialog, opened from the overview canvas (the proxy page has it inline). */
+/** The add-a-domain form as a dialog, opened from the proxy page and the architecture canvas. */
 export function AddDomainDialog({ path, port, onSaved, ...controlled }: { path: string; port?: DomainPort; onSaved: () => Promise<void> | void } & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
@@ -219,11 +221,18 @@ export function DomainsPanel({
   path,
   manage,
   port,
+  title,
+  hint,
+  titleId,
 }: {
   team: string
   path: string
   manage: boolean
   port?: DomainPort
+  /** The section heading; the add button sits at its end. */
+  title: string
+  hint?: string
+  titleId?: string
 }) {
   const { t } = useI18n()
   const fmt = useFormatDate()
@@ -231,11 +240,10 @@ export function DomainsPanel({
   const [domains, setDomains] = useState<Domain[] | null>(null)
   const [appsDomain, setAppsDomain] = useState<boolean | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [hostname, setHostname] = useState("")
-  const [tls, setTls] = useState<TLSMode>("auto")
-  const [portValue, setPortValue] = useState(port?.suggested ? String(port.suggested) : "")
-  const [busy, setBusy] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [messages, setMessages] = useState<Record<string, string>>({})
+  const [removing, setRemoving] = useState<Domain | null>(null)
+  const page = useInfiniteLimit(domains?.length ?? 0)
 
   const load = useCallback(async () => {
     try {
@@ -255,23 +263,22 @@ export function DomainsPanel({
       .catch(() => setAppsDomain(null))
   }, [load, team])
 
-  const hostOK = hostnameOK(hostname)
-  const wildcard = useWildcardTLS(hostname, tls, setTls)
-
-  async function add(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      await addDomain(path, hostname, tls, port && portValue ? Number(portValue) : undefined)
-      setHostname("")
-      await load()
-    } catch (err) {
-      setError(errorText(err))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const domainActions = (d: Domain): RowAction[] => [
+    {
+      id: "open",
+      label: t("apps.domains.open"),
+      icon: ExternalLinkIcon,
+      onSelect: () => window.open(`${d.tls === "off" ? "http" : "https"}://${d.hostname}`, "_blank", "noopener"),
+    },
+    ...(manage
+      ? [
+          ...(!d.verified && !d.hostname.startsWith("*.")
+            ? [{ id: "verify", label: t("apps.domains.verify"), icon: ShieldCheckIcon, onSelect: () => void verify(d) }]
+            : []),
+          { id: "remove", label: t("apps.domains.remove"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setRemoving(d) },
+        ]
+      : []),
+  ]
 
   async function verify(d: Domain) {
     setError(null)
@@ -285,17 +292,30 @@ export function DomainsPanel({
   }
 
   return (
-    <div data-testid="domains">
+    <div data-testid="domains" data-stack>
+      <SectionTitle
+        id={titleId}
+        title={title}
+        hint={hint}
+        action={
+          manage ? (
+            <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
+              <PlusIcon />
+              {t("apps.domains.addTitle")}
+            </Button>
+          ) : null
+        }
+      />
       {appsDomain === false ? <Notice icon={<InfoIcon />}>{t("apps.domains.noAppsDomain")}</Notice> : null}
       <ErrorBand message={error} />
       {domains === null ? (
         <LoadingRows rows={2} />
       ) : domains.length === 0 ? (
-        <EmptyState className="border-b" icon={GlobeIcon} title={t("apps.domains.empty")} />
+        <EmptyState className="rounded-card border border-dashed border-border" icon={GlobeIcon} title={t("apps.domains.empty")} />
       ) : (
-        <ul className="flex flex-col divide-y divide-border border-b border-border">
-          {domains.map((d) => (
-            <li key={d.id} className="flex flex-col gap-3 px-6 py-4" data-domain={d.hostname}>
+        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-card shadow-xs">
+          {domains.slice(0, page.limit).map((d) => (
+            <RowWithActions key={d.id} actions={domainActions(d)} render={<li className="flex flex-col gap-3 px-4 py-4 sm:px-5" data-domain={d.hostname} />}>
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   dir="ltr"
@@ -322,17 +342,9 @@ export function DomainsPanel({
                 ) : (
                   <Badge variant="neutral">{t("apps.domains.unverified")}</Badge>
                 )}
-                {manage ? (
-                  <span className="ms-auto flex gap-2">
-                    {!d.verified && !d.hostname.startsWith("*.") ? (
-                      <Button size="sm" variant="secondary" onClick={() => verify(d)}>
-                        <ShieldCheckIcon />
-                        {t("apps.domains.verify")}
-                      </Button>
-                    ) : null}
-                    <RemoveDomain path={path} domain={d} onRemoved={load} />
-                  </span>
-                ) : null}
+                <span className="ms-auto">
+                  <RowMenu actions={domainActions(d)} label={d.hostname} />
+                </span>
               </div>
               {d.hostname.startsWith("*.") ? (
                 <p className="text-xs text-muted-foreground">{t("apps.domains.wildcardHint")}</p>
@@ -356,78 +368,14 @@ export function DomainsPanel({
                   {messages[d.id]}
                 </p>
               ) : null}
-            </li>
+            </RowWithActions>
           ))}
         </ul>
       )}
+      <LoadMore hasMore={page.hasMore} onMore={page.more} />
+      {removing ? <RemoveDomain open onOpenChange={(v) => !v && setRemoving(null)} path={path} domain={removing} onRemoved={load} /> : null}
 
-      {manage ? (
-        <form onSubmit={add}>
-          <SectionTitle title={t("apps.domains.addTitle")} />
-          <SettingsRow label={t("apps.domains.hostname")} htmlFor="dom-host">
-            <Input
-              id="dom-host"
-              dir="ltr"
-              required
-              maxLength={253}
-              placeholder="app.example.com"
-              value={hostname}
-              onChange={(e) => setHostname(e.target.value)}
-              aria-invalid={hostname !== "" && !hostOK}
-              autoComplete="off"
-            />
-          </SettingsRow>
-          {port ? (
-            <SettingsRow label={t("controls.domainPort")} htmlFor="dom-port" hint={t(port.required ? "controls.domainPortGuest" : "controls.domainPortContainer")}>
-              <Input
-                id="dom-port"
-                type="number"
-                min={1}
-                max={65535}
-                dir="ltr"
-                className="w-32 font-mono"
-                required={port.required}
-                value={portValue}
-                onChange={(e) => setPortValue(e.target.value)}
-              />
-            </SettingsRow>
-          ) : null}
-          <SettingsRow
-            label={t("apps.domains.tlsLabel")}
-            htmlFor="dom-tls"
-            hint={
-              <span className="flex flex-col gap-1">
-                {TLS.map((m) => (
-                  <span key={m}>
-                    <span className="font-medium text-foreground">{t(`apps.domains.tls.${m}`)}</span> — {t(`apps.domains.tlsHint.${m}`)}
-                  </span>
-                ))}
-              </span>
-            }
-          >
-            <Select value={tls} onValueChange={(v) => v && setTls(v as TLSMode)}>
-              <SelectTrigger id="dom-tls" className="w-full">
-                <SelectValue>{(v: string) => t(`apps.domains.tls.${v}`)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {TLS.map((m) => (
-                  <SelectItem key={m} value={m} disabled={wildcard && m === "auto"}>
-                    {t(`apps.domains.tls.${m}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {wildcard ? <p className="mt-2 text-sm text-muted-foreground">{t("apps.domains.wildcardHint")}</p> : null}
-          </SettingsRow>
-          <div className="flex justify-end border-b border-border px-6 py-4">
-            <Button variant="primary" type="submit" disabled={busy || !hostOK || (!!port?.required && !portValue)}>
-              {busy ? t("common.working") : t("apps.domains.add")}
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("common.readOnly")}</p>
-      )}
+      {manage ? <AddDomainDialog path={path} port={port} open={adding} onOpenChange={setAdding} onSaved={load} /> : null}
     </div>
   )
 }

@@ -17,7 +17,8 @@
     "readOnly": "You can view this, but your role cannot change it.",
     "home": "Go home",
     "close": "Close",
-    "next": "Next"
+    "next": "Next",
+    "loadMore": "Load more"
   },
   "prefs": {
     "switchLanguage": "Switch language",
@@ -104,6 +105,15 @@
         "rate_limited": "Too many attempts. Try again in a few minutes.",
         "account_disabled": "This account has been disabled. Contact the platform administrator.",
         "internal": "Something went wrong on our side. Try again."
+      }
+    },
+    "split": {
+      "headline": "Servers, apps and databases in one place.",
+      "points": {
+        "servers": "Connect Proxmox nodes, clouds or any server over SSH.",
+        "deploys": "Deploy from Git with health-gated, zero-downtime releases.",
+        "backups": "Databases with scheduled, encrypted backups.",
+        "panels": "Give every customer their own branded panel."
       }
     }
   },
@@ -204,7 +214,9 @@
     "groups": {
       "infrastructure": "Infrastructure",
       "automation": "Automation"
-    }
+    },
+    "statusPages": "Status pages",
+    "logDrains": "Log drains"
   },
   "feedback": {
     "launcher": "Report a problem",
@@ -287,8 +299,8 @@
     "guestOf": "Guest of {node} · CT {vmid}",
     "guests": {
       "tab": "Guests",
-      "title": "Guests",
-      "description": "Every guest this node reported (pvesh get /cluster/resources), enrolled or not.",
+      "title": "Guest servers",
+      "description": "Guests on this node that are servers of their own. Open one to see its apps.",
       "empty": "No guests discovered yet.",
       "vmid": "VMID",
       "type": "Type",
@@ -494,7 +506,11 @@
       "services": "Services",
       "security": "Security",
       "settings": "Settings",
-      "danger": "Danger zone"
+      "danger": "Danger zone",
+      "more": "More tabs",
+      "panels": "Panels",
+      "users": "Users",
+      "ssh": "SSH"
     },
     "security": {
       "readOnly": "Your role can view this but not change it.",
@@ -751,6 +767,78 @@
       "autoOn": "On",
       "autoOff": "Off",
       "unsupported": "Unsupported on this distribution"
+    },
+    "appOn": "{type} app on {node}",
+    "apps": {
+      "openDashboard": "Open dashboard"
+    },
+    "panelOn": "{type} user on {node}",
+    "panels": {
+      "title": "Users",
+      "hint": "Each LXC or VM on this server is a user: its own login, SSH/SFTP, terminal and apps.",
+      "emptyTitle": "No users yet",
+      "emptyHint": "LXCs and VMs on this server that run the Hosbah agent show up here."
+    },
+    "users": {
+      "editTitle": "Edit user",
+      "editHint": "Slug {slug} stays fixed; the title is what people see.",
+      "titleLabel": "Title"
+    },
+    "ssh": {
+      "title": "SSH access",
+      "hint": "Shell logins for this server and the keys that open them. Connect from your own terminal with any SSH client.",
+      "connect": "Connect from your terminal",
+      "connectHint": "Key logins work right away. Password logins need password authentication enabled in the server's SSH settings.",
+      "users": "SSH users",
+      "usersHint": "Logins Hosbah created on this server. Existing system users are never changed.",
+      "noUsers": "No SSH users yet",
+      "noUsersHint": "Create a login with your public key or a password to reach the server over SSH.",
+      "keys": "Installed keys",
+      "keysHint": "Public keys from the team library installed on this server, per login.",
+      "noKeys": "No keys installed",
+      "noKeysHint": "Add your public key to log in without a password.",
+      "addUser": "Create SSH user",
+      "addUserHint": "A new shell login on this server. Give it a public key, a password, or both.",
+      "addKey": "Add my key",
+      "addKeyHint": "Paste an OpenSSH public key. It joins the team key library and is installed for the login you pick.",
+      "username": "Username",
+      "usernameHint": "Lowercase letters, digits, - and _. Up to 32 characters.",
+      "sudo": "Administrator (can use sudo)",
+      "publicKey": "Public key",
+      "publicKeyHint": "Optional. One line, such as the contents of ~/.ssh/id_ed25519.pub.",
+      "password": "Password",
+      "passwordHint": "Optional. At least 12 characters. Leave empty for key-only access.",
+      "generatePassword": "Generate a strong password",
+      "passwordShown": "Copy this password now. Hosbah does not keep it and will not show it again.",
+      "create": "Create user",
+      "install": "Install key",
+      "keyName": "Key name",
+      "keyNamePlaceholder": "My laptop",
+      "forUser": "Login",
+      "forUserHint": "The key is added to this login's ~/.ssh/authorized_keys.",
+      "role": "Role",
+      "admin": "Administrator",
+      "regular": "Regular",
+      "created": "Created",
+      "grantSudo": "Make administrator",
+      "grantSudoHint": "{user} will be able to run commands as root with sudo.",
+      "revokeSudo": "Remove administrator",
+      "revokeSudoHint": "{user} will no longer be able to use sudo.",
+      "resetPassword": "Set password",
+      "resetPasswordHint": "Set a new password for {user}. Their keys keep working.",
+      "removeUser": "Remove user",
+      "removeUserHint": "Remove {user} from {server} with its home folder. Open sessions are ended.",
+      "removeKey": "Remove key",
+      "removeKeyHint": "Remove \"{key}\" from {user}'s authorized keys on this server. It stays in the team library.",
+      "status": {
+        "ready": "Ready",
+        "failed": "Failed"
+      },
+      "keyStatus": {
+        "installed": "Installed",
+        "removed": "Removed",
+        "failed": "Failed"
+      }
     }
   },
   "apps": {
@@ -795,7 +883,8 @@
       "add": "Add domain",
       "remove": "Remove",
       "removeTitle": "Remove this domain?",
-      "removeHint": "{host} stops routing to this app."
+      "removeHint": "{host} stops routing to this app.",
+      "open": "Open"
     },
     "repo": "Repository URL",
     "branch": "Branch",
@@ -872,7 +961,8 @@
         "drain": "Draining the old release",
         "rollback": "Rolling back",
         "restart": "Restarting"
-      }
+      },
+      "kind": "Kind"
     },
     "new": {
       "title": "New app",
@@ -978,7 +1068,11 @@
       "nameHint": "Letters, digits and underscores; not starting with a digit.",
       "overwrite": "This replaces the current value.",
       "buildTime": "Build time",
-      "buildTimeHint": "Available while the image builds, as a build argument. Build-time values end up baked into the built image's layers — never mark a secret that should stay off disk."
+      "buildTimeHint": "Available while the image builds, as a build argument. Build-time values end up baked into the built image's layers — never mark a secret that should stay off disk.",
+      "title": "Environment variables",
+      "add": "Add variable",
+      "editTitle": "Change {name}",
+      "search": "Search variables"
     },
     "releases": {
       "hint": "Each successful deploy is a release. Standby releases are kept on the server for instant rollback.",
@@ -1747,7 +1841,17 @@
     "titleUnread": "Notifications ({count} unread)",
     "empty": "Nothing new.",
     "enableDesktop": "Enable desktop notifications",
-    "desktopBlocked": "Desktop notifications are blocked in your browser settings"
+    "desktopBlocked": "Desktop notifications are blocked in your browser settings",
+    "all": "All",
+    "unread": "Unread",
+    "markAllRead": "Mark all read",
+    "markRead": "Mark as read",
+    "markUnread": "Mark as unread",
+    "open": "Open",
+    "emptyHint": "Failed deploys and alerts show up here.",
+    "caughtUp": "You're all caught up",
+    "caughtUpHint": "There is nothing new to read.",
+    "updateFailed": "Could not update the notification."
   },
   "databases": {
     "description": "Managed Postgres, MySQL and Redis this team's apps connect to.",
@@ -1975,7 +2079,8 @@
       "rejected": "Rejected",
       "expired": "Expired"
     },
-    "arguments": "Arguments"
+    "arguments": "Arguments",
+    "statusLabel": "Status"
   },
   "proxy": {
     "title": "Proxy hosts",
@@ -2039,7 +2144,8 @@
       "clickhouse": "ClickHouse",
       "mongodb": "MongoDB",
       "other": "Other"
-    }
+    },
+    "nameRequired": "A name is required."
   },
   "scripts": {
     "title": "Scripts",
@@ -2580,7 +2686,8 @@
     "saveCredentials": "Check and save",
     "checking": "Checking…",
     "credentialsVerified": "Connected ({version}). Its databases, users and backups are now managed here.",
-    "credentialsSaved": "Saved."
+    "credentialsSaved": "Saved.",
+    "snapshotNameHint": "Starts with a letter; letters, digits, - and _ only, 2–40 characters."
   },
   "home": {
     "servers": "Servers",
@@ -2735,7 +2842,21 @@
     "credentials": "Credentials",
     "kind": "Kind",
     "status": "Status",
-    "address": "Address"
+    "address": "Address",
+    "provider": "Provider",
+    "tunnel": "Tunnel",
+    "noTunnel": "No tunnel",
+    "clearSearch": "Clear search",
+    "clearFilters": "Clear filters",
+    "reset": "Reset",
+    "sort": "Sort",
+    "sortBy": "Sort by",
+    "sortRecent": "Recently active",
+    "sortOnline": "Online first",
+    "sortActivity": "Last activity",
+    "sortHealth": "Needs attention first",
+    "sortAttention": "Needs attention first",
+    "sortOldest": "Oldest first"
   },
   "site": {
     "visit": "Visit",
@@ -2892,7 +3013,12 @@
       "rules": "Rules",
       "dns": "DNS & SSL",
       "backups": "Backups",
-      "settings": "Settings & actions"
+      "settings": "Settings & actions",
+      "terminal": "Terminal",
+      "architecture": "Architecture",
+      "networking": "Networking",
+      "monitoring": "Monitoring",
+      "releases": "Releases"
     },
     "groups": {
       "code": "Code",
@@ -3063,7 +3189,8 @@
       "changesHint": "{commits} commits, {files} files",
       "truncated": "The list is cut short; open the compare on GitHub for the rest.",
       "pulls": "Open pull requests",
-      "draft": "Draft"
+      "draft": "Draft",
+      "openCommit": "Open on GitHub"
     },
     "dns": {
       "records": "DNS records",
@@ -3215,7 +3342,11 @@
         "open": "Reopen",
         "resolved": "Mark resolved",
         "ignored": "Ignore"
-      }
+      },
+      "viewTraces": "View traces",
+      "viewTrace": "Open trace",
+      "showStacktrace": "Show stack trace",
+      "hideStacktrace": "Hide stack trace"
     },
     "cache": {
       "title": "Edge cache",
@@ -3248,7 +3379,16 @@
       "purgeHint": "Bans every one of the app's hostnames from the cache right now.",
       "purged": "Cache purged.",
       "saved": "Edge cache settings saved.",
-      "disabledHint": "Turn the cache on to set a TTL and bypass rules."
+      "disabledHint": "Turn the cache on to set a TTL and bypass rules.",
+      "hitRate": "Hit rate",
+      "hits": "Hits",
+      "misses": "Misses",
+      "bypassTitle": "Bypass rules",
+      "bypassHint": "Requests matching a path prefix or carrying a cookie always go straight to the app.",
+      "addBypass": "Add bypass rule",
+      "bypassKind": "Rule type",
+      "pathPrefix": "Path prefix",
+      "cookieName": "Cookie name"
     },
     "rules": {
       "remove": "Remove",
@@ -3264,7 +3404,13 @@
         "list": "Redirects",
         "empty": "No redirects yet.",
         "fromPlaceholder": "/old",
-        "toPlaceholder": "https://example.com/new or /new"
+        "toPlaceholder": "https://example.com/new or /new",
+        "add": "Add redirect",
+        "edit": "Edit redirect",
+        "from": "From",
+        "to": "To",
+        "code": "Status code",
+        "preserveQuery": "Keep the query string"
       },
       "headers": {
         "title": "Response headers",
@@ -3283,7 +3429,13 @@
           "nosniff": "No sniff",
           "frame": "Deny framing",
           "cors": "Allow any origin"
-        }
+        },
+        "add": "Add header rule",
+        "edit": "Edit header rule",
+        "action": "Action",
+        "name": "Header",
+        "value": "Value",
+        "presetsLabel": "Quick fill"
       },
       "access": {
         "title": "Access",
@@ -3300,7 +3452,16 @@
         "cidrPlaceholder": "10.0.0.0/8 or a single IP",
         "blockBadBots": "Block known bad bots",
         "blockBadBotsHint": "Blocks a curated list of scraper and AI-crawler user agents.",
-        "rateLimitNote": "Rate limiting is not available: the agent's Caddy build has no rate-limit module, and this project does not rebuild Caddy to add one."
+        "rateLimitNote": "Rate limiting is not available: the agent's Caddy build has no rate-limit module, and this project does not rebuild Caddy to add one.",
+        "addUser": "Add user",
+        "changePassword": "Change password",
+        "passwordHint": "8 to 72 characters. Only a hash is stored; it is never shown again.",
+        "authSettings": "Settings",
+        "noUsers": "No users yet. Add one, or nobody can sign in.",
+        "noAddresses": "None yet.",
+        "addAddresses": "Add addresses",
+        "addresses": "Addresses",
+        "cidrsHint": "One CIDR or IP per line (commas work too)."
       }
     },
     "monitors": {
@@ -3394,7 +3555,9 @@
         "member": "manual",
         "mcp": "MCP",
         "deploy": "after deploy"
-      }
+      },
+      "findings": "Findings",
+      "search": "Search packages or IDs"
     },
     "schedules": {
       "add": "Add schedule",
@@ -3469,7 +3632,8 @@
         "detected": "Detected",
         "likely": "Likely",
         "unknown": "Unknown"
-      }
+      },
+      "failedAt": "Failed at"
     },
     "workers": {
       "needsDeployer": "Worker status, restart, stop and start need the deployer role: a process's environment and command can be as sensitive as its logs.",
@@ -3532,7 +3696,8 @@
         "ready": "Ready",
         "failed": "Failed",
         "removing": "Removing…"
-      }
+      },
+      "browse": "Browse"
     },
     "realtime": {
       "routed": "Routed",
@@ -3622,7 +3787,26 @@
       },
       "fromStack": "Prefilled from the {name} stack."
     },
-    "deployNow": "Deployment #{n}"
+    "deployNow": "Deployment #{n}",
+    "traffic": "Traffic & performance",
+    "architecture": {
+      "sheetHint": "Part of this app’s architecture. Changes here apply right away."
+    },
+    "viewCaption": {
+      "analytics": "Visitors and pages",
+      "web-vitals": "Real-user speed",
+      "apm": "Endpoints and traces",
+      "deployments": "Latest deployment",
+      "releases": "Live release",
+      "repository": "Deployed branch",
+      "deploy-script": "Build runtime",
+      "proxy": "Domains",
+      "dns": "Records and certificates",
+      "cache": "Cached responses",
+      "rules": "Request rules",
+      "monitors": "Uptime and alerts",
+      "security": "Image scans"
+    }
   },
   "resources": {
     "title": "Resources",
@@ -3644,7 +3828,8 @@
     "placeholder": "Search apps, servers, domains…",
     "title": "Search",
     "none": "Nothing matches. Try an app name, a hostname or a server.",
-    "hint": "↑↓ to move · Enter to open"
+    "hint": "↑↓ to move · Enter to open",
+    "loading": "Loading apps, servers and domains…"
   },
   "home2": {
     "morning": "Good morning, {name}",
@@ -3786,7 +3971,26 @@
       "ready": "Ready",
       "failed": "Failed",
       "removing": "Removing"
-    }
+    },
+    "name": "Name",
+    "type": "Type",
+    "mounted": "Mounted",
+    "kinds": {
+      "service": "Object storage",
+      "bucket": "Bucket",
+      "volume": "Volume"
+    },
+    "add": "New storage",
+    "createTitle": "New S3 object storage",
+    "createHint": "Runs MinIO on a server. Apps get buckets from it on their Storage tab.",
+    "pickBucket": "Open a bucket first.",
+    "tooLarge": "{name} is over 2 MiB; upload it with an S3 client.",
+    "noBucketDelete": "Buckets are removed from the app's Storage tab.",
+    "notFound": "This storage service was not found",
+    "notRunning": "The storage service is not running, so its files cannot be browsed.",
+    "ownersOnly": "Only team owners and admins can browse files.",
+    "truncated": "Only the first 1000 items of this folder are shown.",
+    "limitHint": "Uploads and downloads here are at most 2 MiB each. Use an S3 client for larger files."
   },
   "domains2": {
     "lede": "Every hostname you serve: app domains and proxy hosts, their verification and certificates.",
@@ -3794,14 +3998,14 @@
     "emptyBody": "Route a domain to an app from its Domains tab, or proxy a hostname to any upstream on one of your servers.",
     "toApps": "Go to apps",
     "attention": "{n} hostnames need attention: not verified yet, or a certificate failing or about to expire.",
-    "search": "Search hostnames",
+    "search": "Search domains",
     "kind": "Kind",
     "kinds": {
       "app": "App domain",
       "proxy": "Proxy host"
     },
     "needsAttention": "Needs attention",
-    "noMatch": "No hostname matches these filters.",
+    "noMatch": "No domain matches these filters.",
     "routesTo": "Routes to",
     "tls": "TLS",
     "awaitingVerify": "Waiting for verification",
@@ -3812,7 +4016,22 @@
     "showRecord": "Show the TXT record",
     "recordHint": "Add this TXT record at your DNS provider, then press Verify.",
     "manage": "Manage",
-    "addHint": "App domains are added on each app's Domains tab. Hostnames are unique across app domains and proxy hosts."
+    "addHint": "App domains are added on each app's Domains tab. Hostnames are unique across app domains and proxy hosts.",
+    "healthy": "Healthy",
+    "domain": "Domain",
+    "hostnames": "Hostnames",
+    "hostCount": "{n} hostnames",
+    "dnsOnly": "DNS only",
+    "connectedTo": "Connected to",
+    "notConnected": "Not connected",
+    "zoneVia": "DNS managed through Cloudflare ({name}).",
+    "visit": "Visit",
+    "notFound": "Domain not found",
+    "notFoundBody": "{name} is not one of this team's domains.",
+    "connections": "Connected hostnames",
+    "noZoneTitle": "DNS not connected",
+    "noZoneBody": "Add a Cloudflare credential that can see {name} to manage its DNS records here.",
+    "connectCloudflare": "Add a Cloudflare credential"
   },
   "serverHere": {
     "title": "Running here",
@@ -3846,5 +4065,219 @@
     "progressTitle": "Deployment #{n}",
     "progressHint": "You can close this window; the deployment keeps going and shows up under Deployments.",
     "done": "The new release is live."
+  },
+  "home3": {
+    "lede": "Deploy, manage and grow your applications, all in one place.",
+    "allGood": "Everything looks good",
+    "allOperational": "All systems operational",
+    "needsYou": "{n} need attention",
+    "seeBelow": "Open the counts below to see what",
+    "deployNew": "Deploy new app",
+    "deploy": "Deploy",
+    "addToSite": "Add to a site",
+    "browse": "Browse",
+    "tabCatalog": "One-click apps",
+    "tabGit": "From GitHub",
+    "tabTemplate": "Templates",
+    "tabByo": "Bring your own",
+    "ideaToLive": "From idea to live in minutes.",
+    "perkConfigured": "Pre-configured",
+    "perkSecure": "Secure by default",
+    "perkHealth": "Health-checked deploys",
+    "perkServers": "Runs on your servers",
+    "yourApps": "Applications",
+    "noDomain": "No domain yet",
+    "quickActions": "Quick actions",
+    "qaDeployBody": "From a Git repo, a template or the catalogue",
+    "qaDatabase": "Create database",
+    "qaDatabaseBody": "PostgreSQL, MySQL, Redis…",
+    "qaDomain": "Add domain",
+    "qaDomainBody": "Point a domain at an app",
+    "serverStatus": "Server status",
+    "noServers": "No servers connected yet.",
+    "healthy": "Healthy",
+    "offline": "Offline",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "activity": "Live activity",
+    "helpTitle": "Need help?",
+    "helpBody": "Read the documentation or tell us what went wrong.",
+    "viewDocs": "View docs",
+    "contact": "Contact support",
+    "circlexoTitle": "Build faster with CircleXO",
+    "noPower": "Power actions are not available from Hosbah yet. Use your provider's console.",
+    "openServer": "Open server",
+    "deployed": "{app} deploy #{n}",
+    "viewAllApps": "View all apps",
+    "filterApps": "Filter apps",
+    "searchApps": "Search apps...",
+    "noAppsMatch": "No apps match.",
+    "noDescription": "No description",
+    "appFilter": {
+      "all": "All",
+      "running": "Running",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    },
+    "deployActivity": "Deploy activity",
+    "deployCount": "{n} recent",
+    "filterActivity": "Filter activity",
+    "searchActivity": "Search activity...",
+    "noActivityMatch": "Nothing matches.",
+    "endOfActivity": "That's everything.",
+    "activityFilter": {
+      "all": "All",
+      "deploys": "Deploys",
+      "failed": "Failed",
+      "audit": "Audit log"
+    },
+    "logHint": "Build and release output, live while it runs.",
+    "logFailed": "Could not load this deployment.",
+    "openDeployments": "Open in deployments",
+    "cpuTrend": "CPU, last hour",
+    "appLoad": "CPU, last hour",
+    "appLoadNow": "{cpu}% · {mem}",
+    "appLoadWaiting": "Waiting for the first reading…",
+    "appLoadIdle": "Not running",
+    "allServers": "All servers ({n})",
+    "searchServers": "Search servers...",
+    "noServersMatch": "No server matches."
+  },
+  "connectAgent": {
+    "team": "This team",
+    "teamHint": "Your AI agent works with {team}'s servers, apps and deploys.",
+    "tryHint": "Try asking: “List my Hosbah servers and their load.”",
+    "askAdmin": "Only a team owner or admin can create an access key. Ask one to create it for you on the",
+    "tokensPage": "MCP tokens page",
+    "defaultName": "AI agent",
+    "expiry": "The key expires in 90 days. You can revoke it any time from the MCP tokens page.",
+    "mint": "Create the key"
+  },
+  "deployNow": {
+    "button": "Deploy now",
+    "title": "Deploy an app",
+    "hint": "Pick the app to build and release from its branch.",
+    "search": "Search apps",
+    "empty": "No apps match.",
+    "start": "Deploy {app}",
+    "starting": "Starting…"
+  },
+  "panel": {
+    "title": "Panel",
+    "console": "Console",
+    "notFound": "Panel not found",
+    "notFoundHint": "This panel does not exist or you have no access to it.",
+    "tabs": {
+      "overview": "Dashboard",
+      "apps": "Apps",
+      "databases": "Databases",
+      "files": "Files",
+      "sftp": "SFTP",
+      "terminal": "Terminal",
+      "account": "Account",
+      "ssh": "SSH"
+    },
+    "login": {
+      "title": "Sign in",
+      "description": "Sign in to {name}.",
+      "signOut": "Sign out",
+      "limited": "Your account is ready. The tools of this panel are being enabled for your account.",
+      "noAccess": "This account cannot sign in here.",
+      "limitedTitle": "Signed in"
+    },
+    "accounts": {
+      "title": "Panel accounts",
+      "hint": "People who sign in to this panel only, with an email and password. They never see the Hosbah console.",
+      "add": "Add account",
+      "email": "Email",
+      "password": "Password",
+      "passwordHint": "At least 10 characters.",
+      "resetTitle": "Set a new password",
+      "reset": "New password",
+      "remove": "Remove",
+      "removeTitle": "Remove {email}?",
+      "removeHint": "They are signed out and can no longer sign in to this panel.",
+      "empty": "No panel accounts yet.",
+      "disabled": "Disabled",
+      "open": "Open panel",
+      "created": "Created"
+    },
+    "impersonation": {
+      "hint": "You are in Hosbah as {email}, seeing the customer's panel. Changes are made as you.",
+      "exit": "Back to Hosbah"
+    },
+    "nav": {
+      "tools": "Tools",
+      "workloads": "Your workloads"
+    },
+    "dashboard": {
+      "title": "Welcome back",
+      "description": "Everything you run on {name}.",
+      "newApp": "New app",
+      "apps": "Apps",
+      "databases": "Databases",
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "account": {
+      "title": "Account",
+      "description": "Your sign-in to this panel.",
+      "email": "Email",
+      "password": "Change password",
+      "passwordHint": "Changing it signs you out everywhere else.",
+      "current": "Current password",
+      "new": "New password",
+      "save": "Change password",
+      "saved": "Password changed. Other sessions were signed out.",
+      "signOut": "Sign out",
+      "signOutHint": "End this session on this device.",
+      "consoleTitle": "Your Hosbah account",
+      "consoleHint": "You are here as a team member. Your sign-in, password and two-factor are managed in the console.",
+      "openConsole": "Open account settings"
+    },
+    "forgot": {
+      "link": "Forgot password?",
+      "title": "Reset your password",
+      "description": "We will email a 6-digit code to the address on your account.",
+      "send": "Send code",
+      "sent": "If {email} has an account here, a code is on its way.",
+      "code": "Code",
+      "password": "New password",
+      "submit": "Set password",
+      "back": "Back to sign in",
+      "resend": "Send a new code"
+    },
+    "appTokens": {
+      "title": "Integration tokens",
+      "hint": "Tokens an outside service (like Mahaam) uses to read this app, deploy it and open its customer panel. Each one reaches this app only.",
+      "empty": "No integration tokens.",
+      "label": "Label",
+      "createdBy": "Created by",
+      "created": "Created",
+      "lastUsed": "Last used",
+      "never": "Never",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke {label}?",
+      "revokeHint": "The service using it stops working with this app at once. This cannot be undone."
+    },
+    "linkExpired": {
+      "title": "This link has expired",
+      "hint": "Panel links work once and only for a few minutes. Ask the service that sent you here for a new one.",
+      "signedOutTitle": "You are signed out",
+      "signedOutHint": "To come back, open the panel again from the service that sent you here."
+    }
+  },
+  "oauth": {
+    "title": "Connect an app",
+    "heading": "Connect {client} to Hosbah",
+    "description": "{client} will be able to see the app you pick, deploy it and open its customer panel. Nothing else in your teams.",
+    "pick": "Pick the app",
+    "noApps": "You do not manage any app yet. Only owners and admins of a team can connect its apps.",
+    "allow": "Allow",
+    "deny": "Cancel",
+    "revokeHint": "You can revoke the connection at any time from the app’s Settings, under Integration tokens.",
+    "invalidTitle": "This request cannot be used",
+    "invalidHint": "The service that sent you here is not registered with Hosbah, or sent an address it did not register."
   }
 }

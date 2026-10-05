@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteRealtime } from "@/components/site/realtime"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteRealtime />
+  return <SectionRedirect section="realtime" />
 }

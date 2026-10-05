@@ -35,6 +35,8 @@ export function NavLink({
       href={href}
       icon={icon}
       active={active}
+      // The selected row is shaded; Nasaq's accent stripe on its start edge is dropped.
+      className="before:hidden"
       tooltip={children}
       onClick={(e) => {
         onNavigate?.()

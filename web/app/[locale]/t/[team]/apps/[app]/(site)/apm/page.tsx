@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteApm } from "@/components/site/apm"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteApm />
+  return <SectionRedirect section="apm" />
 }

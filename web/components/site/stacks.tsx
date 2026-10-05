@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { BlocksIcon, BoxIcon, ExternalLinkIcon, LayersIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -9,7 +9,9 @@ import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { LoadMore, useInfiniteLimit } from "@/components/lists/infinite"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -22,7 +24,7 @@ import { apiFetch } from "@/lib/api"
 import { isImported } from "@/lib/apps"
 import type { DataService } from "@/lib/databases"
 import { useI18n } from "@/lib/i18n"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase, useServerHref } from "@/lib/team"
 
 export type Recipe = {
   id: string
@@ -72,16 +74,17 @@ function extraPortName(recipes: Recipe[] | null, recipeId: string) {
  * links it to the site through sealed variables. A "stack" recipe prefills a new site.
  */
 export function SiteStacks() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { team, manage } = useTeam()
   const errorText = useErrorText()
   const { app, path } = useLoadedSite()
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
   const [recipes, setRecipes] = useState<Recipe[] | null>(null)
   const [installs, setInstalls] = useState<Install[] | null>(null)
   const [services, setServices] = useState<DataService[]>([])
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
+  const [removing, setRemoving] = useState<Install | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -116,6 +119,7 @@ export function SiteStacks() {
   }, [installs, load])
 
   const shown = (recipes ?? []).filter((r) => matches(q, r.id, r.name, r.summary, r.kind, r.licence))
+  const catalog = useInfiniteLimit(shown.length, 12, q)
 
   return (
     <>
@@ -125,78 +129,89 @@ export function SiteStacks() {
         {installs === null ? (
           <LoadingRows rows={2} />
         ) : installs.length === 0 ? (
-          <p className="flex items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <BoxIcon className="size-4" />
             {t("site.stacks.none")}
           </p>
         ) : (
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("site.monitors.name")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead>{t("proxy.hostname")}</TableHead>
-                  <TableHead>{t("site.storage.variables")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {installs.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell>
-                      <span dir="ltr" className="font-medium">
-                        {i.name}
-                      </span>
-                      <div dir="ltr" className="text-start text-xs text-muted-foreground">
-                        {i.recipe_name} · {i.recipe_version}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant={i.status === "ready" ? "brand" : i.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${i.status}`)}</Badge>
-                        {i.status === "ready" && i.running != null ? (
-                          <Badge variant={i.running ? "neutral" : "outline"}>{i.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
-                        ) : null}
-                      </span>
-                      {i.error ? (
-                        <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
-                          {i.error}
-                        </p>
+          <NasaqTable
+            data={installs}
+            rowId={(i) => i.id}
+            rowLabel={(i) => i.name}
+            label={t("site.stacks.installed")}
+            rowActions={
+              manage ? (i) => [{ id: "remove", label: t("site.storage.remove"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setRemoving(i) }] : undefined
+            }
+            columns={[
+              {
+                id: "name",
+                header: t("site.monitors.name"),
+                cell: (i) => (
+                  <>
+                    <span dir="ltr" className="font-medium">
+                      {i.name}
+                    </span>
+                    <div dir="ltr" className="text-start text-xs text-muted-foreground">
+                      {i.recipe_name} · {i.recipe_version}
+                    </div>
+                  </>
+                ),
+                sortValue: (i) => i.name,
+              },
+              {
+                id: "status",
+                header: t("lists.status"),
+                cell: (i) => (
+                  <>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant={i.status === "ready" ? "brand" : i.status === "failed" ? "danger" : "neutral"}>{t(`site.storage.status.${i.status}`)}</Badge>
+                      {i.status === "ready" && i.running != null ? (
+                        <Badge variant={i.running ? "neutral" : "outline"}>{i.running ? t("site.browsers.running") : t("site.browsers.stopped")}</Badge>
                       ) : null}
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start font-mono text-xs">
-                      {i.hostname ? (
-                        <a href={`https://${i.hostname}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                          {i.hostname}
-                          <ExternalLinkIcon className="size-3" />
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                      {i.extra_host_port ? (
-                        <div className="mt-1 text-muted-foreground">
-                          {t("site.stacks.extraPort", { name: extraPortName(recipes, i.recipe), port: String(i.extra_host_port) })}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell dir="ltr" className="max-w-64 text-start font-mono text-xs text-muted-foreground">
-                      {i.env_injected.join(" ")}
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <RemoveInstall path={path} install={i} onRemoved={load} />
-                        </div>
-                      </TableCell>
+                    </span>
+                    {i.error ? (
+                      <p dir="auto" className="mt-1 max-w-xs text-xs text-nq-danger-text">
+                        {i.error}
+                      </p>
                     ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
+                  </>
+                ),
+                sortValue: (i) => i.status,
+              },
+              {
+                id: "host",
+                header: t("proxy.hostname"),
+                cell: (i) => (
+                  <div dir="ltr" className="text-start font-mono text-xs">
+                    {i.hostname ? (
+                      <a href={`https://${i.hostname}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
+                        {i.hostname}
+                        <ExternalLinkIcon className="size-3" />
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                    {i.extra_host_port ? (
+                      <div className="mt-1 text-muted-foreground">{t("site.stacks.extraPort", { name: extraPortName(recipes, i.recipe), port: String(i.extra_host_port) })}</div>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                id: "vars",
+                header: t("site.storage.variables"),
+                cell: (i) => (
+                  <span dir="ltr" className="block max-w-64 text-start font-mono text-xs text-muted-foreground">
+                    {i.env_injected.join(" ")}
+                  </span>
+                ),
+              },
+            ]}
+          />
         )}
       </section>
+
+      {removing ? <RemoveInstall open onOpenChange={(v) => !v && setRemoving(null)} path={path} install={removing} onRemoved={load} /> : null}
 
       <section aria-labelledby="cat-h">
         <SectionTitle id="cat-h" title={t("site.stacks.catalog")} hint={t("site.stacks.catalogHint")} />
@@ -206,13 +221,13 @@ export function SiteStacks() {
           <>
             <ListSearch value={q} onChange={setQ} placeholder={t("site.stacks.search")} shown={shown.length} total={recipes.length} />
             {shown.length === 0 ? (
-              <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p>
+              <p className="nq-band py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p>
             ) : (
-              <ul className="grid gap-4 border-b border-border px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
-                {shown.map((r) => (
-                  <li key={r.id} className="flex min-w-0 flex-col border border-border bg-card">
+              <ul className="grid gap-4 nq-band py-6 md:grid-cols-2 xl:grid-cols-3">
+                {shown.slice(0, catalog.limit).map((r) => (
+                  <li key={r.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
                     <div className="flex items-start gap-3 px-4 pt-4 pb-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-nq-brand [&_svg]:size-4">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-nq-brand [&_svg]:size-4">
                         {r.kind === "stack" ? <LayersIcon /> : <BlocksIcon />}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -265,9 +280,10 @@ export function SiteStacks() {
                 ))}
               </ul>
             )}
+            <LoadMore hasMore={catalog.hasMore} onMore={catalog.more} />
           </>
         )}
-        <p className="border-b border-border px-6 py-3 text-xs text-muted-foreground">{t("site.stacks.publishLater")}</p>
+        <p className="nq-band py-3 text-xs text-muted-foreground">{t("site.stacks.publishLater")}</p>
       </section>
     </>
   )
@@ -284,8 +300,8 @@ export function InstallDialog({
   onSaved,
   ...controlled
 }: { path: string; recipe: Recipe; services: DataService[]; onSaved: () => Promise<void> | void } & Controlled) {
-  const { t, locale } = useI18n()
-  const { team } = useTeam()
+  const { t } = useI18n()
+  const serverHref = useServerHref()
   const { app } = useLoadedSite()
   const errorText = useErrorText()
   const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled)
@@ -299,7 +315,7 @@ export function InstallDialog({
   const pg = services.filter((s) => s.kind === "postgres")
   const my = services.filter((s) => s.kind === "mysql")
   const rd = services.filter((s) => s.kind === "redis")
-  const databasesHref = `/${locale}/t/${team.slug}/servers/${app.server_id}/databases`
+  const databasesHref = serverHref(app.server_id, "databases")
 
   async function submit(e: FormEvent) {
     e.preventDefault()

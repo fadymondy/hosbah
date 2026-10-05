@@ -295,6 +295,8 @@ func TestIsolationSweep(t *testing.T) {
 		"rule":        func(string) []string { return []string{ruleA.ID} },
 		"preset":      func(string) []string { return []string{"web"} },
 		"sftp_user":   func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e1", "sweep_sftp"} },
+		"ssh_user":    func(string) []string { return []string{"sweep_ssh"} },
+		"panel_account": func(string) []string { return []string{"00000000-0000-4000-8000-0000000000e2"} },
 		"drain":       func(string) []string { return []string{drainA.ID, drainA.Name} },
 		"product":     func(string) []string { return []string{prodA.ID, prodA.Name} },
 		"instance":    func(string) []string { return []string{instA.ID, instA.Name} },
@@ -362,6 +364,11 @@ func TestIsolationSweep(t *testing.T) {
 				// header and is refused before any product/instance lookup happens. Its own
 				// cross-tenant isolation (a key cannot touch another product's instance) is
 				// checked below, with an actual key.
+				want = http.StatusUnauthorized
+			case strings.HasPrefix(op.Path, "/api/integrations/"):
+				// The integration API (MH-1153) takes only a bearer hbu_/hba_ token, never a session:
+				// team B's cookie is refused before any app is looked up. Its token isolation is
+				// TestIntegrationAPI's job.
 				want = http.StatusUnauthorized
 			}
 			if status != want {
@@ -554,6 +561,9 @@ func TestIsolationSweep(t *testing.T) {
 		"ssh_keys_remove":    {"key": sshKeyA.ID, "confirm": sshKeyA.Name},
 		"ssh_keys_install":   {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
 		"ssh_keys_uninstall": {"key": sshKeyA.ID, "server": srvA, "user": "root", "confirm": "alpha-" + suffix},
+		"ssh_users_list":     {"server": srvA},
+		"ssh_users_create":   {"server": srvA, "username": "sweep_ssh", "generate_password": true, "confirm": "sweep_ssh"},
+		"ssh_users_remove":   {"server": srvA, "username": "sweep_ssh", "confirm": "sweep_ssh"},
 		// MH-580 J5: image scans of A's app. J7: rotating A's team MCP token.
 		"app_scan": {"app": appA.App.ID}, "app_scan_results": {"app": appA.App.ID},
 		"rotate_mcp_token": {"id": tokA.ID},
@@ -1236,6 +1246,10 @@ func sample(o *huma.OpenAPI, s *huma.Schema) any {
 		if s.Format == "email" {
 			return "sweep@example.test"
 		}
-		return "sweep12"
+		v := "sweep12"
+		if s.MinLength != nil && len(v) < *s.MinLength {
+			v += strings.Repeat("x", *s.MinLength-len(v)) // a field with a floor (a password) must pass validation to reach the handler
+		}
+		return v
 	}
 }

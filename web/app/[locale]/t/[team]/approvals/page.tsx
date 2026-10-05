@@ -16,13 +16,14 @@ Two things on this page are deliberate and easy to get wrong later:
     something to fix by hiding it in the UI.
 */
 
-import { Badge, Button, Checkbox, EmptyState, Field, FieldDescription, FieldLabel, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Checkbox, EmptyState, Field, FieldDescription, FieldLabel, toast, type DataTableColumn, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
-import { ShieldCheckIcon } from "lucide-react"
+import { CheckIcon, ShieldCheckIcon, XIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
-import { ErrorBand, LoadingRows, SettingsRow, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SettingsRow } from "@/components/states"
 
 
 
@@ -122,6 +123,102 @@ export default function ApprovalsPage() {
     }
   }
 
+  const columns: DataTableColumn<ApprovalRequest>[] = [
+    {
+      id: "tool",
+      header: t("approvals.tool"),
+      label: t("approvals.tool"),
+      sortValue: (r) => r.tool,
+      searchValue: (r) => `${r.tool} ${r.resource_name} ${r.resource_type} ${r.token_name ?? ""}`,
+      cell: (r) => (
+        <span className="flex flex-col items-start gap-1">
+          <span className="font-mono text-sm" dir="ltr">
+            {r.tool}
+          </span>
+          <Badge variant={statusTone[r.status]}>{t(`approvals.status.${r.status}`)}</Badge>
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      header: t("approvals.statusLabel"),
+      label: t("approvals.statusLabel"),
+      defaultHidden: true,
+      filterValue: (r) => r.status,
+      sortValue: (r) => r.status,
+      cell: (r) => t(`approvals.status.${r.status}`),
+    },
+    {
+      id: "resource",
+      header: t("approvals.resource"),
+      label: t("approvals.resource"),
+      sortValue: (r) => r.resource_name,
+      cell: (r) => (
+        <span className="block">
+          <span className="block font-mono text-sm" dir="ltr">
+            {r.resource_name}
+          </span>
+          <span className="block text-caption text-muted-foreground">{r.resource_type}</span>
+        </span>
+      ),
+    },
+    {
+      id: "token",
+      header: t("approvals.token"),
+      label: t("approvals.token"),
+      sortValue: (r) => r.token_name ?? "",
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (r) => (
+        <span className="block">
+          <span className="block">{r.token_name || "—"}</span>
+          <span className="block font-mono text-caption text-muted-foreground" dir="ltr">
+            {r.token_id}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "arguments",
+      header: t("approvals.arguments"),
+      label: t("approvals.arguments"),
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (r) => {
+        const args = argumentNames(r.args_summary)
+        return (
+          <span className="font-mono text-caption text-muted-foreground" dir="ltr">
+            {args.length ? args.join(", ") : "—"}
+          </span>
+        )
+      },
+    },
+    {
+      id: "asked",
+      header: t("approvals.asked"),
+      label: t("approvals.asked"),
+      sortValue: (r) => r.created_at,
+      cell: (r) => <span className="whitespace-nowrap text-caption">{fmt(r.created_at)}</span>,
+    },
+    {
+      id: "expires",
+      header: t("approvals.expires"),
+      label: t("approvals.expires"),
+      sortValue: (r) => r.expires_at,
+      className: "max-md:hidden",
+      headerClassName: "max-md:hidden",
+      cell: (r) => <span className="whitespace-nowrap text-caption">{fmt(r.expires_at)}</span>,
+    },
+  ]
+
+  const actions = (r: ApprovalRequest): DataTableRowAction[] =>
+    r.status === "pending"
+      ? [
+          { id: "approve", label: t("approvals.approve"), icon: CheckIcon, disabled: busy === r.id, onSelect: () => void decide(r.id, "approve") },
+          { id: "reject", label: t("approvals.reject"), icon: XIcon, danger: true, disabled: busy === r.id, onSelect: () => void decide(r.id, "reject") },
+        ]
+      : []
+
   return (
     <PageBody title={t("approvals.title")} description={t("approvals.description")} bleed>
       <ErrorBand message={error} />
@@ -148,72 +245,20 @@ export default function ApprovalsPage() {
       ) : requests.length === 0 ? (
         <EmptyState className="border-b" icon={ShieldCheckIcon} title={enabled ? t("approvals.empty") : t("approvals.disabledNote")} description={enabled ? t("approvals.description") : t("approvals.emptyDisabled")} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("approvals.tool")}</TableHead>
-                <TableHead>{t("approvals.resource")}</TableHead>
-                <TableHead>{t("approvals.token")}</TableHead>
-                <TableHead>{t("approvals.arguments")}</TableHead>
-                <TableHead>{t("approvals.asked")}</TableHead>
-                <TableHead>{t("approvals.expires")}</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requests.map((r) => {
-                const args = argumentNames(r.args_summary)
-                return (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <span className="font-mono text-sm" dir="ltr">
-                        {r.tool}
-                      </span>
-                      <div>
-                        <Badge variant={statusTone[r.status]}>{t(`approvals.status.${r.status}`)}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-sm" dir="ltr">
-                        {r.resource_name}
-                      </span>
-                      <div className="text-muted-foreground text-xs">{r.resource_type}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{r.token_name || "—"}</div>
-                      <div className="text-muted-foreground font-mono text-xs" dir="ltr">
-                        {r.token_id}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs" dir="ltr">
-                      {args.length ? args.join(", ") : "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{fmt(r.created_at)}</TableCell>
-                    <TableCell className="whitespace-nowrap">{fmt(r.expires_at)}</TableCell>
-                    <TableCell>
-                      {manage && r.status === "pending" ? (
-                        <div className="flex gap-2">
-                          <Button variant="primary" size="sm" disabled={busy === r.id} onClick={() => decide(r.id, "approve")}>
-                            {t("approvals.approve")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={busy === r.id}
-                            onClick={() => decide(r.id, "reject")}
-                          >
-                            {t("approvals.reject")}
-                          </Button>
-                        </div>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <div className="flex flex-col gap-3 px-6 py-6">
+          <NasaqTable
+            data={requests}
+            columns={columns}
+            rowId={(r) => r.id}
+            label={t("approvals.title")}
+            rowLabel={(r) => `${r.tool} ${r.resource_name}`}
+            search={t("approvals.tool")}
+            facets={[{ column: "status", title: t("approvals.statusLabel"), options: [...new Set(requests.map((r) => r.status))].map((v) => ({ value: v, label: t(`approvals.status.${v}`) })) }]}
+            rowActions={manage ? actions : undefined}
+            defaultSort={{ id: "asked", direction: "desc" }}
+            empty={t("home.noMatch")}
+          />
+        </div>
       )}
     </PageBody>
   )

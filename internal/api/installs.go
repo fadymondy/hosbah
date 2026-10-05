@@ -152,7 +152,7 @@ func (d *deps) registerInstalls(api huma.API) {
 	huma.Register(api, huma.Operation{OperationID: "list-app-installs", Method: http.MethodGet, Path: base, Tags: tags,
 		Summary: "The recipes installed next to the app. running, restarts and memory_bytes are best effort — the server is asked (up to 8 s), " +
 			"and an offline or silent server leaves them null, still 200. Never a secret. Any member.",
-	}, func(ctx context.Context, in *AppPath) (*installsOut, error) {
+	}, func(ctx context.Context, in *AppListPath) (*installsOut, error) {
 		out := &installsOut{Body: InstallsOut{Installs: []dbsvc.AppInstall{}}}
 		var (
 			op     db.Operation
@@ -168,7 +168,9 @@ func (d *deps) registerInstalls(api huma.API) {
 			if out.Body.Installs, err = dbsvc.ListInstalls(ctx, q, m.TeamID, a); err != nil {
 				return huma.Error500InternalServerError("could not list the installs")
 			}
-			op = d.dbs().QueueInstallStatus(ctx, q, m.TeamID, webActor(id), a, out.Body.Installs)
+			if !in.NoStatus {
+				op = d.dbs().QueueInstallStatus(ctx, q, m.TeamID, webActor(id), a, out.Body.Installs)
+			}
 			return nil
 		})
 		if err != nil {

@@ -111,7 +111,7 @@ export function SiteBuildConfig() {
         <>
           {!canSave ? <Notice>{t("common.readOnly")}</Notice> : null}
           <fieldset disabled={!canSave || busy} className="contents">
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <label className="mb-1 block text-sm font-medium text-foreground">{t("site.build.dockerfilePath")}</label>
               <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.build.dockerfilePathHint")}</p>
               <Input
@@ -126,7 +126,7 @@ export function SiteBuildConfig() {
               {!dockerfileOk ? <p className="mt-1 text-xs text-destructive">{t("site.build.invalidPath")}</p> : null}
             </div>
 
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <label className="mb-1 block text-sm font-medium text-foreground">{t("site.build.buildContext")}</label>
               <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.build.buildContextHint")}</p>
               <Input

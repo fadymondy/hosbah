@@ -1,23 +1,25 @@
 "use client"
 
-import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { GitBranchIcon, GitCommitHorizontalIcon, RocketIcon, TriangleAlertIcon } from "lucide-react"
+import { ChevronDownIcon, GitBranchIcon, GitCommitHorizontalIcon, RocketIcon, ScrollTextIcon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
-import { duration, isActive as active, Pipeline } from "@/components/deploy/pipeline"
+import { isActive as active } from "@/components/deploy/pipeline"
 import { useErrorText } from "@/components/form-error"
 import { StatusIcon, type FeedItem } from "@/components/home/deployments-feed"
+import { LogDialog, type LogTarget } from "@/components/home/log-dialog"
 import { useTimeAgo } from "@/components/home/sparkline"
-import { FilterPills, ListBar, SortSelect } from "@/components/lists/list-bar"
+import { CardListToolbar, useInfinite } from "@/components/lists/card-list"
 import { ServerMark } from "@/components/server-mark"
+import { DeployRun } from "@/components/deploy/deploy-run"
+import { DeployNowButton } from "@/components/deploy/deploy-now"
 import { ErrorBand, LoadingRows } from "@/components/states"
 import { Button } from "@/components/ui/button"
 import { apiFetch } from "@/lib/api"
 import { shortSha } from "@/lib/apps"
+import { cn } from "@/lib/utils"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useTeam } from "@/lib/team"
-import { cn } from "@/lib/utils"
 
 type Page = { deployments: FeedItem[]; next_cursor: string | null }
 type StatusFilter = "" | "active" | "succeeded" | "failed"
@@ -33,7 +35,6 @@ export default function DeploymentsPage() {
   useDocumentTitle(`${t("nav.deployments")} — ${team.name}`)
   const errorText = useErrorText()
   const ago = useTimeAgo(locale)
-  const base = `/${locale}/t/${team.slug}`
   const api = `/api/teams/${team.slug}/deployments`
 
   const [items, setItems] = useState<FeedItem[] | null>(null)
@@ -41,9 +42,17 @@ export default function DeploymentsPage() {
   const [more, setMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
-  const [status, setStatus] = useState<StatusFilter>("")
-  const [app, setApp] = useState("")
-  const [server, setServer] = useState("")
+  // Rows start folded; a click unfolds the steps, the log button opens the dashboard's log dialog.
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const [logOf, setLogOf] = useState<LogTarget | null>(null)
+  const toggle = (id: string) =>
+    setOpen((o) => {
+      const n = new Set(o)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
+  const [chosen, setChosen] = useState<Record<string, string[]>>({})
+  const [sort, setSort] = useState("recent")
 
   // The first page, merged over what is loaded so older pages survive a refresh.
   const refresh = useCallback(async () => {
@@ -97,7 +106,7 @@ export default function DeploymentsPage() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     if (p.get("q")) setQ(p.get("q")!)
-    if (p.get("app")) setApp(p.get("app")!)
+    if (p.get("app")) setChosen({ app: [p.get("app")!] })
   }, [])
 
   const apps = useMemo(() => [...new Set((items ?? []).map((d) => d.app.name))].sort(), [items])
@@ -115,162 +124,170 @@ export default function DeploymentsPage() {
     const needle = q.trim().toLowerCase()
     return (items ?? []).filter(
       (d) =>
-        is(d, status) &&
-        (!app || d.app.name === app) &&
-        (!server || d.server?.id === server) &&
+        (!(chosen.status ?? []).length || chosen.status.some((x) => is(d, x as StatusFilter))) &&
+        (!(chosen.app ?? []).length || chosen.app.includes(d.app.name)) &&
+        (!(chosen.server ?? []).length || chosen.server.includes(d.server?.id ?? "")) &&
         (!needle ||
           [d.app.name, d.app.title, d.branch, d.commit_sha, d.commit_message, d.server?.name, d.triggered_by?.email, `#${d.number}`]
             .filter(Boolean)
             .some((v) => (v as string).toLowerCase().includes(needle))),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, q, status, app, server])
+  }, [items, q, chosen])
+  const ordered = useMemo(() => (sort === "oldest" ? [...shown].reverse() : shown), [shown, sort])
+  const { visible, more: moreShown, sentinel } = useInfinite(ordered, JSON.stringify([q, chosen, sort]))
+  // Past the last loaded page: fetch the next older one as the list scrolls to its end.
+  useEffect(() => {
+    if (!moreShown && cursor && !more && items?.length) void loadMore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moreShown, visible.length])
 
   const deployNew = (
-    <Button nativeButton={false} render={<Link href={`${base}/apps/new`} />}>
-      <RocketIcon />
-      {t("home2.deploy")}
-    </Button>
+    <DeployNowButton
+      team={team.slug}
+      onStarted={(target) => {
+        void refresh()
+        setLogOf(target)
+      }}
+    />
   )
 
   return (
-    <PageBody title={t("nav.deployments")} description={t("deploys2.lede")} actions={deployNew} bleed>
+    <PageBody title={t("nav.deployments")} description={t("deploys2.lede")} actions={deployNew} bleed divider={false}>
       <ErrorBand message={error} />
       {items === null ? (
         <LoadingRows rows={6} />
       ) : items.length === 0 ? (
         <div className="flex flex-col items-start gap-3 px-6 py-10">
-          <RocketIcon className="size-6 text-grid-muted" />
-          <p className="text-base font-medium text-grid-fg">{t("deploys2.emptyTitle")}</p>
-          <p className="max-w-lg text-sm text-grid-muted">{t("deploys2.emptyBody")}</p>
+          <RocketIcon className="size-6 text-muted-foreground" />
+          <p className="text-base font-medium text-foreground">{t("deploys2.emptyTitle")}</p>
+          <p className="max-w-lg text-sm text-muted-foreground">{t("deploys2.emptyBody")}</p>
           {deployNew}
         </div>
       ) : (
-        <>
-          <ListBar q={q} onQ={setQ} placeholder={t("deploys2.search")}>
-            <FilterPills
-              label={t("lists.status")}
-              value={status}
-              onChange={setStatus}
-              options={[
-                ["", t("home.filterAll"), count("")],
-                ["active", t("deploys2.active"), count("active")],
-                ["succeeded", t("apps.deploy.statuses.succeeded"), count("succeeded")],
-                ["failed", t("apps.deploy.statuses.failed"), count("failed")],
-              ]}
-            />
-            {apps.length > 1 ? (
-              <SortSelect label={t("nav.apps")} value={app} onChange={setApp} options={[["", t("deploys2.allApps")], ...apps.map((a) => [a, a] as [string, string])]} />
-            ) : null}
-            {servers.length > 1 ? (
-              <SortSelect label={t("nav.servers")} value={server} onChange={setServer} options={[["", t("apps2.allServers")], ...servers]} />
-            ) : null}
-          </ListBar>
-
-          {shown.length === 0 ? (
-            <p className="border-b border-line px-6 py-8 text-center text-sm text-grid-muted">{t("deploys2.noMatch")}</p>
+        <div className="flex flex-col gap-4 px-6 pb-6">
+          <CardListToolbar
+            q={q}
+            onQ={setQ}
+            placeholder={t("deploys2.search")}
+            chosen={chosen}
+            onChosen={setChosen}
+            facets={[
+              {
+                id: "status",
+                title: t("lists.status"),
+                options: (["active", "succeeded", "failed"] as const).map((v) => ({
+                  value: v,
+                  label: v === "active" ? t("deploys2.active") : t(`apps.deploy.statuses.${v}`),
+                  count: count(v),
+                })),
+              },
+              ...(apps.length > 1 ? [{ id: "app", title: t("nav.apps"), options: apps.map((x) => ({ value: x, label: x })) }] : []),
+              ...(servers.length > 1
+                ? [{ id: "server", title: t("nav.servers"), options: servers.map(([value, label]) => ({ value, label })) }]
+                : []),
+            ]}
+            sort={sort}
+            onSort={setSort}
+            sorts={[
+              ["recent", t("lists.sortActivity")],
+              ["oldest", t("lists.sortOldest")],
+            ]}
+          />
+          {ordered.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-body-sm text-muted-foreground">
+              {t("deploys2.noMatch")}
+            </p>
           ) : (
-            <ul className="divide-y divide-line border-b border-line">
-              {shown.map((d) => {
-                const log = `${base}/apps/${encodeURIComponent(d.app.name)}/deployments?d=${d.id}`
-                const took = duration(d.started_at ?? d.created_at, d.finished_at ?? (active(d) ? null : d.created_at))
+            <div className="flex flex-col gap-4">
+              {visible.map((d) => {
                 const failed = d.status === "failed"
+                const isOpen = open.has(d.id)
+                const target = { app: d.app.name, appTitle: d.app.title || d.app.name, id: d.id, number: d.number }
                 return (
-                  <li key={d.id} className={cn("px-4 py-3 sm:px-6", failed && "bg-grid-danger/[0.03]")}>
-                    <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-                      <span className="mt-0.5">
-                        <StatusIcon status={d.status} />
-                      </span>
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <Link href={`${base}/apps/${encodeURIComponent(d.app.name)}`} className="flex min-w-0 items-center gap-2 hover:underline">
-                            <ServerMark server={{ color: d.app.color ?? null, icon: d.app.icon ?? "globe", logo_url: d.app.logo_url ?? null }} size={6} />
-                            <span dir="auto" className="truncate font-medium text-grid-fg">
+                  <div key={d.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => toggle(d.id)}
+                        aria-expanded={isOpen}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-start outline-none focus-visible:outline-2 focus-visible:outline-nq-focus"
+                      >
+                        <ServerMark
+                          server={{ color: d.app.color ?? null, icon: d.app.icon ?? "globe", logo_url: d.app.logo_url ?? null }}
+                          size={8}
+                        />
+                        <span className="flex min-w-0 flex-1 flex-col gap-1">
+                          <span className="flex min-w-0 items-center gap-2 text-body-sm font-medium text-foreground">
+                            <StatusIcon status={d.status} />
+                            <span dir="auto" className="truncate">
                               {d.app.title || d.app.name}
                             </span>
-                          </Link>
-                          <Link href={log} dir="ltr" className="text-xs text-grid-muted hover:text-grid-fg hover:underline">
-                            #{d.number}
-                          </Link>
-                          {d.kind && d.kind !== "deploy" ? (
-                            <span className="border border-line px-1.5 text-[11px] text-grid-muted">{t(`apps.deploy.kinds.${d.kind}`)}</span>
-                          ) : null}
-                          <span className="text-xs text-grid-muted">{t(`apps.deploy.statuses.${d.status}`, undefined, d.status)}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-grid-muted">
-                          {d.commit_sha ? (
-                            <span className="flex min-w-0 items-center gap-1">
-                              <GitCommitHorizontalIcon className="size-3.5 shrink-0" />
-                              <code dir="ltr" className="text-grid-fg">
-                                {shortSha(d.commit_sha)}
-                              </code>
-                              {d.commit_message ? (
-                                <span dir="auto" className="max-w-[28rem] truncate">
-                                  {d.commit_message}
-                                </span>
-                              ) : null}
+                            <span dir="ltr" className="text-caption font-normal text-muted-foreground">
+                              #{d.number}
                             </span>
-                          ) : null}
-                          {d.branch ? (
-                            <span className="flex items-center gap-1">
-                              <GitBranchIcon className="size-3.5" />
-                              <span dir="ltr">{d.branch}</span>
-                            </span>
-                          ) : null}
-                          {d.server?.id ? (
-                            <Link href={`${base}/servers/${d.server.id}`} dir="ltr" className="hover:text-grid-fg hover:underline">
-                              {d.server.name || "—"}
-                            </Link>
-                          ) : null}
-                        </div>
-                        {d.status !== "succeeded" ? <Pipeline d={d} /> : null}
-                        {failed ? (
-                          <div className="flex flex-col gap-1 border-s-2 border-grid-danger ps-3 text-xs">
-                            <p className="flex items-center gap-1.5 font-medium text-grid-danger">
-                              <TriangleAlertIcon className="size-3.5 shrink-0" />
-                              {d.step
-                                ? t("deploys2.failedAt", { step: t(`apps.deploy.steps.${d.step}`, undefined, d.step) })
-                                : t("deploys2.failed")}
-                            </p>
-                            {d.error ? (
-                              <p dir="ltr" className="line-clamp-3 font-mono break-all text-grid-body">
-                                {d.error}
-                              </p>
+                            {d.kind && d.kind !== "deploy" ? (
+                              <span className="text-caption font-normal text-muted-foreground">{t(`apps.deploy.kinds.${d.kind}`)}</span>
                             ) : null}
-                            <p className="text-grid-muted">{t(`deploys2.hint.${d.step ?? "none"}`, undefined, t("deploys2.hint.none"))}</p>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-grid-muted max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:justify-between">
-                        <span title={new Date(d.created_at).toLocaleString(locale)}>{ago(d.created_at)}</span>
-                        {took ? <span dir="ltr" className="tabular-nums">{took}</span> : null}
-                        <span className="max-w-[14rem] truncate">
-                          {d.triggered_by?.email ? (
-                            <span dir="ltr">{d.triggered_by.email}</span>
-                          ) : (
-                            t(`home.trigger.${d.trigger ?? "manual"}`, undefined, d.trigger ?? "")
-                          )}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-muted-foreground">
+                            {d.commit_sha ? (
+                              <span className="flex min-w-0 items-center gap-1">
+                                <GitCommitHorizontalIcon className="size-3.5 shrink-0" />
+                                <code dir="ltr" className="rounded-sm bg-secondary px-1 font-mono text-code">
+                                  {shortSha(d.commit_sha)}
+                                </code>
+                                {d.commit_message ? (
+                                  <span dir="auto" className="max-w-[28rem] truncate">
+                                    {d.commit_message}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                            {d.branch ? (
+                              <span className="flex items-center gap-1">
+                                <GitBranchIcon className="size-3.5" />
+                                <span dir="ltr">{d.branch}</span>
+                              </span>
+                            ) : null}
+                            {d.server?.name ? <span dir="ltr">{d.server.name}</span> : null}
+                            <span>
+                              {d.triggered_by?.email ? (
+                                <bdi dir="ltr">{d.triggered_by.email}</bdi>
+                              ) : (
+                                t(`home.trigger.${d.trigger ?? "manual"}`, undefined, d.trigger ?? "")
+                              )}
+                            </span>
+                            <span title={new Date(d.created_at).toLocaleString(locale)}>{ago(d.created_at)}</span>
+                          </span>
                         </span>
-                        <Link href={log} className={cn("font-medium hover:underline", failed ? "text-grid-danger" : "text-grid-action")}>
-                          {failed ? t("deploys2.openFailedLog") : t("deploys2.openLog")}
-                        </Link>
-                      </div>
+                        <ChevronDownIcon
+                          aria-hidden
+                          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")}
+                        />
+                      </button>
+                      <Button size="sm" variant={failed ? "destructive" : "outline"} onClick={() => setLogOf(target)}>
+                        <ScrollTextIcon aria-hidden />
+                        {failed ? t("deploys2.openFailedLog") : t("deploys2.openLog")}
+                      </Button>
                     </div>
-                  </li>
+                    {isOpen ? (
+                      <div className="border-t border-border p-4">
+                        <DeployRun team={team.slug} d={d} />
+                      </div>
+                    ) : null}
+                  </div>
                 )
               })}
-            </ul>
+            </div>
           )}
-          <div className="flex items-center justify-between gap-3 px-6 py-3 text-xs text-grid-muted">
-            <span>{t("lists.count", { shown: shown.length, total: items.length })}</span>
-            {cursor ? (
-              <Button variant="outline" size="sm" onClick={loadMore} disabled={more}>
-                {more ? t("common.loading") : t("deploys2.older")}
-              </Button>
-            ) : null}
-          </div>
-        </>
+          {moreShown || cursor ? <div ref={sentinel} className="h-8" aria-hidden /> : null}
+          <p className="text-caption text-muted-foreground">
+            {more ? t("common.loading") : t("lists.count", { shown: visible.length, total: items.length })}
+          </p>
+        </div>
       )}
+      <LogDialog team={team.slug} target={logOf} onClose={() => setLogOf(null)} />
     </PageBody>
   )
 }

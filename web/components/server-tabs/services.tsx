@@ -1,11 +1,11 @@
 "use client"
 
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Card, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { PauseIcon, PlayIcon, RefreshCwIcon, RotateCwIcon, SquareIcon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
@@ -26,12 +26,11 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
   const [units, setUnits] = useState<ServiceUnit[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [q, setQ] = useState("")
   const base = `/api/teams/${team}/servers/${serverId}/services`
 
   const load = useCallback(async () => {
     try {
-      const r = await apiFetch<{ units: ServiceUnit[] }>(`${base}${q.trim() ? `?query=${encodeURIComponent(q.trim())}` : ""}`)
+      const r = await apiFetch<{ units: ServiceUnit[] }>(base)
       setUnits(r.units ?? [])
       setError(null)
     } catch (err) {
@@ -39,7 +38,7 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
       setUnits((x) => x ?? [])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, q])
+  }, [base])
 
   useEffect(() => {
     void load()
@@ -63,12 +62,11 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
     return (
       <section aria-labelledby="svc-h">
         <SectionTitle id="svc-h" title={t("servers.services.title")} hint={t("servers.services.hint")} />
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.services.readOnly")}</p>
+        <p className="mt-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{t("servers.services.readOnly")}</p>
       </section>
     )
   }
 
-  const shown = (units ?? []).filter((u) => matches(q, u.name, u.description, u.active_state, u.sub_state))
 
   return (
     <section aria-labelledby="svc-h">
@@ -87,65 +85,88 @@ export function ServerServices({ team, serverId }: { team: string; serverId: str
       {units === null ? (
         <LoadingRows rows={5} />
       ) : units.length === 0 ? (
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("servers.services.empty")}</p>
+        <Card className="mt-3 px-5 py-8 text-center text-sm text-muted-foreground">{t("servers.services.empty")}</Card>
       ) : (
-        <>
-          <ListSearch value={q} onChange={setQ} placeholder={t("servers.services.search")} shown={shown.length} total={units.length} />
-          <div className="border-b border-border [&_tr>*:first-child]:ps-6 [&_tr>*:last-child]:pe-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("servers.services.unit")}</TableHead>
-                  <TableHead>{t("servers.services.state")}</TableHead>
-                  <TableHead>{t("servers.services.enabled")}</TableHead>
-                  {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((u) => (
-                  <TableRow key={u.name}>
-                    <TableCell>
-                      <span dir="ltr" className="font-mono text-sm">
-                        {u.name}
+        <div className="mt-3">
+          <NasaqTable
+            data={units}
+            rowId={(u) => u.name}
+            label={t("servers.services.title")}
+            rowLabel={(u) => u.name}
+            search={t("servers.services.search")}
+            empty={t("home.noMatch")}
+            pageSize={25}
+            facets={[
+              { column: "state", title: t("servers.services.state"), options: [...new Set(units.map((u) => u.active_state))].map((v) => ({ value: v, label: v })) },
+              {
+                column: "enabled",
+                title: t("servers.services.enabled"),
+                options: [
+                  { value: "yes", label: t("servers.services.enabledYes") },
+                  { value: "no", label: t("servers.services.enabledNo") },
+                ],
+              },
+            ]}
+            rowActions={
+              manage
+                ? (u) =>
+                    (
+                      [
+                        ["start", PlayIcon],
+                        ["stop", SquareIcon],
+                        ["restart", RotateCwIcon],
+                        ["reload", PauseIcon],
+                      ] as const
+                    ).map(([action, icon]) => ({
+                      id: action,
+                      label: t(`servers.services.${action}`),
+                      icon,
+                      disabled: busy === u.name,
+                      onSelect: () => void act(u, action),
+                    }))
+                : undefined
+            }
+            columns={[
+              {
+                id: "unit",
+                header: t("servers.services.unit"),
+                label: t("servers.services.unit"),
+                sortValue: (u) => u.name,
+                searchValue: (u) => [u.name, u.description, u.active_state, u.sub_state].join(" "),
+                cell: (u) => (
+                  <span className="block min-w-0">
+                    <span dir="ltr" className="font-mono text-sm font-medium">
+                      {u.name}
+                    </span>
+                    {u.description ? (
+                      <span className="block max-w-xs truncate text-caption text-muted-foreground" dir="auto">
+                        {u.description}
                       </span>
-                      {u.description ? <div className="max-w-xs truncate text-xs text-muted-foreground" dir="auto">{u.description}</div> : null}
-                    </TableCell>
-                    <TableCell>
-                      <ServiceStateBadge active={u.active_state} sub={u.sub_state} load={u.load_state} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={u.enabled ? "neutral" : "outline"}>
-                        {u.enabled ? t("servers.services.enabledYes") : t("servers.services.enabledNo")}
-                      </Badge>
-                    </TableCell>
-                    {manage ? (
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "start")}>
-                            <PlayIcon />
-                            {t("servers.services.start")}
-                          </Button>
-                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "stop")}>
-                            <SquareIcon />
-                            {t("servers.services.stop")}
-                          </Button>
-                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "restart")}>
-                            <RotateCwIcon />
-                            {t("servers.services.restart")}
-                          </Button>
-                          <Button size="sm" variant="secondary" disabled={busy === u.name} onClick={() => void act(u, "reload")}>
-                            <PauseIcon />
-                            {t("servers.services.reload")}
-                          </Button>
-                        </div>
-                      </TableCell>
                     ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
+                  </span>
+                ),
+              },
+              {
+                id: "state",
+                header: t("servers.services.state"),
+                label: t("servers.services.state"),
+                sortValue: (u) => u.active_state,
+                filterValue: (u) => u.active_state,
+                cell: (u) => <ServiceStateBadge active={u.active_state} sub={u.sub_state} load={u.load_state} />,
+              },
+              {
+                id: "enabled",
+                header: t("servers.services.enabled"),
+                label: t("servers.services.enabled"),
+                sortValue: (u) => (u.enabled ? 0 : 1),
+                filterValue: (u) => (u.enabled ? "yes" : "no"),
+                cell: (u) => (
+                  <Badge variant={u.enabled ? "neutral" : "outline"}>{u.enabled ? t("servers.services.enabledYes") : t("servers.services.enabledNo")}</Badge>
+                ),
+              },
+            ] satisfies DataTableColumn<ServiceUnit>[]}
+          />
+        </div>
       )}
     </section>
   )

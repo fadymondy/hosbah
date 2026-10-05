@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, toast, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { CalendarClockIcon, HistoryIcon, PauseIcon, PencilIcon, PlayIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
@@ -8,9 +8,10 @@ import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { LoadMore } from "@/components/lists/infinite"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -77,7 +78,8 @@ export function SiteSchedules() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [history, setHistory] = useState<Schedule | null>(null)
-  const [q, setQ] = useState("")
+  const [editing, setEditing] = useState<Schedule | null>(null)
+  const [deleting, setDeleting] = useState<Schedule | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -111,7 +113,34 @@ export function SiteSchedules() {
     }
   }
 
-  const shown = (items ?? []).filter((s) => matches(q, s.name, s.cron, s.command, s.last_status))
+  const rowActions = (s: Schedule): DataTableRowAction[] => [
+    { id: "runs", label: t("site.schedules.runs"), icon: HistoryIcon, onSelect: () => setHistory(s) },
+    ...(operate
+      ? [
+          {
+            id: "run",
+            label: t("site.schedules.runNow"),
+            icon: PlayIcon,
+            disabled: busy === s.id,
+            onSelect: () => void act(s, () => apiFetch(`${path}/schedules/${s.id}/run`, { method: "POST" }), t("site.schedules.started")),
+          },
+        ]
+      : []),
+    ...(manage
+      ? [
+          {
+            id: "toggle",
+            label: s.enabled ? t("site.schedules.pause") : t("site.schedules.resume"),
+            icon: s.enabled ? PauseIcon : PlayIcon,
+            group: "manage",
+            disabled: busy === s.id,
+            onSelect: () => void act(s, () => apiFetch(`${path}/schedules/${s.id}`, { method: "PATCH", body: { enabled: !s.enabled } }), t("site.saved")),
+          },
+          { id: "edit", label: t("lists.edit"), icon: PencilIcon, group: "manage", onSelect: () => setEditing(s) },
+          { id: "delete", label: t("common.delete"), icon: Trash2Icon, danger: true, group: "danger", onSelect: () => setDeleting(s) },
+        ]
+      : []),
+  ]
   const add = manage ? <ScheduleDialog path={path} onSaved={load} /> : null
 
   return (
@@ -122,98 +151,78 @@ export function SiteSchedules() {
         {items === null ? (
           <LoadingRows rows={3} />
         ) : items.length === 0 ? (
-          <EmptyState className="border-b" icon={CalendarClockIcon} title={t("site.schedules.emptyTitle")} description={t("site.schedules.emptyHint")} actions={<>{add}</>} />
+          <EmptyState className="nq-empty" icon={CalendarClockIcon} title={t("site.schedules.emptyTitle")} description={t("site.schedules.emptyHint")} actions={<>{add}</>} />
         ) : (
-          <>
-            <ListSearch value={q} onChange={setQ} placeholder={t("site.schedules.search")} shown={shown.length} total={items.length} />
-            <TableBand>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("site.monitors.name")}</TableHead>
-                    <TableHead>{t("site.schedules.when")}</TableHead>
-                    <TableHead>{t("site.schedules.last")}</TableHead>
-                    <TableHead>{t("site.schedules.next")}</TableHead>
-                    <TableHead className="text-end">{t("common.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        <span dir="auto" className="font-medium">
-                          {s.name}
-                        </span>
-                        <div dir="ltr" className="max-w-72 truncate text-start font-mono text-xs text-muted-foreground" title={s.command}>
-                          {s.command}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code dir="ltr" className="font-mono text-xs">
-                          {s.cron}
-                        </code>
-                        <div dir="ltr" className="text-start text-xs text-muted-foreground">
-                          {s.timezone}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {s.last_run ? (
-                          <span className="flex flex-col items-start gap-1">
-                            <Badge variant={TONE[s.last_run.status]}>{t(`site.schedules.status.${s.last_run.status}`)}</Badge>
-                            <span className="text-xs text-muted-foreground">{s.last_run.started_at ? ago(s.last_run.started_at) : ""}</span>
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{t("site.schedules.never")}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {!s.enabled ? <Badge variant="outline">{t("site.monitors.paused")}</Badge> : s.next_run_at ? <span dir="ltr">{fmt(s.next_run_at)}</span> : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => setHistory(s)}>
-                            <HistoryIcon />
-                            {t("site.schedules.runs")}
-                          </Button>
-                          {operate ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={busy === s.id}
-                              onClick={() => void act(s, () => apiFetch(`${path}/schedules/${s.id}/run`, { method: "POST" }), t("site.schedules.started"))}
-                            >
-                              <PlayIcon />
-                              {t("site.schedules.runNow")}
-                            </Button>
-                          ) : null}
-                          {manage ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy === s.id}
-                                onClick={() =>
-                                  void act(s, () => apiFetch(`${path}/schedules/${s.id}`, { method: "PATCH", body: { enabled: !s.enabled } }), t("site.saved"))
-                                }
-                              >
-                                {s.enabled ? <PauseIcon /> : <PlayIcon />}
-                                {s.enabled ? t("site.schedules.pause") : t("site.schedules.resume")}
-                              </Button>
-                              <ScheduleDialog path={path} schedule={s} onSaved={load} />
-                              <DeleteSchedule path={path} schedule={s} onDeleted={load} />
-                            </>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableBand>
-          </>
+          <NasaqTable
+            data={items}
+            rowId={(s) => s.id}
+            rowLabel={(s) => s.name}
+            label={t("site.nav.schedules")}
+            search={t("site.schedules.search")}
+            rowActions={rowActions}
+            onRowClick={(s) => setHistory(s)}
+            columns={[
+              {
+                id: "name",
+                header: t("site.monitors.name"),
+                cell: (s) => (
+                  <>
+                    <span dir="auto" className="font-medium">
+                      {s.name}
+                    </span>
+                    <div dir="ltr" className="max-w-72 truncate text-start font-mono text-xs text-muted-foreground" title={s.command}>
+                      {s.command}
+                    </div>
+                  </>
+                ),
+                sortValue: (s) => s.name,
+                searchValue: (s) => [s.name, s.cron, s.command, s.last_status ?? ""].join(" "),
+              },
+              {
+                id: "when",
+                header: t("site.schedules.when"),
+                cell: (s) => (
+                  <>
+                    <code dir="ltr" className="font-mono text-xs">
+                      {s.cron}
+                    </code>
+                    <div dir="ltr" className="text-start text-xs text-muted-foreground">
+                      {s.timezone}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                id: "last",
+                header: t("site.schedules.last"),
+                cell: (s) =>
+                  s.last_run ? (
+                    <span className="flex flex-col items-start gap-1">
+                      <Badge variant={TONE[s.last_run.status]}>{t(`site.schedules.status.${s.last_run.status}`)}</Badge>
+                      <span className="text-xs text-muted-foreground">{s.last_run.started_at ? ago(s.last_run.started_at) : ""}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("site.schedules.never")}</span>
+                  ),
+                sortValue: (s) => s.last_run?.started_at ?? "",
+              },
+              {
+                id: "next",
+                header: t("site.schedules.next"),
+                cell: (s) => (
+                  <span className="text-xs">
+                    {!s.enabled ? <Badge variant="outline">{t("site.monitors.paused")}</Badge> : s.next_run_at ? <span dir="ltr">{fmt(s.next_run_at)}</span> : "—"}
+                  </span>
+                ),
+                sortValue: (s) => (s.enabled ? (s.next_run_at ?? "") : "~"),
+              },
+            ]}
+          />
         )}
       </section>
       {history ? <Runs path={path} schedule={history} canRead={operate} onClose={() => setHistory(null)} /> : null}
+      {editing ? <ScheduleDialog open onOpenChange={(v) => !v && setEditing(null)} path={path} schedule={editing} onSaved={load} /> : null}
+      {deleting ? <DeleteSchedule open onOpenChange={(v) => !v && setDeleting(null)} path={path} schedule={deleting} onDeleted={load} /> : null}
     </>
   )
 }
@@ -247,6 +256,12 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
     setPicked(null)
     void load()
   }, [load])
+  const [loadingMore, setLoadingMore] = useState(false)
+  const more = useCallback(() => {
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
+    void load(cursor).finally(() => setLoadingMore(false))
+  }, [cursor, load, loadingMore])
 
   async function open(r: Run) {
     setPicked(r)
@@ -273,9 +288,9 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
       {runs === null ? (
         <LoadingRows rows={3} />
       ) : runs.length === 0 ? (
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.schedules.never")}</p>
+        <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.schedules.never")}</p>
       ) : (
-        <div className="grid border-b border-border xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="grid nq-box xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <ol className="flex max-h-[28rem] min-w-0 flex-col divide-y divide-border overflow-y-auto border-b border-border xl:border-e xl:border-b-0">
             {runs.map((r) => (
               <li key={r.id}>
@@ -299,13 +314,9 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
                 </button>
               </li>
             ))}
-            {cursor ? (
-              <li className="flex justify-center px-6 py-3">
-                <Button variant="ghost" size="sm" onClick={() => void load(cursor)}>
-                  {t("site.monitors.more")}
-                </Button>
-              </li>
-            ) : null}
+            <li>
+              <LoadMore hasMore={!!cursor} onMore={more} loading={loadingMore} />
+            </li>
           </ol>
           <div className="min-w-0">
             {!picked ? (
@@ -315,7 +326,7 @@ function Runs({ path, schedule, canRead, onClose }: { path: string; schedule: Sc
             ) : (
               <>
                 {picked.error ? (
-                  <p dir="auto" className="border-b border-border px-6 py-3 text-sm text-nq-danger-text">
+                  <p dir="auto" className="nq-band py-3 text-sm text-nq-danger-text">
                     {picked.error}
                   </p>
                 ) : null}

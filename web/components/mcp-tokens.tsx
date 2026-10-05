@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { KeyRoundIcon, PlusIcon, TriangleAlertIcon } from "lucide-react"
 
@@ -9,7 +9,8 @@ import { CopyField } from "@/components/copy-field"
 import { FormError, useErrorText } from "@/components/form-error"
 
 
-import { ErrorBand, LoadingRows, SectionTitle, SettingsRow, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle, SettingsRow } from "@/components/states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@fadymondy/nasaq/web"
 
 
@@ -87,59 +88,117 @@ export function McpTokens({
     return <Badge variant="neutral">{t("tokens.active")}</Badge>
   }
 
+  const tokenState = (tok: McpToken) =>
+    tok.revoked_at ? "revoked" : tok.expires_at && new Date(tok.expires_at) < new Date() ? "expired" : "active"
+
+  const columns: DataTableColumn<McpToken>[] = [
+    {
+      id: "name",
+      header: t("tokens.name"),
+      label: t("tokens.name"),
+      sortValue: (tok) => tok.name,
+      searchValue: (tok) => `${tok.name} ${(tok.scopes ?? []).join(" ")}`,
+      cell: (tok) => (
+        <span className="flex min-w-0 items-center gap-3">
+          <KeyRoundIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium">{tok.name}</span>
+        </span>
+      ),
+    },
+    ...(withScopes
+      ? [
+          {
+            id: "scopes",
+            header: t("tokens.scopes"),
+            label: t("tokens.scopes"),
+            className: "max-md:hidden",
+            headerClassName: "max-md:hidden",
+            cell: (tok: McpToken) => (
+              <div className="flex flex-wrap gap-1">
+                {(tok.scopes ?? []).map((s) => (
+                  <Badge key={s} variant={s === "danger" ? "danger" : "outline"} className="font-mono">
+                    <span dir="ltr">{s}</span>
+                  </Badge>
+                ))}
+              </div>
+            ),
+          } satisfies DataTableColumn<McpToken>,
+        ]
+      : []),
+    {
+      id: "status",
+      header: t("tokens.status"),
+      label: t("tokens.status"),
+      sortValue: tokenState,
+      filterValue: tokenState,
+      cell: status,
+    },
+    {
+      id: "last_used",
+      header: t("tokens.lastUsed"),
+      label: t("tokens.lastUsed"),
+      sortValue: (tok) => tok.last_used_at ?? "",
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (tok) => (
+        <span dir="ltr" className="text-caption text-muted-foreground">
+          {tok.last_used_at ? fmt(tok.last_used_at) : t("tokens.never")}
+        </span>
+      ),
+    },
+    {
+      id: "expires",
+      header: t("tokens.expires"),
+      label: t("tokens.expires"),
+      sortValue: (tok) => tok.expires_at ?? "",
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (tok) => (
+        <span dir="ltr" className="text-caption text-muted-foreground">
+          {tok.expires_at ? fmt(tok.expires_at) : t("tokens.never")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("common.actions")}</span>,
+      label: t("common.actions"),
+      cell: (tok) =>
+        canCreate && !tok.revoked_at ? (
+          <div className="flex justify-end">
+            <ConfirmButton
+              label={t("tokens.revoke")}
+              title={t("tokens.revokeTitle")}
+              description={t("tokens.revokeHint", { name: tok.name })}
+              confirmLabel={t("tokens.revoke")}
+              onConfirm={async () => {
+                await apiFetch(`${basePath}/${tok.id}`, { method: "DELETE" })
+                await load()
+              }}
+            />
+          </div>
+        ) : null,
+    },
+  ]
+
   const table =
     tokens && tokens.length ? (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("tokens.name")}</TableHead>
-            {withScopes ? <TableHead>{t("tokens.scopes")}</TableHead> : null}
-            <TableHead>{t("tokens.status")}</TableHead>
-            <TableHead>{t("tokens.lastUsed")}</TableHead>
-            <TableHead>{t("tokens.expires")}</TableHead>
-            <TableHead className="text-end">{canCreate ? t("common.actions") : null}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tokens.map((tok) => (
-            <TableRow key={tok.id}>
-              <TableCell className="font-medium">{tok.name}</TableCell>
-              {withScopes ? (
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {(tok.scopes ?? []).map((s) => (
-                      <Badge key={s} variant={s === "danger" ? "danger" : "outline"} className="font-mono">
-                        <span dir="ltr">{s}</span>
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-              ) : null}
-              <TableCell>{status(tok)}</TableCell>
-              <TableCell dir="ltr" className="text-start">
-                {tok.last_used_at ? fmt(tok.last_used_at) : t("tokens.never")}
-              </TableCell>
-              <TableCell dir="ltr" className="text-start">
-                {tok.expires_at ? fmt(tok.expires_at) : t("tokens.never")}
-              </TableCell>
-              <TableCell className="text-end">
-                {canCreate && !tok.revoked_at ? (
-                  <ConfirmButton
-                    label={t("tokens.revoke")}
-                    title={t("tokens.revokeTitle")}
-                    description={t("tokens.revokeHint", { name: tok.name })}
-                    confirmLabel={t("tokens.revoke")}
-                    onConfirm={async () => {
-                      await apiFetch(`${basePath}/${tok.id}`, { method: "DELETE" })
-                      await load()
-                    }}
-                  />
-                ) : null}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <NasaqTable
+        data={tokens}
+        columns={columns}
+        rowId={(tok) => String(tok.id)}
+        label={t("tokens.listTitle")}
+        rowLabel={(tok) => tok.name}
+        search={t("tokens.name")}
+        facets={[
+          {
+            column: "status",
+            title: t("tokens.status"),
+            options: [...new Set(tokens.map(tokenState))].map((v) => ({ value: v, label: t(`tokens.${v}`) })),
+          },
+        ]}
+        empty={t("home.noMatch")}
+      />
     ) : null
 
   const empty = (className: string) => (
@@ -193,7 +252,7 @@ export function McpTokens({
         ) : tokens.length === 0 && !error ? (
           empty("border-b")
         ) : table ? (
-          <TableBand>{table}</TableBand>
+          <div className="px-6 py-6">{table}</div>
         ) : null}
       </>
     )

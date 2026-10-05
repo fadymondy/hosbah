@@ -1,4 +1,4 @@
-h1:c2pPJcjgZ8Z0+yyHCE7lUC8SEMpC2IujY6OQez+mMao=
+h1:9nlpnXypHYzn65PfDBVRdKX7XcdNNcaoSO8l3ForQ64=
 20260914101053_init.sql h1:iewGcxx/XPD9dB0WqAKy96pP03tHBFQhGX3KjfARD1A=
 20260914101755_audit_and_auth.sql h1:WvNRrlHpdnPI3h+RGJUYKF5LgZyFUoWI02OtTVBbgxs=
 20260914101756_row_level_security.sql h1:TXYpzpdjqP/9KZpuUGmrUjjuQR1jdUzNUN1e69TMbdM=
@@ -115,3 +115,7 @@ h1:c2pPJcjgZ8Z0+yyHCE7lUC8SEMpC2IujY6OQez+mMao=
 20260929090613_add_apps_connected_server.sql h1:QTa6zCKBmFeH8C5InVxSbwOOOu4us4YQMlkia9LmcCc=
 20260929220015_add_wildcard_domains.sql h1:APFcwYhLgqWkXN+Udg7oywOlvXgN7CbWCQ/wkRO1pkk=
 20260930100000_add_circlexo.sql h1:db1IBYE/Wj20wBh+TzaR4a7SMIaDV0JbrQ2onnl1/UQ=
+20261005100000_add_panel_accounts.sql h1:71l8giVEo0oBYZdwBw6EAwPEpfJoprdX13IpZfmRViw=
+20261005120000_add_server_ssh_users.sql h1:pf5shhod+r2q9o/PQNlHuucmEM6qQkQMArHvCnkzaSw=
+20261005140000_add_app_tokens.sql h1:Il/CulIuGr2dF76mglSpPSz8M6uxEfvW9SUNPhWNXCE=
+20261005160000_add_oauth.sql h1:XxXTVeZU7lrOVYhylwQd+HxsPA+/j22Detpr9lcZI+s=

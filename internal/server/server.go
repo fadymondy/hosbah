@@ -198,6 +198,8 @@ func Boot() *app.App {
 	api.MountTerminal(k.Router, a, svc)
 	// The public status page (MH-575 H3): GET /api/public/status/{slug}, no session.
 	api.MountPublic(k.Router, a, svc)
+	// The integration API's panel link (MH-1153): GET /api/integrations/panel/{link}, one use.
+	api.MountIntegrations(k.Router, a, authSvc)
 
 	k.Router.Post("/api/mcp", mcp.UserServer().Handler(a))
 	k.Router.Get("/api/mcp", mcp.UserServer().Handler(a)) // 405: no server-initiated stream

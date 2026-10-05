@@ -1,10 +1,30 @@
 "use client"
 
-import { Button, Checkbox, Input, Skeleton, toast } from "@fadymondy/nasaq/web"
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Input,
+  StatCard,
+  StatGrid,
+  toast,
+} from "@fadymondy/nasaq/web"
 import { useCallback, useState, type FormEvent, type ReactNode } from "react"
 import {
   ArchiveIcon,
   CameraIcon,
+  ClockIcon,
+  CpuIcon,
+  HardDriveIcon,
+  MemoryStickIcon,
   PlayIcon,
   PowerIcon,
   RefreshCwIcon,
@@ -14,11 +34,10 @@ import {
   Trash2Icon,
 } from "lucide-react"
 
-import { Facts } from "@/components/admin/admin-list"
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { OperationLog } from "@/components/op-log"
-import { ErrorBand, SectionTitle, SettingsRow } from "@/components/states"
+import { ErrorBand, SectionTitle, SettingsFooter, SettingsRow } from "@/components/states"
 
 
 
@@ -68,7 +87,7 @@ export function useWorkloadActions(path: string, serverId: string) {
   const log = op ? (
     <section aria-label={t("controls.lastOperation")}>
       <SectionTitle title={t("controls.lastOperation")} hint={op.kind} />
-      <div className="border-b border-border">
+      <div className="nq-box">
         <OperationLog team={path.split("/")[3] ?? ""} serverId={serverId} op={op} />
       </div>
     </section>
@@ -193,24 +212,52 @@ export function WorkloadStats({ path }: { path: string }) {
       />
       <ErrorBand message={error} />
       {loading && !stats ? (
-        <div className="grid grid-cols-2 gap-px border-b border-border bg-border lg:grid-cols-4">
+        <StatGrid className="nq-stats">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="bg-background px-6 py-4">
-              <Skeleton className="h-10 w-full" />
-            </div>
+            <StatCard key={i} label="" value={null} loading />
           ))}
-        </div>
+        </StatGrid>
       ) : stats === "none" ? (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("controls.statsNone")}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{t("controls.statsNone")}</p>
       ) : stats ? (
-        <Facts
-          items={[
-            [t("controls.cpu"), <span key="c" dir="ltr" className="font-mono">{stats.cpu_percent.toFixed(1)}%{stats.cpus ? ` · ${stats.cpus} vCPU` : ""}</span>],
-            [t("imported.facts.memory"), <span key="m" dir="ltr" className="font-mono">{humanBytes(stats.mem_used_bytes)} / {humanBytes(stats.mem_total_bytes)}{pct(stats.mem_used_bytes, stats.mem_total_bytes)}</span>],
-            [t("imported.facts.disk"), <span key="d" dir="ltr" className="font-mono">{humanBytes(stats.disk_used_bytes)} / {humanBytes(stats.disk_total_bytes)}{pct(stats.disk_used_bytes, stats.disk_total_bytes)}</span>],
-            [t("controls.uptime"), <span key="u" dir="ltr" className="font-mono">{stats.uptime_seconds ? uptime(stats.uptime_seconds) : "—"}</span>],
-          ]}
-        />
+        <StatGrid className="nq-stats">
+          <StatCard
+            label={t("controls.cpu")}
+            icon={<CpuIcon />}
+            value={
+              <span dir="ltr">
+                {stats.cpu_percent.toFixed(1)}%{stats.cpus ? <span className="ms-2 text-xs font-normal text-muted-foreground">{stats.cpus} vCPU</span> : null}
+              </span>
+            }
+          />
+          <StatCard
+            label={t("imported.facts.memory")}
+            icon={<MemoryStickIcon />}
+            value={
+              <span className="flex flex-col gap-1">
+                <span dir="ltr">{humanBytes(stats.mem_used_bytes)}</span>
+                <span dir="ltr" className="text-xs font-normal text-muted-foreground">
+                  / {humanBytes(stats.mem_total_bytes)}
+                  {pct(stats.mem_used_bytes, stats.mem_total_bytes)}
+                </span>
+              </span>
+            }
+          />
+          <StatCard
+            label={t("imported.facts.disk")}
+            icon={<HardDriveIcon />}
+            value={
+              <span className="flex flex-col gap-1">
+                <span dir="ltr">{humanBytes(stats.disk_used_bytes)}</span>
+                <span dir="ltr" className="text-xs font-normal text-muted-foreground">
+                  / {humanBytes(stats.disk_total_bytes)}
+                  {pct(stats.disk_used_bytes, stats.disk_total_bytes)}
+                </span>
+              </span>
+            }
+          />
+          <StatCard label={t("controls.uptime")} icon={<ClockIcon />} value={<span dir="ltr">{stats.uptime_seconds ? uptime(stats.uptime_seconds) : "—"}</span>} />
+        </StatGrid>
       ) : null}
     </section>
   )
@@ -228,7 +275,7 @@ export function WorkloadLogs({ run, busy }: { run: (key: string, suffix: string,
   return (
     <form onSubmit={submit}>
       <SectionTitle title={t("controls.logs")} hint={t("controls.logsHint")} />
-      <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+      <div className="flex flex-wrap items-end gap-3 nq-band py-4">
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.tail")}
           <Input type="number" min={1} max={2000} dir="ltr" className="w-28 font-mono" value={tail} onChange={(e) => setTail(e.target.value)} />
@@ -272,11 +319,11 @@ export function ResizeGuest({ run, busy, item }: { run: (key: string, suffix: st
       <SettingsRow label={t("controls.diskGrow")} htmlFor="rs-disk" hint={t("controls.diskGrowHint")}>
         <Input id="rs-disk" type="number" min={0} dir="ltr" className="w-28 font-mono" placeholder="0" value={grow} onChange={(e) => setGrow(e.target.value)} />
       </SettingsRow>
-      <div className="flex justify-end border-b border-border px-6 py-4">
+      <SettingsFooter>
         <Button variant="primary" type="submit" disabled={!!busy}>
           {busy === "resize" ? t("common.working") : t("controls.applyResize")}
         </Button>
-      </div>
+      </SettingsFooter>
     </form>
   )
 }
@@ -305,6 +352,7 @@ export function GuestSnapshots({
   const [error, setError] = useState<string | null>(null)
   const [snapName, setSnapName] = useState("")
   const [note, setNote] = useState("")
+  const [taking, setTaking] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -327,6 +375,7 @@ export function GuestSnapshots({
         setNote("")
       })
       .catch(() => {})
+      .finally(() => setTaking(false))
   }
 
   const validName = /^[A-Za-z][A-Za-z0-9_-]{1,39}$/.test(snapName.trim())
@@ -338,17 +387,23 @@ export function GuestSnapshots({
         hint={t("controls.snapshotsHint")}
         className="border-t"
         action={
-          <Button variant="secondary" size="sm" disabled={loading} onClick={() => void load()}>
-            <RefreshCwIcon className={loading ? "animate-spin" : ""} />
-            {list ? t("controls.refresh") : t("controls.loadSnapshots")}
-          </Button>
+          <span className="flex gap-2">
+            <Button variant="secondary" size="sm" disabled={loading} onClick={() => void load()}>
+              <RefreshCwIcon className={loading ? "animate-spin" : ""} />
+              {list ? t("controls.refresh") : t("controls.loadSnapshots")}
+            </Button>
+            <Button variant="primary" size="sm" disabled={!!busy} onClick={() => setTaking(true)}>
+              <CameraIcon />
+              {t("controls.takeSnapshot")}
+            </Button>
+          </span>
         }
       />
       <ErrorBand message={error} />
       {list === null ? null : list.length === 0 ? (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("controls.noSnapshots")}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{t("controls.noSnapshots")}</p>
       ) : (
-        <ul className="divide-y divide-border border-b border-border">
+        <ul className="divide-y divide-border nq-box">
           {list.map((s) => (
             <li key={s.name} className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
               <span className="flex min-w-0 flex-col">
@@ -389,20 +444,36 @@ export function GuestSnapshots({
           ))}
         </ul>
       )}
-      <form onSubmit={create} className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          {t("controls.snapshotName")}
-          <Input dir="ltr" className="w-48 font-mono" placeholder="before-upgrade" value={snapName} onChange={(e) => setSnapName(e.target.value)} />
-        </label>
-        <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          {t("controls.snapshotNote")}
-          <Input value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
-        </label>
-        <Button variant="primary" type="submit" disabled={!!busy || !validName}>
-          <CameraIcon />
-          {busy === "snap" ? t("common.working") : t("controls.takeSnapshot")}
-        </Button>
-      </form>
+      <Dialog open={taking} onOpenChange={setTaking}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+          <form onSubmit={create} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>{t("controls.takeSnapshot")}</DialogTitle>
+              <DialogDescription>{t("controls.snapshotsHint")}</DialogDescription>
+            </DialogHeader>
+            <div className="flex w-full flex-col gap-5">
+              <Field>
+                <FieldLabel htmlFor="snap-name">{t("controls.snapshotName")}</FieldLabel>
+                <Input id="snap-name" dir="ltr" autoFocus className="font-mono" placeholder="before-upgrade" value={snapName} onChange={(e) => setSnapName(e.target.value)} />
+                <FieldDescription>{t("controls.snapshotNameHint")}</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="snap-note">{t("controls.snapshotNote")}</FieldLabel>
+                <Input id="snap-note" dir="auto" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
+              </Field>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setTaking(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button variant="primary" type="submit" disabled={!!busy || !validName}>
+                <CameraIcon />
+                {busy === "snap" ? t("common.working") : t("controls.takeSnapshot")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -414,7 +485,7 @@ export function GuestBackup({ run, busy }: { run: (key: string, suffix: string, 
   return (
     <section>
       <SectionTitle title={t("controls.backup")} hint={t("controls.backupHint")} className="border-t" />
-      <div className="flex flex-wrap items-end gap-3 border-b border-border px-6 py-4">
+      <div className="flex flex-wrap items-end gap-3 nq-band py-4">
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t("controls.storage")}
           <Input dir="ltr" className="w-48 font-mono" placeholder={t("controls.storageDefault")} value={storage} onChange={(e) => setStorage(e.target.value)} />
@@ -438,7 +509,7 @@ export function RecreateContainer({ run }: { run: (key: string, suffix: string, 
   return (
     <section>
       <SectionTitle title={t("controls.recreate")} hint={t("controls.recreateHint")} className="border-t" />
-      <div className="flex border-b border-border px-6 py-4">
+      <div className="flex nq-band py-4">
         <ConfirmButton
           size="md"
           icon={<RefreshCwIcon />}
@@ -576,11 +647,11 @@ export function DatabaseCredentials({ path, onSaved }: { path: string; onSaved: 
       <SettingsRow label={t("controls.dbName")} htmlFor="cr-db" hint={t("controls.dbNameHint")}>
         <Input id="cr-db" dir="ltr" autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
       </SettingsRow>
-      <div className="flex justify-end border-b border-border px-6 py-4">
+      <SettingsFooter>
         <Button variant="primary" type="submit" disabled={busy || !username.trim()}>
           {busy ? t("controls.checking") : t("controls.saveCredentials")}
         </Button>
-      </div>
+      </SettingsFooter>
     </form>
   )
 }

@@ -71,6 +71,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerGitHubApp(api)
 	d.registerFiles(api)
 	d.registerSFTPUsers(api)
+	d.registerPanelAccounts(api)
 	d.registerRepository(api)
 	d.registerDNS(api)
 	d.registerDNSZones(api)
@@ -88,10 +89,13 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerServerUpdates(api)
 	d.registerSSLCertificates(api)
 	d.registerSSHKeys(api)
+	d.registerSSHUsers(api)
 	d.registerServerSecurity(api)
 	d.registerSiteTemplates(api)
 	d.registerServices(api)
 	d.registerStorage(api)
+	d.registerObjects(api)
+	d.registerVolumeFiles(api)
 	d.registerBrowsers(api)
 	d.registerInstalls(api)
 	d.registerRealtime(api)
@@ -109,6 +113,8 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerFeedback(api)
 	d.registerAdmin(api)
 	d.registerPlatformAdmin(api)
+	d.registerIntegrations(api)
+	d.registerOAuth(api)
 }
 
 var (
@@ -145,7 +151,17 @@ func (d *deps) inTeam(ctx context.Context, teamID, ability string,
 	return d.tx(ctx, tenancy.Scope{UserID: id.ID}, func(q *db.Queries, tx *sql.Tx) error {
 		// {team} is an id or a slug, resolved only among the caller's own memberships —
 		// so another team's id and a made-up one are the same 404.
-		row, err := q.MembershipForRef(ctx, db.MembershipForRefParams{UserID: id.ID, Ref: teamID})
+		var row db.MembershipForRefRow
+		var err error
+		if id.Guard == PanelAppGuard {
+			// A panel-link customer has no membership: it is a deployer of its one app's team.
+			var ok bool
+			if row, ok = d.panelAppMembership(ctx, q, tx, id, teamID); !ok {
+				return errNotFound
+			}
+		} else {
+			row, err = q.MembershipForRef(ctx, db.MembershipForRefParams{UserID: id.ID, Ref: teamID})
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return errNotFound
 		}

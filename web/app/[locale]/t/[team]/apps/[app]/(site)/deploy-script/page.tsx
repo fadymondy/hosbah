@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteDeployConfig } from "@/components/site/deploy-config"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteDeployConfig />
+  return <SectionRedirect section="deploy-script" />
 }

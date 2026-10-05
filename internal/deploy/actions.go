@@ -54,8 +54,10 @@ func asActionError(err error) error {
 // Actor is who asked: a member in the browser, an MCP token, a deploy hook, the GitHub App.
 type Actor struct {
 	UserID  string
-	Via     string // web | mcp | hook | github
+	Via     string // web | mcp | hook | github | integration
 	TokenID string
+	// AppTokenID is the integration API's app token (MH-1153) that made the call, if any.
+	AppTokenID string
 }
 
 func (a Actor) audit(extra map[string]any) map[string]any {
@@ -68,6 +70,9 @@ func (a Actor) audit(extra map[string]any) map[string]any {
 	if a.TokenID != "" {
 		extra["mcp_token_id"] = a.TokenID
 	}
+	if a.AppTokenID != "" {
+		extra["app_token_id"] = a.AppTokenID
+	}
 	return extra
 }
 
@@ -75,6 +80,8 @@ func (a Actor) trigger() string {
 	switch a.Via {
 	case "mcp", "hook", "github":
 		return a.Via
+	case "integration": // an outside system's app token (MH-1153): automation, like a deploy hook
+		return "hook"
 	}
 	return "manual"
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, EmptyState } from "@fadymondy/nasaq/web"
+import { Button, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { ChartNoAxesColumnIcon } from "lucide-react"
 
@@ -96,9 +96,9 @@ export function ServerMetrics({ path }: { path: string }) {
       {series === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <EmptyState className="border-b" icon={ChartNoAxesColumnIcon} title={t("servers.metrics.emptyTitle")} description={t("servers.metrics.emptyHint")} />
+        <EmptyState className="rounded-lg border border-dashed border-border" icon={ChartNoAxesColumnIcon} title={t("servers.metrics.emptyTitle")} description={t("servers.metrics.emptyHint")} />
       ) : (
-        <div className="grid grid-cols-1 gap-px border-b border-border bg-border lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <ChartCard title={t("servers.cpu")}>
             <MetricChart
               ariaLabel={t("servers.cpu")}
@@ -187,9 +187,11 @@ export function ServerMetrics({ path }: { path: string }) {
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 bg-background px-6 py-4">
-      <h3 className="text-sm font-medium text-foreground">{title}</h3>
-      {children}
-    </div>
+    <Card className="min-w-0">
+      <CardHeader>
+        <CardTitle as="h3">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   )
 }

@@ -1,15 +1,16 @@
 "use client"
 
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Progress, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldLabel, Input, Progress, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
-import { ChevronDownIcon, ChevronRightIcon, CircleDollarSignIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { CircleDollarSignIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { PageBody } from "@/components/app-shell"
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { useErrorText } from "@/components/form-error"
 import { MetricChart, type ChartPoint } from "@/components/servers/metrics-chart"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -164,7 +165,89 @@ function ServersSection({
   onChanged: () => Promise<void> | void
 }) {
   const { t } = useI18n()
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const fmtMoney = useFormatMoney()
+  const [open, setOpen] = useState<ServerCostOut | null>(null)
+  const pct = (v: number | undefined) => (v != null ? Math.round(v) : undefined)
+
+  const columns: DataTableColumn<ServerCostOut>[] = [
+    {
+      id: "server",
+      header: t("costs.server"),
+      label: t("costs.server"),
+      sortValue: (s) => s.server_name,
+      searchValue: (s) => s.server_name,
+      cell: (s) => (
+        <span dir="auto" className="font-medium">
+          {s.server_name}
+        </span>
+      ),
+    },
+    {
+      id: "price",
+      header: t("costs.price"),
+      label: t("costs.price"),
+      sortValue: (s) => (s.priced ? (s.amount ?? 0) : -1),
+      cell: (s) =>
+        s.priced ? (
+          <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
+            {fmtMoney(s.amount ?? 0, s.currency ?? "USD")}
+            {s.idle_amount ? (
+              <span className="ms-1 text-xs text-muted-foreground">({t("costs.idleOf", { amount: fmtMoney(s.idle_amount, s.currency ?? "USD") })})</span>
+            ) : null}
+          </span>
+        ) : (
+          <Badge variant="outline">{t("costs.unpriced")}</Badge>
+        ),
+    },
+    {
+      id: "cpu",
+      header: t("servers.cpu"),
+      label: t("servers.cpu"),
+      sortValue: (s) => s.usage?.avg_cpu_percent ?? -1,
+      className: "max-md:hidden",
+      headerClassName: "max-md:hidden",
+      cell: (s) => <UsageBar percent={pct(s.usage?.avg_cpu_percent)} label={t("servers.cpu")} />,
+    },
+    {
+      id: "memory",
+      header: t("servers.memory"),
+      label: t("servers.memory"),
+      sortValue: (s) => s.usage?.mem_percent ?? -1,
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (s) => <UsageBar percent={pct(s.usage?.mem_percent)} label={t("servers.memory")} />,
+    },
+    {
+      id: "disk",
+      header: t("servers.disk"),
+      label: t("servers.disk"),
+      sortValue: (s) => s.usage?.disk_percent ?? -1,
+      className: "max-lg:hidden",
+      headerClassName: "max-lg:hidden",
+      cell: (s) => <UsageBar percent={pct(s.usage?.disk_percent)} label={t("servers.disk")} />,
+    },
+    {
+      id: "hint",
+      header: t("costs.hint"),
+      label: t("costs.hint"),
+      sortValue: (s) => s.hint ?? "",
+      filterValue: (s) => s.hint ?? "none",
+      cell: (s) =>
+        s.hint ? <Badge variant={hintTone(s.hint)}>{t(`costs.hints.${s.hint}`)}</Badge> : <span className="text-xs text-muted-foreground">—</span>,
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">{t("common.actions")}</span>,
+      label: t("common.actions"),
+      cell: (s) =>
+        manage ? (
+          <div className="flex flex-wrap justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            <PriceDialog team={team} server={s} onSaved={onChanged} />
+            {s.priced ? <ClearPrice team={team} server={s} onCleared={onChanged} /> : null}
+          </div>
+        ) : null,
+    },
+  ]
 
   return (
     <section aria-labelledby="costs-servers-h">
@@ -172,37 +255,35 @@ function ServersSection({
       {servers.length === 0 ? (
         <EmptyState className="border-b" icon={CircleDollarSignIcon} title={t("costs.serversEmptyTitle")} description={t("costs.serversEmptyHint")} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead />
-                <TableHead>{t("costs.server")}</TableHead>
-                <TableHead>{t("costs.price")}</TableHead>
-                <TableHead>{t("servers.cpu")}</TableHead>
-                <TableHead>{t("servers.memory")}</TableHead>
-                <TableHead>{t("servers.disk")}</TableHead>
-                <TableHead>{t("costs.hint")}</TableHead>
-                {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {servers.map((s) => (
-                <ServerRows
-                  key={s.server_id}
-                  team={team}
-                  manage={manage}
-                  window={win}
-                  server={s}
-                  expanded={expanded === s.server_id}
-                  onToggle={() => setExpanded((cur) => (cur === s.server_id ? null : s.server_id))}
-                  onChanged={onChanged}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <div className="px-6 py-6">
+          <NasaqTable
+            data={servers}
+            columns={columns}
+            rowId={(s) => s.server_id}
+            label={t("costs.serversTitle")}
+            rowLabel={(s) => s.server_name}
+            search={t("costs.server")}
+            facets={[
+              {
+                column: "hint",
+                title: t("costs.hint"),
+                options: [...new Set(servers.map((s) => s.hint ?? "none"))].map((h) => ({ value: h, label: h === "none" ? "—" : t(`costs.hints.${h}`) })),
+              },
+            ]}
+            onRowClick={setOpen}
+            empty={t("home.noMatch")}
+          />
+        </div>
       )}
+      <Dialog open={open !== null} onOpenChange={(v) => (v ? null : setOpen(null))}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle dir="auto">{open?.server_name}</DialogTitle>
+            <DialogDescription>{t("costs.showDetail")}</DialogDescription>
+          </DialogHeader>
+          {open ? <ServerDetail team={team} server={open} window={win} /> : null}
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -216,83 +297,6 @@ function UsageBar({ percent, label }: { percent: number | undefined; label: stri
         {percent}%
       </span>
     </div>
-  )
-}
-
-function ServerRows({
-  team,
-  manage,
-  window: win,
-  server: s,
-  expanded,
-  onToggle,
-  onChanged,
-}: {
-  team: string
-  manage: boolean
-  window: WindowKey
-  server: ServerCostOut
-  expanded: boolean
-  onToggle: () => void
-  onChanged: () => Promise<void> | void
-}) {
-  const { t } = useI18n()
-  const fmtMoney = useFormatMoney()
-
-  return (
-    <>
-      <TableRow className="align-top">
-        <TableCell>
-          <Button size="sm" variant="ghost" onClick={onToggle} aria-expanded={expanded} aria-label={t("costs.showDetail")}>
-            {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-          </Button>
-        </TableCell>
-        <TableCell>
-          <span dir="auto" className="font-medium">
-            {s.server_name}
-          </span>
-        </TableCell>
-        <TableCell>
-          {s.priced ? (
-            <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
-              {fmtMoney(s.amount ?? 0, s.currency ?? "USD")}
-              {s.idle_amount ? (
-                <span className="ms-1 text-xs text-muted-foreground">({t("costs.idleOf", { amount: fmtMoney(s.idle_amount, s.currency ?? "USD") })})</span>
-              ) : null}
-            </span>
-          ) : (
-            <Badge variant="outline">{t("costs.unpriced")}</Badge>
-          )}
-        </TableCell>
-        <TableCell>
-          <UsageBar percent={s.usage?.avg_cpu_percent != null ? Math.round(s.usage.avg_cpu_percent) : undefined} label={t("servers.cpu")} />
-        </TableCell>
-        <TableCell>
-          <UsageBar percent={s.usage?.mem_percent != null ? Math.round(s.usage.mem_percent) : undefined} label={t("servers.memory")} />
-        </TableCell>
-        <TableCell>
-          <UsageBar percent={s.usage?.disk_percent != null ? Math.round(s.usage.disk_percent) : undefined} label={t("servers.disk")} />
-        </TableCell>
-        <TableCell>
-          {s.hint ? <Badge variant={hintTone(s.hint)}>{t(`costs.hints.${s.hint}`)}</Badge> : <span className="text-xs text-muted-foreground">—</span>}
-        </TableCell>
-        {manage ? (
-          <TableCell>
-            <div className="flex flex-wrap justify-end gap-2">
-              <PriceDialog team={team} server={s} onSaved={onChanged} />
-              {s.priced ? <ClearPrice team={team} server={s} onCleared={onChanged} /> : null}
-            </div>
-          </TableCell>
-        ) : null}
-      </TableRow>
-      {expanded ? (
-        <TableRow>
-          <TableCell colSpan={manage ? 8 : 7} className="bg-secondary/40">
-            <ServerDetail team={team} server={s} window={win} />
-          </TableCell>
-        </TableRow>
-      ) : null}
-    </>
   )
 }
 
@@ -552,39 +556,65 @@ function LineItemsSection({
       {items.length === 0 ? (
         <EmptyState className="border-b" icon={CircleDollarSignIcon} title={t("costs.lineItemsEmptyTitle")} description={t("costs.lineItemsEmptyHint")} actions={<>{add}</>} />
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("costs.name")}</TableHead>
-                <TableHead>{t("costs.amount")}</TableHead>
-                <TableHead>{t("costs.added")}</TableHead>
-                {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((li) => (
-                <TableRow key={li.id}>
-                  <TableCell dir="auto">{li.name}</TableCell>
-                  <TableCell dir="ltr" className="text-start font-mono text-sm tabular-nums">
+        <div className="px-6 py-6">
+          <NasaqTable
+            data={items}
+            columns={[
+              {
+                id: "name",
+                header: t("costs.name"),
+                label: t("costs.name"),
+                sortValue: (li) => li.name,
+                searchValue: (li) => li.name,
+                cell: (li) => (
+                  <span dir="auto" className="font-medium">
+                    {li.name}
+                  </span>
+                ),
+              },
+              {
+                id: "amount",
+                header: t("costs.amount"),
+                label: t("costs.amount"),
+                sortValue: (li) => li.amount,
+                cell: (li) => (
+                  <span dir="ltr" className="font-mono text-sm tabular-nums">
                     {fmtMoney(li.amount, li.currency)}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start text-xs text-muted-foreground">
+                  </span>
+                ),
+              },
+              {
+                id: "added",
+                header: t("costs.added"),
+                label: t("costs.added"),
+                sortValue: (li) => li.created_at,
+                className: "max-md:hidden",
+                headerClassName: "max-md:hidden",
+                cell: (li) => (
+                  <span dir="ltr" className="text-caption text-muted-foreground">
                     {fmtDate(li.created_at)}
-                  </TableCell>
-                  {manage ? (
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <LineItemDialog team={team} item={li} onSaved={onChanged} />
-                        <DeleteLineItem team={team} item={li} onDeleted={onChanged} />
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+                  </span>
+                ),
+              },
+              {
+                id: "actions",
+                header: <span className="sr-only">{t("common.actions")}</span>,
+                label: t("common.actions"),
+                cell: (li) =>
+                  manage ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <LineItemDialog team={team} item={li} onSaved={onChanged} />
+                      <DeleteLineItem team={team} item={li} onDeleted={onChanged} />
+                    </div>
+                  ) : null,
+              },
+            ]}
+            rowId={(li) => li.id}
+            label={t("costs.lineItemsTitle")}
+            rowLabel={(li) => li.name}
+            empty={t("home.noMatch")}
+          />
+        </div>
       )}
     </section>
   )

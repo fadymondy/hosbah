@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteStacks } from "@/components/site/stacks"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteStacks />
+  return <SectionRedirect section="stacks" />
 }

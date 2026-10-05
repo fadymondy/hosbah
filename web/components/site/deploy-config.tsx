@@ -1,10 +1,11 @@
 "use client"
 
-import { Badge, Button, Checkbox, Collapsible, CollapsiblePanel, CollapsibleTrigger, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Collapsible, CollapsiblePanel, CollapsibleTrigger, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, Textarea, toast } from "@fadymondy/nasaq/web"
 import { useEffect, useState } from "react"
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, HistoryIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, HistoryIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon } from "lucide-react"
 
 import { useErrorText } from "@/components/form-error"
+import { NasaqTable } from "@/components/lists/nasaq-table"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, Notice, SectionTitle } from "@/components/states"
 
@@ -235,7 +236,7 @@ export function SiteDeployConfig() {
         <>
           {!canSave ? <Notice>{t("common.readOnly")}</Notice> : null}
           <fieldset disabled={!canSave || busy} className="contents">
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <p className="mb-3 text-sm font-medium text-foreground">{t("site.deployScript.mode")}</p>
               <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("site.deployScript.mode")}>
                 {(["auto", "fast", "full"] as DeployMode[]).map((m) => (
@@ -257,7 +258,7 @@ export function SiteDeployConfig() {
               </div>
             </div>
 
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <p className="mb-2 text-sm font-medium text-foreground">{t("site.deployScript.preset")}</p>
               <p className="mb-3 max-w-xl text-xs text-muted-foreground">{t("site.deployScript.presetHint")}</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -283,7 +284,7 @@ export function SiteDeployConfig() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-b border-border px-6 py-5">
+            <div className="flex flex-col gap-3 nq-band py-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-foreground">{t("site.deployScript.steps")}</p>
                 <Select
@@ -366,7 +367,7 @@ export function SiteDeployConfig() {
               )}
             </div>
 
-            <div className="border-b border-border px-6 py-5">
+            <div className="nq-band py-5">
               <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
                 <CollapsibleTrigger render={<button type="button" className="flex w-full items-center justify-between text-start group/deploy-adv" />}>
                   <span className="text-sm font-medium text-foreground">{t("site.deployScript.advanced")}</span>
@@ -467,39 +468,40 @@ export function SiteDeployConfig() {
             ) : versions.length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted-foreground">{t("site.deployScript.historyEmpty")}</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("site.deployScript.version")}</TableHead>
-                    <TableHead>{t("site.deployScript.updatedBy")}</TableHead>
-                    <TableHead>{t("site.deployScript.updatedAt")}</TableHead>
-                    {canSave ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {versions.map((v) => (
-                    <TableRow key={v.version}>
-                      <TableCell dir="ltr">
+              <NasaqTable
+                data={versions}
+                rowId={(v) => String(v.version)}
+                rowLabel={(v) => `v${v.version}`}
+                label={t("site.deployScript.history")}
+                defaultSort={{ id: "version", direction: "desc" }}
+                density="compact"
+                rowActions={
+                  canSave
+                    ? (v) => [
+                        { id: "restore", label: t("site.deployScript.restore"), icon: RotateCcwIcon, disabled: v.version === config?.version, onSelect: () => setRestoreTarget(v) },
+                      ]
+                    : undefined
+                }
+                columns={[
+                  {
+                    id: "version",
+                    header: t("site.deployScript.version"),
+                    cell: (v) => (
+                      <span dir="ltr">
                         v{v.version}
                         {v.version === config?.version ? (
                           <Badge variant="outline" className="ms-2">
                             {t("site.deployScript.current")}
                           </Badge>
                         ) : null}
-                      </TableCell>
-                      <TableCell dir="auto">{v.updated_by ?? "—"}</TableCell>
-                      <TableCell dir="ltr">{new Date(v.created_at).toLocaleString(locale)}</TableCell>
-                      {canSave ? (
-                        <TableCell className="text-end">
-                          <Button size="sm" variant="secondary" disabled={v.version === config?.version} onClick={() => setRestoreTarget(v)}>
-                            {t("site.deployScript.restore")}
-                          </Button>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </span>
+                    ),
+                    sortValue: (v) => v.version,
+                  },
+                  { id: "by", header: t("site.deployScript.updatedBy"), cell: (v) => <span dir="auto">{v.updated_by ?? "—"}</span> },
+                  { id: "at", header: t("site.deployScript.updatedAt"), cell: (v) => <span dir="ltr">{new Date(v.created_at).toLocaleString(locale)}</span>, sortValue: (v) => v.created_at },
+                ]}
+              />
             )}
           </div>
         </SheetContent>

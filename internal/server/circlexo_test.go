@@ -819,3 +819,86 @@ func TestCircleXODisabled(t *testing.T) {
 		t.Fatal("Current must be nil when off")
 	}
 }
+
+// TestCircleXOIntegrationTokens: the integrations API (MH-1153) takes a CircleXO hub token issued
+// to an integration (an act chain), mapped through the user and org links like /api/mcp. It lists
+// only the apps that person can manage and mints hba_ tokens for them; a token with no act chain,
+// or an actor outside HOSBAH_INTEGRATION_ACTORS, is refused.
+func TestCircleXOIntegrationTokens(t *testing.T) {
+	s := bootHub(t)
+	org := hubOrg()
+	ownerID, viewerID := "own-"+rnd(), "view-"+rnd()
+	s.install(org, [2]string{ownerID, "owner"}, [2]string{viewerID, "member"})
+	if code, _ := s.provision(org); code != 200 {
+		t.Fatal("provision")
+	}
+	team, _ := s.teamOf(org)
+	s.hub.Lock()
+	s.hub.Entitlements[org] = circlexo.Entitlements{OrgID: org, AppID: testHubApp, Active: true, Plan: "pro", Status: "active", Version: 1, Features: []circlexo.Entitlement{
+		{Key: "servers", Kind: "limit", Enabled: true}, {Key: "members", Kind: "limit", Enabled: true}, {Key: "apps", Kind: "limit", Enabled: true},
+	}}
+	s.hub.Unlock()
+	sub, viewerSub := "sub-own-"+rnd(), "sub-dep-"+rnd()
+	res, _, err := s.login(sub, ownerID+"@example.test", true, org, "owner", "sid-"+rnd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.login(viewerSub, viewerID+"@example.test", true, org, "member", "sid-"+rnd()); err != nil {
+		t.Fatal(err)
+	}
+
+	// The owner's browser session makes a server and an app in the hub team.
+	owner := newClient(t, s.base)
+	u, _ := url.Parse(s.base)
+	owner.http.Jar.SetCookies(u, []*http.Cookie{sessionCookie(res)})
+	srv, _ := enrolServer(t, owner, s.base, team, "hubint-"+rnd())
+	var created struct {
+		App struct{ ID string } `json:"app"`
+	}
+	owner.mustJSON("POST", "/api/teams/"+team+"/apps", map[string]any{"name": "hubint-" + rnd(), "server": srv,
+		"repo_url": "https://github.com/octocat/api.git"}, 201, &created)
+
+	agent := func(subject string) string {
+		return s.hub.AccessToken(map[string]any{"sub": subject, "org_id": org, "act": map[string]any{"sub": "mahaam", "agent_id": "mahaam-1"}})
+	}
+	var list struct {
+		Apps []struct{ ID string } `json:"apps"`
+	}
+	keyJSON(t, s.base, agent(sub), "GET", "/api/integrations/apps", nil, 200, &list)
+	if len(list.Apps) != 1 || list.Apps[0].ID != created.App.ID {
+		t.Fatalf("hub owner lists %+v, want the one app", list.Apps)
+	}
+	var minted struct {
+		Token string `json:"token"`
+		App   struct{ ID string }
+	}
+	keyJSON(t, s.base, agent(sub), "POST", "/api/integrations/apps/"+created.App.ID+"/tokens", map[string]any{"label": "Mahaam"}, 201, &minted)
+	if !strings.HasPrefix(minted.Token, "hba_") || minted.App.ID != created.App.ID {
+		t.Fatalf("minted %+v", minted)
+	}
+	keyJSON(t, s.base, minted.Token, "GET", "/api/integrations/app", nil, 200, nil)
+
+	// A deployer (hub "member") sees nothing and cannot mint.
+	keyJSON(t, s.base, agent(viewerSub), "GET", "/api/integrations/apps", nil, 200, &list)
+	if len(list.Apps) != 0 {
+		t.Errorf("a deployer lists %d apps, want 0", len(list.Apps))
+	}
+	if code, text := keyDo(t, s.base, agent(viewerSub), "POST", "/api/integrations/apps/"+created.App.ID+"/tokens", map[string]any{"label": "x"}); code != 403 {
+		t.Errorf("deployer minting -> %d, want 403: %s", code, text)
+	}
+
+	refuse := func(what, token string, want int) {
+		t.Helper()
+		if code, text := keyDo(t, s.base, token, "GET", "/api/integrations/apps", nil); code != want {
+			t.Errorf("%s -> %d, want %d: %s", what, code, want, text)
+		}
+	}
+	refuse("no act chain", s.hub.AccessToken(map[string]any{"sub": sub, "org_id": org, "scope": "read write"}), http.StatusForbidden)
+	refuse("unlinked user", agent("nobody-"+rnd()), http.StatusForbidden)
+	refuse("wrong audience", s.hub.AccessToken(map[string]any{"sub": sub, "org_id": org, "aud": "other", "act": map[string]any{"sub": "mahaam"}}), http.StatusUnauthorized)
+	refuse("garbage", "not-a-token", http.StatusUnauthorized)
+	t.Setenv("HOSBAH_INTEGRATION_ACTORS", "someone-else, another")
+	refuse("actor not allowed", agent(sub), http.StatusForbidden)
+	t.Setenv("HOSBAH_INTEGRATION_ACTORS", "someone-else,mahaam")
+	refuse("actor allowed", agent(sub), http.StatusOK)
+}

@@ -16,7 +16,7 @@ import { ApiError, apiFetch } from "@/lib/api"
 import { APP_NAME, runtimeLabel, shortSha, type App, type Deployment, type DetectResult } from "@/lib/apps"
 import { useDocumentTitle, useI18n } from "@/lib/i18n"
 import { useEventStream, type Operation, type Server } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 type Created = { app: App; deploy_hook_url: string; deployment?: Deployment }
@@ -31,7 +31,7 @@ export default function NewAppPage() {
   const { team, manage } = useTeam()
   useDocumentTitle(`${t("apps.new.title")} — ${team.name}`)
   const errorText = useErrorText()
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
 
   const [servers, setServers] = useState<Server[] | null>(null)
   const [name, setName] = useState("")
@@ -265,7 +265,7 @@ export default function NewAppPage() {
                 />
                 <SourceOption icon={<LayoutTemplateIcon />} title={t("home2.fromTemplate")} body={t("home2.fromTemplateBody")} href={`${base}/templates`} />
                 {importServer ? (
-                  <SourceOption icon={<DownloadIcon />} title={t("home2.fromServer")} body={t("home2.fromServerBody")} href={`${base}/servers/${importServer}/discovered`} />
+                  <SourceOption icon={<DownloadIcon />} title={t("home2.fromServer")} body={t("home2.fromServerBody")} href={`${base}/servers/${importServer}/settings#import`} />
                 ) : null}
                 <SourceOption icon={<PackageIcon />} title={t("nav.products")} body={t("apps.new.wizard.productsBody")} href={`${base}/products`} />
               </div>

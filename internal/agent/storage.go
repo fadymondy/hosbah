@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -16,6 +17,8 @@ import (
 
 type storageHost struct {
 	run runFunc
+	// runIn is run with stdin (object.browse uploads); nil uses execRunIn.
+	runIn func(ctx context.Context, env []string, stdin []byte, name string, args ...string) ([]byte, error)
 }
 
 func newStorageHost() *storageHost { return &storageHost{run: execRun} }

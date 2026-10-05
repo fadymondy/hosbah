@@ -1,11 +1,12 @@
 "use client"
 
-import { Badge, Button, EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, EmptyState, StatCard, StatGrid } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ActivityIcon, ChartNoAxesColumnIcon, ExternalLinkIcon, GaugeIcon, TriangleAlertIcon, UsersIcon } from "lucide-react"
 
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -90,11 +91,11 @@ export function SiteAnalytics() {
       {series === null ? (
         <LoadingRows rows={4} />
       ) : empty ? (
-        <EmptyState className="border-b" icon={ChartNoAxesColumnIcon} title={t("site.analytics.emptyTitle")} description={t("site.analytics.emptyHint")} />
+        <EmptyState className="nq-empty" icon={ChartNoAxesColumnIcon} title={t("site.analytics.emptyTitle")} description={t("site.analytics.emptyHint")} />
       ) : (
         <>
-          <Tiles t={t} totals={series.totals} />
-          <div className="border-b border-border px-6 py-6">
+          <Tiles t={t} totals={series.totals} points={series.points} />
+          <div className="nq-band py-6">
             <RequestsChart points={series.points} />
           </div>
           <StatusBreakdown t={t} points={series.points} />
@@ -108,27 +109,34 @@ export function SiteAnalytics() {
 
 type TFunc = (key: string, vars?: Record<string, string | number>, fallback?: string) => string
 
-function Tiles({ t, totals }: { t: TFunc; totals: Totals }) {
+function Tiles({ t, totals, points }: { t: TFunc; totals: Totals; points: Point[] }) {
   const tiles = [
-    { icon: <ActivityIcon />, label: t("site.analytics.requests"), value: totals.requests.toLocaleString() },
+    { icon: <ActivityIcon />, label: t("site.analytics.requests"), value: totals.requests.toLocaleString(), spark: points.map((p) => p.requests) },
     { icon: <UsersIcon />, label: t("site.analytics.visitors"), value: totals.visitors.toLocaleString() },
-    { icon: <TriangleAlertIcon />, label: t("site.analytics.errorRate"), value: `${(totals.error_rate * 100).toFixed(1)}%` },
+    {
+      icon: <TriangleAlertIcon />,
+      label: t("site.analytics.errorRate"),
+      value: `${(totals.error_rate * 100).toFixed(1)}%`,
+      spark: points.map((p) => p.status_5xx + p.status_4xx),
+    },
     { icon: <GaugeIcon />, label: t("site.analytics.p95"), value: `${Math.round(totals.p95_ms)} ms` },
   ]
   return (
-    <div className="grid grid-cols-2 divide-x divide-border border-b border-border rtl:divide-x-reverse sm:grid-cols-4">
+    <StatGrid className="nq-stats">
       {tiles.map((tile) => (
-        <div key={tile.label} className="flex flex-col gap-1 px-6 py-4">
-          <span className="flex items-center gap-2 text-xs text-muted-foreground [&_svg]:size-3.5">
-            {tile.icon}
-            {tile.label}
-          </span>
-          <span dir="ltr" className="text-start text-xl font-semibold text-foreground">
-            {tile.value}
-          </span>
-        </div>
+        <StatCard
+          key={tile.label}
+          icon={tile.icon}
+          label={tile.label}
+          sparkline={tile.spark && tile.spark.length > 1 ? tile.spark : undefined}
+          value={
+            <span dir="ltr" className="text-start">
+              {tile.value}
+            </span>
+          }
+        />
       ))}
-    </div>
+    </StatGrid>
   )
 }
 
@@ -193,7 +201,7 @@ function StatusBreakdown({ t, points }: { t: TFunc; points: Point[] }) {
   const total = Math.max(1, sums["2xx"] + sums["3xx"] + sums["4xx"] + sums["5xx"])
   const classes: (keyof typeof sums)[] = ["2xx", "3xx", "4xx", "5xx"]
   return (
-    <section aria-labelledby="an-status-h" className="border-b border-border px-6 py-6">
+    <section aria-labelledby="an-status-h" className="nq-band py-6">
       <h3 id="an-status-h" className="mb-3 text-sm font-medium text-foreground">
         {t("site.analytics.statusBreakdown")}
       </h3>
@@ -235,37 +243,41 @@ function TopTable({ title, rows, empty, external }: { title: string; rows: KeyCo
     <section aria-labelledby={`${title}-h`}>
       <SectionTitle id={`${title}-h`} title={title} />
       {rows.length === 0 ? (
-        <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{empty}</p>
+        <p className="nq-band py-4 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("site.analytics.path")}</TableHead>
-                <TableHead className="text-end">{t("site.analytics.requests")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.key}>
-                  <TableCell dir="ltr" className="max-w-md truncate font-mono text-xs">
-                    {external ? (
-                      <a href={r.key.includes("://") ? r.key : `https://${r.key}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                        {r.key}
-                        <ExternalLinkIcon className="size-3" />
-                      </a>
-                    ) : (
-                      r.key
-                    )}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    <Badge variant="outline">{r.count.toLocaleString()}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
+        <NasaqTable
+          data={rows}
+          rowId={(r) => r.key}
+          rowLabel={(r) => r.key}
+          label={title}
+          defaultSort={{ id: "count", direction: "desc" }}
+          columns={[
+            {
+              id: "path",
+              header: t("site.analytics.path"),
+              cell: (r) => (
+                <span dir="ltr" className="block max-w-md truncate font-mono text-xs">
+                  {external ? (
+                    <a href={r.key.includes("://") ? r.key : `https://${r.key}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
+                      {r.key}
+                      <ExternalLinkIcon className="size-3" />
+                    </a>
+                  ) : (
+                    r.key
+                  )}
+                </span>
+              ),
+              searchValue: (r) => r.key,
+            },
+            {
+              id: "count",
+              header: t("site.analytics.requests"),
+              align: "end",
+              cell: (r) => <Badge variant="outline">{r.count.toLocaleString()}</Badge>,
+              sortValue: (r) => r.count,
+            },
+          ]}
+        />
       )}
     </section>
   )

@@ -178,3 +178,16 @@ export function shortSha(sha: string | null | undefined): string {
 export function appPath(team: string, app: string): string {
   return `/api/teams/${encodeURIComponent(team)}/apps/${encodeURIComponent(app)}`
 }
+
+/** When an app last did something: its latest deploy, else when it was added. Heartbeats are not activity. */
+export function appActivity(a: App): number {
+  return Date.parse(a.latest_deployment?.created_at ?? a.created_at) || 0
+}
+
+/** Last activity per server: the newest app activity on it, else when the server joined. */
+export function serverActivity(servers: { id: string; enrolled_at: string | null; created_at: string }[], apps: App[]) {
+  const m = new Map<string, number>()
+  for (const s of servers) m.set(s.id, Date.parse(s.enrolled_at ?? s.created_at) || 0)
+  for (const a of apps) m.set(a.server_id, Math.max(m.get(a.server_id) ?? 0, appActivity(a)))
+  return m
+}

@@ -61,9 +61,9 @@ export const SERVER_ICONS: Record<string, LucideIcon> = {
 export const SERVER_COLORS = ["#3B82F6", "#22C55E", "#EAB308", "#F97316", "#EF4444", "#EC4899", "#A855F7", "#14B8A6", "#64748B"]
 
 /** A server's badge: its logo, else its icon in its color, else the plain server icon. */
-export function ServerMark({ server, size = 8 }: { server: Pick<Server, "color" | "icon" | "logo_url">; size?: 6 | 8 | 10 }) {
+export function ServerMark({ server, size = 8 }: { server: Pick<Server, "color" | "icon" | "logo_url">; size?: 6 | 8 | 10 | 16 | 22 }) {
   const Icon = SERVER_ICONS[server.icon ?? ""] ?? ServerIcon
-  const box = size === 10 ? "size-10 [&_svg]:size-5" : size === 6 ? "size-6 [&_svg]:size-3.5" : "size-8 [&_svg]:size-4"
+  const box = size === 22 ? "size-18 rounded-xl sm:size-22 [&_svg]:size-9 sm:[&_svg]:size-11" : size === 16 ? "size-16 [&_svg]:size-8" : size === 10 ? "size-10 [&_svg]:size-5" : size === 6 ? "size-6 [&_svg]:size-3.5" : "size-8 [&_svg]:size-4"
   return (
     <span
       className={`flex ${box} shrink-0 items-center justify-center overflow-hidden border border-border bg-background text-nq-brand`}

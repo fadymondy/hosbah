@@ -1,14 +1,15 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { NetworkIcon, PlusIcon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
-import { EditDialog, ListSearch, matches } from "@/components/server-tabs/list-tools"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { EditDialog } from "@/components/server-tabs/list-tools"
 import { FormError, useErrorText } from "@/components/form-error"
 import { SiteRules } from "@/components/site/rules"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -33,8 +34,6 @@ export function ServerProxy({ serverId }: { serverId: string }) {
   const [hosts, setHosts] = useState<ProxyHost[] | null>(null)
   const [servers, setServers] = useState<Server[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
-  const shown = (hosts ?? []).filter((h) => matches(q, h.hostname, h.upstream, h.tls))
 
   const load = useCallback(async () => {
     try {
@@ -72,88 +71,96 @@ export function ServerProxy({ serverId }: { serverId: string }) {
       {hosts === null ? (
         <LoadingRows />
       ) : hosts.length === 0 ? (
-        <EmptyState className="border-b" icon={NetworkIcon} title={t("proxy.emptyTitle")} description={t("proxy.emptyHint")} />
+        <EmptyState className="mt-3 rounded-lg border border-border bg-card" icon={NetworkIcon} title={t("proxy.emptyTitle")} description={t("proxy.emptyHint")} />
       ) : (
-        <>
-        <ListSearch value={q} onChange={setQ} placeholder={t("lists.searchProxy")} shown={shown.length} total={hosts.length} />
-        {shown.length === 0 ? <p className="border-b border-border px-6 py-8 text-center text-sm text-muted-foreground">{t("home.noMatch")}</p> : null}
-        <TableBand>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("proxy.hostname")}</TableHead>
-                <TableHead>{t("proxy.upstream")}</TableHead>
-                <TableHead>{t("proxy.server")}</TableHead>
-                <TableHead>{t("proxy.tls")}</TableHead>
-                {manage ? <TableHead className="text-end">{t("common.actions")}</TableHead> : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((h) => (
-                <TableRow key={h.id}>
-                  <TableCell>
-                    <span dir="ltr" className="font-medium">
-                      {h.hostname}
+        <div className="mt-3">
+          <NasaqTable
+            data={hosts}
+            rowId={(h) => h.id}
+            label={t("proxy.title")}
+            rowLabel={(h) => h.hostname}
+            search={t("lists.searchProxy")}
+            empty={t("home.noMatch")}
+            facets={[{ column: "tls", title: t("proxy.tls"), options: [...new Set(hosts.map((h) => h.tls))].map((v) => ({ value: v, label: t(`proxy.tlsModes.${v}`) })) }]}
+            rowActions={
+              manage
+                ? (h) => [
+                    ...(h.tls === "auto" && !h.verified ? [{ id: "verify", label: t("proxy.verify"), onSelect: () => void act(`${h.id}/verify`, "POST") }] : []),
+                    { id: "toggle", label: h.enabled ? t("proxy.disable") : t("proxy.enable"), onSelect: () => void act(h.id, "PATCH", { enabled: !h.enabled }) },
+                  ]
+                : undefined
+            }
+            columns={[
+              {
+                id: "hostname",
+                header: t("proxy.hostname"),
+                label: t("proxy.hostname"),
+                sortValue: (h) => h.hostname,
+                searchValue: (h) => [h.hostname, h.upstream, h.server_name ?? "", h.tls].join(" "),
+                cell: (h) => (
+                  <span className="block min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span dir="ltr" className="font-medium">
+                        {h.hostname}
+                      </span>
+                      <Badge variant={h.enabled ? "success" : "outline"}>{h.enabled ? t("proxy.enabled") : t("proxy.disabled")}</Badge>
+                      {h.tls === "auto" ? <Badge variant={h.verified ? "neutral" : "warning"}>{h.verified ? t("proxy.verified") : t("proxy.unverified")}</Badge> : null}
                     </span>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <Badge variant={h.enabled ? "neutral" : "outline"}>
-                        {h.enabled ? t("proxy.enabled") : t("proxy.disabled")}
-                      </Badge>
-                      {h.tls === "auto" ? (
-                        <Badge variant={h.verified ? "neutral" : "outline"}>
-                          {h.verified ? t("proxy.verified") : t("proxy.unverified")}
-                        </Badge>
-                      ) : null}
-                    </div>
                     {h.tls === "auto" && !h.verified ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("proxy.verifyHint", { name: h.verify_name, value: h.verify_value })}
-                      </p>
+                      <span className="mt-1 block max-w-md text-caption text-muted-foreground">{t("proxy.verifyHint", { name: h.verify_name, value: h.verify_value })}</span>
                     ) : null}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start font-mono text-xs">
+                  </span>
+                ),
+              },
+              {
+                id: "upstream",
+                header: t("proxy.upstream"),
+                label: t("proxy.upstream"),
+                sortValue: (h) => h.upstream,
+                cell: (h) => (
+                  <span dir="ltr" className="font-mono text-caption">
                     {h.upstream}
-                  </TableCell>
-                  <TableCell dir="ltr" className="text-start">
-                    {h.server_name ?? "—"}
-                  </TableCell>
-                  <TableCell>{t(`proxy.tlsModes.${h.tls}`)}</TableCell>
-                  {manage ? (
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {h.tls === "auto" && !h.verified ? (
-                          <Button size="sm" variant="secondary" onClick={() => act(`${h.id}/verify`, "POST")}>
-                            {t("proxy.verify")}
-                          </Button>
-                        ) : null}
-                        <EditProxy host={h} team={team.slug} onSaved={load} />
-                        <ProxyRules host={h} team={team.slug} />
-                        <Button size="sm" variant="secondary" onClick={() => act(h.id, "PATCH", { enabled: !h.enabled })}>
-                          {h.enabled ? t("proxy.disable") : t("proxy.enable")}
-                        </Button>
-                        <ConfirmButton
-                          label={t("proxy.remove")}
-                          title={t("proxy.remove")}
-                          description={t("proxy.removeConfirm", { host: h.hostname })}
-                          confirmLabel={t("proxy.remove")}
-                          onConfirm={async () => {
-                            try {
-                              await apiFetch(`/api/teams/${team.slug}/proxy-hosts/${h.id}`, { method: "DELETE" })
-                            } catch (err) {
-                              throw new Error(errorText(err))
-                            }
-                            await load()
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableBand>
-        </>
+                  </span>
+                ),
+              },
+              {
+                id: "server",
+                header: t("proxy.server"),
+                label: t("proxy.server"),
+                className: "max-lg:hidden",
+                headerClassName: "max-lg:hidden",
+                cell: (h) => <span dir="ltr">{h.server_name ?? "—"}</span>,
+              },
+              { id: "tls", header: t("proxy.tls"), label: t("proxy.tls"), sortValue: (h) => h.tls, filterValue: (h) => h.tls, cell: (h) => <Badge variant="neutral">{t(`proxy.tlsModes.${h.tls}`)}</Badge> },
+              {
+                id: "actions",
+                header: <span className="sr-only">{t("common.actions")}</span>,
+                label: t("common.actions"),
+                cell: (h) =>
+                  !manage ? null : (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <EditProxy host={h} team={team.slug} onSaved={load} />
+                      <ProxyRules host={h} team={team.slug} />
+                      <ConfirmButton
+                        label={t("proxy.remove")}
+                        title={t("proxy.remove")}
+                        description={t("proxy.removeConfirm", { host: h.hostname })}
+                        confirmLabel={t("proxy.remove")}
+                        onConfirm={async () => {
+                          try {
+                            await apiFetch(`/api/teams/${team.slug}/proxy-hosts/${h.id}`, { method: "DELETE" })
+                          } catch (err) {
+                            throw new Error(errorText(err))
+                          }
+                          await load()
+                        }}
+                      />
+                    </div>
+                  ),
+              },
+            ] satisfies DataTableColumn<ProxyHost>[]}
+          />
+        </div>
       )}
     </section>
   )

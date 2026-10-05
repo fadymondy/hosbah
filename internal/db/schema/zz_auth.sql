@@ -22,7 +22,12 @@ CREATE TABLE users (
     -- Hosbah: set when a password sign-up has not proved its address yet (internal/account).
     -- NULL means verified, so every account that existed before verification did stays usable,
     -- and so do invitation sign-ups (the invitation proved the address).
-    email_unverified_at timestamptz
+    email_unverified_at timestamptz,
+    -- Hosbah (MH-1141): set for a panel account — a customer who signs in to one server's
+    -- white-label panel only. Its email column holds "<email>#panel:<server id>" so the same
+    -- address can have a Hosbah account and panel accounts on many servers, and the console
+    -- refuses its sessions (internal/server/accounts.go). NULL for every Hosbah account.
+    panel_server_id text REFERENCES servers (id) ON DELETE CASCADE
 );
 
 -- TOTP secrets from POST /api/auth/2fa/enroll. Hosbah's login wrapper reads them to require

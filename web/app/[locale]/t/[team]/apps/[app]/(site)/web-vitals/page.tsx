@@ -1,7 +1,7 @@
 "use client"
 
-import { SiteWebVitals } from "@/components/site/web-vitals"
+import { SectionRedirect } from "@/components/site/section-redirect"
 
 export default function Page() {
-  return <SiteWebVitals />
+  return <SectionRedirect section="web-vitals" />
 }

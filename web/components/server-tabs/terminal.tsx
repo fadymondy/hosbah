@@ -144,7 +144,7 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
     return (
       <section aria-labelledby="terminal-h" data-testid="terminal">
         <SectionTitle id="terminal-h" title={t("servers.terminal.title")} hint={t("servers.terminal.hint")} />
-        <EmptyState className="border-b" icon={SquareTerminalIcon} title={t("servers.terminal.noAccessTitle")} description={t("servers.terminal.noAccessHint")} />
+        <EmptyState className="mt-3 rounded-lg border border-border bg-card" icon={SquareTerminalIcon} title={t("servers.terminal.noAccessTitle")} description={t("servers.terminal.noAccessHint")} />
       </section>
     )
   }
@@ -166,9 +166,9 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
         }
       />
       {status === "closed" && reason ? (
-        <p className="border-b border-border px-6 py-2 text-sm text-muted-foreground">{t("servers.terminal.closedNotice", { reason })}</p>
+        <p className="mt-3 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">{t("servers.terminal.closedNotice", { reason })}</p>
       ) : null}
-      <div className="min-h-[28rem] flex-1 px-6 py-4" dir="ltr">
+      <div className="mt-3 min-h-[28rem] flex-1 overflow-hidden rounded-lg border border-border bg-background p-3" dir="ltr">
         <div ref={hostRef} className="h-full min-h-[28rem] w-full" />
       </div>
     </section>

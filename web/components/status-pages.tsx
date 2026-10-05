@@ -1,13 +1,12 @@
 "use client"
 
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@fadymondy/nasaq/web"
+import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, EmptyState, Field, FieldDescription, FieldLabel, Input, type DataTableColumn } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import { ExternalLinkIcon, GaugeIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 
 
@@ -15,7 +14,8 @@ import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 
 
 
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 import { apiFetch } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
@@ -40,7 +40,6 @@ export function StatusPagesSection({ team, manage }: { team: string; manage: boo
   const [pages, setPages] = useState<StatusPage[] | null>(null)
   const [monitors, setMonitors] = useState<PickableMonitor[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState("")
 
   const load = useCallback(async () => {
     try {
@@ -79,7 +78,6 @@ export function StatusPagesSection({ team, manage }: { team: string; manage: boo
     void loadMonitors()
   }, [load, loadMonitors])
 
-  const shown = (pages ?? []).filter((p) => matches(q, p.title, p.slug))
   const add = manage ? <StatusPageDialog team={team} monitors={monitors} onSaved={load} /> : null
 
   return (
@@ -91,54 +89,71 @@ export function StatusPagesSection({ team, manage }: { team: string; manage: boo
       ) : pages.length === 0 ? (
         <EmptyState className="border-b" icon={GaugeIcon} title={t("statusPages.emptyTitle")} description={t("statusPages.emptyHint")} actions={<>{add}</>} />
       ) : (
-        <>
-          <ListSearch value={q} onChange={setQ} placeholder={t("statusPages.search")} shown={shown.length} total={pages.length} />
-          <TableBand>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("statusPages.title")}</TableHead>
-                  <TableHead>{t("statusPages.slug")}</TableHead>
-                  <TableHead>{t("lists.status")}</TableHead>
-                  <TableHead className="text-end">{t("common.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <span dir="auto" className="font-medium">
-                        {p.title}
-                      </span>
-                    </TableCell>
-                    <TableCell dir="ltr" className="text-start font-mono text-xs text-muted-foreground">
-                      /status/{p.slug}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.published ? "brand" : "outline"}>{p.published ? t("statusPages.published") : t("statusPages.unpublished")}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {p.published ? (
-                          <Button size="sm" variant="secondary" nativeButton={false} render={<a href={`/${locale}/status/${p.slug}`} target="_blank" rel="noreferrer" />}>
-                            <ExternalLinkIcon />
-                            {t("statusPages.view")}
-                          </Button>
-                        ) : null}
-                        {manage ? (
-                          <>
-                            <StatusPageDialog team={team} monitors={monitors} page={p} onSaved={load} />
-                            <DeletePage team={team} page={p} onDeleted={load} />
-                          </>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableBand>
-        </>
+        <div className="px-6 py-6">
+          <NasaqTable
+            data={pages}
+            rowId={(p) => p.id}
+            label={t("statusPages.title")}
+            rowLabel={(p) => p.title}
+            search={t("statusPages.search")}
+            empty={t("home.noMatch")}
+            columns={[
+              {
+                id: "title",
+                header: t("statusPages.title"),
+                label: t("statusPages.title"),
+                sortValue: (p) => p.title,
+                searchValue: (p) => `${p.title} ${p.slug}`,
+                cell: (p) => (
+                  <span dir="auto" className="font-medium">
+                    {p.title}
+                  </span>
+                ),
+              },
+              {
+                id: "slug",
+                header: t("statusPages.slug"),
+                label: t("statusPages.slug"),
+                sortValue: (p) => p.slug,
+                className: "max-md:hidden",
+                headerClassName: "max-md:hidden",
+                cell: (p) => (
+                  <span dir="ltr" className="font-mono text-caption text-muted-foreground">
+                    /status/{p.slug}
+                  </span>
+                ),
+              },
+              {
+                id: "status",
+                header: t("lists.status"),
+                label: t("lists.status"),
+                sortValue: (p) => (p.published ? 0 : 1),
+                cell: (p) => <Badge variant={p.published ? "brand" : "outline"}>{p.published ? t("statusPages.published") : t("statusPages.unpublished")}</Badge>,
+              },
+              {
+                id: "actions",
+                header: <span className="sr-only">{t("common.actions")}</span>,
+                label: t("common.actions"),
+                cell: (p) => (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {p.published ? (
+                      <Button size="sm" variant="secondary" nativeButton={false} render={<a href={`/${locale}/status/${p.slug}`} target="_blank" rel="noreferrer" />}>
+                        <ExternalLinkIcon />
+                        {t("statusPages.view")}
+                      </Button>
+                    ) : null}
+                    {manage ? (
+                      <>
+                        <StatusPageDialog team={team} monitors={monitors} page={p} onSaved={load} />
+                        <DeletePage team={team} page={p} onDeleted={load} />
+                      </>
+                    ) : null}
+                  </div>
+                ),
+              },
+            ] satisfies DataTableColumn<StatusPage>[]}
+          />
+        </div>
       )}
     </section>
   )

@@ -4,6 +4,7 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogH
 import { useState, type FormEvent, type ReactNode } from "react"
 import { PencilIcon, SearchIcon } from "lucide-react"
 
+import { useDialogOpen, type Controlled } from "@/components/dialog-state"
 import { FormError, useErrorText } from "@/components/form-error"
 
 
@@ -28,7 +29,7 @@ export function ListSearch({
 }) {
   const { t } = useI18n()
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
       <div className="relative w-full max-w-xs">
         <SearchIcon className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} className="ps-8" />
@@ -54,16 +55,20 @@ export function EditDialog({
   onSave,
   children,
   onOpen,
+  ...controlled
 }: {
   title: string
   description?: string
   onSave: () => Promise<void>
   children: ReactNode
   onOpen?: () => void
-}) {
+} & Controlled) {
   const { t } = useI18n()
   const errorText = useErrorText()
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, controlled: fromCaller } = useDialogOpen(controlled, () => {
+    setError(null)
+    onOpen?.()
+  })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -84,18 +89,14 @@ export function EditDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(v) => {
-        setOpen(v)
-        if (v) {
-          setError(null)
-          onOpen?.()
-        }
-      }}
+      onOpenChange={setOpen}
     >
-      <DialogTrigger render={<Button variant="secondary" size="sm" />}>
-        <PencilIcon />
-        {t("lists.edit")}
-      </DialogTrigger>
+      {fromCaller ? null : (
+        <DialogTrigger render={<Button variant="secondary" size="sm" />}>
+          <PencilIcon />
+          {t("lists.edit")}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>

@@ -35,3 +35,64 @@ html[lang="en"] {
     font-size: 16px;
   }
 }
+
+/* A full-bleed band (hairline under it, page gutter) that becomes a rounded Nasaq card inside card
+   pages (CardPieces and the app's side sheet set data-cards). */
+@layer components {
+  .nq-band {
+    border-bottom: 1px solid var(--color-border);
+    padding-inline: 1.5rem;
+  }
+  [data-cards] .nq-band {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    padding-inline: 1rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  @media (min-width: 40rem) {
+    [data-cards] .nq-band {
+      padding-inline: 1.25rem;
+    }
+  }
+}
+
+/* A bordered box (a list, a stat grid, a log) and an empty state, with the same two looks as nq-band. */
+@layer components {
+  .nq-box {
+    border-bottom: 1px solid var(--color-border);
+  }
+  [data-cards] .nq-box {
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-card);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  .nq-empty {
+    border-bottom: 1px solid var(--color-border);
+  }
+  [data-cards] .nq-empty {
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-card);
+  }
+}
+
+/* A grid of StatCards: inset from the edges of a bleed page, flush inside a page of cards. */
+@layer components {
+  .nq-stats {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+  [data-cards] .nq-stats {
+    padding: 0;
+    border-bottom: 0;
+  }
+}
+
+/* A view's own stack of pieces (title, notices, table): spaced as cards inside the app, flush as hairline bands. */
+@layer components {
+  [data-cards] [data-stack] > * + * {
+    margin-top: 0.75rem;
+  }
+}

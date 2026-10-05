@@ -132,6 +132,8 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 		agentproto.KindPasswdSet:         passwdSet,
 		agentproto.KindDeployKeyGenerate: deployKeyGenerate,
 		agentproto.KindGuestEnrol:        guestEnrol,
+		agentproto.KindSSHUserSet:        sshUserSet,
+		agentproto.KindSSHUserRemove:     sshUserRemove,
 	}
 	wl := newWorkloads()
 	for kind, h := range map[string]Handler{
@@ -145,7 +147,7 @@ func NewExecutor(serverID string, cpPub ed25519.PublicKey, version, controlPlane
 	st := newStorageHost()
 	for kind, h := range map[string]Handler{
 		agentproto.KindVolumeUsage: st.volumeUsage, agentproto.KindVolumeRemove: st.volumeRemove,
-		agentproto.KindBucketCreate: st.bucketCreate, agentproto.KindBucketRemove: st.bucketRemove,
+		agentproto.KindBucketCreate: st.bucketCreate, agentproto.KindBucketRemove: st.bucketRemove, agentproto.KindObjectBrowse: st.objectBrowse, agentproto.KindVolumeFiles: st.volumeFiles,
 	} {
 		e.handlers[kind] = h
 	}
@@ -400,6 +402,24 @@ func laneOf(op agentproto.SignedOp) string {
 			return "app:" + p.AppID
 		}
 		return "app:?"
+	case agentproto.KindVolumeFiles:
+		// Its own lane per volume: browsing never waits behind a deploy of the app.
+		var p struct {
+			Volume string `json:"volume"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.Volume != "" {
+			return "files:" + p.Volume
+		}
+		return "files:?"
+	case agentproto.KindObjectBrowse:
+		// Its own lane per service: browsing never waits behind a backup of the same service.
+		var p struct {
+			ServiceID string `json:"service_id"`
+		}
+		if json.Unmarshal(op.Params, &p) == nil && p.ServiceID != "" {
+			return "objects:" + p.ServiceID
+		}
+		return "objects:?"
 	case agentproto.KindLogDrainSet:
 		// Its own lane: two log.drains.set for the same drain must never interleave, but must
 		// never wait behind a build or a provisioning step either.

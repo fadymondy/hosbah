@@ -1,14 +1,14 @@
 "use client"
 
-import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, toast, useConfirm, type DataTableRowAction } from "@fadymondy/nasaq/web"
 import { useCallback, useEffect, useState } from "react"
 import { AlertTriangleIcon, ListOrderedIcon, RefreshCwIcon, RotateCwIcon, Trash2Icon } from "lucide-react"
 
 import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
-import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
-import { ErrorBand, LoadingRows, SectionTitle, TableBand } from "@/components/states"
+import { NasaqTable } from "@/components/lists/nasaq-table"
+import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
 
 
 
@@ -49,7 +49,7 @@ export function SiteQueues() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [q, setQ] = useState("")
+  const confirm = useConfirm()
 
   const load = useCallback(async () => {
     if (!operate) return
@@ -98,11 +98,25 @@ export function SiteQueues() {
     return (
       <section aria-labelledby="qu-h">
         <SectionTitle id="qu-h" title={t("site.nav.queues")} hint={t("site.planned.queues.hint")} />
-        <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.needsDeployer")}</p>
+        <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.queues.needsDeployer")}</p>
       </section>
     )
 
-  const shown = (jobs ?? []).filter((j) => matches(q, j.id, j.name, j.queue, j.connection, j.exception))
+  const jobActions = (j: Job): DataTableRowAction[] => [
+    { id: "retry", label: t("site.queues.retry"), icon: RotateCwIcon, disabled: busy, onSelect: () => void act(`/${encodeURIComponent(j.id)}/retry`, "POST", t("site.queues.done")).catch(() => {}) },
+    {
+      id: "forget",
+      label: t("site.queues.forget"),
+      icon: Trash2Icon,
+      danger: true,
+      group: "danger",
+      disabled: busy,
+      onSelect: async () => {
+        if (await confirm({ title: t("site.queues.forgetTitle"), description: j.name || j.id, confirmLabel: t("site.queues.forget") }))
+          await act(`/${encodeURIComponent(j.id)}`, "DELETE", t("site.queues.done")).catch(() => {})
+      },
+    },
+  ]
 
   return (
     <>
@@ -118,12 +132,12 @@ export function SiteQueues() {
           }
         />
         <ErrorBand message={error} />
-        {note ? <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{note}</p> : null}
+        {note ? <p className="nq-band py-4 text-sm text-muted-foreground">{note}</p> : null}
         {ov === null ? (
           note || error ? null : <LoadingRows rows={3} />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-4 text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 nq-band py-4 text-sm">
               <ListOrderedIcon className="size-4 text-nq-brand" />
               <span className="font-medium">{t(`site.queues.drivers.${ov.driver}`)}</span>
               <Badge variant={ov.confidence === "detected" ? "brand" : "outline"}>{t(`site.queues.confidence.${ov.confidence}`)}</Badge>
@@ -135,7 +149,7 @@ export function SiteQueues() {
               ) : null}
             </div>
             {!ov.readable ? (
-              <p className="flex items-start gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+              <p className="flex items-start gap-2 nq-band py-6 text-sm text-muted-foreground">
                 <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
                 <span>
                   {ov.driver === "none" ? t("site.queues.none") : t("site.queues.unreadable")}
@@ -143,34 +157,36 @@ export function SiteQueues() {
                 </span>
               </p>
             ) : ov.queues.length ? (
-              <TableBand>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("site.queues.queue")}</TableHead>
-                      <TableHead>{t("site.queues.pending")}</TableHead>
-                      <TableHead>{t("site.queues.running")}</TableHead>
-                      <TableHead>{t("site.queues.failed")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {ov.queues.map((x) => (
-                      <TableRow key={x.name}>
-                        <TableCell dir="ltr" className="text-start font-medium">
-                          {x.name}
-                        </TableCell>
-                        <TableCell className="tabular-nums">{n(x.pending)}</TableCell>
-                        <TableCell className="tabular-nums">{n(x.running)}</TableCell>
-                        <TableCell className={x.failed ? "text-nq-danger-text tabular-nums" : "tabular-nums"}>{n(x.failed)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableBand>
+              <NasaqTable
+                data={ov.queues}
+                rowId={(x) => x.name}
+                rowLabel={(x) => x.name}
+                label={t("site.nav.queues")}
+                columns={[
+                  {
+                    id: "name",
+                    header: t("site.queues.queue"),
+                    cell: (x) => (
+                      <span dir="ltr" className="font-medium">
+                        {x.name}
+                      </span>
+                    ),
+                    sortValue: (x) => x.name,
+                  },
+                  { id: "pending", header: t("site.queues.pending"), cell: (x) => <span className="tabular-nums">{n(x.pending)}</span>, sortValue: (x) => x.pending ?? -1 },
+                  { id: "running", header: t("site.queues.running"), cell: (x) => <span className="tabular-nums">{n(x.running)}</span>, sortValue: (x) => x.running ?? -1 },
+                  {
+                    id: "failed",
+                    header: t("site.queues.failed"),
+                    cell: (x) => <span className={x.failed ? "text-nq-danger-text tabular-nums" : "tabular-nums"}>{n(x.failed)}</span>,
+                    sortValue: (x) => x.failed ?? -1,
+                  },
+                ]}
+              />
             ) : (
-              <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.noQueues")}</p>
+              <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.queues.noQueues")}</p>
             )}
-            {ov.readable ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.queues.dash")}</p> : null}
+            {ov.readable ? <p className="nq-band py-2 text-xs text-muted-foreground">{t("site.queues.dash")}</p> : null}
           </>
         )}
       </section>
@@ -207,46 +223,50 @@ export function SiteQueues() {
           {jobs === null ? (
             <LoadingRows rows={2} />
           ) : jobs.length === 0 ? (
-            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.queues.noFailed")}</p>
+            <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.queues.noFailed")}</p>
           ) : (
             <>
-              <ListSearch value={q} onChange={setQ} placeholder={t("site.queues.search")} shown={shown.length} total={jobs.length} />
-              <ol className="flex flex-col divide-y divide-border border-b border-border">
-                {shown.map((j) => (
-                  <li key={j.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3">
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span dir="ltr" className="truncate text-start text-sm font-medium text-foreground" title={j.name}>
-                        {j.name || j.id}
-                      </span>
-                      <span dir="ltr" className="truncate text-start font-mono text-xs text-muted-foreground">
-                        {j.queue} · {j.connection} · {j.failed_at} · {j.id}
-                      </span>
-                      {j.exception ? (
-                        <span dir="ltr" className="truncate text-start text-xs text-nq-danger-text" title={j.exception}>
-                          {j.exception}
+              <NasaqTable
+                data={jobs}
+                rowId={(j) => j.id}
+                rowLabel={(j) => j.name || j.id}
+                label={t("site.queues.failedJobs")}
+                search={t("site.queues.search")}
+                rowActions={manage ? jobActions : undefined}
+                columns={[
+                  {
+                    id: "job",
+                    header: t("site.queues.failedJobs"),
+                    cell: (j) => (
+                      <span className="flex min-w-0 flex-col">
+                        <span dir="ltr" className="max-w-xl truncate text-start text-sm font-medium text-foreground" title={j.name}>
+                          {j.name || j.id}
                         </span>
-                      ) : null}
-                    </span>
-                    {manage ? (
-                      <>
-                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => void act(`/${encodeURIComponent(j.id)}/retry`, "POST", t("site.queues.done")).catch(() => {})}>
-                          <RotateCwIcon />
-                          {t("site.queues.retry")}
-                        </Button>
-                        <ConfirmButton
-                          icon={<Trash2Icon />}
-                          label={t("site.queues.forget")}
-                          title={t("site.queues.forgetTitle")}
-                          description={j.name || j.id}
-                          confirmLabel={t("site.queues.forget")}
-                          onConfirm={() => act(`/${encodeURIComponent(j.id)}`, "DELETE", t("site.queues.done"))}
-                        />
-                      </>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-              {truncated ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.queues.truncated")}</p> : null}
+                        <span dir="ltr" className="max-w-xl truncate text-start font-mono text-xs text-muted-foreground">
+                          {j.queue} · {j.connection} · {j.id}
+                        </span>
+                        {j.exception ? (
+                          <span dir="ltr" className="max-w-xl truncate text-start text-xs text-nq-danger-text" title={j.exception}>
+                            {j.exception}
+                          </span>
+                        ) : null}
+                      </span>
+                    ),
+                    searchValue: (j) => [j.id, j.name, j.queue, j.connection, j.exception ?? ""].join(" "),
+                  },
+                  {
+                    id: "failed_at",
+                    header: t("site.queues.failedAt"),
+                    cell: (j) => (
+                      <span dir="ltr" className="font-mono text-xs text-muted-foreground">
+                        {j.failed_at}
+                      </span>
+                    ),
+                    sortValue: (j) => j.failed_at,
+                  },
+                ]}
+              />
+              {truncated ? <p className="nq-band py-2 text-xs text-muted-foreground">{t("site.queues.truncated")}</p> : null}
             </>
           )}
         </section>

@@ -47,6 +47,11 @@ export function SessionGate({ children, fallback }: { children: ReactNode; fallb
   return <Ctx.Provider value={{ me, refresh: load }}>{children}</Ctx.Provider>
 }
 
+/** Provides a session loaded elsewhere (the panel probes /api/me without sending a visitor to the console login). */
+export function SessionProvider({ me, refresh, children }: Session & { children: ReactNode }) {
+  return <Ctx.Provider value={{ me, refresh }}>{children}</Ctx.Provider>
+}
+
 export function useSession(): Session {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error("useSession outside SessionGate")

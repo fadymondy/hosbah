@@ -1,8 +1,8 @@
 "use client"
 
-import { Button, Progress } from "@fadymondy/nasaq/web"
-import { useState } from "react"
-import { AlertCircleIcon, LoaderIcon } from "lucide-react"
+import { Button, Card, Progress, StatCard, StatGrid } from "@fadymondy/nasaq/web"
+import { useState, type ReactNode } from "react"
+import { ActivityIcon, AlertCircleIcon, CpuIcon, GaugeIcon, HardDriveIcon, LoaderIcon, MemoryStickIcon, TimerIcon } from "lucide-react"
 
 import { CopyField } from "@/components/copy-field"
 import { useErrorText } from "@/components/form-error"
@@ -83,34 +83,40 @@ export default function ServerOverview() {
         <section aria-labelledby="metrics-h">
           <SectionTitle id="metrics-h" title={t("servers.detail.metrics")} />
           {m ? (
-            <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-3 lg:grid-cols-6" data-testid="metrics">
-              <Meter label={t("servers.cpu")} value={Math.round(m.cpu_percent)} text={`${m.cpu_percent.toFixed(1)}%`} />
+            <StatGrid className="mt-3" data-testid="metrics">
+              <Meter icon={<CpuIcon />} label={t("servers.cpu")} value={Math.round(m.cpu_percent)} text={`${m.cpu_percent.toFixed(1)}%`} />
               <Meter
+                icon={<MemoryStickIcon />}
                 label={t("servers.memory")}
                 value={percent(m.mem_used_bytes, m.mem_total_bytes)}
                 text={`${formatBytes(m.mem_used_bytes)} / ${formatBytes(m.mem_total_bytes)}`}
               />
               <Meter
+                icon={<HardDriveIcon />}
                 label={t("servers.disk")}
                 value={percent(m.disk_used_bytes, m.disk_total_bytes)}
                 text={`${formatBytes(m.disk_used_bytes)} / ${formatBytes(m.disk_total_bytes)}`}
               />
-              <Stat label={t("servers.load")} value={m.load1.toFixed(2)} />
-              <Stat label={t("servers.uptime")} value={formatUptime(m.uptime_seconds)} />
-              <Stat label={t("servers.lastSeen")} value={server.last_seen_at ? fmt(server.last_seen_at) : t("servers.never")} small />
-            </dl>
+              <StatCard icon={<GaugeIcon />} label={t("servers.load")} value={<Ltr>{m.load1.toFixed(2)}</Ltr>} />
+              <StatCard icon={<TimerIcon />} label={t("servers.uptime")} value={<Ltr>{formatUptime(m.uptime_seconds)}</Ltr>} />
+              <StatCard
+                icon={<ActivityIcon />}
+                label={t("servers.lastSeen")}
+                value={<span className="text-base">{server.last_seen_at ? fmt(server.last_seen_at) : t("servers.never")}</span>}
+              />
+            </StatGrid>
           ) : (
-            <p className="border-b border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.detail.noMetrics")}</p>
+            <Card className="mt-3 px-5 py-6 text-center text-sm text-muted-foreground">{t("servers.detail.noMetrics")}</Card>
           )}
         </section>
       ) : null}
 
-      <div className="grid gap-px border-b border-border bg-border lg:grid-cols-2">
-        <section aria-labelledby="facts-h" className="min-w-0 bg-background">
-          <h2 id="facts-h" className="px-6 pt-5 pb-3 text-base font-medium text-foreground">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card aria-labelledby="facts-h" className="min-w-0 gap-0 py-0">
+          <h2 id="facts-h" className="border-b border-border px-5 py-4 text-h4 font-semibold text-foreground">
             {t("servers.detail.facts")}
           </h2>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-border px-6 py-4 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 px-5 py-4 text-sm">
             <Fact
               label={t("servers.discovered.platform")}
               value={
@@ -139,17 +145,17 @@ export default function ServerOverview() {
               }
             />
           </dl>
-        </section>
-        <section aria-labelledby="checks-h" className="min-w-0 bg-background">
-          <h2 id="checks-h" className="px-6 pt-5 pb-3 text-base font-medium text-foreground">
+        </Card>
+        <Card aria-labelledby="checks-h" className="min-w-0 gap-0 py-0">
+          <h2 id="checks-h" className="border-b border-border px-5 py-4 text-h4 font-semibold text-foreground">
             {t("servers.detail.checks")}
           </h2>
           {server.checks.length === 0 ? (
-            <p className="border-t border-border px-6 py-4 text-sm text-muted-foreground">{t("servers.detail.checksEmpty")}</p>
+            <p className="px-5 py-6 text-center text-sm text-muted-foreground">{t("servers.detail.checksEmpty")}</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border border-t border-border text-sm" data-testid="checks">
+            <ul className="flex flex-col divide-y divide-border text-sm" data-testid="checks">
               {server.checks.map((c) => (
-                <li key={c.name} className="flex flex-wrap items-center gap-2 px-6 py-2.5">
+                <li key={c.name} className="flex flex-wrap items-center gap-2 px-5 py-3">
                   <CheckBadge status={c.status} />
                   <span className="font-medium">{t(`servers.check.names.${c.name}`, undefined, c.name)}</span>
                   <span dir="auto" className="text-muted-foreground">
@@ -159,35 +165,34 @@ export default function ServerOverview() {
               ))}
             </ul>
           )}
-        </section>
+        </Card>
       </div>
 
     </>
   )
 }
 
-function Meter({ label, value, text }: { label: string; value: number; text: string }) {
+function Meter({ icon, label, value, text }: { icon: ReactNode; label: string; value: number; text: string }) {
   return (
-    <div className="flex flex-col gap-2 bg-background px-6 py-4">
-      <dt className="eyebrow">{label}</dt>
-      <dd className="flex flex-col gap-2">
-        <span dir="ltr" className="text-start font-mono text-sm tabular-nums">
-          {text}
+    <StatCard
+      icon={icon}
+      label={label}
+      value={
+        <span className="flex flex-col gap-2">
+          <span className="tabular-nums">{value}%</span>
+          <Progress value={value} aria-label={label} size="sm" />
+          <Ltr className="text-caption font-normal text-muted-foreground">{text}</Ltr>
         </span>
-        <Progress value={value} aria-label={label} size="sm" />
-      </dd>
-    </div>
+      }
+    />
   )
 }
 
-function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
+function Ltr({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-col gap-2 bg-background px-6 py-4">
-      <dt className="eyebrow">{label}</dt>
-      <dd dir="ltr" className={cn("text-start font-mono tabular-nums", small ? "text-xs" : "text-sm")}>
-        {value}
-      </dd>
-    </div>
+    <span dir="ltr" className={cn("font-mono tabular-nums", className)}>
+      {children}
+    </span>
   )
 }
 

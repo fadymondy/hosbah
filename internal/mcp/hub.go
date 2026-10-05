@@ -49,6 +49,14 @@ func (e *ErrDenied) Error() string { return e.Msg }
 
 func denied(msg string) error { return &ErrDenied{Msg: msg} }
 
+// AuthenticateHubToken is authHub for the integrations API (internal/api/integrations.go): a
+// CircleXO access token for Hosbah's app, mapped to the person's team and current role. ok=false
+// means it is not a valid hub token (or the integration is off); an *ErrDenied is a valid token
+// Hosbah will not act on (403).
+func AuthenticateHubToken(ctx context.Context, a *app.App, token string) (c Caller, err error, ok bool) {
+	return authHub(ctx, a, token)
+}
+
 // authHub authenticates a CircleXO-issued access token. It reports ok=false (a plain 401) for a token
 // that is not a valid hub token, or when the integration is off.
 func authHub(ctx context.Context, a *app.App, token string) (Caller, error, bool) {

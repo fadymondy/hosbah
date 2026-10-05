@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge, Button, toast } from "@fadymondy/nasaq/web"
+import { Badge, Button, StatCard, StatGrid, toast, useConfirm } from "@fadymondy/nasaq/web"
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import {
@@ -16,9 +16,10 @@ import {
 } from "lucide-react"
 
 import { DeploymentStatusBadge } from "@/components/app-status"
-import { ConfirmButton } from "@/components/confirm-button"
 import { useErrorText } from "@/components/form-error"
 import { useTimeAgo } from "@/components/home/sparkline"
+import { LoadMore, useInfiniteLimit } from "@/components/lists/infinite"
+import { RowMenu, RowWithActions, type RowAction } from "@/components/lists/row-actions"
 import { ListSearch, matches } from "@/components/server-tabs/list-tools"
 import { useLoadedSite } from "@/components/site/context"
 import { ErrorBand, LoadingRows, SectionTitle } from "@/components/states"
@@ -28,7 +29,7 @@ import { apiFetch, ApiError } from "@/lib/api"
 import type { Deployment } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 import { canOperate } from "@/lib/servers"
-import { useTeam } from "@/lib/team"
+import { useTeam, useTeamBase } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 type Commit = {
@@ -73,7 +74,7 @@ export function SiteRepository() {
   const errorText = useErrorText()
   const operate = canOperate(team.role)
   const { app, path, pushDeployment } = useLoadedSite()
-  const base = `/${locale}/t/${team.slug}`
+  const base = useTeamBase()
   const [summary, setSummary] = useState<Summary | null>(null)
   const [commits, setCommits] = useState<Commit[] | null>(null)
   const [compare, setCompare] = useState<Compare | null>(null)
@@ -118,11 +119,47 @@ export function SiteRepository() {
       toast.success(t("site.repo.deploying", { sha: c.short_sha }))
       void load()
     } catch (err) {
-      throw new Error(errorText(err))
+      toast.error(errorText(err))
     }
   }
 
   const shown = (commits ?? []).filter((c) => matches(q, c.sha, c.message, c.author_name, c.author_login))
+  const commitPage = useInfiniteLimit(shown.length, 25, q)
+  const filePage = useInfiniteLimit(compare?.files.length ?? 0, 50)
+  const pullPage = useInfiniteLimit(pulls.length)
+  const confirm = useConfirm()
+  const commitActions = (c: Commit): RowAction[] => [
+    { id: "open", label: t("site.repo.openCommit"), icon: ExternalLinkIcon, onSelect: () => window.open(c.url, "_blank", "noopener") },
+    ...(operate && !c.is_live
+      ? [
+          {
+            id: "deploy",
+            label: t("site.repo.deploy"),
+            icon: RocketIcon,
+            group: "deploy",
+            onSelect: async () => {
+              if (await confirm({ title: t("site.repo.deployTitle", { sha: c.short_sha }), description: c.message, confirmLabel: t("apps.actions.deploy") })) await deploy(c)
+            },
+          },
+          {
+            id: "full",
+            label: t("site.repo.fullRebuild"),
+            icon: HammerIcon,
+            group: "deploy",
+            onSelect: async () => {
+              if (
+                await confirm({
+                  title: t("site.repo.fullRebuildTitle", { sha: c.short_sha }),
+                  description: t("site.repo.fullRebuildHint"),
+                  confirmLabel: t("site.repo.fullRebuild"),
+                })
+              )
+                await deploy(c, "full")
+            },
+          },
+        ]
+      : []),
+  ]
 
   return (
     <>
@@ -150,7 +187,7 @@ export function SiteRepository() {
         />
         <ErrorBand message={error} />
         {notConnected ? (
-          <p className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-6 text-sm text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-2 nq-band py-6 text-sm text-muted-foreground">
             <GithubIcon className="size-4" />
             {t("github.connectFirst")}
             <Link href={`${base}/servers/${app.server_id}/github`} className="text-nq-brand underline-offset-4 hover:underline">
@@ -159,28 +196,40 @@ export function SiteRepository() {
           </p>
         ) : null}
         {summary ? (
-          <dl className="grid grid-cols-1 gap-px border-b border-border bg-border sm:grid-cols-3">
-            <Fact label={t("lists.branch")} icon={<GitBranchIcon />}>
-              <span dir="ltr" className="font-mono text-sm">
-                {summary.repo.branch}
-              </span>
-            </Fact>
-            <Fact label={t("apps.liveRelease")} icon={<RocketIcon />}>
-              <span dir="ltr" className="font-mono text-sm">
-                {summary.live ? `v${summary.live.version} · ${(summary.live.sha ?? "").slice(0, 7) || "—"}` : t("apps.noLive")}
-              </span>
-            </Fact>
-            <Fact label={t("site.repo.pending")} icon={<GitCommitHorizontalIcon />}>
-              <span className="text-sm">
-                {summary.ahead_by == null
-                  ? "—"
-                  : summary.ahead_by === 0
-                    ? t("site.repo.upToDate")
-                    : t("site.repo.ahead", { n: summary.ahead_by })}
-                {summary.behind_by ? <span className="ms-2 text-xs text-nq-danger-text">{t("site.repo.behind", { n: summary.behind_by })}</span> : null}
-              </span>
-            </Fact>
-          </dl>
+          <StatGrid className="nq-stats">
+            <StatCard
+              label={t("lists.branch")}
+              icon={<GitBranchIcon />}
+              value={
+                <span dir="ltr" className="font-mono text-sm">
+                  {summary.repo.branch}
+                </span>
+              }
+            />
+            <StatCard
+              label={t("apps.liveRelease")}
+              icon={<RocketIcon />}
+              value={
+                <span dir="ltr" className="font-mono text-sm">
+                  {summary.live ? `v${summary.live.version} · ${(summary.live.sha ?? "").slice(0, 7) || "—"}` : t("apps.noLive")}
+                </span>
+              }
+            />
+            <StatCard
+              label={t("site.repo.pending")}
+              icon={<GitCommitHorizontalIcon />}
+              value={
+                <span className="text-sm">
+                  {summary.ahead_by == null
+                    ? "—"
+                    : summary.ahead_by === 0
+                      ? t("site.repo.upToDate")
+                      : t("site.repo.ahead", { n: summary.ahead_by })}
+                  {summary.behind_by ? <span className="ms-2 text-xs text-nq-danger-text">{t("site.repo.behind", { n: summary.behind_by })}</span> : null}
+                </span>
+              }
+            />
+          </StatGrid>
         ) : null}
       </section>
 
@@ -190,13 +239,17 @@ export function SiteRepository() {
           {commits === null ? (
             <LoadingRows rows={4} />
           ) : commits.length === 0 ? (
-            <p className="border-b border-border px-6 py-6 text-sm text-muted-foreground">{t("site.repo.noCommits")}</p>
+            <p className="nq-band py-6 text-sm text-muted-foreground">{t("site.repo.noCommits")}</p>
           ) : (
             <>
               <ListSearch value={q} onChange={setQ} placeholder={t("site.repo.search")} shown={shown.length} total={commits.length} />
-              <ol className="flex flex-col divide-y divide-border border-b border-border" data-testid="site-commits">
-                {shown.map((c) => (
-                  <li key={c.sha} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-3", c.is_live && "bg-secondary")}>
+              <ol className="flex flex-col divide-y divide-border nq-box" data-testid="site-commits">
+                {shown.slice(0, commitPage.limit).map((c) => (
+                  <RowWithActions
+                    key={c.sha}
+                    actions={commitActions(c)}
+                    render={<li className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 px-6 py-3", c.is_live && "bg-secondary")} />}
+                  >
                     {c.author_avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={c.author_avatar_url} alt="" className="size-7 shrink-0 border border-border" referrerPolicy="no-referrer" />
@@ -226,29 +279,11 @@ export function SiteRepository() {
                         <DeploymentStatusBadge status={c.deployed.status} />
                       </span>
                     ) : null}
-                    {operate && !c.is_live ? (
-                      <span className="flex items-center gap-1">
-                        <ConfirmButton
-                          icon={<RocketIcon />}
-                          label={t("site.repo.deploy")}
-                          title={t("site.repo.deployTitle", { sha: c.short_sha })}
-                          description={c.message}
-                          confirmLabel={t("apps.actions.deploy")}
-                          onConfirm={() => deploy(c)}
-                        />
-                        <ConfirmButton
-                          icon={<HammerIcon />}
-                          label={t("site.repo.fullRebuild")}
-                          title={t("site.repo.fullRebuildTitle", { sha: c.short_sha })}
-                          description={t("site.repo.fullRebuildHint")}
-                          confirmLabel={t("site.repo.fullRebuild")}
-                          onConfirm={() => deploy(c, "full")}
-                        />
-                      </span>
-                    ) : null}
-                  </li>
+                    <RowMenu actions={commitActions(c)} label={c.short_sha} />
+                  </RowWithActions>
                 ))}
               </ol>
+              <LoadMore hasMore={commitPage.hasMore} onMore={commitPage.more} />
             </>
           )}
         </section>
@@ -261,8 +296,8 @@ export function SiteRepository() {
             title={t("site.repo.changes")}
             hint={t("site.repo.changesHint", { commits: compare.total_commits, files: compare.files.length })}
           />
-          <ul className="flex max-h-96 flex-col divide-y divide-border overflow-y-auto border-b border-border">
-            {compare.files.map((f) => (
+          <ul className="flex max-h-96 flex-col divide-y divide-border overflow-y-auto nq-box">
+            {compare.files.slice(0, filePage.limit).map((f) => (
               <li key={f.filename} className="flex items-center gap-3 px-6 py-2 text-xs">
                 <FileDiffIcon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span dir="ltr" className="min-w-0 flex-1 truncate text-start font-mono text-foreground" title={f.filename}>
@@ -274,16 +309,21 @@ export function SiteRepository() {
                 </span>
               </li>
             ))}
+            {filePage.hasMore ? (
+              <li>
+                <LoadMore hasMore onMore={filePage.more} />
+              </li>
+            ) : null}
           </ul>
-          {compare.truncated ? <p className="border-b border-border px-6 py-2 text-xs text-muted-foreground">{t("site.repo.truncated")}</p> : null}
+          {compare.truncated ? <p className="nq-band py-2 text-xs text-muted-foreground">{t("site.repo.truncated")}</p> : null}
         </section>
       ) : null}
 
       {pulls.length ? (
         <section aria-labelledby="pulls-h">
           <SectionTitle id="pulls-h" title={t("site.repo.pulls")} />
-          <ul className="flex flex-col divide-y divide-border border-b border-border">
-            {pulls.map((p) => (
+          <ul className="flex flex-col divide-y divide-border nq-box">
+            {pulls.slice(0, pullPage.limit).map((p) => (
               <li key={p.number}>
                 <a href={p.url} target="_blank" rel="noreferrer" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-3 hover:bg-secondary">
                   <GitPullRequestIcon className="size-4 shrink-0 text-nq-brand" />
@@ -302,20 +342,9 @@ export function SiteRepository() {
               </li>
             ))}
           </ul>
+          <LoadMore hasMore={pullPage.hasMore} onMore={pullPage.more} />
         </section>
       ) : null}
     </>
-  )
-}
-
-function Fact({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-2 bg-background px-6 py-4">
-      <dt className="eyebrow inline-flex items-center gap-1.5 [&_svg]:size-3.5">
-        {icon}
-        {label}
-      </dt>
-      <dd className="min-w-0">{children}</dd>
-    </div>
   )
 }

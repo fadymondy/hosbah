@@ -6,18 +6,21 @@ import {
   AppShell as NasaqAppShell,
   Button,
   DropdownMenuItem,
+  NotificationCenter,
+  type NotificationCenterItem,
+  ProductLogo,
   ProductMark,
   SectionHeader,
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
+  SidebarNest,
+  SidebarSubItem,
   SidebarTrigger,
+  toast,
+  useSidebarCollapsed,
   UserMenu,
   WorkspaceSwitcher,
 } from "@fadymondy/nasaq/web"
@@ -30,19 +33,21 @@ import {
   DatabaseIcon,
   HardDriveIcon,
   HouseIcon,
-  NetworkIcon,
   RocketIcon,
   BellIcon,
-  CircleDollarSignIcon,
+  CheckIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  InfoIcon,
+  SirenIcon,
+  ExternalLinkIcon,
   GlobeIcon,
   KeyRoundIcon,
   LayoutGridIcon,
   LayoutTemplateIcon,
-  LockKeyholeIcon,
   MailIcon,
   MegaphoneIcon,
   TriangleAlertIcon,
-  MailPlusIcon,
   MessageSquareWarningIcon,
   PackageIcon,
   ScrollTextIcon,
@@ -58,18 +63,17 @@ import {
   UsersIcon,
 } from "lucide-react"
 
+import { ConnectAgent } from "@/components/connect-agent"
 import { MahaamFeedback } from "@/components/feedback/mahaam-feedback"
 import { ReportProblem, requestReport } from "@/components/feedback/report-problem"
-import { LanguageMenu, ThemeToggle } from "@/components/preferences"
 import { GlobalSearch } from "@/components/shell/global-search"
-import { NavLink } from "@/components/shell/nav-link"
-import { SECURITY_PAGES } from "@/components/shell/sub-nav"
+import { isPlainClick, NavLink } from "@/components/shell/nav-link"
 import { ShellScopeProvider } from "@/components/shell/scope"
-import { ScopeCrumbs, ServerNav, SiteNav, useScope } from "@/components/shell/scope-nav"
+import { ScopeCrumbs, SiteNav, useScope } from "@/components/shell/scope-nav"
 
 import { apiFetch } from "@/lib/api"
 import type { Notification } from "@/lib/apps"
-import { useFormatDate, useI18n } from "@/lib/i18n"
+import { useI18n } from "@/lib/i18n"
 import { useEventStream } from "@/lib/servers"
 import { useSession } from "@/lib/session"
 import { usePublicSettings } from "@/lib/platform"
@@ -77,8 +81,9 @@ import { useOptionalTeam } from "@/lib/team"
 import { cn } from "@/lib/utils"
 
 /**
- * The signed-in shell on Nasaq's AppShell: the sidebar (team switcher, then the navigation, then
- * the account menu) and a slim header (sidebar trigger, brand and scope crumbs at the start;
+ * The signed-in shell on Nasaq's AppShell, laid out like its app-shell dashboard: the sidebar
+ * (logo, team switcher and search on top, then the navigation, then the account menu) and a slim
+ * header (sidebar trigger and scope crumbs at the start;
  * report, notifications, language and theme at the end). The rail, its width and Ctrl/Cmd+B are
  * Nasaq's; below md the sidebar is its sheet. `title` is kept for callers; the page header
  * (PageBody) carries the visible title.
@@ -90,20 +95,18 @@ export function AppShell({ children }: { children: ReactNode; title?: ReactNode 
       <NasaqAppShell sidebar={<AppSidebar />} resizeLabel={t("shell.resizeNav")}>
         <AppHeader>
           <SidebarTrigger label={t("shell.navigation")} />
-          <Brand />
           <ScopeCrumbs />
-          <div className="ms-auto flex items-center gap-1">
-            <GlobalSearch />
-            <ReportProblem />
+          <div className="ms-auto flex items-center gap-2">
+            <ConnectAgent />
             <NotificationsBell />
-            <LanguageMenu />
-            <ThemeToggle />
           </div>
         </AppHeader>
         <Announcement />
         <AppMain className="p-0">{children}</AppMain>
         {/* Mahaam Feedback SDK, for signed-in people only: the shell only renders behind the session. */}
         <MahaamFeedback />
+        {/* The report dialog; its launcher is the account menu's item. */}
+        <ReportProblem launcher={false} />
       </NasaqAppShell>
     </ShellScopeProvider>
   )
@@ -114,7 +117,9 @@ function AppSidebar() {
   return (
     <Sidebar aria-label={t("shell.navigation")}>
       <SidebarHeader>
+        <Brand />
         <TeamSwitcher />
+        <GlobalSearch />
       </SidebarHeader>
       <SidebarContent>
         <ShellNav />
@@ -152,13 +157,40 @@ function Announcement() {
   )
 }
 
+/** The Hosbah logo at the top of the sidebar, like every Nasaq product: mark and wordmark (the
+ * Arabic name in ar), the mark alone on the collapsed rail. */
 function Brand() {
   const { locale, t } = useI18n()
+  const collapsed = useSidebarCollapsed()
   return (
-    <Link href={`/${locale}`} className="flex items-center gap-2" aria-label={t("common.brand")}>
-      <ProductMark brand="hosbah" size={22} title="" />
-      <span className="hidden text-label sm:inline">{t("common.brand")}</span>
+    <Link
+      href={`/${locale}`}
+      aria-label={t("common.brand")}
+      className={cn("flex h-control items-center rounded-control outline-none focus-visible:outline-2 focus-visible:outline-nq-focus", collapsed ? "justify-center" : "px-1.5")}
+    >
+      {collapsed ? <ProductMark brand="hosbah" size={20} title="" /> : <ProductLogo brand="hosbah" size={20} arabic={locale === "ar"} />}
     </Link>
+  )
+}
+
+const SETTINGS_PAGES = ["settings", "notifications", "status-pages", "log-drains", "tokens", "ssh-keys", "credentials", "certificates", "audit", "costs"]
+
+/** A Settings sub-page in the sidebar's Settings dropdown (Nasaq SidebarSubItem), routed client-side. */
+function SubLink({ href, children }: { href: string; children: string }) {
+  const pathname = usePathname() ?? ""
+  const router = useRouter()
+  return (
+    <SidebarSubItem
+      href={href}
+      active={pathname === href || pathname.startsWith(href + "/")}
+      onClick={(e) => {
+        if (!isPlainClick(e)) return
+        e.preventDefault()
+        router.push(href)
+      }}
+    >
+      {children}
+    </SidebarSubItem>
   )
 }
 
@@ -171,6 +203,7 @@ function ShellNav() {
   const { me } = useSession()
   const pathname = usePathname() ?? ""
   const scope = useScope()
+  const under = (p: string) => pathname === p || pathname.startsWith(p + "/")
   const L = (props: { href: string; icon: ReactNode; children: string; exact?: boolean; also?: string[] }) => <NavLink {...props} />
   const base = teamCtx ? `/${locale}/t/${teamCtx.team.slug}` : null
   const admin = `/${locale}/admin`
@@ -210,7 +243,7 @@ function ShellNav() {
     )
   }
 
-  if (scope.kind === "server") return <ServerNav serverId={scope.serverId} />
+  // A server keeps the team sidebar; its sections are the tabs under its cover (components/server-tabs/header.tsx).
   if (scope.kind === "site") return <SiteNav site={scope.site} />
 
   return (
@@ -221,25 +254,22 @@ function ShellNav() {
             <L href={base} exact icon={<HouseIcon />}>
               {t("nav.home")}
             </L>
+            <L href={`${base}/servers`} icon={<ServerIcon />}>
+              {t("nav.servers")}
+            </L>
             <L href={`${base}/apps`} icon={<AppWindowIcon />}>
               {t("nav.apps")}
             </L>
             <L href={`${base}/deployments`} icon={<RocketIcon />}>
               {t("nav.deployments")}
             </L>
-            <L href={`${base}/servers`} icon={<ServerIcon />}>
-              {t("nav.servers")}
-            </L>
+          </SidebarGroup>
+          <SidebarGroup label={t("nav.groups.infrastructure")}>
             <L href={`${base}/databases`} icon={<DatabaseIcon />}>
               {t("nav.databases")}
             </L>
-            <L href={`${base}/domains`} icon={<GlobeIcon />} also={[`${base}/proxy-hosts`]}>
+            <L href={`${base}/domains`} icon={<GlobeIcon />} also={[`${base}/proxy-hosts`, `${base}/dns`]}>
               {t("nav.domains")}
-            </L>
-          </SidebarGroup>
-          <SidebarGroup label={t("nav.groups.infrastructure")}>
-            <L href={`${base}/dns`} icon={<NetworkIcon />}>
-              {t("nav.networking")}
             </L>
             <L href={`${base}/storage`} icon={<HardDriveIcon />}>
               {t("nav.storage")}
@@ -272,32 +302,31 @@ function ShellNav() {
             <L href={`${base}/approvals`} icon={<ShieldCheckIcon />}>
               {t("nav.approvals")}
             </L>
-          </SidebarGroup>
-          <SidebarGroup label={t("nav.settings")}>
-            <L href={`${base}/settings`} icon={<SettingsIcon />} also={[`${base}/audit`]}>
-              {t("nav.general")}
-            </L>
-            <L href={`${base}/tokens`} icon={<LockKeyholeIcon />} also={SECURITY_PAGES.map((p) => `${base}/${p}`)}>
-              {t("nav.security")}
-            </L>
-            <L href={`${base}/costs`} icon={<CircleDollarSignIcon />}>
-              {t("nav.billing")}
-            </L>
+            <SidebarNest
+              label={t("nav.settings")}
+              icon={<SettingsIcon />}
+              active={SETTINGS_PAGES.some((p) => under(`${base}/${p}`))}
+              defaultOpen={SETTINGS_PAGES.some((p) => under(`${base}/${p}`))}
+            >
+              <SubLink href={`${base}/settings`}>{t("nav.general")}</SubLink>
+              <SubLink href={`${base}/notifications`}>{t("nav.notifications")}</SubLink>
+              <SubLink href={`${base}/status-pages`}>{t("nav.statusPages")}</SubLink>
+              <SubLink href={`${base}/log-drains`}>{t("nav.logDrains")}</SubLink>
+              <SubLink href={`${base}/tokens`}>{t("nav.tokens")}</SubLink>
+              <SubLink href={`${base}/ssh-keys`}>{t("nav.sshKeys")}</SubLink>
+              {teamCtx?.manage ? <SubLink href={`${base}/credentials`}>{t("nav.credentials")}</SubLink> : null}
+              <SubLink href={`${base}/certificates`}>{t("nav.certificates")}</SubLink>
+              <SubLink href={`${base}/audit`}>{t("nav.audit")}</SubLink>
+              <SubLink href={`${base}/costs`}>{t("nav.billing")}</SubLink>
+            </SidebarNest>
           </SidebarGroup>
         </>
-      ) : null}
-      {me.user.platform_admin ? (
-        <SidebarGroup label={t("nav.platform")}>
-          <L href={`/${locale}/admin`} icon={<ShieldIcon />}>
-            {t("nav.admin")}
-          </L>
-        </SidebarGroup>
       ) : null}
     </>
   )
 }
 
-/** The current team, as Nasaq's workspace switcher (first in the sidebar header). */
+/** The current team, as Nasaq's workspace switcher (under the logo in the sidebar header). */
 function TeamSwitcher() {
   const { t, locale } = useI18n()
   const { me } = useSession()
@@ -325,7 +354,7 @@ function TeamSwitcher() {
 }
 
 /** The account menu at the foot of the sidebar: identity, account, report a problem, sign out. */
-function AccountMenu() {
+export function AccountMenu() {
   const { t, locale } = useI18n()
   const { me } = useSession()
   const router = useRouter()
@@ -342,7 +371,6 @@ function AccountMenu() {
   return (
     <UserMenu
       user={{ name: me.user.email.split("@")[0] || me.user.email, email: me.user.email }}
-      preferences={false}
       onSignOut={signOut}
       labels={{ signOut: t("shell.signOut") }}
     >
@@ -350,11 +378,45 @@ function AccountMenu() {
         <UserIcon />
         {t("shell.accountAnd2fa")}
       </DropdownMenuItem>
+      {me.user.platform_admin ? (
+        <DropdownMenuItem onClick={() => router.push(`/${locale}/admin`)}>
+          <ShieldIcon />
+          {t("nav.admin")}
+        </DropdownMenuItem>
+      ) : null}
       <DropdownMenuItem onClick={requestReport}>
         <MessageSquareWarningIcon />
         {t("feedback.launcher")}
       </DropdownMenuItem>
     </UserMenu>
+  )
+}
+
+/** Each kind gets its own colour and icon so failures, alerts and recoveries read apart at a glance. */
+const NOTIFICATION_TONES: Record<string, { icon: typeof BellIcon; className: string }> = {
+  danger: { icon: CircleXIcon, className: "bg-nq-danger/15 text-nq-danger-text" },
+  alert: { icon: SirenIcon, className: "bg-nq-warning/15 text-nq-warning-text" },
+  success: { icon: CircleCheckIcon, className: "bg-nq-success/15 text-nq-success-text" },
+  info: { icon: InfoIcon, className: "bg-nq-info/15 text-nq-info" },
+  neutral: { icon: BellIcon, className: "bg-secondary text-muted-foreground" },
+}
+
+function notificationTone(kind: string) {
+  if (kind === "deploy.failed" || kind.endsWith(".failed")) return NOTIFICATION_TONES.danger
+  if (kind === "monitor.resolved" || kind === "deploy.succeeded") return NOTIFICATION_TONES.success
+  if (kind.startsWith("monitor.")) return NOTIFICATION_TONES.alert
+  if (kind === "adoptable") return NOTIFICATION_TONES.info
+  return NOTIFICATION_TONES.neutral
+}
+
+function NotificationIcon({ kind }: { kind: string }) {
+  const tone = notificationTone(kind)
+  const Icon = tone.icon
+  // Fills Nasaq's round icon slot (border included) with the tone.
+  return (
+    <span data-kind={kind} className={cn("-m-px flex size-8 items-center justify-center rounded-full", tone.className)}>
+      <Icon />
+    </span>
   )
 }
 
@@ -372,7 +434,6 @@ function NotificationsBell() {
   const { t, locale } = useI18n()
   const teamCtx = useOptionalTeam()
   const router = useRouter()
-  const fmt = useFormatDate()
   const slug = teamCtx?.team.slug
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
@@ -425,13 +486,35 @@ function NotificationsBell() {
 
   if (!slug) return null
 
-  async function markRead() {
+  function patch(id: string, readAt: string | null) {
+    setItems((list) => list.map((n) => (n.id === id ? { ...n, read_at: readAt } : n)))
+  }
+
+  /** Optimistic: flip the row and the count now, put them back if the API refuses. */
+  async function setRead(n: Notification, read: boolean) {
+    if (!!n.read_at === read) return
+    const before = n.read_at
+    patch(n.id, read ? new Date().toISOString() : null)
+    setUnread((c) => Math.max(0, c + (read ? -1 : 1)))
+    try {
+      await apiFetch(`/api/teams/${slug}/notifications/${n.id}/${read ? "read" : "unread"}`, { method: "POST" })
+    } catch {
+      patch(n.id, before)
+      setUnread((c) => Math.max(0, c + (read ? 1 : -1)))
+      toast.error(t("notifications.updateFailed"))
+    }
+  }
+
+  async function markAllRead() {
     if (unread === 0) return
+    const before = items
+    setItems((list) => list.map((n) => (n.read_at ? n : { ...n, read_at: new Date().toISOString() })))
+    setUnread(0)
     try {
       await apiFetch(`/api/teams/${slug}/notifications/read`, { method: "POST" })
-      setUnread(0)
     } catch {
-      // Stays unread; the next stream frame shows the truth.
+      setItems(before)
+      toast.error(t("notifications.updateFailed"))
     }
   }
 
@@ -441,83 +524,84 @@ function NotificationsBell() {
   }
 
   function open(n: Notification) {
+    void setRead(n, true)
     if (n.subject_type === "app" && n.subject_id)
       router.push(`/${locale}/t/${slug}/apps/${n.subject_id}${n.kind === "adoptable" ? "?adopt=1" : ""}`)
     setSheetOpen(false)
   }
 
+  const byId = new Map(items.map((n) => [n.id, n]))
+  const rows: NotificationCenterItem[] = items.slice(0, 50).map((n) => ({
+    id: n.id,
+    title: n.title,
+    description: n.body ?? undefined,
+    icon: <NotificationIcon kind={n.kind} />,
+    time: n.created_at,
+    unread: !n.read_at,
+  }))
+
   return (
-    <Sheet open={sheetOpen} onOpenChange={(o) => { setSheetOpen(o); if (o) void markRead() }}>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="relative"
-        aria-label={unread ? t("notifications.titleUnread", { count: unread }) : t("notifications.title")}
-        aria-expanded={sheetOpen}
-        data-testid="notifications"
-        data-unread={unread}
-        onClick={() => setSheetOpen(true)}
-      >
-        <BellIcon />
-        {unread > 0 ? (
-          <span className="absolute -end-0.5 -top-0.5 min-w-4 rounded-full bg-nq-danger px-1 text-center text-[11px] leading-4 text-white tabular-nums">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        ) : null}
-      </Button>
-      <SheetContent side="end" className="w-80 gap-0 sm:max-w-sm">
-        <SheetHeader className="border-b border-border">
-          <SheetTitle>{t("notifications.title")}</SheetTitle>
-        </SheetHeader>
-        {permission !== "unsupported" && permission !== "granted" ? (
-          <div className="border-b border-border px-4 py-2">
-            <Button variant="secondary" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
-              {permission === "denied" ? t("notifications.desktopBlocked") : t("notifications.enableDesktop")}
-            </Button>
-          </div>
-        ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {items.length === 0 ? (
-            <p className="px-4 py-3 text-body-sm text-muted-foreground">{t("notifications.empty")}</p>
-          ) : (
-            items.slice(0, 50).map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => open(n)}
-                className="flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-start hover:bg-secondary"
-              >
-                <span className="flex w-full items-center gap-2">
-                  {!n.read_at ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-nq-brand" /> : null}
-                  <span className="truncate font-medium" dir="auto">
-                    {n.title}
-                  </span>
-                </span>
-                {n.body ? (
-                  <span className="line-clamp-2 text-caption text-muted-foreground" dir="auto">
-                    {n.body}
-                  </span>
-                ) : null}
-                <span className="text-caption text-muted-foreground" dir="ltr">
-                  {fmt(n.created_at)}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+    <NotificationCenter
+      variant="sheet"
+      side="end"
+      open={sheetOpen}
+      onOpenChange={setSheetOpen}
+      items={rows}
+      unreadCount={unread}
+      onMarkAllRead={() => void markAllRead()}
+      onItemClick={(row) => {
+        const n = byId.get(row.id)
+        if (n) open(n)
+      }}
+      itemActions={(row) => {
+        const n = byId.get(row.id)
+        if (!n) return []
+        const isUnread = !n.read_at
+        return [
+          {
+            id: "toggle-read",
+            label: isUnread ? t("notifications.markRead") : t("notifications.markUnread"),
+            icon: isUnread ? CheckIcon : MailIcon,
+            onSelect: () => void setRead(n, isUnread),
+          },
+          ...(n.subject_type === "app" && n.subject_id
+            ? [{ id: "open", label: t("notifications.open"), icon: ExternalLinkIcon, onSelect: () => open(n) }]
+            : []),
+        ]
+      }}
+      labels={{
+        title: t("notifications.title"),
+        all: t("notifications.all"),
+        unread: t("notifications.unread"),
+        markAllRead: t("notifications.markAllRead"),
+        emptyAll: t("notifications.empty"),
+        emptyAllDescription: t("notifications.emptyHint"),
+        emptyUnread: t("notifications.caughtUp"),
+        emptyUnreadDescription: t("notifications.caughtUpHint"),
+        trigger: (c) => (c ? t("notifications.titleUnread", { count: c }) : t("notifications.title")),
+      }}
+      header={
+        permission !== "unsupported" && permission !== "granted" ? (
+          <Button variant="secondary" size="sm" onClick={requestDesktop} disabled={permission === "denied"}>
+            {permission === "denied" ? t("notifications.desktopBlocked") : t("notifications.enableDesktop")}
+          </Button>
+        ) : undefined
+      }
+      data-testid="notifications"
+      data-unread={unread}
+    />
   )
 }
 
 /** The page header: an eyebrow (the team by default), then Nasaq's SectionHeader (the h1, its
- * description and the page's actions at the inline end). Content follows below a hairline. */
+ * description and the page's actions at the inline end). Content follows as cards, no hairline. */
 export function PageBody({
   title,
   description,
   eyebrow,
   actions,
   bleed = false,
+  divider = false,
   children,
 }: {
   title: ReactNode
@@ -526,13 +610,14 @@ export function PageBody({
   actions?: ReactNode
   /** Full-bleed content: sections draw their own hairlines edge to edge (no padded column). */
   bleed?: boolean
+  /** A hairline under the header (off: the content below is cards, as in Nasaq). */
+  divider?: boolean
   children: ReactNode
 }) {
-  const teamCtx = useOptionalTeam()
-  const micro = eyebrow ?? teamCtx?.team.name
+  const micro = eyebrow
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col gap-1.5 border-b border-border px-6 py-6">
+      <div className={cn("flex flex-col gap-1.5 px-6 py-6", divider && "border-b border-border")}>
         {micro ? <p className="eyebrow">{micro}</p> : null}
         <SectionHeader
           as="h1"
