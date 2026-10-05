@@ -1464,6 +1464,34 @@ func (d *deps) registerApps(api huma.API) {
 		return nil, err
 	})
 
+	type notificationPath struct {
+		Team         string `path:"team" maxLength:"64"`
+		Notification string `path:"notification" maxLength:"64"`
+	}
+	setNotificationRead := func(summary string, read bool) {
+		op, suffix := "mark-notification-read", "read"
+		if !read {
+			op, suffix = "mark-notification-unread", "unread"
+		}
+		huma.Register(api, huma.Operation{OperationID: op, Method: http.MethodPost, Path: "/api/teams/{team}/notifications/{notification}/" + suffix,
+			DefaultStatus: http.StatusNoContent, Summary: summary, Tags: []string{"Notifications"},
+		}, func(ctx context.Context, in *notificationPath) (*struct{}, error) {
+			err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, id *auth.Identity, m *tenancy.Membership) error {
+				n, err := q.SetNotificationRead(ctx, db.SetNotificationReadParams{ID: in.Notification, TeamID: m.TeamID, UserID: id.ID, Read: read})
+				if err != nil {
+					return huma.Error500InternalServerError("could not update the notification")
+				}
+				if n == 0 {
+					return huma.Error404NotFound("notification not found")
+				}
+				return nil
+			})
+			return nil, err
+		})
+	}
+	setNotificationRead("Mark one notification read", true)
+	setNotificationRead("Mark one notification unread", false)
+
 	huma.Register(api, huma.Operation{OperationID: "stream-notifications", Method: http.MethodGet, Path: "/api/teams/{team}/notifications/stream",
 		Summary: "Live notifications bell (text/event-stream: event notifications, the same shape as list-notifications)", Tags: []string{"Notifications"},
 	}, func(ctx context.Context, in *TeamPath) (*huma.StreamResponse, error) {

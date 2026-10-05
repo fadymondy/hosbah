@@ -206,6 +206,8 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 			nextGPU = now.Add(time.Minute)
 		}
 		m.GPUs = lastGPUs
+		// Per-app container load for the apps' live charts, once per heartbeat.
+		m.Apps = appLoads(ctx, appDocker)
 		return send(agentproto.Frame{Type: agentproto.TypeHeartbeat, Metrics: &m, AgentVersion: a.Version})
 	}
 	// Between heartbeats, light readings for live charts: CPU, memory, disk, load, network and the

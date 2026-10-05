@@ -26,3 +26,8 @@ ORDER BY created_at DESC LIMIT sqlc.arg('lim');
 -- name: MarkNotificationsRead :exec
 UPDATE notifications SET read_at = now(), updated_at = now()
 WHERE team_id = sqlc.arg('team_id') AND read_at IS NULL AND (user_id IS NULL OR user_id = sqlc.arg('user_id')::text);
+
+-- name: SetNotificationRead :execrows
+-- Marks one notification read (read = true) or unread (read = false) for the signed-in member.
+UPDATE notifications SET read_at = CASE WHEN sqlc.arg('read')::bool THEN COALESCE(read_at, now()) ELSE NULL END, updated_at = now()
+WHERE id = sqlc.arg('id') AND team_id = sqlc.arg('team_id') AND (user_id IS NULL OR user_id = sqlc.arg('user_id')::text);

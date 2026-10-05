@@ -13,6 +13,7 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/metrics"
+	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/provisioning"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -110,6 +111,32 @@ func (d *deps) registerHome(api huma.API) {
 			}
 			if out.Body, err = metrics.TeamSparks(ctx, q, m.TeamID, ids, r, time.Now()); err != nil {
 				return huma.Error500InternalServerError("could not read metrics")
+			}
+			return nil
+		})
+		return out, err
+	})
+
+	type appLoadOut struct {
+		Body struct {
+			Apps map[string][]ops.AppLoadPoint `json:"apps" doc:"The last hour of each running app's container load, oldest first, keyed by app id."`
+		}
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "list-app-load", Method: http.MethodGet, Path: "/api/teams/{team}/apps/metrics",
+		Summary: "Every app's live container load (CPU, memory) for the last hour, from its server's heartbeats", Tags: []string{"Apps"},
+	}, func(ctx context.Context, in *TeamPath) (*appLoadOut, error) {
+		out := &appLoadOut{}
+		out.Body.Apps = map[string][]ops.AppLoadPoint{}
+		err := d.inTeam(ctx, in.Team, tenancy.AbilityView, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
+			apps, err := q.ListAppsOfTeam(ctx, m.TeamID)
+			if err != nil {
+				return huma.Error500InternalServerError("could not list apps")
+			}
+			for _, a := range apps {
+				if pts := d.ops.AppLoad(a.ServerID, a.ID); len(pts) > 0 {
+					out.Body.Apps[a.ID] = pts
+				}
 			}
 			return nil
 		})

@@ -323,6 +323,8 @@ func TestIsolationSweep(t *testing.T) {
 		// both: an approval authorises destroying something, so being able to tell "exists but
 		// not yours" from "does not exist" would be a way to enumerate another team's pending
 		// deletions — and, worse, a route that leaked through would let B approve them.
+		// Any notification id: team B must get a 404 for it.
+		"notification": func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
 		"approval": func(string) []string { return []string{approvalA, "00000000-0000-4000-8000-0000000000a1"} },
 		"id": func(path string) []string {
 			switch {

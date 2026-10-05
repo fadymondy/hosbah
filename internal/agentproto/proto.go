@@ -203,6 +203,19 @@ type Metrics struct {
 	// non-virtual interfaces (/proc/net/dev deltas). Zero on the first beat.
 	NetRxBytesPerSec float64 `json:"net_rx_bytes_per_sec,omitempty"`
 	NetTxBytesPerSec float64 `json:"net_tx_bytes_per_sec,omitempty"`
+	// Apps is the load of every Hosbah app with running containers on this host, summed over the
+	// app's containers. Heartbeats only; empty from older agents or without Docker.
+	Apps []AppLoad `json:"apps,omitempty"`
+}
+
+// AppLoad is one app's running containers on a host, summed: CPU as `docker stats` reports it
+// (percent of one core, so it can pass 100) and memory in use against the containers' limits.
+type AppLoad struct {
+	AppID         string  `json:"app_id"`
+	CPUPercent    float64 `json:"cpu_percent"`
+	MemUsedBytes  uint64  `json:"mem_used_bytes"`
+	MemLimitBytes uint64  `json:"mem_limit_bytes"`
+	Containers    int     `json:"containers"`
 }
 
 // KeyCount is one entry of a ranked list (a path or a referrer host, and how many requests it

@@ -203,6 +203,7 @@ func (s *Service) heartbeat(ctx context.Context, ac *agentConn, f agentproto.Fra
 		s.log.Warn("heartbeat not stored", "server", ac.serverID, "err", err)
 	}
 	s.recordMetrics(ctx, ac, *f.Metrics)
+	s.recordAppLoads(ac.serverID, f.Metrics.Apps)
 	s.broker.Publish(ServerTopic(ac.serverID))
 }
 

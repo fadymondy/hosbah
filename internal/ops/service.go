@@ -85,6 +85,7 @@ type Service struct {
 	now    func() time.Time
 	dist   distCache
 	live   liveMetrics
+	apps   appLoadHistory
 	// terminals is the in-memory registry of open web terminal sessions (internal/ops/terminal.go).
 	// Never persisted: a session a restart interrupts is simply over.
 	terminals *terminalRegistry
