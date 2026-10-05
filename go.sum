@@ -12,6 +12,8 @@ github.com/arbovm/levenshtein v0.0.0-20160628152529-48b4e1c0c4d0 h1:jfIu9sQUG6Ig
 github.com/arbovm/levenshtein v0.0.0-20160628152529-48b4e1c0c4d0/go.mod h1:t2tdKJDJF9BV14lnkjHmOQgcvEKgtqs5a1N3LNdJhGE=
 github.com/circlexo/circlexo-go v0.1.1 h1:8eaNPmDozUNNXOSeNHH5F+z58Eq8KikfQhwYt7W25ak=
 github.com/circlexo/circlexo-go v0.1.1/go.mod h1:8owk1RIM0vdyUFE1kqqQ1ZGhof7uQ7xAxm5AaW8xMGQ=
+github.com/circlexo/circlexo-go v0.2.0 h1:pLAQQ+1QK5erWrfx8oSu6jT5Dac6KHuvoOxSNNCXmRA=
+github.com/circlexo/circlexo-go v0.2.0/go.mod h1:8owk1RIM0vdyUFE1kqqQ1ZGhof7uQ7xAxm5AaW8xMGQ=
 github.com/coder/websocket v1.8.15 h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=
 github.com/coder/websocket v1.8.15/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/cpuguy83/go-md2man/v2 v2.0.5 h1:ZtcqGrnekaHpVLArFSe4HK5DoKx1T0rq2DwVB0alcyc=

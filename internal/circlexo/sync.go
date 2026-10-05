@@ -56,7 +56,16 @@ type ProvisionInput struct {
 	Slug   string
 	Name   string
 	Locale string
+	// SignIn is set when a member's sign-in (not the hub's install) asks for the team. A
+	// sign-in only creates one while the hub is still provisioning the install; once the install
+	// is active, a missing team means someone deleted it in Hosbah (MH-1149).
+	SignIn bool
 }
+
+// ErrReleased: the org's team was deleted in Hosbah, so a sign-in does not make a new one.
+// The hub has been told (Client.ReleaseTenant) and shows the app as not installed; installing it
+// again from the hub provisions a fresh team.
+var ErrReleased = errors.New("circlexo: the org's team was deleted in Hosbah")
 
 // Provision is idempotent: any number of calls for one org leave one team, one link and the current
 // members, and always end by confirming the tenant.
@@ -75,6 +84,14 @@ func (s *Service) Provision(ctx context.Context, in ProvisionInput) (*OrgLink, e
 	link, err := s.OrgByID(ctx, in.OrgID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
+		if in.SignIn && org.Tenant.Status != "provisioning" {
+			if org.Tenant.ProductTenantID != "" {
+				if _, err := s.Client.ReleaseTenant(ctx, in.OrgID, org.Tenant.ProductTenantID); err != nil {
+					s.Log.Warn("circlexo: releasing a deleted team's tenant", "org", in.OrgID, "err", err)
+				}
+			}
+			return nil, ErrReleased
+		}
 		owner, err := s.ownerFor(ctx, org.Members)
 		if err != nil {
 			return nil, err
