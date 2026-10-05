@@ -17,13 +17,16 @@ CREATE TABLE oauth_clients (
 
 CREATE UNIQUE INDEX oauth_clients_client_id_key ON oauth_clients (client_id);
 
--- A code lives a few minutes and is spent once (used_at). It names the app the person picked.
+-- A code lives a few minutes and is spent once (used_at). It names the apps the person picked
+-- (MH-1194): app_id is the first, app_ids all of them (every one of the same team; an empty
+-- app_ids is a code from before it, meaning just app_id).
 CREATE TABLE oauth_codes (
     id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
     code_hash text NOT NULL,
     client_id text NOT NULL,
     team_id text NOT NULL,
     app_id text NOT NULL,
+    app_ids text[] NOT NULL DEFAULT '{}',
     user_id text NOT NULL,
     redirect_uri text NOT NULL,
     code_challenge text NOT NULL,

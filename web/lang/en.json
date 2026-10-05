@@ -4271,8 +4271,10 @@
   "oauth": {
     "title": "Connect an app",
     "heading": "Connect {client} to Hosbah",
-    "description": "{client} will be able to see the app you pick, deploy it and open its customer panel. Nothing else in your teams.",
-    "pick": "Pick the app",
+    "description": "{client} will be able to see the apps you pick, deploy them and open their customer panels. Nothing else in your teams.",
+    "pick": "Pick the apps",
+    "pickHint": "Pick every app of the project (its web, API, MCP…). They must be in one team.",
+    "otherTeam": "Another team: clear your picks to choose here.",
     "noApps": "You do not manage any app yet. Only owners and admins of a team can connect its apps.",
     "allow": "Allow",
     "deny": "Cancel",

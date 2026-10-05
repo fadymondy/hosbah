@@ -17,9 +17,9 @@ SELECT * FROM oauth_clients ORDER BY created_at;
 UPDATE oauth_clients SET revoked_at = now() WHERE client_id = $1 AND revoked_at IS NULL;
 
 -- name: InsertOAuthCode :one
--- Team scope: the person's consent, for an app of that team.
-INSERT INTO oauth_codes (code_hash, client_id, team_id, app_id, user_id, redirect_uri, code_challenge, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+-- Team scope: the person's consent, for apps of that team.
+INSERT INTO oauth_codes (code_hash, client_id, team_id, app_id, app_ids, user_id, redirect_uri, code_challenge, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: OAuthCodeByHash :one

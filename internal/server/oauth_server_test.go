@@ -213,6 +213,40 @@ func TestOAuthAuthorizationServer(t *testing.T) {
 	if res.StatusCode != 200 {
 		t.Errorf("basic auth exchange -> %d", res.StatusCode)
 	}
+
+	// Several apps of the team in one consent (MH-1194): one app token each, every token
+	// reaching only its own app; access_token/app stay the first app's.
+	var appB struct {
+		App struct{ ID, Name string } `json:"app"`
+	}
+	owner.mustJSON("POST", "/api/teams/"+team.ID+"/apps", map[string]any{"name": "oauth-b-" + short, "server": srv,
+		"repo_url": "https://github.com/octocat/web.git"}, 201, &appB)
+	authorize(owner, map[string]any{"app": "", "apps": []string{}}, 422)
+	authorize(owner, map[string]any{"app": "", "apps": []string{app.App.ID, "app-of-nobody"}}, 404)
+	code5 := authorize(owner, map[string]any{"app": "", "apps": []string{appB.App.ID, app.App.ID, appB.App.ID}}, 200).Get("code")
+	st, out = exchange(form(code5))
+	apps, _ := out["apps"].([]any)
+	if st != 200 || len(apps) != 2 {
+		t.Fatalf("multi-app exchange -> %d %v", st, out)
+	}
+	for i, want := range []string{appB.App.ID, app.App.ID} {
+		a, _ := apps[i].(map[string]any)
+		inner, _ := a["app"].(map[string]any)
+		tok := fmt.Sprint(a["access_token"])
+		if inner["id"] != want || !strings.HasPrefix(tok, tokens.PrefixApp) {
+			t.Fatalf("apps[%d]: %v", i, a)
+		}
+		var reach struct {
+			App struct{ ID string } `json:"app"`
+		}
+		keyJSON(t, ts.URL, tok, "GET", "/api/integrations/app", nil, 200, &reach)
+		if reach.App.ID != want {
+			t.Errorf("apps[%d] token reaches %q, want %q", i, reach.App.ID, want)
+		}
+	}
+	if first, _ := apps[0].(map[string]any); out["access_token"] != first["access_token"] {
+		t.Errorf("access_token is not the first app's")
+	}
 }
 
 func pkceChallenge(verifier string) string {

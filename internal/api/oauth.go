@@ -2,7 +2,8 @@ package api
 
 /*
 Hosbah's OAuth authorization server for integrations (MH-1153), so Mahaam (or any registered
-client) can connect one Hosbah app without the person copying a token by hand:
+client) can connect Hosbah apps without the person copying a token by hand. One consent can
+cover several apps of one team (MH-1194: a project's web, api and mcp apps):
 
 	GET  /oauth/authorize?response_type=code&client_id&redirect_uri&state
 	     &code_challenge&code_challenge_method=S256&scope=app&ui_locales=en|ar
@@ -13,10 +14,12 @@ client) can connect one Hosbah app without the person copying a token by hand:
 	POST /api/oauth/authorize   their answer: a redirect URL carrying the code (or the error)
 	POST /oauth/token           grant_type=authorization_code, code, redirect_uri, code_verifier,
 	                            client_id, client_secret (form, or HTTP Basic for the client) →
-	                            {access_token: "hba_…", token_type: "Bearer", app}; RFC 6749 errors.
+	                            {access_token: "hba_…", token_type: "Bearer", app,
+	                             apps: [{access_token, app}]}; RFC 6749 errors. access_token/app
+	                            are the first app's, for clients that link one.
 
 A code is one-time, lives five minutes, is bound to its client, redirect URI and PKCE challenge
-(S256 only), and names exactly one app. Clients are registered by a platform admin
+(S256 only), and names the apps picked, all of one team; each gets its own app token. Clients are registered by a platform admin
 (go run ./cmd/admin oauth-client add <name> <redirect_uri>...); only the secret's hash is kept.
 An unknown client or a redirect URI it did not register is never redirected to: the page shows
 the error instead (RFC 6749 §4.1.2.1).
@@ -40,6 +43,7 @@ import (
 	"github.com/togo-framework/auth"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/pgtext"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
@@ -199,7 +203,7 @@ func (d *deps) registerOAuth(api huma.API) {
 		}
 	}
 	huma.Register(api, huma.Operation{OperationID: "oauth-authorize", Method: http.MethodPost, Path: "/api/oauth/authorize",
-		Summary: "Answer a client's authorization request: allow it one app (owner or admin), or deny", Tags: tags,
+		Summary: "Answer a client's authorization request: allow it apps of one team (owner or admin), or deny", Tags: tags,
 	}, func(ctx context.Context, in *struct {
 		Body struct {
 			ResponseType        string `json:"response_type" maxLength:"40"`
@@ -210,7 +214,8 @@ func (d *deps) registerOAuth(api huma.API) {
 			CodeChallengeMethod string `json:"code_challenge_method,omitempty" maxLength:"20"`
 			Scope               string `json:"scope,omitempty" maxLength:"200"`
 			Team                string `json:"team,omitempty" maxLength:"64" doc:"The app's team (id or slug)"`
-			App                 string `json:"app,omitempty" maxLength:"64" doc:"The app to connect (id)"`
+			App                 string   `json:"app,omitempty" maxLength:"64" doc:"The app to connect (id); or apps"`
+			Apps                []string `json:"apps,omitempty" maxItems:"20" doc:"The apps to connect (ids), all of the team"`
 			Allow               bool   `json:"allow"`
 		}
 	}) (*oauthDecisionOut, error) {
@@ -236,22 +241,31 @@ func (d *deps) registerOAuth(api huma.API) {
 			return fail("invalid_scope", "the only scope is \"app\"")
 		case !b.Allow:
 			return fail("access_denied", "the person declined")
-		case b.Team == "" || b.App == "":
+		}
+		picked := oauthPicked(b.App, b.Apps)
+		if b.Team == "" || len(picked) == 0 {
 			return nil, huma.Error422UnprocessableEntity("pick an app")
 		}
 		var client db.OauthClient
 		client, _ = d.oauthClient(ctx, b.ClientID, b.RedirectURI)
 		plain, hash := tokens.New(tokens.PrefixOAuthCode)
 		err = d.inTeam(ctx, b.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
-			a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: b.App, TeamID: m.TeamID})
-			if err != nil {
-				return huma.Error404NotFound("no such app in this team")
+			for _, app := range picked {
+				if _, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: app, TeamID: m.TeamID}); err != nil {
+					return huma.Error404NotFound("no such app in this team")
+				}
 			}
-			if _, err := q.InsertOAuthCode(ctx, db.InsertOAuthCodeParams{CodeHash: hash, ClientID: client.ID, TeamID: m.TeamID, AppID: a.ID,
-				UserID: id.ID, RedirectUri: b.RedirectURI, CodeChallenge: b.CodeChallenge, ExpiresAt: time.Now().Add(oauthCodeTTL)}); err != nil {
+			if _, err := q.InsertOAuthCode(ctx, db.InsertOAuthCodeParams{CodeHash: hash, ClientID: client.ID, TeamID: m.TeamID, AppID: picked[0],
+				AppIds: pgtext.Array(picked), UserID: id.ID, RedirectUri: b.RedirectURI, CodeChallenge: b.CodeChallenge,
+				ExpiresAt: time.Now().Add(oauthCodeTTL)}); err != nil {
 				return huma.Error500InternalServerError("could not issue the code")
 			}
-			return tenancy.Record(ctx, q, m.TeamID, id.ID, "oauth.authorized", "app", a.ID, map[string]any{"client": client.Name, "client_id": client.ClientID})
+			for _, app := range picked {
+				if err := tenancy.Record(ctx, q, m.TeamID, id.ID, "oauth.authorized", "app", app, map[string]any{"client": client.Name, "client_id": client.ClientID}); err != nil {
+					return err
+				}
+			}
+			return nil
 		})
 		if err != nil {
 			return nil, err
@@ -259,6 +273,28 @@ func (d *deps) registerOAuth(api huma.API) {
 		out.Body.Redirect = oauthRedirect(b.RedirectURI, map[string]string{"code": plain, "state": b.State})
 		return out, nil
 	})
+}
+
+// oauthPicked is the apps of an answer, in order and once each: apps, or the single app.
+func oauthPicked(app string, apps []string) []string {
+	if len(apps) == 0 && app != "" {
+		apps = []string{app}
+	}
+	out := make([]string, 0, len(apps))
+	seen := map[string]bool{}
+	for _, a := range apps {
+		if a = strings.TrimSpace(a); a != "" && !seen[a] {
+			seen[a] = true
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// oauthTokenApp is one app of a token response, with its own app token.
+type oauthTokenApp struct {
+	AccessToken string         `json:"access_token"`
+	App         IntegrationApp `json:"app"`
 }
 
 // oauthError writes an RFC 6749 §5.2 error.
@@ -324,8 +360,7 @@ func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 	invalid := func() { oauthError(w, http.StatusBadRequest, "invalid_grant", "the code is invalid, expired or already used") }
 
 	hash := tokens.Hash(code)
-	var plain string
-	var out IntegrationApp
+	var out []oauthTokenApp
 	err = d.tx(ctx, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
 		c, err := q.OAuthCodeByHash(ctx, hash)
 		if err != nil || c.ClientID != client.ID {
@@ -353,21 +388,27 @@ func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 		if at, err := q.TeamSuspendedAt(ctx, c.TeamID); err != nil || at != nil {
 			return errOAuthGrantSpent
 		}
-		a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: c.AppID, TeamID: c.TeamID})
-		if err != nil {
-			return errOAuthGrantSpent
+		ids := []string(c.AppIds)
+		if len(ids) == 0 {
+			ids = []string{c.AppID}
 		}
-		var h string
-		plain, h = tokens.New(tokens.PrefixApp)
-		t, err := q.InsertAppToken(ctx, db.InsertAppTokenParams{TeamID: c.TeamID, AppID: a.ID, Label: client.Name, TokenHash: h, CreatedBy: c.UserID})
-		if err != nil {
-			return err
+		for _, id := range ids {
+			// Every app must still exist in the team; one gone fails the whole exchange.
+			a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: id, TeamID: c.TeamID})
+			if err != nil {
+				return errOAuthGrantSpent
+			}
+			plain, h := tokens.New(tokens.PrefixApp)
+			t, err := q.InsertAppToken(ctx, db.InsertAppTokenParams{TeamID: c.TeamID, AppID: a.ID, Label: client.Name, TokenHash: h, CreatedBy: c.UserID})
+			if err != nil {
+				return err
+			}
+			if err := tenancy.Record(ctx, q, c.TeamID, c.UserID, "app_token.created", "app", a.ID,
+				map[string]any{"token_id": t.ID, "label": client.Name, "via": "oauth", "client_id": client.ClientID}); err != nil {
+				return err
+			}
+			out = append(out, oauthTokenApp{AccessToken: plain, App: integrationApp(ctx, q, a, "")})
 		}
-		if err := tenancy.Record(ctx, q, c.TeamID, c.UserID, "app_token.created", "app", a.ID,
-			map[string]any{"token_id": t.ID, "label": client.Name, "via": "oauth", "client_id": client.ClientID}); err != nil {
-			return err
-		}
-		out = integrationApp(ctx, q, a, "")
 		return nil
 	})
 	switch {
@@ -387,7 +428,7 @@ func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
-	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": plain, "token_type": "Bearer", "app": out})
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": out[0].AccessToken, "token_type": "Bearer", "app": out[0].App, "apps": out})
 }
 
 var (

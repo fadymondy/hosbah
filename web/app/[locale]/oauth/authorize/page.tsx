@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Field, FieldDescription, Radio, RadioGroup } from "@fadymondy/nasaq/web"
+import { Button, Checkbox, Field, FieldDescription } from "@fadymondy/nasaq/web"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 
@@ -15,9 +15,10 @@ type OAuthApp = { id: string; name: string; title: string; status: string; serve
 type Consent = { client: { name: string }; apps: OAuthApp[] }
 
 /**
- * The OAuth consent page (MH-1153): a registered client (Mahaam) asks to connect one Hosbah app.
- * The person signs in if they have not, picks one of the apps they manage, and is sent back to the
- * client with a one-time code (or an error). An unknown client or redirect URI is shown here and
+ * The OAuth consent page (MH-1153): a registered client (Mahaam) asks to connect Hosbah apps.
+ * The person signs in if they have not, ticks the apps they manage (MH-1194: several, all of one
+ * team, e.g. a project's web, api and mcp), and is sent back to the client with a one-time code
+ * (or an error). An unknown client or redirect URI is shown here and
  * never redirected to.
  */
 export default function OAuthAuthorizePage() {
@@ -37,7 +38,8 @@ function Authorize() {
   const [consent, setConsent] = useState<Consent | null>(null)
   const [fatal, setFatal] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pick, setPick] = useState("")
+  // The picked apps, "team_slug/app_id" each; all of one team.
+  const [picks, setPicks] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   useDocumentTitle(t("oauth.title"))
 
@@ -60,7 +62,7 @@ function Authorize() {
         const c = await apiFetch<Consent>(`/api/oauth/authorize?${new URLSearchParams({ client_id: clientID, redirect_uri: redirectURI })}`)
         if (!live) return
         setConsent(c)
-        if (c.apps.length === 1) setPick(`${c.apps[0].team_slug}/${c.apps[0].id}`)
+        if (c.apps.length === 1) setPicks([`${c.apps[0].team_slug}/${c.apps[0].id}`])
       } catch (e) {
         if (live) setFatal(errorText(e))
       }
@@ -74,7 +76,8 @@ function Authorize() {
   async function answer(allow: boolean) {
     setError(null)
     setBusy(true)
-    const [team, app] = pick.split("/")
+    const team = picks[0]?.split("/")[0] ?? ""
+    const apps = picks.map((p) => p.split("/")[1])
     try {
       const { redirect } = await apiFetch<{ redirect: string }>("/api/oauth/authorize", {
         method: "POST",
@@ -87,7 +90,7 @@ function Authorize() {
           code_challenge_method: params?.get("code_challenge_method") ?? "",
           scope: params?.get("scope") ?? "",
           team: allow ? team : "",
-          app: allow ? app : "",
+          apps: allow ? apps : [],
           allow,
         },
       })
@@ -108,6 +111,9 @@ function Authorize() {
   if (!consent) return <PageLoading />
 
   const name = consent.client.name
+  const pickedTeam = picks[0]?.split("/")[0]
+  const toggle = (value: string, on: boolean) =>
+    setPicks((cur) => (on ? (cur.includes(value) ? cur : [...cur, value]) : cur.filter((v) => v !== value)))
   return (
     <AuthFrame title={t("oauth.heading", { client: name })} description={t("oauth.description", { client: name })}>
       <div className="flex flex-col gap-4">
@@ -115,18 +121,26 @@ function Authorize() {
           <p className="text-sm text-muted-foreground">{t("oauth.noApps")}</p>
         ) : (
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-label">{t("oauth.pick")}</legend>
-            <RadioGroup value={pick} onValueChange={(v) => setPick(String(v))}>
+            <legend className="mb-1 text-label">{t("oauth.pick")}</legend>
+            <p className="mb-1 text-caption text-muted-foreground">{t("oauth.pickHint")}</p>
+            <div className="flex flex-col gap-2">
               {consent.apps.map((a) => {
                 const value = `${a.team_slug}/${a.id}`
+                const otherTeam = !!pickedTeam && pickedTeam !== a.team_slug
                 return (
                   <label
                     key={value}
                     htmlFor={`app-${a.id}`}
-                    className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary"
+                    title={otherTeam ? t("oauth.otherTeam") : undefined}
+                    className="block cursor-pointer rounded-control border border-border bg-card p-3 has-[[data-checked]]:border-primary has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-60"
                   >
                     <Field className="flex-row items-center">
-                      <Radio value={value} id={`app-${a.id}`} />
+                      <Checkbox
+                        id={`app-${a.id}`}
+                        checked={picks.includes(value)}
+                        disabled={otherTeam}
+                        onCheckedChange={(v) => toggle(value, v === true)}
+                      />
                       <ServerMark server={{ logo_url: a.logo_url }} size={6} />
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <div dir="auto" className="truncate text-label">
@@ -140,12 +154,12 @@ function Authorize() {
                   </label>
                 )
               })}
-            </RadioGroup>
+            </div>
           </fieldset>
         )}
         <FormError message={error} />
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" disabled={busy || !pick} onClick={() => void answer(true)}>
+          <Button variant="primary" disabled={busy || picks.length === 0} onClick={() => void answer(true)}>
             {t("oauth.allow")}
           </Button>
           <Button variant="secondary" disabled={busy} onClick={() => void answer(false)}>
