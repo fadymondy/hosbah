@@ -1,6 +1,6 @@
 "use client"
 
-import { Button, Checkbox, Field, FieldDescription } from "@fadymondy/nasaq/web"
+import { Button, Checkbox, Field, FieldDescription, Input } from "@fadymondy/nasaq/web"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 
@@ -41,6 +41,7 @@ function Authorize() {
   // The picked apps, "team_slug/app_id" each; all of one team.
   const [picks, setPicks] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [q, setQ] = useState("")
   useDocumentTitle(t("oauth.title"))
 
   const clientID = params?.get("client_id") ?? ""
@@ -90,7 +91,8 @@ function Authorize() {
           code_challenge_method: params?.get("code_challenge_method") ?? "",
           scope: params?.get("scope") ?? "",
           team: allow ? team : "",
-          apps: allow ? apps : [],
+          // One app goes as `app`, which every Hosbah API version takes; `apps` only when several.
+          ...(allow && apps.length > 1 ? { apps } : { app: allow ? (apps[0] ?? "") : "" }),
           allow,
         },
       })
@@ -114,6 +116,14 @@ function Authorize() {
   const pickedTeam = picks[0]?.split("/")[0]
   const toggle = (value: string, on: boolean) =>
     setPicks((cur) => (on ? (cur.includes(value) ? cur : [...cur, value]) : cur.filter((v) => v !== value)))
+  // The search matches title, name, server and team; a picked app always stays in the list.
+  const needle = q.trim().toLowerCase()
+  const shown = consent.apps.filter(
+    (a) =>
+      !needle ||
+      picks.includes(`${a.team_slug}/${a.id}`) ||
+      `${a.title} ${a.name} ${a.server_name} ${a.team_name} ${a.team_slug}`.toLowerCase().includes(needle),
+  )
   return (
     <AuthFrame title={t("oauth.heading", { client: name })} description={t("oauth.description", { client: name })}>
       <div className="flex flex-col gap-4">
@@ -123,8 +133,19 @@ function Authorize() {
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1 text-label">{t("oauth.pick")}</legend>
             <p className="mb-1 text-caption text-muted-foreground">{t("oauth.pickHint")}</p>
-            <div className="flex flex-col gap-2">
-              {consent.apps.map((a) => {
+            {consent.apps.length > 5 ? (
+              <Input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t("oauth.search")}
+                aria-label={t("oauth.search")}
+                autoFocus
+              />
+            ) : null}
+            <div className="flex max-h-[26rem] flex-col gap-2 overflow-y-auto">
+              {shown.length === 0 ? <p className="py-2 text-sm text-muted-foreground">{t("oauth.noMatch")}</p> : null}
+              {shown.map((a) => {
                 const value = `${a.team_slug}/${a.id}`
                 const otherTeam = !!pickedTeam && pickedTeam !== a.team_slug
                 return (
@@ -165,6 +186,7 @@ function Authorize() {
           <Button variant="secondary" disabled={busy} onClick={() => void answer(false)}>
             {t("oauth.deny")}
           </Button>
+          {picks.length > 1 ? <span className="self-center text-caption text-muted-foreground">{t("oauth.picked", { n: picks.length })}</span> : null}
         </div>
         <p className="text-caption text-muted-foreground">{t("oauth.revokeHint")}</p>
       </div>
