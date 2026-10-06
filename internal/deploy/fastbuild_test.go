@@ -36,6 +36,11 @@ func TestFastPresetKeepsDockerfileApps(t *testing.T) {
 	if got := fastPreset(db.AppDeployConfig{Preset: PresetStatic}, &dockerfile); got != PresetStatic {
 		t.Fatalf("the chosen preset must win: %q", got)
 	}
+	// MH-1262: seatfor-web chose "static" but builds web-next/Dockerfile; the full build follows
+	// the path, so the fast track must too, not lay the source over the old image.
+	if got := fastPreset(db.AppDeployConfig{Preset: PresetStatic, DockerfilePath: "web-next/Dockerfile"}, nil); got != PresetDockerfile {
+		t.Fatalf("a Dockerfile path wins over the chosen preset: %q", got)
+	}
 	if got := fastPreset(db.AppDeployConfig{}, &node); got != "" {
 		t.Fatalf("no Dockerfile signal keeps the detected preset: %q", got)
 	}

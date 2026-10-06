@@ -735,8 +735,14 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 		return false, nil
 	}
 	r.notePreset(ctx, res.DetectedFiles)
+	// The app keeps the runtime its last full build recorded: fastPreset reads it next time, and
+	// "fast" would erase the sign that the app builds from its Dockerfile (MH-1262).
+	runtime := "fast"
+	if r.app.Runtime != nil && *r.app.Runtime != "" {
+		runtime = *r.app.Runtime
+	}
 	*built = agentproto.BuildResult{
-		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: "fast",
+		DetectResult: agentproto.DetectResult{Commit: res.Commit, Message: res.Message, Runtime: runtime,
 			HosbahToml: res.HosbahToml, TomlFile: res.TomlFile},
 		Image: res.Image, ImageID: res.ImageID,
 	}
@@ -767,12 +773,13 @@ func effectivePreset(cfg db.AppDeployConfig) string {
 	return cfg.DetectedPreset
 }
 
-// fastPreset is the preset the fast track builds with. With no preset chosen, an app that has a
-// Dockerfile path configured, or whose last build ran its Dockerfile, is a Dockerfile app even
-// when detection never recorded one — otherwise the runtime fallback would copy the new source
-// over the old image without building it, and the release would silently serve the old build.
+// fastPreset is the preset the fast track builds with. An app with a Dockerfile path configured is
+// a Dockerfile app whatever preset it has, because the full build always builds that Dockerfile
+// (MH-1262). With no preset chosen, an app whose last build ran its Dockerfile is one too, even
+// when detection never recorded it. Otherwise the runtime fallback would copy the new source over
+// the old image without building it, and the release would silently serve the old build.
 func fastPreset(cfg db.AppDeployConfig, runtime *string) string {
-	if cfg.Preset == "" && (cfg.DockerfilePath != "" || (runtime != nil && *runtime == PresetDockerfile)) {
+	if cfg.DockerfilePath != "" || (cfg.Preset == "" && runtime != nil && *runtime == PresetDockerfile) {
 		return PresetDockerfile
 	}
 	return effectivePreset(cfg)
