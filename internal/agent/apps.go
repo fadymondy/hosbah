@@ -555,6 +555,7 @@ func appBuild(oc *OpContext) (any, int, error) {
 		keep = agentproto.DefaultKeepImages
 	}
 	pruned := pruneImages(oc, p.App, keep, append(p.Protect, p.Image))
+	pruneBuildCache(oc)
 	return agentproto.BuildResult{DetectResult: d, Image: p.Image, ImageID: strings.TrimSpace(id), Pruned: pruned}, 0, nil
 }
 
@@ -588,6 +589,27 @@ func dockerReady(oc *OpContext) (int, error) {
 		return 1, errors.New("docker buildx is missing — run the build.tools provisioning step")
 	}
 	return 0, nil
+}
+
+// buildCacheKeep is how much BuildKit cache a server holds on to between builds. Pruning images
+// alone left the cache growing about 2 GB per full Next build until the disk filled and a deploy
+// died with "no space left on device" (MH-1237); the newest cache, which the next build reuses,
+// stays.
+const buildCacheKeep = "8gb"
+
+// pruneBuildCache trims the BuildKit cache to buildCacheKeep. It is best-effort: the build already
+// succeeded, so a failed prune is only logged.
+func pruneBuildCache(oc *OpContext) {
+	out, err := execOutput(oc, "docker", "builder", "prune", "-f", "--keep-storage", buildCacheKeep)
+	if err != nil {
+		oc.Info("could not trim the build cache: %v", err)
+		return
+	}
+	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.HasPrefix(l, "Total") {
+			oc.Info("trimmed the build cache to %s (%s)", buildCacheKeep, strings.TrimSpace(strings.TrimPrefix(l, "Total:")))
+		}
+	}
 }
 
 // pruneImages keeps the newest `keep` images of hosbah/<app> — counting the app's images from before
