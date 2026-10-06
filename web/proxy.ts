@@ -19,6 +19,9 @@ function preferred(request: NextRequest): Locale {
   return DEFAULT_LOCALE
 }
 
+// Top-level pages under a locale (next.config.mjs, from app/[locale]); empty means unchecked.
+const ROUTES = new Set((process.env.HOSBAH_ROUTES ?? "").split(",").filter(Boolean))
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (
@@ -45,7 +48,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  const response = NextResponse.next()
+  // An unknown page: render the not-found page, but with a real 404 (MH-1257).
+  const [, , second] = pathname.split("/")
+  const response = second && ROUTES.size > 0 && !ROUTES.has(second)
+    ? NextResponse.rewrite(request.nextUrl, { status: 404 })
+    : NextResponse.next()
   if (request.cookies.get(LOCALE_COOKIE)?.value !== first) {
     response.cookies.set(LOCALE_COOKIE, first, { path: "/", maxAge: 31536000, sameSite: "lax" })
   }
