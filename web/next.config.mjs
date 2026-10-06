@@ -1,4 +1,17 @@
 /** @type {import('next').NextConfig} */
+// Security headers on every response (MH-1253): pin HTTPS, no MIME sniffing, no full-URL referrers,
+// and the app can only be framed by itself (clickjacking). Nothing embeds these pages cross-origin.
+const SECURITY_HEADERS = {
+  source: "/:path*",
+  headers: [
+    { key: "Strict-Transport-Security", value: "max-age=31536000" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+  ],
+}
+
 const nextConfig = {
   // Don't let `next dev` write AGENTS.md / CLAUDE.md into the app.
   agentRules: false,
@@ -44,13 +57,14 @@ const nextConfig = {
     const sw = { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }
     return process.env.NODE_ENV === "development"
       ? [
+          SECURITY_HEADERS,
           sw,
           {
             source: "/_next/static/:path*",
             headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
           },
         ]
-      : [sw]
+      : [SECURITY_HEADERS, sw]
   },
 }
 
