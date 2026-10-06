@@ -1,1 +1,1 @@
-export { default } from "@/app/[locale]/t/[team]/apps/new/page"
+export { default } from "@/app/[locale]/(console)/t/[team]/apps/new/page"

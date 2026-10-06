@@ -88,3 +88,61 @@ export function useServerHref(): (serverId: string, tab?: string) => string {
   const panel = useInPanel()
   return (serverId, tab = "") => (panel ? `${base}${tab ? `/${tab}` : ""}` : `${base}/servers/${serverId}${tab ? `/${tab}` : ""}`)
 }
+
+/**
+ * Like TeamGate, but for the console's persistent shell: the shell stays mounted while a team loads
+ * (or when you move between teams, /account and /admin) and only the page body is swapped for the
+ * loading, not-found or failed state. While the next team loads, the sidebar keeps the previous
+ * one; the body never renders a page against the wrong team.
+ */
+export function TeamScope({
+  slug,
+  shell,
+  children,
+  loading,
+  notFound,
+  failed,
+}: {
+  slug: string | null
+  shell: (body: ReactNode) => ReactNode
+  children: ReactNode
+  loading: ReactNode
+  notFound: ReactNode
+  failed: (message: string, retry: () => void) => ReactNode
+}) {
+  const [team, setTeam] = useState<Team | null>(null)
+  const [loadedFor, setLoadedFor] = useState<string | null>(null)
+  const [state, setState] = useState<"loading" | "ok" | "missing" | "error">("loading")
+  const [message, setMessage] = useState("")
+
+  const load = useCallback(async () => {
+    if (!slug) return
+    try {
+      const next = await apiFetch<Team>(`/api/teams/${encodeURIComponent(slug)}`)
+      setTeam(next)
+      setLoadedFor(slug)
+      setState("ok")
+    } catch (e) {
+      setLoadedFor(slug)
+      if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setState("missing")
+      else {
+        setMessage(e instanceof Error ? e.message : String(e))
+        setState("error")
+      }
+    }
+  }, [slug])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const ready = !!slug && loadedFor === slug && state === "ok" && !!team
+  let body: ReactNode = children
+  if (slug && !ready) {
+    if (loadedFor === slug && state === "missing") body = notFound
+    else if (loadedFor === slug && state === "error") body = failed(message, load)
+    else body = loading
+  }
+  const value = slug && team ? { team, manage: canManage(team.role), refresh: load } : null
+  return <Ctx.Provider value={value}>{shell(body)}</Ctx.Provider>
+}
