@@ -26,6 +26,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     manifest: "/manifest.webmanifest",
     appleWebApp: { capable: true, title: brand, statusBarStyle: "black-translucent" },
     formatDetection: { telephone: false },
+    // MH-1256: the console is not for search engines; hosbah.com is the page to rank.
+    robots: { index: false, follow: false },
   }
 }
 
