@@ -281,10 +281,39 @@ func (a *Agent) reader(ctx context.Context, conn *websocket.Conn) error {
 	}
 }
 
+// restartDrain caps how long an update waits for the operations already running (a build's own
+// timeout is shorter); restartPoll is how often it looks. Variables so tests can shorten them.
+var restartDrain, restartPoll = 2 * time.Hour, 2 * time.Second
+
+// waitIdle polls running until it reports 0 (true) or max has passed (false), calling waiting
+// with the count each time it has to wait.
+func waitIdle(running func() int, max, poll time.Duration, waiting func(int)) bool {
+	until := time.Now().Add(max)
+	for {
+		n := running()
+		if n == 0 {
+			return true
+		}
+		if !time.Now().Before(until) {
+			return false
+		}
+		waiting(n)
+		time.Sleep(poll)
+	}
+}
+
 // restart re-executes the (just replaced) binary once the final status of the update operation
 // has had a chance to reach the control plane. If it has not, the next session's resume reports
 // the op as unknown, the server re-queues it, and the new binary answers "already at version".
 func (a *Agent) restart() {
+	// Re-executing kills every operation still running here (a build the update raced, MH-1254) and
+	// the control plane would wait on it forever, so let them finish first. The update operation
+	// itself leaves the running set as soon as it returns.
+	if !waitIdle(a.Exec.Running, restartDrain, restartPoll, func(n int) {
+		a.Log.Info("restart waits for running operations", "running", n)
+	}) {
+		a.Log.Warn("restarting with operations still running", "running", a.Exec.Running())
+	}
 	deadline := time.Now().Add(5 * time.Second)
 	for len(a.live) > 0 && time.Now().Before(deadline) {
 		time.Sleep(100 * time.Millisecond)

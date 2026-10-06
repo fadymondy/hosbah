@@ -606,6 +606,13 @@ func (o *OpContext) Info(format string, args ...any) { o.log("info", fmt.Sprintf
 // Progress reports step of total.
 func (o *OpContext) Progress(step, total int) { o.progress(step, total) }
 
+// Running is how many operations are executing right now.
+func (e *Executor) Running() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.running)
+}
+
 // RequestRestart asks the agent to re-exec itself after this operation reports success.
 func (o *OpContext) RequestRestart() { o.restart = true }
 
