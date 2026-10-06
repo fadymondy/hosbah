@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -204,5 +205,62 @@ func TestTerminalWSRelay(t *testing.T) {
 	back := agentRead(t)
 	if back.Type != agentproto.TypeTermData || back.SessionID != params.SessionID || back.TermData != "d29ybGQ=" {
 		t.Fatalf("agent got: %+v", back)
+	}
+}
+
+// An app terminal: the browser names only the app and process; the API looks up the live
+// release's deployment itself (the web app never knew it), and says so when nothing is live.
+func TestTerminalWSAppTarget(t *testing.T) {
+	ts, cleanup := bootTestServer(t)
+	defer cleanup()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	short := suffix[len(suffix)-6:]
+
+	ua := newClient(t, ts.URL)
+	ua.register("term-app-" + suffix + "@example.test")
+	var teamA struct{ ID string }
+	ua.mustJSON("POST", "/api/teams", map[string]any{"name": "TermApp " + suffix}, 201, &teamA)
+	srvA, priv := enrolServer(t, ua, ts.URL, teamA.ID, "term-app-"+short)
+	var app struct{ App struct{ ID string } }
+	ua.mustJSON("POST", "/api/teams/"+teamA.ID+"/apps", map[string]any{"name": "term-app-" + short, "server": srvA,
+		"repo_url": "https://github.com/octocat/api.git"}, 201, &app)
+
+	agentRead, _ := agentTermSocket(t, ts.URL, srvA, priv)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/api/teams/" + teamA.ID + "/servers/" + srvA +
+		"/terminal/ws?cols=80&rows=24&target=" + url.QueryEscape("app:"+app.App.ID+"/web")
+
+	// Nothing live yet: the session closes with a reason a person can act on.
+	b1, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{HTTPClient: ua.http})
+	if err != nil {
+		t.Fatalf("browser dial: %v", err)
+	}
+	var closed agentproto.Frame
+	if err := wsjson.Read(ctx, b1, &closed); err != nil {
+		t.Fatalf("browser read: %v", err)
+	}
+	b1.CloseNow() //nolint:errcheck
+	if closed.Type != agentproto.TypeTermClose || !strings.Contains(closed.TermReason, "deploy it first") {
+		t.Fatalf("no live release: got %+v", closed)
+	}
+
+	// With a live release, the agent's terminal.open carries its deployment id.
+	dep := seedLiveRelease(t, teamA.ID, app.App.ID, srvA, "term-app-"+short)
+	b2, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{HTTPClient: ua.http})
+	if err != nil {
+		t.Fatalf("browser dial: %v", err)
+	}
+	defer b2.CloseNow() //nolint:errcheck
+	op := agentRead(t)
+	if op.Type != agentproto.TypeOp || op.Op == nil || op.Op.Kind != agentproto.KindTerminalOpen {
+		t.Fatalf("agent's first frame: %+v", op)
+	}
+	var params agentproto.TerminalOpenParams
+	if err := json.Unmarshal(op.Op.Params, &params); err != nil {
+		t.Fatalf("op params: %v", err)
+	}
+	if params.DeploymentID != dep || params.Target != "app:"+app.App.ID+"/web" {
+		t.Fatalf("op params: %+v, want deployment %s", params, dep)
 	}
 }

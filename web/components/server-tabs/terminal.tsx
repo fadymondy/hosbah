@@ -4,6 +4,7 @@ import { Button, EmptyState } from "@fadymondy/nasaq/web"
 import { useEffect, useRef, useState } from "react"
 import { RefreshCwIcon, SquareTerminalIcon } from "lucide-react"
 import type { Terminal as XTerm } from "@xterm/xterm"
+import "@xterm/xterm/css/xterm.css"
 
 import { SectionTitle } from "@/components/states"
 
@@ -74,7 +75,8 @@ export function ServerTerminal({ serverId, manage, target = "host" }: { serverId
       term = new Terminal({
         cursorBlink: true,
         fontSize: 13,
-        fontFamily: "var(--font-mono, ui-monospace, monospace)",
+        // xterm measures the font itself, so it needs a real family list, not a var().
+        fontFamily: styles.getPropertyValue("--font-mono").trim() || "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         theme: {
           background: styles.getPropertyValue("--nq-bg").trim() || undefined,
           foreground: styles.getPropertyValue("--nq-fg").trim() || undefined,

@@ -82,6 +82,23 @@ func (d *deps) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		srv, teamID = row, m.TeamID
+		if target == agentproto.TerminalTargetHost {
+			return nil
+		}
+		// An app container: the live release's deployment is looked up here (the web app does not
+		// know it), and the app must be on this server.
+		appID, _, ok := agentproto.ParseTerminalAppTarget(target)
+		if !ok {
+			return nil // terminal.open's own validation answers
+		}
+		a, err := appIn(ctx, q, m, appID)
+		if err != nil || a.ServerID != srv.ID {
+			return errNotFound
+		}
+		deploymentID = ""
+		if live, err := q.LiveReleaseOfApp(ctx, a.ID); err == nil && live.TeamID == m.TeamID {
+			deploymentID = live.DeploymentID
+		}
 		return nil
 	})
 	if err != nil {
@@ -105,6 +122,9 @@ func (d *deps) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	c.SetReadLimit(1 << 20)
 
 	sess, err := d.ops.OpenTerminal(teamID, srv.ID, id.ID, target, deploymentID, cols, rows)
+	if err != nil && target != agentproto.TerminalTargetHost && deploymentID == "" {
+		err = errors.New("nothing is live in this app yet — deploy it first")
+	}
 	if err != nil {
 		wctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		_ = wsjson.Write(wctx, c, agentproto.Frame{Type: agentproto.TypeTermClose, TermReason: err.Error()})
