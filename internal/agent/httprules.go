@@ -319,5 +319,9 @@ func headerHandlers(rules []agentproto.HeaderRule) []any {
 	if len(del) > 0 {
 		resp["delete"] = del
 	}
-	return []any{map[string]any{"handler": "headers", "response": map[string]any{"headers": resp}}}
+	// Caddy's headers handler takes the operations directly under "response" (RespHeaderOps inlines
+	// HeaderOps). Deferred so they apply to the upstream's response as it is written: without it an
+	// upstream header of the same name wins and "delete" cannot remove what the app sends.
+	resp["deferred"] = true
+	return []any{map[string]any{"handler": "headers", "response": resp}}
 }

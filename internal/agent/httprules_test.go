@@ -98,9 +98,25 @@ func TestHeaderHandlersSetAddRemove(t *testing.T) {
 		`"Strict-Transport-Security":["max-age=63072000"]`,
 		`"X-Frame-Options":["DENY"]`,
 		`"delete":["Server"]`,
+		`"deferred":true`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("header handler lacks %s:\n%s", want, s)
+		}
+	}
+	// Caddy reads the operations directly under "response" and rejects anything else
+	// ("unknown field \"headers\""), which refused every app's header rules in production.
+	var shape struct {
+		Response map[string]json.RawMessage `json:"response"`
+	}
+	if err := json.Unmarshal(b, &shape); err != nil {
+		t.Fatal(err)
+	}
+	for k := range shape.Response {
+		switch k {
+		case "set", "add", "delete", "replace", "deferred", "require":
+		default:
+			t.Errorf("response has %q, which Caddy's headers handler does not accept:\n%s", k, s)
 		}
 	}
 }
