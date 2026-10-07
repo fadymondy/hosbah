@@ -31,15 +31,31 @@ func AppTools() []Tool {
 		// ---- read ----
 		{
 			Name: "list_apps", Scope: scopes.Read,
-			Description: "The team's apps: status, server, detected runtime, live release, domains, last deployment.",
-			InputSchema: schema(nil, map[string]any{}),
-			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+			Description: "The team's apps: status, server, detected runtime, live release, domains, last deployment. Imported workloads whose container is gone are left out unless include_missing is set.",
+			InputSchema: schema(nil, map[string]any{
+				"include_missing": map[string]any{"type": "boolean", "description": "Also list imported workloads that are no longer on their server"},
+			}),
+			Run: func(ctx context.Context, env *Env, args Args) (string, error) {
 				rows, err := env.Q.ListAppsOfTeam(ctx, env.Caller.TeamID)
 				if err != nil {
 					return "", errors.New("could not list apps")
 				}
 				if len(rows) == 0 {
 					return "No apps yet. create_app adds one from a public git URL.", nil
+				}
+				// An imported record whose workload disappeared stays (it comes back as running if the
+				// workload returns), but it is noise in the list of what runs (MH-1303).
+				hidden := 0
+				if !args.Bool("include_missing") {
+					kept := rows[:0]
+					for _, r := range rows {
+						if r.Source == importer.SourceImported && r.ImportedState != nil && *r.ImportedState == importer.StateMissing {
+							hidden++
+							continue
+						}
+						kept = append(kept, r)
+					}
+					rows = kept
 				}
 				var b strings.Builder
 				fmt.Fprintf(&b, "%d app(s):\n", len(rows))
@@ -59,6 +75,9 @@ func AppTools() []Tool {
 					}
 					fmt.Fprintf(&b, "  %-20s %-9s server %-16s runtime %-18s live %-4s last %s  (id %s)\n",
 						r.Name, r.Status, r.ServerName, orDash(r.Runtime), live, last, r.ID)
+				}
+				if hidden > 0 {
+					fmt.Fprintf(&b, "%d imported workload(s) no longer on their server are not listed (include_missing shows them; delete_app forgets one).\n", hidden)
 				}
 				return b.String(), nil
 			},

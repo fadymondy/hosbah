@@ -266,6 +266,15 @@ func TestImportedWorkloads(t *testing.T) {
 		if deref(apps["wordpress"].ImportedState) != "missing" || deref(dss["cache"].ImportedState) != "missing" {
 			t.Fatalf("wordpress %+v, cache %+v", apps["wordpress"], dss["cache"])
 		}
+		// list_apps leaves a missing import out unless asked (MH-1303).
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "list_apps", nil); res.IsError ||
+			strings.Contains(res.Text, "wordpress") || !strings.Contains(res.Text, "1 imported workload(s) no longer on their server") {
+			t.Errorf("list_apps should hide the missing wordpress: %q", res.Text)
+		}
+		if res := mcpCall(t, ts.URL, "/api/mcp", tok.Token, "list_apps", map[string]any{"include_missing": true}); res.IsError ||
+			!strings.Contains(res.Text, "wordpress") {
+			t.Errorf("list_apps include_missing should show wordpress: %q", res.Text)
+		}
 		// A report that says nothing about services (an older agent) changes nothing.
 		if res, err := importer.SyncFacts(ctx, sqlDB, team.ID, srv, []byte(`{"hostname":"x"}`)); err != nil || res != (importer.Result{}) {
 			t.Fatalf("a report without services: %+v %v", res, err)
