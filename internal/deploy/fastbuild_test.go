@@ -33,8 +33,13 @@ func TestFastPresetKeepsDockerfileApps(t *testing.T) {
 	if got := fastPreset(db.AppDeployConfig{DockerfilePath: "web/Dockerfile"}, nil); got != PresetDockerfile {
 		t.Fatalf("an app with a Dockerfile path: %q", got)
 	}
-	if got := fastPreset(db.AppDeployConfig{Preset: PresetStatic}, &dockerfile); got != PresetStatic {
-		t.Fatalf("the chosen preset must win: %q", got)
+	// MH-1284: zekra-api chose "static" but its full builds run its Dockerfile; a runtime-mode fast
+	// build started its minimal image with `tail` and failed every deploy.
+	if got := fastPreset(db.AppDeployConfig{Preset: PresetStatic}, &dockerfile); got != PresetDockerfile {
+		t.Fatalf("an app last built from its Dockerfile stays one whatever preset was chosen: %q", got)
+	}
+	if got := fastPreset(db.AppDeployConfig{Preset: PresetNode}, &node); got != PresetNode {
+		t.Fatalf("without a Dockerfile the chosen preset wins: %q", got)
 	}
 	// MH-1262: seatfor-web chose "static" but builds web-next/Dockerfile; the full build follows
 	// the path, so the fast track must too, not lay the source over the old image.

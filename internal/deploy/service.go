@@ -773,13 +773,14 @@ func effectivePreset(cfg db.AppDeployConfig) string {
 	return cfg.DetectedPreset
 }
 
-// fastPreset is the preset the fast track builds with. An app with a Dockerfile path configured is
-// a Dockerfile app whatever preset it has, because the full build always builds that Dockerfile
-// (MH-1262). With no preset chosen, an app whose last build ran its Dockerfile is one too, even
-// when detection never recorded it. Otherwise the runtime fallback would copy the new source over
-// the old image without building it, and the release would silently serve the old build.
+// fastPreset is the preset the fast track builds with. An app with a Dockerfile path configured, or
+// whose last full build ran its Dockerfile, is a Dockerfile app whatever preset it has: the full
+// build (agent detect) builds a Dockerfile whenever the checkout has one and never consults the
+// preset (MH-1262, MH-1284). Otherwise the runtime fallback would run in the old image — which a
+// minimal Dockerfile image cannot even host (no `tail`), or, when it can, would copy the new source
+// over the old build without building it, and the release would silently serve the old code.
 func fastPreset(cfg db.AppDeployConfig, runtime *string) string {
-	if cfg.DockerfilePath != "" || (cfg.Preset == "" && runtime != nil && *runtime == PresetDockerfile) {
+	if cfg.DockerfilePath != "" || (runtime != nil && *runtime == PresetDockerfile) {
 		return PresetDockerfile
 	}
 	return effectivePreset(cfg)
