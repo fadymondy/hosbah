@@ -591,23 +591,52 @@ func dockerReady(oc *OpContext) (int, error) {
 	return 0, nil
 }
 
-// buildCacheKeep is how much BuildKit cache a server holds on to between builds. Pruning images
+// buildCacheKeepMax is the most BuildKit cache a server holds on to between builds. Pruning images
 // alone left the cache growing about 2 GB per full Next build until the disk filled and a deploy
 // died with "no space left on device" (MH-1237); the newest cache, which the next build reuses,
-// stays.
-const buildCacheKeep = "8gb"
+// stays. On a small guest a flat 8 GB was still 40% of a 20 GB disk (MH-1312), so the cap also
+// shrinks with the filesystem Docker lives on: buildCacheShare of it, but never under
+// buildCacheKeepMin, which still holds one build's layers.
+const (
+	buildCacheKeepMax = 8 << 30
+	buildCacheKeepMin = 1 << 30
+	buildCacheShare   = 15 // percent of Docker's filesystem
+)
+
+// buildCacheKeep is the --keep-storage for a Docker filesystem of diskTotal bytes (0 when it is
+// unknown, which keeps the old fixed cap).
+func buildCacheKeep(diskTotal uint64) string {
+	keep := uint64(buildCacheKeepMax)
+	if share := diskTotal * buildCacheShare / 100; diskTotal > 0 && share < keep {
+		keep = max(share, buildCacheKeepMin)
+	}
+	return fmt.Sprintf("%dmb", keep>>20)
+}
+
+// dockerRootDir is where Docker keeps its images and build cache, so the filesystem the cache cap
+// is measured against.
+func dockerRootDir(oc *OpContext) string {
+	if out, err := execOutput(oc, "docker", "info", "--format", "{{.DockerRootDir}}"); err == nil {
+		if dir := strings.TrimSpace(out); strings.HasPrefix(dir, "/") {
+			return dir
+		}
+	}
+	return "/var/lib/docker"
+}
 
 // pruneBuildCache trims the BuildKit cache to buildCacheKeep. It is best-effort: the build already
 // succeeded, so a failed prune is only logged.
 func pruneBuildCache(oc *OpContext) {
-	out, err := execOutput(oc, "docker", "builder", "prune", "-f", "--keep-storage", buildCacheKeep)
+	total, _ := diskUsage(dockerRootDir(oc))
+	keep := buildCacheKeep(total)
+	out, err := execOutput(oc, "docker", "builder", "prune", "-f", "--keep-storage", keep)
 	if err != nil {
 		oc.Info("could not trim the build cache: %v", err)
 		return
 	}
 	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
 		if strings.HasPrefix(l, "Total") {
-			oc.Info("trimmed the build cache to %s (%s)", buildCacheKeep, strings.TrimSpace(strings.TrimPrefix(l, "Total:")))
+			oc.Info("trimmed the build cache to %s (%s)", keep, strings.TrimSpace(strings.TrimPrefix(l, "Total:")))
 		}
 	}
 }
