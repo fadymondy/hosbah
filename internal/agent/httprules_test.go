@@ -152,8 +152,13 @@ func TestAccessBlockRouteIPAllowInverts(t *testing.T) {
 	route := accessBlockRoute("id", []string{"h"}, &agentproto.AccessRules{IPAllow: []string{"192.168.1.0/24"}})
 	b, _ := json.Marshal(route)
 	s := string(b)
-	if !strings.Contains(s, `"not":[{"remote_ip":{"ranges":["192.168.1.0/24"]}}]`) {
+	if !strings.Contains(s, `"not":[{"client_ip":{"ranges":["192.168.1.0/24"]}}]`) {
 		t.Errorf("ip_allow should be a negated match: %s", s)
+	}
+	route = accessBlockRoute("id", []string{"h"}, &agentproto.AccessRules{IPDeny: []string{"203.0.113.0/24"}})
+	b, _ = json.Marshal(route)
+	if s := string(b); !strings.Contains(s, `"client_ip":{"ranges":["203.0.113.0/24"]}`) || strings.Contains(s, "remote_ip") {
+		t.Errorf("ip rules must match the resolved client, never the proxy's remote_ip: %s", s)
 	}
 }
 

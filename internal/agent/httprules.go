@@ -113,7 +113,9 @@ func simpleRoute(id string, hosts []string, handlers []any) map[string]any {
 }
 
 // accessBlockRoute returns a terminal 403 route matched by whichever access condition should refuse
-// the request, or nil when there is nothing to block on.
+// the request, or nil when there is nothing to block on. IP rules match client_ip, not remote_ip:
+// behind a proxy named in edge.json (MH-1283) remote_ip is that proxy for every visitor, and with no
+// trusted proxies configured Caddy's client_ip is the remote address, so nothing changes there.
 func accessBlockRoute(baseID string, hosts []string, a *agentproto.AccessRules) map[string]any {
 	if a == nil {
 		return nil
@@ -121,12 +123,12 @@ func accessBlockRoute(baseID string, hosts []string, a *agentproto.AccessRules) 
 	var matches []any
 	if len(a.IPDeny) > 0 {
 		if ranges := validCIDRs(a.IPDeny); len(ranges) > 0 {
-			matches = append(matches, map[string]any{"host": hosts, "remote_ip": map[string]any{"ranges": ranges}})
+			matches = append(matches, map[string]any{"host": hosts, "client_ip": map[string]any{"ranges": ranges}})
 		}
 	}
 	if len(a.IPAllow) > 0 {
 		if ranges := validCIDRs(a.IPAllow); len(ranges) > 0 {
-			matches = append(matches, map[string]any{"host": hosts, "not": []any{map[string]any{"remote_ip": map[string]any{"ranges": ranges}}}})
+			matches = append(matches, map[string]any{"host": hosts, "not": []any{map[string]any{"client_ip": map[string]any{"ranges": ranges}}}})
 		}
 	}
 	if a.BlockBadBots {
