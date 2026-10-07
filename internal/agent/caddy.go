@@ -154,6 +154,8 @@ type routeTable struct {
 	Apps   map[string]routeEntry `json:"apps"`
 	// Proxies are the proxy manager's hosts (proxy.set), keyed by proxy id.
 	Proxies map[string]proxyEntry `json:"proxies,omitempty"`
+	// Edge is edge.json (see edge.go), read fresh for every render and never persisted here.
+	Edge *edgeConfig `json:"-"`
 }
 
 var routesMu sync.Mutex
@@ -359,13 +361,15 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 		if cacheOn {
 			dial = cacheVarnishAddr
 		}
-		mainHandler := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": dial}}, "flush_interval": -1}
+		mainHandler := applyEdgeProxy(map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": dial}}, "flush_interval": -1}, t.Edge)
 		emit := func(dst *[]any, suffix string, hosts []string) {
 			if len(hosts) == 0 {
 				return
 			}
 			if rt != nil {
-				*dst = append(*dst, realtimeCaddyRoute(id, suffix, hosts, *rt))
+				rr := realtimeCaddyRoute(id, suffix, hosts, *rt)
+				applyEdgeProxy(rr["handle"].([]any)[0].(map[string]any), t.Edge)
+				*dst = append(*dst, rr)
 			}
 			*dst = append(*dst, renderTargetRoutes(agentproto.RouteID(id)+suffix, hosts, []any{mainHandler}, e.Rules)...)
 		}
@@ -383,7 +387,7 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	sort.Strings(pids)
 	for _, id := range pids {
 		p := t.Proxies[id]
-		proxy := map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": p.Dial}}, "flush_interval": -1}
+		proxy := applyEdgeProxy(map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": p.Dial}}, "flush_interval": -1}, t.Edge)
 		if p.TLS {
 			tr := map[string]any{"protocol": "http", "tls": map[string]any{}}
 			if p.SkipVerify {
@@ -420,12 +424,14 @@ func renderCaddy(t routeTable, accessLog bool) map[string]any {
 	})
 
 	httpServer := map[string]any{"listen": []string{":80"}, "routes": httpRoutes}
+	applyEdgeServer(httpServer, t.Edge)
 	if accessLog {
 		httpServer["logs"] = map[string]any{"default_logger_name": accessLoggerName}
 	}
 	servers := map[string]any{caddyHTTP: httpServer}
 	if len(httpsRoutes) > 0 {
 		httpsServer := map[string]any{"listen": []string{":443"}, "routes": httpsRoutes}
+		applyEdgeServer(httpsServer, t.Edge)
 		if accessLog {
 			httpsServer["logs"] = map[string]any{"default_logger_name": accessLoggerName}
 		}
@@ -583,6 +589,7 @@ func writeConfigFile(oc *OpContext) error {
 	if err != nil {
 		return err
 	}
+	t.Edge = wantEdge(oc)
 	return writeCaddyFile(renderCaddy(t, wantAccessLogging(oc)))
 }
 
@@ -612,6 +619,7 @@ func applyRoutes(oc *OpContext, change func(*routeTable)) error {
 	if change != nil {
 		change(&t)
 	}
+	t.Edge = wantEdge(oc)
 	cfg := renderCaddy(t, wantAccessLogging(oc))
 	if err := caddyLoad(oc.Ctx, cfg); err != nil {
 		return err
