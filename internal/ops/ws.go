@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -135,13 +136,13 @@ func (s *Service) authenticate(ctx context.Context, c *websocket.Conn, ip string
 		return nil
 	})
 	if err != nil || key.AgentPublicKey == nil {
-		return nil, errors.New("unknown or un-enrolled server")
+		return nil, fmt.Errorf("server %q: unknown or un-enrolled server", auth.ServerID)
 	}
 	if !agentproto.VerifyAuth(*key.AgentPublicKey, nonce, auth.ServerID, auth.Signature) {
-		return nil, errors.New("challenge signature does not verify")
+		return nil, fmt.Errorf("server %q: challenge signature does not verify", auth.ServerID)
 	}
 	if status != "enrolled" {
-		return nil, errors.New("server is not enrolled")
+		return nil, fmt.Errorf("server %q: server is not enrolled", auth.ServerID)
 	}
 	dek, err := s.a.Keys.UnwrapDEK(key.TeamID, key.DekWrapped)
 	if err != nil {
