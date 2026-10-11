@@ -91,8 +91,18 @@ func TestFrameworkAndGeneratedRoutes(t *testing.T) {
 		"/api/me/2fa/disable":       "member",
 		"/api/me/2fa/recovery":      "member",
 		// The plugin's own TOTP (plain-text secret, never checked at sign-in): replaced.
-		"/api/auth/2fa/enroll": "blocked",
-		"/api/auth/2fa/verify": "blocked",
+		"/api/auth/2fa/enroll":  "blocked",
+		"/api/auth/2fa/verify":  "blocked",
+		"/api/auth/2fa/disable": "blocked",
+		// auth v0.10.0's user management, impersonation and magic links: Hosbah has its own.
+		"/api/auth/admin":                         "blocked",
+		"/api/auth/admin/users":                   "blocked",
+		"/api/auth/admin/users/u1/impersonate":    "blocked",
+		"/api/auth/admin/users/u1/reset-password": "blocked",
+		"/api/auth/admin/users/u1/magic-link":     "blocked",
+		"/api/auth/impersonation/stop":            "blocked",
+		"/api/auth/magic":                         "blocked",
+		"/api/auth/administrators":                "admin", // a prefix match needs the slash
 		// The account cycle: public.
 		"/api/auth/verify-email":        "public",
 		"/api/auth/verify-email/resend": "public",

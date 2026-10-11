@@ -17,6 +17,12 @@ DELETE FROM users WHERE id = $1 AND panel_server_id = $2;
 -- name: SetPanelAccountPassword :execrows
 UPDATE users SET password_hash = $3 WHERE id = $1 AND panel_server_id = $2;
 
+-- name: SetPanelAppAccountScope :execrows
+-- An app's integration customer (MH-1153): the team and app its panel-link sessions are limited to.
+-- Since auth v0.10.0 the plugin replaces a session's permissions with the stored ones on every
+-- request, so the scope lives on the account (one per app) as well as in the token.
+UPDATE users SET permissions = $3 WHERE id = $1 AND panel_server_id = $2 AND position('#app:' in email) > 0;
+
 -- name: PanelAccountByEmail :one
 SELECT id, email, password_hash, disabled_at FROM users WHERE email = $1 AND panel_server_id = $2;
 

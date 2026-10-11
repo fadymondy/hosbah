@@ -21,7 +21,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/togo-framework/audit v0.1.1
-	github.com/togo-framework/auth v0.8.0
+	github.com/togo-framework/auth v0.10.0
 	github.com/togo-framework/authz v0.1.1
 	github.com/togo-framework/cache v0.3.0
 	github.com/togo-framework/db-postgres v0.1.0
@@ -29,7 +29,7 @@ require (
 	github.com/togo-framework/i18n v0.2.0
 	github.com/togo-framework/orm v0.1.0
 	github.com/togo-framework/queue v0.3.0
-	github.com/togo-framework/realtime v0.2.0
+	github.com/togo-framework/realtime v0.2.1
 	github.com/togo-framework/storage v0.2.0
 	github.com/togo-framework/validation v0.1.0
 	github.com/vektah/gqlparser/v2 v2.5.22
