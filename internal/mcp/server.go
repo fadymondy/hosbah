@@ -29,6 +29,7 @@ import (
 
 	"github.com/fadymondy/hosbah/internal/app"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/oauthmeta"
 	"github.com/fadymondy/hosbah/internal/platform"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
@@ -90,6 +91,9 @@ type Server struct {
 	AllowedScopes []string
 	Authenticate  func(ctx context.Context, a *app.App, bearer string) (Caller, error)
 	TxScope       func(c Caller) tenancy.Scope
+	// OAuth: the server is an OAuth 2.1 protected resource (internal/api/mcp_oauth.go), so its 401
+	// names the protected-resource metadata, where a connector discovers how to get a token.
+	OAuth bool
 }
 
 type rpcRequest struct {
@@ -151,7 +155,7 @@ func (s *Server) Handler(a *app.App) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="`+s.Name+`"`)
+			w.Header().Set("WWW-Authenticate", s.challenge(r, bearer != ""))
 			writeRPC(w, http.StatusUnauthorized, rpcResponse{JSONRPC: "2.0",
 				Error: &rpcError{Code: -32001, Message: ErrUnauthorized.Error()}})
 			return
@@ -169,6 +173,19 @@ func (s *Server) Handler(a *app.App) http.HandlerFunc {
 		}
 		writeRPC(w, http.StatusOK, res)
 	}
+}
+
+// challenge is the 401's WWW-Authenticate (RFC 6750 §3, MCP authorization: resource_metadata from
+// RFC 9728 §5.1). A presented token that did not work is invalid_token, so a connector refreshes it.
+func (s *Server) challenge(r *http.Request, presented bool) string {
+	c := `Bearer realm="` + s.Name + `"`
+	if s.OAuth {
+		c += `, resource_metadata="` + oauthmeta.ResourceMetadataURL(r) + `"`
+	}
+	if presented {
+		c += `, error="invalid_token"`
+	}
+	return c
 }
 
 // Dispatch answers one JSON-RPC request for an authenticated caller.

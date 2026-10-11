@@ -104,7 +104,7 @@ func oauthClient(ctx context.Context, sqlDB *sql.DB, args []string) {
 			}
 			clientID, _ := tokens.New("hbc_")
 			secret, hash := tokens.New(tokens.PrefixOAuthSecret)
-			if _, err := q.InsertOAuthClient(ctx, db.InsertOAuthClientParams{ClientID: clientID, Name: args[1], SecretHash: hash,
+			if _, err := q.InsertOAuthClient(ctx, db.InsertOAuthClientParams{ClientID: clientID, Name: args[1], SecretHash: &hash,
 				RedirectUris: strings.Join(args[2:], "\n")}); err != nil {
 				return err
 			}

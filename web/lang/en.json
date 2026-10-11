@@ -1329,7 +1329,8 @@
       "write": "Create and change resources",
       "secrets_read": "Read secret values",
       "destructive": "Delete resources and data"
-    }
+    },
+    "connector": "AI connector"
   },
   "audit": {
     "description": "Every change made in this team, newest first.",
@@ -1638,6 +1639,16 @@
       "linkedToast": "{provider} is connected.",
       "unlinkedToast": "{provider} is disconnected.",
       "githubSetupFailed": "The GitHub App installation link expired or was opened in another browser. Start again from the team settings."
+    },
+    "connections": {
+      "title": "AI connections",
+      "hint": "Every AI connector and MCP key you hold, and the team each one works with. A connection works with one team only.",
+      "name": "Connection",
+      "team": "Team",
+      "key": "Key",
+      "emptyTitle": "No AI connections",
+      "emptyHint": "Connect claude.ai, ChatGPT or Claude Code to Hosbah’s MCP server and the connection shows up here.",
+      "revokeHint": "“{name}” loses access to {team} right away. Connect it again to restore it."
     }
   },
   "admin": {
@@ -4283,6 +4294,20 @@
     "deny": "Cancel",
     "revokeHint": "You can revoke the connection at any time from the app’s Settings, under Integration tokens.",
     "invalidTitle": "This request cannot be used",
-    "invalidHint": "The service that sent you here is not registered with Hosbah, or sent an address it did not register."
+    "invalidHint": "The service that sent you here is not registered with Hosbah, or sent an address it did not register.",
+    "mcp": {
+      "heading": "Connect {client} to Hosbah",
+      "description": "{client} will work with one team’s servers, apps and deploys, with the permissions you tick below.",
+      "pickTeam": "Team",
+      "pickTeamHint": "The connection works with this team only. To use another team, connect again and pick it.",
+      "suggested": "Suggested",
+      "footprint": "{servers} servers · {apps} apps",
+      "cannotConnect": "Only owners and admins can connect a team",
+      "permissions": "Permissions",
+      "allowTeam": "Allow access to {team}",
+      "noTeams": "You are not in any team yet. Create one to connect, or ask a team owner to invite you.",
+      "createTeam": "Create this team",
+      "revokeHint": "You can revoke the connection at any time from your account, under AI connections."
+    }
   }
 }

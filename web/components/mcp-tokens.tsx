@@ -101,7 +101,8 @@ export function McpTokens({
       cell: (tok) => (
         <span className="flex min-w-0 items-center gap-3">
           <KeyRoundIcon className="size-4 shrink-0 text-muted-foreground" />
-          <span className="truncate font-medium">{tok.name}</span>
+          <span dir="auto" className="truncate font-medium">{tok.name}</span>
+          {tok.connector ? <Badge variant="outline">{t("tokens.connector")}</Badge> : null}
         </span>
       ),
     },

@@ -31,8 +31,12 @@ export function proxy(request: NextRequest) {
     // The CircleXO sign-in round trip (rewritten to the API): no locale prefix.
     pathname.startsWith("/auth/circlexo/") ||
     pathname === "/sso/circlexo" ||
-    // The OAuth token endpoint (MH-1153), rewritten to the API: no locale prefix.
+    // The OAuth endpoints (MH-1153; MCP connectors: register, revoke) and the OAuth discovery
+    // documents, rewritten to the API: no locale prefix. /oauth/authorize is the web's own page.
     pathname === "/oauth/token" ||
+    pathname === "/oauth/register" ||
+    pathname === "/oauth/revoke" ||
+    pathname.startsWith("/.well-known/oauth-") ||
     pathname.startsWith("/_next") ||
     /\.[a-zA-Z0-9]+$/.test(pathname)
   ) {
