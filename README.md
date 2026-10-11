@@ -245,7 +245,7 @@ cd web && npm run grid:check && npm run feedback:check && npm run build
 
 | Endpoint | Tokens | Tools |
 |---|---|---|
-| `POST /api/mcp` | team-bound `hbu_…` (mint in *MCP tokens*; `cld_…` from before the rename still works) | `whoami`, `get_team`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · databases: `create_db`, `attach_database`, `set_backup_schedule`, `drop_database`, `delete_data_service` · servers: `run_server_step` · apps: `update_app`, `list_releases`, `rotate_deploy_hook` · team: `update_member_role`, `delete_credential` · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
+| `POST /api/mcp` | team-bound `hbu_…` (mint in *MCP tokens*; `cld_…` from before the rename still works) | `whoami`, `get_team`, `list_teams`, `list_members`, `list_invitations`, `list_audit`, `list_mcp_tokens`, `list_servers`, `get_server`, `server_metrics`, `list_operations`, `list_credentials` (read) · `invite_member`, `add_server` (install / SSH connect / Proxmox), `add_credential` (Proxmox, Cloudflare) (write) · databases: `create_db`, `attach_database`, `set_backup_schedule`, `drop_database`, `delete_data_service` · servers: `run_server_step` · apps: `update_app`, `list_releases`, `rotate_deploy_hook` · team: `update_member_role`, `delete_credential` · `revoke_invitation`, `remove_member` (destructive, `confirm` = email) |
 | `POST /api/admin/mcp` | platform-admin `hba_…` (`cla_…` from before the rename still works) | `list_issues`, `get_issue`, `create_issue`, `update_issue`, `comment_issue`, `start_issue`, `finish_issue`, `list_teams`, `get_team`, `list_users`, `get_user`, `set_platform_admin` |
 
 Every tool declares a scope (`internal/mcp/scopes_test.go` fails otherwise); a token without it gets
@@ -255,6 +255,39 @@ an in-band `isError`. Only SHA-256 hashes of tokens are stored.
 { "mcpServers": { "hosbah": { "type": "http", "url": "http://localhost:8710/api/mcp",
   "headers": { "Authorization": "Bearer hbu_..." } } } }
 ```
+
+### AI connectors (OAuth 2.1)
+
+claude.ai, ChatGPT, Claude Code, Cursor and other MCP clients connect to `https://<host>/api/mcp` with
+no token pasted: Hosbah is its own OAuth 2.1 authorization server, following the MCP authorization spec
+(`internal/api/mcp_oauth.go`).
+
+| Step | Endpoint |
+|---|---|
+| A 401 on `/api/mcp` names the metadata | `WWW-Authenticate: Bearer realm="hosbah", resource_metadata="<host>/.well-known/oauth-protected-resource/api/mcp"` |
+| Protected-resource metadata (RFC 9728) | `GET /.well-known/oauth-protected-resource[/api/mcp]` |
+| Authorization-server metadata (RFC 8414) | `GET /.well-known/oauth-authorization-server[/api/mcp]` |
+| Dynamic client registration (RFC 7591) | `POST /oauth/register`: public clients (`none`) or `client_secret_post` / `client_secret_basic` |
+| Consent | `GET /oauth/authorize` (web page): PKCE S256 required, RFC 8707 `resource` checked |
+| Token | `POST /oauth/token`: `authorization_code` and `refresh_token` |
+| Revocation (RFC 7009) | `POST /oauth/revoke` (access or refresh token) |
+
+On the consent page the person picks **one team** and the scopes. Every team they belong to is listed.
+The team with the most servers and apps is pre-selected, so an empty team made at sign-up is never
+the default. Only owners and admins can connect a team, the same people who can mint a token. The flow
+never creates a team. A person with no team sees an explicit "Create this team" form.
+
+**One connection, one team.** The access token is an ordinary team-bound `hbu_` token that lives one
+hour. The `hbf_` refresh token rotates on every use and the connection lives 90 days from the last
+refresh. Both are one `mcp_tokens` row (`oauth_client_id` set), so the tenancy invariant and row-level
+security are unchanged. There is no `switch_team` and no `team` argument: a token that spans teams
+would make every tool's team implicit, and one mistaken call could change the wrong team's servers.
+`list_teams` shows the person's teams with the bound one marked, and says how to reconnect for another.
+To use two teams, add the connector twice.
+
+Connections are listed per team (*MCP tokens*, marked *AI connector*) and for the person across all
+their teams (*Account → AI connections*, with the team each is bound to). Either place can revoke.
+`node scripts/mcp-oauth-check.mjs` walks the whole flow without a browser.
 
 ## Migrations (the ledger)
 

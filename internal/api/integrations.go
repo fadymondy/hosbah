@@ -725,6 +725,7 @@ func MountIntegrations(r chi.Router, a *app.App, sessions SessionIssuer) {
 		d.handlePanelLink(w, r, sessions)
 	})
 	mountOAuthToken(r, d)
+	MountMCPOAuth(r, d)
 }
 
 func (d *deps) handlePanelLink(w http.ResponseWriter, r *http.Request, sessions SessionIssuer) {

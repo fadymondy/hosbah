@@ -32,6 +32,7 @@ func UserServer() *Server {
 		Version:       "0.1.0",
 		Tools:         append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(append(UserTools(), ServerTools()...), InfraTools()...), ProxyTools()...), AppTools()...), DatabaseTools()...), ManageTools()...), TunnelTools()...), SiteTools()...), WorkloadTools()...), GitHubTools()...), GitHubAppTools()...), RepositoryTools()...), DNSTools()...), DNSZoneTools()...), MonitorTools()...), ScheduleTools()...), QueueTools()...), ProcessTools()...), StorageTools()...), RealtimeTools()...), BrowserTools()...), InstallTools()...), DeployConfigTools()...), SharedServiceTools()...), ImportTools()...), FileTools()...), ResourceTools()...), SFTPUserTools()...), NotificationChannelTools()...), StatusPageTools()...), LogDrainTools()...), RumTools()...), ApmTools()...), EdgeCacheTools()...), HTTPRulesTools()...), CostTools()...), ScriptTools()...), ServiceTools()...), SiteTemplateTools()...), ProductTools()...), FirewallTools()...), Fail2banTools()...), MailTools()...), CertCheckTools()...), ServerUpdateTools()...), SSHKeyTools()...), SSHUserTools()...), AppScanTools()...), SecurityTools()...), 
 		AllowedScopes: scopes.All,
+		OAuth:         true,
 		Authenticate:  authenticateUser,
 		TxScope: func(c Caller) tenancy.Scope {
 			return tenancy.Scope{UserID: c.UserID, TeamID: c.TeamID, TokenHash: c.TokenHash}
@@ -150,6 +151,40 @@ func UserTools() []Tool {
 				n, _ := env.Q.CountMembers(ctx, t.ID)
 				return fmt.Sprintf("%s  (slug %s, id %s)\nmembers: %d\ncreated: %s\n",
 					t.Name, t.Slug, t.ID, n, t.CreatedAt.Format(time.RFC3339)), nil
+			},
+		},
+		{
+			// One token, one team (the tenancy invariant): there is no switch_team and no `team`
+			// argument. This lists the person's other teams so an agent can say which one to pick
+			// when the connector is reconnected (the consent page has a team picker).
+			Name: "list_teams",
+			Description: "Every team the token's user belongs to, with their role; the one this connection is bound to is marked. " +
+				"A connection works with exactly one team: to use another, reconnect the connector and pick that team on Hosbah's consent page.",
+			Scope:       scopes.Read,
+			InputSchema: schema(nil, map[string]any{}),
+			Run: func(ctx context.Context, env *Env, _ Args) (string, error) {
+				teams, err := env.Q.ListTeamsForUser(ctx, env.Caller.UserID)
+				if err != nil {
+					return "", errors.New("could not list your teams")
+				}
+				var b strings.Builder
+				for _, t := range teams {
+					mark := " "
+					if t.ID == env.Caller.TeamID {
+						mark = "*"
+					}
+					suspended := ""
+					if t.SuspendedAt != nil {
+						suspended = "  [suspended]"
+					}
+					fmt.Fprintf(&b, "%s %s  (slug %s, id %s)  role: %s%s\n", mark, t.Name, t.Slug, t.ID, t.Role, suspended)
+				}
+				if b.Len() == 0 {
+					return "no teams", nil
+				}
+				b.WriteString("\n* = the team this connection is bound to. To work with another team, reconnect the connector " +
+					"(for claude.ai: Settings → Connectors → Hosbah → Disconnect, then Connect) and pick that team on Hosbah's consent page.\n")
+				return b.String(), nil
 			},
 		},
 		{

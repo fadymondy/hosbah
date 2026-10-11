@@ -152,6 +152,8 @@ export type McpToken = {
   expires_at: string | null
   revoked_at: string | null
   created_at: string
+  /** Issued over OAuth to an AI connector (claude.ai, ChatGPT, …); expires_at is the connection's. */
+  connector?: boolean
 }
 export type Report = { key: string; title: string; status: string; created_at: string }
 

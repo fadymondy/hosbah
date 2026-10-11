@@ -43,7 +43,9 @@ import (
 	"github.com/togo-framework/auth"
 
 	db "github.com/fadymondy/hosbah/internal/db/gen"
+	"github.com/fadymondy/hosbah/internal/oauthmeta"
 	"github.com/fadymondy/hosbah/internal/pgtext"
+	"github.com/fadymondy/hosbah/internal/scopes"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 	"github.com/fadymondy/hosbah/internal/tokens"
 )
@@ -81,7 +83,11 @@ func (d *deps) oauthClient(ctx context.Context, clientID, redirectURI string) (d
 	if err != nil {
 		return c, errors.New("unknown client")
 	}
-	if redirectURI == "" || !oauthRedirectAllowed(c, redirectURI) {
+	allowed := oauthRedirectAllowed
+	if c.Kind == oauthKindMCP {
+		allowed = mcpRedirectAllowed
+	}
+	if redirectURI == "" || !allowed(c, redirectURI) {
 		return c, errors.New("this redirect URI is not registered for the client")
 	}
 	return c, nil
@@ -139,6 +145,11 @@ func (d *deps) registerOAuth(api huma.API) {
 				Name string `json:"name"`
 			} `json:"client"`
 			Apps []OAuthApp `json:"apps"`
+			// An MCP connector (kind "mcp") is granted a team, not apps: Teams and Scopes are for it.
+			Kind          string      `json:"kind" enum:"integration,mcp"`
+			Teams         []OAuthTeam `json:"teams"`
+			Scopes        []string    `json:"scopes" doc:"Every scope a connector can be granted"`
+			DefaultScopes []string    `json:"default_scopes" doc:"The scopes pre-ticked: the ones the connector asked for, or read, deploy and write"`
 		}
 	}
 	huma.Register(api, huma.Operation{OperationID: "oauth-consent", Method: http.MethodGet, Path: "/api/oauth/authorize",
@@ -146,6 +157,8 @@ func (d *deps) registerOAuth(api huma.API) {
 	}, func(ctx context.Context, in *struct {
 		ClientID    string `query:"client_id" maxLength:"200"`
 		RedirectURI string `query:"redirect_uri" maxLength:"2000"`
+		Scope       string `query:"scope" maxLength:"500"`
+		Resource    string `query:"resource" maxLength:"2000"`
 	}) (*oauthConsentOut, error) {
 		id, err := current(ctx)
 		if err != nil {
@@ -158,6 +171,22 @@ func (d *deps) registerOAuth(api huma.API) {
 		out := &oauthConsentOut{}
 		out.Body.Client.Name = c.Name
 		out.Body.Apps = []OAuthApp{}
+		out.Body.Kind = c.Kind
+		out.Body.Teams = []OAuthTeam{}
+		out.Body.Scopes = []string{}
+		out.Body.DefaultScopes = []string{}
+		if c.Kind == oauthKindMCP {
+			if !oauthmeta.ResourceAllowed(in.Resource) {
+				return nil, huma.Error400BadRequest("this connector asks for a resource other than Hosbah's MCP server")
+			}
+			out.Body.Scopes = scopes.All
+			out.Body.DefaultScopes = requestedScopes(in.Scope)
+			out.Body.Teams, err = d.oauthTeams(ctx, id.ID)
+			if err != nil {
+				return nil, huma.Error500InternalServerError("could not list your teams")
+			}
+			return out, nil
+		}
 		var teams []db.ListTeamsForUserRow
 		if err := d.tx(ctx, tenancy.Scope{UserID: id.ID}, func(q *db.Queries, _ *sql.Tx) error {
 			teams, err = q.ListTeamsForUser(ctx, id.ID)
@@ -197,11 +226,6 @@ func (d *deps) registerOAuth(api huma.API) {
 		return out, nil
 	})
 
-	type oauthDecisionOut struct {
-		Body struct {
-			Redirect string `json:"redirect" doc:"Where to send the browser: the client's redirect URI with code and state, or error"`
-		}
-	}
 	huma.Register(api, huma.Operation{OperationID: "oauth-authorize", Method: http.MethodPost, Path: "/api/oauth/authorize",
 		Summary: "Answer a client's authorization request: allow it apps of one team (owner or admin), or deny", Tags: tags,
 	}, func(ctx context.Context, in *struct {
@@ -216,6 +240,8 @@ func (d *deps) registerOAuth(api huma.API) {
 			Team                string `json:"team,omitempty" maxLength:"64" doc:"The app's team (id or slug)"`
 			App                 string   `json:"app,omitempty" maxLength:"64" doc:"The app to connect (id); or apps"`
 			Apps                []string `json:"apps,omitempty" maxItems:"20" doc:"The apps to connect (ids), all of the team"`
+			Scopes              []string `json:"scopes,omitempty" maxItems:"5" doc:"MCP connector: the scopes granted"`
+			Resource            string   `json:"resource,omitempty" maxLength:"2000" doc:"MCP connector: the RFC 8707 resource indicator"`
 			Allow               bool   `json:"allow"`
 		}
 	}) (*oauthDecisionOut, error) {
@@ -224,7 +250,8 @@ func (d *deps) registerOAuth(api huma.API) {
 			return nil, err
 		}
 		b := in.Body
-		if _, err := d.oauthClient(ctx, b.ClientID, b.RedirectURI); err != nil {
+		client, err := d.oauthClient(ctx, b.ClientID, b.RedirectURI)
+		if err != nil {
 			return nil, huma.Error400BadRequest(err.Error())
 		}
 		out := &oauthDecisionOut{}
@@ -237,17 +264,20 @@ func (d *deps) registerOAuth(api huma.API) {
 			return fail("unsupported_response_type", "only response_type=code is supported")
 		case b.CodeChallenge == "" || b.CodeChallengeMethod != "S256":
 			return fail("invalid_request", "PKCE is required: code_challenge with code_challenge_method=S256")
-		case b.Scope != "" && b.Scope != oauthScopeApp:
+		case client.Kind != oauthKindMCP && b.Scope != "" && b.Scope != oauthScopeApp:
 			return fail("invalid_scope", "the only scope is \"app\"")
+		case client.Kind == oauthKindMCP && !oauthmeta.ResourceAllowed(b.Resource):
+			return fail("invalid_target", "the only resource is Hosbah's MCP server, "+oauthmeta.ResourcePath)
 		case !b.Allow:
 			return fail("access_denied", "the person declined")
+		}
+		if client.Kind == oauthKindMCP {
+			return d.authorizeMCP(ctx, id.ID, client, b.Team, b.Scopes, b.RedirectURI, b.CodeChallenge, b.State)
 		}
 		picked := oauthPicked(b.App, b.Apps)
 		if b.Team == "" || len(picked) == 0 {
 			return nil, huma.Error422UnprocessableEntity("pick an app")
 		}
-		var client db.OauthClient
-		client, _ = d.oauthClient(ctx, b.ClientID, b.RedirectURI)
 		plain, hash := tokens.New(tokens.PrefixOAuthCode)
 		err = d.inTeam(ctx, b.Team, tenancy.AbilityManageApps, func(q *db.Queries, _ *sql.Tx, _ *auth.Identity, m *tenancy.Membership) error {
 			for _, app := range picked {
@@ -273,6 +303,12 @@ func (d *deps) registerOAuth(api huma.API) {
 		out.Body.Redirect = oauthRedirect(b.RedirectURI, map[string]string{"code": plain, "state": b.State})
 		return out, nil
 	})
+}
+
+type oauthDecisionOut struct {
+	Body struct {
+		Redirect string `json:"redirect" doc:"Where to send the browser: the client's redirect URI with code and state, or error"`
+	}
 }
 
 // oauthPicked is the apps of an answer, in order and once each: apps, or the single app.
@@ -325,27 +361,31 @@ func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := r.PostForm
-	clientID, secret := f.Get("client_id"), f.Get("client_secret")
-	if u, p, ok := r.BasicAuth(); ok {
-		clientID, _ = url.QueryUnescape(u)
-		secret, _ = url.QueryUnescape(p)
+	oauthCORS(w)
+	clientKey := f.Get("client_id")
+	if u, _, ok := r.BasicAuth(); ok {
+		clientKey, _ = url.QueryUnescape(u)
 	}
-	if !oauthTokenCalls.allow(panelClientIP(r) + "|" + clientID) {
+	if !oauthTokenCalls.allow(panelClientIP(r) + "|" + clientKey) {
 		oauthError(w, http.StatusTooManyRequests, "slow_down", "too many requests, try again in a minute")
+		return
+	}
+	if g := f.Get("grant_type"); g != "authorization_code" && g != "refresh_token" {
+		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "grant_type must be authorization_code or refresh_token")
+		return
+	}
+	client, ok := d.authenticateOAuthClient(ctx, r, f)
+	if !ok {
+		oauthError(w, http.StatusUnauthorized, "invalid_client", "unknown client or wrong client secret")
+		return
+	}
+	// An MCP connector gets a team MCP token (mcp_oauth.go); an integration client an app token.
+	if client.Kind == oauthKindMCP {
+		d.mcpGrant(w, r, client, f)
 		return
 	}
 	if f.Get("grant_type") != "authorization_code" {
 		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "only grant_type=authorization_code is supported")
-		return
-	}
-	var client db.OauthClient
-	err := d.tx(ctx, tenancy.Scope{System: true}, func(q *db.Queries, _ *sql.Tx) error {
-		var err error
-		client, err = q.OAuthClientByClientID(ctx, clientID)
-		return err
-	})
-	if err != nil || secret == "" || subtle.ConstantTimeCompare([]byte(tokens.Hash(secret)), []byte(client.SecretHash)) != 1 {
-		oauthError(w, http.StatusUnauthorized, "invalid_client", "unknown client or wrong client secret")
 		return
 	}
 	code, redirectURI, verifier := f.Get("code"), f.Get("redirect_uri"), f.Get("code_verifier")
@@ -361,7 +401,7 @@ func (d *deps) handleOAuthToken(w http.ResponseWriter, r *http.Request) {
 
 	hash := tokens.Hash(code)
 	var out []oauthTokenApp
-	err = d.tx(ctx, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
+	err := d.tx(ctx, tenancy.Scope{TokenHash: hash}, func(q *db.Queries, tx *sql.Tx) error {
 		c, err := q.OAuthCodeByHash(ctx, hash)
 		if err != nil || c.ClientID != client.ID {
 			return errOAuthGrant

@@ -48,7 +48,7 @@ func TestOAuthAuthorizationServer(t *testing.T) {
 	secret, secretHash := tokens.New(tokens.PrefixOAuthSecret)
 	if err := tenancy.Tx(context.Background(), sqlDB, tenancy.Scope{PlatformAdmin: true}, func(q *db.Queries, _ *sql.Tx) error {
 		_, err := q.InsertOAuthClient(context.Background(), db.InsertOAuthClientParams{ClientID: clientID, Name: "Mahaam " + short,
-			SecretHash: secretHash, RedirectUris: "https://other.example.test/cb\n" + redirect})
+			SecretHash: &secretHash, RedirectUris: "https://other.example.test/cb\n" + redirect})
 		return err
 	}); err != nil {
 		t.Fatal(err)

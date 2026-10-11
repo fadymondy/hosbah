@@ -24,14 +24,70 @@ type McpTokenOut struct {
 	ExpiresAt  *time.Time `json:"expires_at"`
 	RevokedAt  *time.Time `json:"revoked_at"`
 	CreatedAt  time.Time  `json:"created_at"`
+	// Connector: issued over OAuth to an AI connector (claude.ai, ChatGPT, …) rather than minted
+	// by hand. Its access token lives an hour and is refreshed, so ExpiresAt is the connection's
+	// (the refresh token's) expiry, which every refresh pushes back.
+	Connector bool `json:"connector"`
 }
 
 func toTokenOut(t db.McpToken) McpTokenOut {
-	return McpTokenOut{ID: t.ID, Name: t.Name, Scopes: scopes.Parse(t.Scopes), LastUsedAt: t.LastUsedAt,
+	out := McpTokenOut{ID: t.ID, Name: t.Name, Scopes: scopes.Parse(t.Scopes), LastUsedAt: t.LastUsedAt,
 		ExpiresAt: t.ExpiresAt, RevokedAt: t.RevokedAt, CreatedAt: t.CreatedAt}
+	if t.OauthClientID != nil || t.RefreshHash != nil {
+		out.Connector = true
+		out.ExpiresAt = t.RefreshExpiresAt
+	}
+	return out
+}
+
+// MyTokenOut is one of the signed-in person's own MCP tokens, with the team it is bound to.
+type MyTokenOut struct {
+	McpTokenOut
+	TeamID   string `json:"team_id"`
+	TeamSlug string `json:"team_slug"`
+	TeamName string `json:"team_name"`
 }
 
 func (d *deps) registerTokens(api huma.API) {
+	// The account's "AI connections": every live MCP token the person holds, in every team, each
+	// with the team it is bound to. Revoking goes through the team route below (owner or admin,
+	// the same people who can hold a token).
+	type myTokensOut struct {
+		Body struct {
+			Tokens []MyTokenOut `json:"tokens"`
+		}
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "list-my-mcp-tokens", Method: http.MethodGet, Path: "/api/me/mcp-tokens",
+		Summary: "Your MCP tokens and AI connectors in every team, with the team each is bound to (never the secret)", Tags: []string{"MCP"},
+	}, func(ctx context.Context, _ *struct{}) (*myTokensOut, error) {
+		id, err := current(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := &myTokensOut{}
+		out.Body.Tokens = []MyTokenOut{}
+		var teams []db.ListTeamsForUserRow
+		if err := d.tx(ctx, tenancy.Scope{UserID: id.ID}, func(q *db.Queries, _ *sql.Tx) error {
+			teams, err = q.ListTeamsForUser(ctx, id.ID)
+			return err
+		}); err != nil {
+			return nil, huma.Error500InternalServerError("could not list your teams")
+		}
+		for _, t := range teams {
+			if err := d.tx(ctx, tenancy.Scope{UserID: id.ID, TeamID: t.ID}, func(q *db.Queries, _ *sql.Tx) error {
+				rows, err := q.ListMcpTokensOfUserInTeam(ctx, db.ListMcpTokensOfUserInTeamParams{TeamID: t.ID, UserID: id.ID})
+				for _, r := range rows {
+					out.Body.Tokens = append(out.Body.Tokens, MyTokenOut{McpTokenOut: toTokenOut(r), TeamID: t.ID, TeamSlug: t.Slug, TeamName: t.Name})
+				}
+				return err
+			}); err != nil {
+				return nil, huma.Error500InternalServerError("could not list your tokens")
+			}
+		}
+		return out, nil
+	})
+
 	type tokensListOut struct {
 		Body struct {
 			Tokens []McpTokenOut `json:"tokens"`

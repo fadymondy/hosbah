@@ -70,6 +70,12 @@ const nextConfig = {
       { source: "/sso/circlexo", destination: `${origin}/sso/circlexo` },
       // The OAuth token endpoint for integrations (MH-1153); /oauth/authorize is the web's own page.
       { source: "/oauth/token", destination: `${origin}/oauth/token` },
+      // OAuth for MCP connectors (claude.ai, ChatGPT, Claude Code): dynamic client registration,
+      // revocation and the RFC 9728 / RFC 8414 discovery documents (internal/api/mcp_oauth.go).
+      { source: "/oauth/register", destination: `${origin}/oauth/register` },
+      { source: "/oauth/revoke", destination: `${origin}/oauth/revoke` },
+      { source: "/.well-known/oauth-protected-resource/:path*", destination: `${origin}/.well-known/oauth-protected-resource/:path*` },
+      { source: "/.well-known/oauth-authorization-server/:path*", destination: `${origin}/.well-known/oauth-authorization-server/:path*` },
       // The real-user-monitoring beacon (internal/rum); its ingest endpoint is under /api/rum/.
       { source: "/rum.js", destination: `${origin}/rum.js` },
     ]

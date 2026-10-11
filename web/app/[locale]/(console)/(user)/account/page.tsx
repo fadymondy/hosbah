@@ -7,6 +7,7 @@ import { InboxIcon, MessageSquareShareIcon } from "lucide-react"
 import { PageBody } from "@/components/app-shell"
 import { useErrorText } from "@/components/form-error"
 
+import { AIConnections } from "@/components/account/ai-connections"
 import { ChangePassword } from "@/components/account/change-password"
 import { ConnectedAccounts } from "@/components/account/connected-accounts"
 import { TwoFactor } from "@/components/account/two-factor"
@@ -29,6 +30,7 @@ export default function AccountPage() {
       <Suspense fallback={null}>
         <ConnectedAccounts />
       </Suspense>
+      <AIConnections />
       <MyReports />
     </PageBody>
   )
