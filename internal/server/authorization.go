@@ -77,8 +77,12 @@ Framework routes closed to everyone, admins included.
   - /api/auth/dev, /api/auth/mfa: auth-dev (admin session for an empty body) and auth-mfa
     (magic-link token echo, FM-81; user_id taken from the request body) are not installed.
     Blocking the paths too means re-installing either by accident still exposes nothing.
-  - /api/auth/2fa/enroll, /api/auth/2fa/verify: the plugin's TOTP stored the secret in plain
-    text and its login never asked for it. Two-factor is internal/account's /api/me/2fa/*.
+  - /api/auth/2fa/enroll, /api/auth/2fa/verify, /api/auth/2fa/disable: the plugin's TOTP stored
+    the secret in plain text. Two-factor is internal/account's /api/me/2fa/*.
+  - /api/auth/admin, /api/auth/impersonation (auth v0.10.0): the plugin's user management,
+    impersonation and magic links write users directly, past everything Hosbah keeps per account
+    (disabled_at, sessions_revoked_at, email verification, panel accounts, its own two-factor).
+    Platform admins manage accounts through Hosbah's admin API and MCP instead.
   - /graphql: not mounted in P0 — the generated resolvers are unscoped CRUD over tenant tables.
 */
 func isBlocked(r *http.Request) bool {
@@ -86,7 +90,8 @@ func isBlocked(r *http.Request) bool {
 	for _, prefix := range []string{
 		"/api/auth/tokens", "/api/auth/otp", "/api/auth/pin",
 		"/api/auth/dev", "/api/auth/mfa", "/api/auth/magic",
-		"/api/auth/2fa/enroll", "/api/auth/2fa/verify",
+		"/api/auth/2fa/enroll", "/api/auth/2fa/verify", "/api/auth/2fa/disable",
+		"/api/auth/admin", "/api/auth/impersonation",
 		"/graphql",
 	} {
 		if p == prefix || strings.HasPrefix(p, prefix+"/") {

@@ -59,6 +59,42 @@ func resetSettings(t *testing.T) {
 	}
 }
 
+// auth v0.10.0 mounts its own user management, impersonation and magic links. They write users
+// past Hosbah's account state, so they are closed even to a platform admin (isBlocked).
+func TestPluginAdminAPIClosedToPlatformAdmins(t *testing.T) {
+	ts, cleanup := bootTestServer(t)
+	defer cleanup()
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	admin := platformAdmin(t, ts.URL, "plugin-admin-"+suffix+"@example.test")
+	target := newClient(t, ts.URL)
+	target.register("plugin-target-" + suffix + "@example.test")
+	id := userID(t, target)
+
+	for _, c := range []struct {
+		method, path string
+		body         any
+	}{
+		{"GET", "/api/auth/admin/users", nil},
+		{"GET", "/api/auth/admin/users/" + id, nil},
+		{"POST", "/api/auth/admin/users", map[string]any{"email": "made-" + suffix + "@example.test", "password": "a-long-password-1"}},
+		{"PATCH", "/api/auth/admin/users/" + id, map[string]any{"roles": []string{"admin"}}},
+		{"DELETE", "/api/auth/admin/users/" + id, nil},
+		{"POST", "/api/auth/admin/users/" + id + "/impersonate", map[string]any{}},
+		{"POST", "/api/auth/admin/users/" + id + "/reset-password", map[string]any{}},
+		{"POST", "/api/auth/admin/users/" + id + "/magic-link", map[string]any{}},
+		{"POST", "/api/auth/impersonation/stop", map[string]any{}},
+		{"POST", "/api/auth/2fa/disable", map[string]any{}},
+	} {
+		if status, text := admin.do(c.method, c.path, c.body); status != http.StatusNotFound {
+			t.Errorf("%s %s as a platform admin -> %d, want 404: %s", c.method, c.path, status, text)
+		}
+	}
+	// Still there, still not an admin.
+	if got := userID(t, target); got != id {
+		t.Fatalf("target account changed: %q -> %q", id, got)
+	}
+}
+
 func TestPlatformAdminRoutesRefuseNonAdmins(t *testing.T) {
 	ts, cleanup := bootTestServer(t)
 	defer cleanup()

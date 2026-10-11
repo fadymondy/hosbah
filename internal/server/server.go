@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/fadymondy/hosbah/catalog"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/api"
 	"github.com/fadymondy/hosbah/internal/apm"
 	"github.com/fadymondy/hosbah/internal/app"
+	"github.com/fadymondy/hosbah/internal/brand"
 	"github.com/fadymondy/hosbah/internal/certcheck"
 	"github.com/fadymondy/hosbah/internal/config"
 	"github.com/fadymondy/hosbah/internal/crypto"
@@ -39,6 +41,21 @@ import (
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
+/*
+shareTrustedProxies gives the auth plugin's sign-in limiter the proxies Hosbah's own limiters
+trust. Since auth v0.9.2 the plugin honours X-Forwarded-For only from TRUSTED_PROXIES (default
+loopback); behind a proxy on another address every sign-in would share the proxy's bucket of 10
+per 5 minutes. An explicit TRUSTED_PROXIES wins.
+*/
+func shareTrustedProxies() {
+	if _, set := os.LookupEnv("TRUSTED_PROXIES"); set {
+		return
+	}
+	if v := brand.Getenv("TRUSTED_PROXIES"); v != "" {
+		_ = os.Setenv("TRUSTED_PROXIES", v)
+	}
+}
+
 // Boot builds the kernel + app and mounts Hosbah's routes. It does not listen.
 //
 // What is deliberately NOT mounted:
@@ -51,6 +68,7 @@ import (
 //   - /api/_meta/resources: the admin dashboard's schema dump; there is no such dashboard.
 func Boot() *app.App {
 	config.LoadDotEnv()
+	shareTrustedProxies()
 
 	k := togo.New()
 	a := app.New(context.Background(), k)

@@ -586,7 +586,9 @@ func (d *deps) registerPanelAppMe(api huma.API) {
 			if err != nil {
 				return errNotFound
 			}
-			o.Body = PanelAppSession{Email: id.Email, TeamID: t.ID, TeamSlug: t.Slug, AppID: a.ID, AppName: a.Name, ServerID: a.ServerID}
+			// The plugin reloads the session's email from the account: "<email>#app:<app id>".
+			email, _, _ := strings.Cut(id.Email, panelAppKeyInfix)
+			o.Body = PanelAppSession{Email: email, TeamID: t.ID, TeamSlug: t.Slug, AppID: a.ID, AppName: a.Name, ServerID: a.ServerID}
 			return nil
 		})
 		return o, err
@@ -795,7 +797,13 @@ func (d *deps) handlePanelLink(w http.ResponseWriter, r *http.Request, sessions 
 		}); err != nil {
 			return err
 		}
-		ident = auth.Identity{ID: userID, Email: link.Email, Guard: PanelAppGuard, Permissions: []string{"team:" + link.TeamID, "app:" + ap.ID}}
+		scope := []string{"team:" + link.TeamID, "app:" + ap.ID}
+		// auth v0.10.0 reloads a session's permissions from the account on every request.
+		if n, err := q.SetPanelAppAccountScope(ctx, db.SetPanelAppAccountScopeParams{ID: userID, PanelServerID: &ap.ServerID,
+			Permissions: strings.Join(scope, ",")}); err != nil || n == 0 {
+			return errNotFound
+		}
+		ident = auth.Identity{ID: userID, Email: link.Email, Guard: PanelAppGuard, Permissions: scope}
 		target = panelAppPath(locale, ap.ServerID, ap.ID)
 		return nil
 	})

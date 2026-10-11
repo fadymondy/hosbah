@@ -81,8 +81,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/togo-framework/audit v0.1.1 h1:IJEDwUuiBZEBXYhqlhbAEwoqLF7xfND3tOJT4wbykiU=
 github.com/togo-framework/audit v0.1.1/go.mod h1:aPyP598+oRh18KpbxWFaeo0nApDobf3AnFnygM1ZoyI=
-github.com/togo-framework/auth v0.8.0 h1:wpbR6x50gbvZZ3pcZYOripRxs+yO2vHqycH3MpqHA6c=
-github.com/togo-framework/auth v0.8.0/go.mod h1:dPa8CdFlMGggb/PSHlhhqJvEqBelgf36t+qP/vkq2vQ=
+github.com/togo-framework/auth v0.10.0 h1:eFZVnAiQ5zqFFvwB8TriwZIu8UVMcjuVU0KdsQL9ZAk=
+github.com/togo-framework/auth v0.10.0/go.mod h1:7rvnIe3YweUjp2JS0tBINDQB78YC5FToAYq6j2VUtuM=
 github.com/togo-framework/authz v0.1.1 h1:Z0oBXiDfke1CH5e2Jz+wN2SYzN1s2iFu6gi8/sdDGcc=
 github.com/togo-framework/authz v0.1.1/go.mod h1:Y/QhvI7M5vDj12k8qB6dSY/bbtEtFXLsxIniP4HxJmc=
 github.com/togo-framework/cache v0.3.0 h1:COOKnJ+uo6lbhYOYugOwi/0BS7cwb9B45cRrmTkQc9Q=
@@ -99,8 +99,8 @@ github.com/togo-framework/providers v0.1.0 h1:/y20o43hHAzLO/oFrs3hdkT9oHbRZ4NzN9
 github.com/togo-framework/providers v0.1.0/go.mod h1:LjwCkkrabE/llqyrmK/6cxBbhYrt2t3pP00BS7aBLuY=
 github.com/togo-framework/queue v0.3.0 h1:l6NrDeJIhqgyTVOxok197vVVr5aV5Len7naT02+EXTk=
 github.com/togo-framework/queue v0.3.0/go.mod h1:HsjBEk31j+z/4yGZRHqxNxaYvRorUCaJzZsjWzQdKk0=
-github.com/togo-framework/realtime v0.2.0 h1:ejT+Z40ukumu5QWPRzgbFfCyAoVtidLfD/snQnPZPso=
-github.com/togo-framework/realtime v0.2.0/go.mod h1:saQu84DVN19AjtlUqf6nHvJ1zgtt17rV7R7vs/JfSXY=
+github.com/togo-framework/realtime v0.2.1 h1:N+wnogccG27MlWjfnmM7wceE2BtCh07LrzCo0pdFSO0=
+github.com/togo-framework/realtime v0.2.1/go.mod h1:saQu84DVN19AjtlUqf6nHvJ1zgtt17rV7R7vs/JfSXY=
 github.com/togo-framework/settings v0.1.1 h1:7m1Ou7hoYIIJg/bmTs5h0SyzmZChjCetXgq5WSeInpc=
 github.com/togo-framework/settings v0.1.1/go.mod h1:qbERlVcWHGB6wtGV0SuUDDwj78aekgXr06EQBurwSKo=
 github.com/togo-framework/storage v0.2.0 h1:tsv6JzNDUiVoeCu+itIBfFciAxn/vRSX4Ky6VXb09/M=
