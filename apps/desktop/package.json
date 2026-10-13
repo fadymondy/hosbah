@@ -1,0 +1,71 @@
+{
+  "name": "@hosbah/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hosbah for Windows and macOS: servers, apps and alerts in a tray app.",
+  "author": "Fady Mondy <info@3x1.io>",
+  "homepage": "https://hosbah.com",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "build": "vite build && node scripts/build-main.mjs",
+    "package": "npm run build && electron-builder",
+    "package:win": "npm run build && electron-builder --win nsis --x64",
+    "package:mac": "npm run build && electron-builder --mac dmg zip --universal",
+    "package:dir": "npm run build && electron-builder --dir",
+    "mock": "node scripts/mock-api.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "shots": "node scripts/shots.mjs"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^2.5.0",
+    "@hosbah/client": "*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "clsx": "^2.1.1",
+    "electron": "44.4.3",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^0.462.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "build": {
+    "appId": "com.fadymondy.hosbah.desktop",
+    "productName": "Hosbah",
+    "copyright": "Copyright © 2026 Fady Mondy",
+    "artifactName": "Hosbah-${version}-${os}-${arch}.${ext}",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["dist/**", "package.json"],
+    "asar": true,
+    "protocols": [{ "name": "Hosbah", "schemes": ["hosbah"] }],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg", "zip"],
+      "icon": "build/icon.png",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false,
+      "notarize": false
+    },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Hosbah-Setup-${version}.${ext}"
+    },
+    "linux": { "target": ["AppImage"], "icon": "build/icon.png", "category": "Development", "maintainer": "Fady Mondy <info@3x1.io>" },
+    "afterSign": "scripts/notarize.cjs",
+    "publish": [{ "provider": "github", "owner": "fadymondy", "repo": "hosbah", "releaseType": "draft" }]
+  }
+}

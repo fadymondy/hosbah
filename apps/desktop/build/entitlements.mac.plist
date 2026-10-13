@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened runtime entitlements. `hardenedRuntime: true` without this file builds fine and then
+  fails notarisation, or worse ships an app that crashes on launch — which is why it was a trap
+  rather than an omission.
+
+  Deliberately minimal. Every entitlement here is one the app cannot run without, and the ones
+  people copy in out of habit are left out on purpose:
+
+    - no com.apple.security.cs.allow-unsigned-executable-memory
+    - no com.apple.security.cs.disable-library-validation
+    - no camera, microphone, location, contacts or calendar
+
+  The tray has no network access in the renderer at all (sandbox: true, connect-src 'none'); the
+  main process does the talking, which is why client.network.client is here and nothing else is.
+-->
+<plist version="1.0">
+<dict>
+  <!-- V8 compiles JavaScript at runtime. Without this, Electron cannot start under the
+       hardened runtime. This is the one genuinely unavoidable entitlement. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- Outbound HTTPS to the user's Hosbah server, from the main process. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+</dict>
+</plist>
