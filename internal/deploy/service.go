@@ -36,6 +36,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/crypto"
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/push"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -373,7 +374,9 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 			r.logf("error", "✗ %s #%d failed: %s", r.dep.Kind, r.dep.Number, errText)
 		}
 	}
+	var alert *push.Event
 	err := r.tx(context.Background(), func(q *db.Queries) error {
+		alert = nil
 		var e *string
 		if errText != "" && status != "succeeded" {
 			e = &errText
@@ -396,6 +399,10 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 		}
 		kind := strings.ToUpper(r.dep.Kind[:1]) + r.dep.Kind[1:]
 		if status == "succeeded" {
+			alert = &push.Event{TeamID: r.dep.TeamID, Kind: push.EventDeploySucceeded, SubjectType: "deployment", SubjectID: r.dep.ID,
+				Link: "apps/" + r.app.ID, Tag: "deploy:" + r.app.ID,
+				Title:   fmt.Sprintf("%s #%d of %s is live", kind, r.dep.Number, r.app.Name),
+				TitleAR: fmt.Sprintf("تم نشر %s (#%d) بنجاح", r.app.Name, r.dep.Number)}
 			// The bell tells whoever is around that it shipped, not only when it broke.
 			return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: r.dep.TeamID, Kind: "deploy.succeeded",
 				Title:       fmt.Sprintf("%s #%d of %s is live", kind, r.dep.Number, r.app.Name),
@@ -408,12 +415,28 @@ func (r *runner) finish(ctx context.Context, status, errText string, rel *db.Rel
 		if r.live != nil {
 			body += fmt.Sprintf("\nRelease v%d is still serving.", r.live.Version)
 		}
+		alert = &push.Event{TeamID: r.dep.TeamID, Kind: push.EventDeployFailed, SubjectType: "deployment", SubjectID: r.dep.ID,
+			Link: "apps/" + r.app.ID, Tag: "deploy:" + r.app.ID, Body: body, BodyAR: errText,
+			Title:   fmt.Sprintf("%s #%d of %s failed", kind, r.dep.Number, r.app.Name),
+			TitleAR: fmt.Sprintf("فشل نشر %s (#%d)", r.app.Name, r.dep.Number)}
 		return q.InsertNotification(ctx, db.InsertNotificationParams{TeamID: r.dep.TeamID, Kind: "deploy.failed",
 			Title: fmt.Sprintf("%s #%d of %s failed", kind, r.dep.Number, r.app.Name),
 			Body:  &body, SubjectType: ptr("deployment"), SubjectID: &r.dep.ID})
 	})
 	if err != nil {
 		r.s.log.Error("could not finish a deployment", "deployment", r.dep.ID, "err", err)
+	} else if alert != nil {
+		push.Notify(*alert)
+		if alert.Kind == push.EventDeployFailed {
+			// The team's channels (email, Slack, ...) subscribed to deploy.failed; off the deploy's
+			// own context, which a cancel may already have ended.
+			a := *alert
+			go func() {
+				cctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				defer cancel()
+				push.Current().Channels(cctx, a)
+			}()
+		}
 	}
 	r.publish()
 	r.s.ops.Broker().Publish(ops.TeamTopic(r.dep.TeamID))

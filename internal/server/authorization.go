@@ -123,6 +123,7 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/code/request",
 		"/api/auth/code/verify",
 		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
+		"/api/auth/device/refresh", // the apps' rotating refresh token (internal/account/devices.go)
 		"/api/auth/logout",
 		// The CircleXO hub integration (internal/circlexo): the sign-in button flag, and the signed
 		// webhook / provision endpoints, each authenticated by its Standard Webhooks signature.

@@ -29,6 +29,7 @@ import (
 	db "github.com/fadymondy/hosbah/internal/db/gen"
 	"github.com/fadymondy/hosbah/internal/monitors"
 	"github.com/fadymondy/hosbah/internal/notifications"
+	"github.com/fadymondy/hosbah/internal/push"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -291,6 +292,9 @@ func (s *Service) maybeAlert(ctx context.Context, row db.SslCertificate) {
 				Event: notifications.EventCertExpiring, Subject: "certificate", Title: "Certificate check failed: " + row.Hostname,
 				Reason: strings.TrimSpace(row.Error), Link: certLink(row.TeamID),
 			})
+			push.Record(ctx, push.Event{TeamID: row.TeamID, Kind: push.EventCertExpiring, SubjectType: "certificate", SubjectID: row.Hostname,
+				Link: "domains", Title: "Certificate check failed: " + row.Hostname, Body: strings.TrimSpace(row.Error),
+				TitleAR: "فشل فحص شهادة " + row.Hostname, BodyAR: strings.TrimSpace(row.Error)})
 		}
 		return
 	}
@@ -312,6 +316,11 @@ func (s *Service) maybeAlert(ctx context.Context, row db.SslCertificate) {
 			Reason: fmt.Sprintf("issued by %s, valid until %s", row.Issuer, row.NotAfter.Format(time.RFC3339)),
 			Link:   certLink(row.TeamID),
 		})
+		push.Record(ctx, push.Event{TeamID: row.TeamID, Kind: push.EventCertExpiring, SubjectType: "certificate", SubjectID: row.Hostname,
+			Link: "domains", Title: fmt.Sprintf("Certificate for %s expires in %d day(s)", row.Hostname, daysLeft),
+			Body:    fmt.Sprintf("Valid until %s.", row.NotAfter.Format("2006-01-02")),
+			TitleAR: fmt.Sprintf("شهادة %s تنتهي خلال %d يوم", row.Hostname, daysLeft),
+			BodyAR:  fmt.Sprintf("صالحة حتى %s.", row.NotAfter.Format("2006-01-02"))})
 		return
 	}
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/deploy"
 	"github.com/fadymondy/hosbah/internal/ops"
 	"github.com/fadymondy/hosbah/internal/quota"
+	"github.com/fadymondy/hosbah/internal/push"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -367,6 +368,13 @@ func (s *Service) runBackup(ctx context.Context, teamID string, svc db.DataServi
 			SizeBytes: int64ptr(res.SizeBytes), TakenAt: timeptr(time.Now().UTC()),
 		})
 	})
+	if err != nil {
+		ev := push.Event{TeamID: teamID, Kind: push.EventBackupFailed, SubjectType: "backup", SubjectID: b.ID, Link: "backups",
+			Tag: "backup:" + svc.ID, Title: "Backup of " + svc.Name + " failed", Body: err.Error(),
+			TitleAR: "فشل النسخ الاحتياطي لـ " + svc.Name, BodyAR: err.Error()}
+		push.Record(ctx, ev)
+		push.Current().Channels(ctx, ev)
+	}
 }
 
 // RestoreTest restores a backup into a throwaway container and stamps the result. The agent's

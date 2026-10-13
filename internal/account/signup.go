@@ -304,6 +304,7 @@ func (s *Service) Mount(post, get, del func(pattern string, h http.HandlerFunc))
 	post("/api/auth/code/request", s.handleCodeRequest)
 	post("/api/auth/code/verify", s.handleCodeVerify)
 	post("/api/auth/2fa/challenge", s.handleChallenge)
+	post("/api/auth/device/refresh", s.handleDeviceRefresh)
 
 	get("/api/me/2fa", s.handleStatus)
 	post("/api/me/2fa/enroll", s.handleEnroll)
