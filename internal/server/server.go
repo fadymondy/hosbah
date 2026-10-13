@@ -35,6 +35,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/ops"
 	_ "github.com/fadymondy/hosbah/internal/plugins" // blank-imports installed plugins (togo install)
 	"github.com/fadymondy/hosbah/internal/provisioning"
+	"github.com/fadymondy/hosbah/internal/push"
 	"github.com/fadymondy/hosbah/internal/rum"
 	"github.com/fadymondy/hosbah/internal/schedules"
 	"github.com/fadymondy/hosbah/internal/scripts"
@@ -120,6 +121,19 @@ func Boot() *app.App {
 	svc.Start()
 	a.Ops = svc
 
+	// Push to the phone and desktop apps (docs/apps-plan.md): installed before anything that can
+	// raise an alert. Without HOSBAH_FCM_* it still records bell rows; only the FCM send is off.
+	sender, err := push.SenderFromEnv()
+	if err != nil {
+		a.Log.Error("push notifications disabled: bad FCM configuration", "err", err)
+	} else if sender == nil {
+		a.Log.Info("push notifications disabled: HOSBAH_FCM_PROJECT_ID / HOSBAH_FCM_SERVICE_ACCOUNT_FILE not set")
+	}
+	pushes := push.New(a.SQLDB, sender, a.Log)
+	pushes.SetPublisher(func(teamID string) { svc.Broker().Publish(ops.TeamTopic(teamID)) })
+	push.Set(pushes)
+	pushes.StartSweeper()
+
 	deploys := deploy.New(a, svc)
 	deploys.MountPublic(k.Router)       // /hooks/*, /internal/tls/allow — outside /api, token / HMAC / yes-no
 	deploys.MountBrowsersAuth(k.Router) // /api/browsers/auth — Caddy's forward_auth target for a desktop browser's hostname
@@ -157,6 +171,9 @@ func Boot() *app.App {
 	// slack/discord/webhook URL is resolved and dialed exactly as carefully as a monitor's target.
 	notify := notifications.New(a, svc, monitors.SafeTransport(nil))
 	a.Notifications = notify
+	pushes.SetChannels(func(ctx context.Context, ev push.Event) {
+		notify.DeliverEvent(ctx, ev.TeamID, notifications.Alert{Event: ev.Kind, Title: ev.Title, Reason: ev.Body, Subject: ev.SubjectType})
+	})
 	watch.SetNotifier(notify)
 	watch.SetBroker(svc.Broker())
 	watch.Start()
@@ -197,6 +214,7 @@ func Boot() *app.App {
 	certs.Start()
 	a.CertCheck = certs
 	a.Stop = func() {
+		pushes.StopSweeper()
 		certs.Stop()
 		scriptsSvc.Close()
 		crons.Close()

@@ -259,6 +259,12 @@ func TestIsolationSweep(t *testing.T) {
 	var teamB struct{ ID, Slug string }
 	ub.mustJSON("POST", "/api/teams", map[string]any{"name": "Bravo " + suffix}, 201, &teamB)
 
+	// A's phone (docs/apps-plan.md): B must not see, sign out, re-point or test-push it.
+	var devA struct {
+		Device struct{ ID string } `json:"device"`
+	}
+	ua.mustJSON("POST", "/api/me/devices", map[string]any{"name": "Alpha phone", "platform": "android", "app": "mobile"}, 201, &devA)
+
 	// ---- REST sweep -------------------------------------------------------------------------
 	oapi := openAPIDoc()
 	fillers := map[string]func(path string) []string{
@@ -327,6 +333,7 @@ func TestIsolationSweep(t *testing.T) {
 		// deletions — and, worse, a route that leaked through would let B approve them.
 		// Any notification id: team B must get a 404 for it.
 		"notification": func(string) []string { return []string{"00000000-0000-4000-8000-0000000000b1"} },
+		"device":       func(string) []string { return []string{devA.Device.ID} },
 		"approval": func(string) []string { return []string{approvalA, "00000000-0000-4000-8000-0000000000a1"} },
 		"id": func(path string) []string {
 			switch {

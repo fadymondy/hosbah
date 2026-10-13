@@ -103,6 +103,7 @@ func Register(api huma.API, a *app.App, svc *ops.Service) {
 	d.registerProcesses(api)
 	d.registerCredentials(api)
 	d.registerMe(api)
+	d.registerDevices(api)
 	d.registerTeams(api)
 	d.registerMembers(api)
 	d.registerInvitations(api)

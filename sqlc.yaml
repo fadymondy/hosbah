@@ -59,6 +59,8 @@ sql:
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
           - column: "notification_channels.events"
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
+          - column: "notification_prefs.muted_events"
+            go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
           - column: "oauth_codes.app_ids"
             go_type: { import: "github.com/fadymondy/hosbah/internal/pgtext", type: "Array" }
           - column: "status_pages.monitor_ids"

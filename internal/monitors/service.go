@@ -30,6 +30,7 @@ import (
 	"github.com/fadymondy/hosbah/internal/mail"
 	"github.com/fadymondy/hosbah/internal/notifications"
 	"github.com/fadymondy/hosbah/internal/ops"
+	"github.com/fadymondy/hosbah/internal/push"
 	"github.com/fadymondy/hosbah/internal/tenancy"
 )
 
@@ -461,6 +462,23 @@ func (s *Service) apply(ctx context.Context, m db.Monitor, tg target, res result
 
 func ptr[T any](v T) *T { return &v }
 
+// push is the event as the phone and desktop apps get it: app.down when a monitor opens, app.up
+// when it resolves. The tag is per app, so the "up" banner replaces the "down" one.
+func (e Event) push() push.Event {
+	pe := push.Event{TeamID: e.teamID, SubjectType: "app", SubjectID: e.App.ID, Link: "apps/" + e.App.ID,
+		Title: e.title(), Body: e.Reason}
+	if e.Event == "resolved" {
+		pe.Kind = push.EventAppUp
+		pe.TitleAR = fmt.Sprintf("%s: عاد %s للعمل", e.App.Name, e.Monitor.Name)
+		pe.BodyAR = "عاد التطبيق للعمل بشكل طبيعي."
+	} else {
+		pe.Kind = push.EventAppDown
+		pe.TitleAR = fmt.Sprintf("%s: فشل %s", e.App.Name, e.Monitor.Name)
+		pe.BodyAR = e.Reason
+	}
+	return pe
+}
+
 func (e Event) title() string {
 	if e.Event == "resolved" {
 		return fmt.Sprintf("%s: %s has recovered", e.App.Name, e.Monitor.Name)
@@ -487,6 +505,7 @@ func (e Event) text() string {
 // announce emails and posts an event. Failures are logged, never retried. An opening is then
 // marked notified.
 func (s *Service) announce(ctx context.Context, ev Event) {
+	push.Notify(ev.push())
 	rt, send := s.deps()
 	for _, to := range ev.emails {
 		mctx, cancel := context.WithTimeout(ctx, 30*time.Second)
