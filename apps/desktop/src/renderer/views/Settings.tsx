@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { EVENT_NAMES, normalizeApiUrl, type EventName, type NotificationPrefs } from "@hosbah/client";
+import { EVENT_NAMES, normalizeApiUrl, type EventName, type NotificationPrefs, type NotificationPrefsResponse } from "@hosbah/client";
 import { Button, Card, ErrorNote, PageHeader, Segmented, Spinner, Toggle } from "../components/ui";
 import { useApp } from "../lib/app";
 import { BridgeError, call, data } from "../lib/bridge";
@@ -10,10 +10,10 @@ export function Settings() {
   const [url, setUrl] = useState(prefs.apiUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const np = useData(() => data<NotificationPrefs>("prefs"), []);
+  const np = useData(() => data<NotificationPrefsResponse>("prefs"), []);
 
   async function toggle(ev: EventName, on: boolean) {
-    const base = np.data ?? ({} as NotificationPrefs);
+    const base = np.data?.events ?? ({} as NotificationPrefs);
     try {
       await data("putPrefs", { ...base, [ev]: on });
     } finally {
@@ -85,7 +85,7 @@ export function Settings() {
           ) : (
             <div className="divide-y divide-line">
               {EVENT_NAMES.map((ev) => (
-                <Toggle key={ev} checked={np.data?.[ev] !== false} onChange={(v) => void toggle(ev, v)} label={t(`event.${ev}` as never)} desc={t(`event.${ev}.desc` as never)} />
+                <Toggle key={ev} checked={np.data?.events[ev] !== false} onChange={(v) => void toggle(ev, v)} label={t(`event.${ev}` as never)} desc={t(`event.${ev}.desc` as never)} />
               ))}
             </div>
           )}

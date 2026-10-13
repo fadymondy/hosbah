@@ -208,7 +208,7 @@ const server = createServer(async (req, res) => {
   if (m && method === "DELETE") { devices.delete(m[1]); for (const [k, v] of refreshTokens) if (v === m[1]) refreshTokens.delete(k); calls.push({ method, path }); return send(res, 204); }
   if (path === "/api/me/notification-prefs") {
     if (method === "PUT") { Object.assign(prefs, (await readBody(req)).events ?? {}); calls.push({ method, path, body: prefs }); }
-    return send(res, 200, { events: prefs });
+    return send(res, 200, { events: prefs, push_available: false });
   }
 
   m = /^\/api\/teams\/([^/]+)\/(.*)$/.exec(path);

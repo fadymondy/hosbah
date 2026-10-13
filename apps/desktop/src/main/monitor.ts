@@ -55,7 +55,7 @@ export async function loadPrefs(): Promise<void> {
   const c = session.api();
   if (!c) return;
   try {
-    prefs = await c.prefs();
+    prefs = (await c.prefs()).events;
   } catch {
     /* keep what we had */
   }

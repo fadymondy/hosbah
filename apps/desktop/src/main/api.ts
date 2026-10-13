@@ -1,6 +1,6 @@
 // IPC handlers. Every reply is a Reply<T> so a failure keeps its status and code across the bridge.
 import { app, ipcMain, nativeTheme } from "electron";
-import { ApiError, type Locale } from "@hosbah/client";
+import { ApiError, type Locale, type NotificationPrefsResponse } from "@hosbah/client";
 import { DATA_FNS, type ActionRequest, type AppInfo, type DataFn, type Reply } from "../core/ipc";
 import { tr } from "../core/strings";
 import * as confirm from "./confirm";
@@ -78,7 +78,7 @@ export function register(broadcast: (channel: string, payload: unknown) => void)
       if (!c) throw new ApiError(401, "sign in required");
       if (!(DATA_FNS as readonly string[]).includes(fn)) throw new Error(`blocked call: ${fn}`);
       const out = await (c[fn] as (...a: unknown[]) => Promise<unknown>).apply(c, args);
-      if (fn === "putPrefs" && out && typeof out === "object") monitor.setPrefs(out as never);
+      if (fn === "putPrefs" && out && typeof out === "object") monitor.setPrefs((out as NotificationPrefsResponse).events);
       return out;
     }),
   );
