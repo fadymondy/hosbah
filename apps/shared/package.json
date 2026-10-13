@@ -1,0 +1,22 @@
+{
+  "name": "@hosbah/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed Hosbah API client (device sessions, SSE), status rules, deep links, i18n (ar/en) and brand tokens for the mobile and desktop apps.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./i18n": "./src/i18n/index.ts",
+    "./brand": "./src/brand/index.ts"
+  },
+  "scripts": {
+    "gen:types": "node scripts/gen-types.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.5",
+    "openapi-typescript": "^7.13.0",
+    "vitest": "^5.0.1"
+  }
+}

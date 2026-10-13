@@ -1,0 +1,11 @@
+node_modules
+dist
+out
+release
+secrets
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.jks
+.env*
+!.env.example
