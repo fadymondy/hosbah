@@ -1,0 +1,18 @@
+# Mock mode (npm run mock): sign in and land on the overview.
+appId: com.fadymondy.hosbah
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: sign-in-title
+- tapOn:
+    id: sign-in-email
+- inputText: demo@example.com
+- tapOn:
+    id: sign-in-password
+- inputText: demo
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- assertVisible:
+    id: overall-status

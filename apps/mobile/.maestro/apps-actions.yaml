@@ -1,0 +1,8 @@
+# Mock mode, signed in: open an app and cancel a restart at the confirm dialog.
+appId: com.fadymondy.hosbah
+---
+- launchApp
+- tapOn:
+    id: tab-apps
+- tapOn: shop-api
+- assertVisible: shop-api

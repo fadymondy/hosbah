@@ -1,0 +1,16 @@
+{
+  "name": "hosbah-apps",
+  "private": true,
+  "description": "Hosbah companion clients: the shared API client, and the desktop tray app (added in feat/apps-desktop). The mobile app has its own lockfile, like Mahaam's.",
+  "workspaces": [
+    "shared"
+  ],
+  "scripts": {
+    "gen:types": "npm run gen:types -w @hosbah/client",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test -w @hosbah/client"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
