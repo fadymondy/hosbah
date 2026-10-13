@@ -1,0 +1,123 @@
+# Codemagic CI for the Hosbah phone app (apps/mobile, Expo + React Native).
+#
+# Lives at the repository root because Codemagic only reads codemagic.yaml from there; every workflow
+# runs inside apps/mobile through `working_directory`. apps/mobile depends on ../shared (@hosbah/client),
+# so the whole repo is checked out and `npm ci` links it. Release runbook: apps/mobile/RELEASING.md.
+#
+# android/ and ios/ are generated (gitignored): each build runs `expo prebuild` from app.config.js.
+# app.config.js reads BUILD_NUMBER, which Codemagic raises by one per build of a workflow.
+#
+# Nothing secret is in this file. Keys and Firebase config live in Codemagic env groups / integrations:
+#
+#   hosbah_app_env          EXPO_PUBLIC_HOSBAH_API_URL (optional override of the default server)
+#                           GOOGLE_SERVICES_JSON       base64 of secrets/google-services.json
+#                           GOOGLE_SERVICE_INFO_PLIST  base64 of secrets/GoogleService-Info.plist
+#   hosbah_android_keystore CM_KEYSTORE (base64 .jks), CM_KEYSTORE_PASSWORD, CM_KEY_ALIAS, CM_KEY_PASSWORD
+#   hosbah_google_play      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+#   integration hosbah_asc  App Store Connect API key (Team -> Integrations), team JW9HJH86GC
+#
+# Only the Play INTERNAL track (as a draft) and TestFlight are ever targeted. There is deliberately no
+# review, production or App Store submission anywhere in this file. Builds are manual.
+
+definitions:
+  email: &email
+    email:
+      recipients:
+        - info@3x1.io
+      notify:
+        success: true
+        failure: true
+  install: &install
+    name: Install dependencies
+    script: npm ci
+  firebase: &firebase
+    name: Firebase config
+    # app.config.js links each platform's Firebase only when its file exists, so a missing variable
+    # yields a build without push/Crashlytics, not a failure. The files are never committed.
+    script: |
+      mkdir -p secrets
+      if [ -n "$GOOGLE_SERVICES_JSON" ]; then echo "$GOOGLE_SERVICES_JSON" | base64 --decode > secrets/google-services.json; fi
+      if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > secrets/GoogleService-Info.plist; fi
+      ls -la secrets
+
+workflows:
+  hosbah-android-internal:
+    name: Hosbah Android - Play internal (draft)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    working_directory: apps/mobile
+    environment:
+      groups:
+        - hosbah_app_env
+        - hosbah_android_keystore
+        - hosbah_google_play
+      node: 22
+      java: 17
+    scripts:
+      - *install
+      - name: Upload keystore
+        # Decoded outside the repo; CM_KEYSTORE_PATH reaches Gradle through CM_ENV and
+        # plugins/with-release-signing.js signs the release with it.
+        script: |
+          echo "$CM_KEYSTORE" | base64 --decode > "$CM_BUILD_DIR/hosbah-upload.jks"
+          echo "CM_KEYSTORE_PATH=$CM_BUILD_DIR/hosbah-upload.jks" >> "$CM_ENV"
+      - *firebase
+      - name: Generate the native project
+        script: npx expo prebuild --platform android --non-interactive --clean
+      - name: Build the release bundle
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/mapping.txt
+    publishing:
+      <<: *email
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  hosbah-ios-testflight:
+    name: Hosbah iOS - TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    working_directory: apps/mobile
+    integrations:
+      app_store_connect: hosbah_asc
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.fadymondy.hosbah
+      groups:
+        - hosbah_app_env
+      vars:
+        APPLE_TEAM_ID: JW9HJH86GC
+      node: 22
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - *install
+      - *firebase
+      - name: Generate the native project
+        # --no-install: prebuild only warns when its own `pod install` fails; run CocoaPods as its own step.
+        script: npx expo prebuild --platform ios --non-interactive --no-install --clean
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install --repo-update
+      - name: Apply the signing profiles
+        script: xcode-project use-profiles --project ios/*.xcodeproj
+      - name: Build the IPA
+        script: |
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcode-project build-ipa --workspace "$WORKSPACE" --scheme "$SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      <<: *email
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

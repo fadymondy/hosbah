@@ -173,4 +173,15 @@ export const ar: Record<keyof typeof en, string> = {
   "common.refresh": "تحديث",
   "common.none": "لا شيء",
   "common.justNow": "الآن",
+
+  "apps.empty": "لا توجد تطبيقات بعد",
+  "overview.appsUp": "تطبيقات تعمل",
+  "overview.appsAttention": "تحتاج انتباهاً",
+  "overview.appsDown": "تطبيقات متوقفة",
+  "settings.serverChangeWarning": "تغيير الخادم سيسجّل خروج هذا الجهاز. هل تريد المتابعة؟",
+  "settings.pushUnavailable": "الإشعارات الفورية غير متاحة في هذا الإصدار.",
+  "settings.pushDenied": "الإشعارات محظورة. اسمح بها من إعدادات النظام.",
+  "settings.enablePush": "تفعيل الإشعارات",
+  "settings.testPushNoToken": "لا يوجد رمز إشعارات لهذا الجهاز بعد. فعّل الإشعارات أولاً.",
+  "deploy.noLogs": "لا توجد سجلات بعد",
 };

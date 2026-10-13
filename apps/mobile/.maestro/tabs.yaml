@@ -1,0 +1,18 @@
+# Mock mode, signed in: every tab renders.
+appId: com.fadymondy.hosbah
+---
+- launchApp
+- tapOn:
+    id: tab-domains
+- assertVisible:
+    id: screen-infra
+- tapOn:
+    id: segment-backups
+- tapOn:
+    id: tab-alerts
+- assertVisible:
+    id: screen-alerts
+- tapOn:
+    id: tab-settings
+- assertVisible:
+    id: screen-settings

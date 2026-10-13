@@ -66,6 +66,18 @@ export interface RefreshResult {
 
 export type NotificationPrefs = Record<EventName, boolean>;
 
+export interface NotificationPrefsResponse {
+  events: NotificationPrefs;
+  /** False when the server has no FCM configured: toggles still save, but nothing can be delivered. */
+  push_available: boolean;
+}
+
+/** The extra body fields of PUT /api/me/devices/{id}/push. */
+export interface PushRegistration {
+  locale?: Locale;
+  app_version?: string;
+}
+
 // ── teams ─────────────────────────────────────────────────────────────────
 
 export interface TeamSummary {

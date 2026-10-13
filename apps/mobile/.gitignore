@@ -1,0 +1,41 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# generated native folders (expo prebuild)
+/ios
+/android
+
+# Firebase configs and signing material: never committed. Codemagic decodes them from secure variables.
+/secrets/
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# local env
+.env
+.env.*
+!.env.example
+
+# build output
+build/
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+.kotlin/
+*.tsbuildinfo
+.metro-health-check*
+npm-debug.*
+
+# Maestro screenshots
+/shots/
+
+.DS_Store

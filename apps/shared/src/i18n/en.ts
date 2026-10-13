@@ -171,4 +171,15 @@ export const en = {
   "common.refresh": "Refresh",
   "common.none": "None",
   "common.justNow": "Just now",
+
+  "apps.empty": "No apps yet",
+  "overview.appsUp": "Apps up",
+  "overview.appsAttention": "Need attention",
+  "overview.appsDown": "Apps down",
+  "settings.serverChangeWarning": "Changing the server signs this device out. Continue?",
+  "settings.pushUnavailable": "Push notifications are not available in this build.",
+  "settings.pushDenied": "Notifications are blocked. Allow them in the system settings.",
+  "settings.enablePush": "Turn on notifications",
+  "settings.testPushNoToken": "This device has no push token yet. Turn on notifications first.",
+  "deploy.noLogs": "No log lines yet",
 } as const;

@@ -230,3 +230,48 @@ describe("data methods", () => {
     expect(h.calls).toHaveLength(0);
   });
 });
+
+describe("notification prefs and push registration", () => {
+  const session = { token: fresh(), refreshToken: "r", deviceId: "dev-1" };
+
+  it("prefs() returns events and push_available; putPrefs sends a partial {events} map", async () => {
+    const events = { "deploy.failed": true };
+    const h = harness((c) => json(200, { events, push_available: false, seen: c.init.method }));
+    const { client } = make(h, session);
+    const r = await client.prefs();
+    expect(r.push_available).toBe(false);
+    await client.putPrefs({ "deploy.failed": false });
+    const put = h.calls[1]!;
+    expect(put.url.pathname).toBe("/api/me/notification-prefs");
+    expect(put.init.method).toBe("PUT");
+    expect(JSON.parse(String(put.init.body))).toEqual({ events: { "deploy.failed": false } });
+  });
+
+  it("setPushToken PUTs {token, locale, app_version} for this device (204)", async () => {
+    const h = harness(() => json(204));
+    const { client } = make(h, session);
+    await client.setPushToken("fcm-token", { locale: "ar", app_version: "1.2.3" });
+    const c = h.calls[0]!;
+    expect(c.url.pathname).toBe("/api/me/devices/dev-1/push");
+    expect(c.init.method).toBe("PUT");
+    expect(JSON.parse(String(c.init.body))).toEqual({ token: "fcm-token", locale: "ar", app_version: "1.2.3" });
+  });
+
+  it("setPushToken / testPush reject before the device is registered", async () => {
+    const { client } = make(harness(() => json(204)), { token: fresh(), refreshToken: null, deviceId: null });
+    await expect(client.setPushToken("t")).rejects.toBeInstanceOf(ApiError);
+    await expect(client.testPush()).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("testPush returns {sent}; 503 and 409 surface as ApiError statuses", async () => {
+    let status = 200;
+    const h = harness(() => json(status, status === 200 ? { sent: 1 } : { error: "x" }));
+    const { client } = make(h, session);
+    expect(await client.testPush()).toEqual({ sent: 1 });
+    expect(h.calls[0]!.url.pathname).toBe("/api/me/devices/dev-1/test");
+    status = 503;
+    await expect(client.testPush()).rejects.toMatchObject({ status: 503 });
+    status = 409;
+    await expect(client.testPush()).rejects.toMatchObject({ status: 409 });
+  });
+});

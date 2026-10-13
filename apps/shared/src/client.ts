@@ -15,7 +15,8 @@ import type {
   Me,
   MetricsRange,
   MetricsSeries,
-  NotificationPrefs,
+  NotificationPrefsResponse,
+  PushRegistration,
   NotificationsResponse,
   PowerAction,
   RefreshResult,
@@ -451,12 +452,14 @@ export class HosbahClient {
 
   // ── notification preferences / devices / push ──────────────────────────
 
-  async prefs(): Promise<NotificationPrefs> {
-    return (await this.request<{ events: NotificationPrefs }>("GET", "/api/me/notification-prefs")).events;
+  /** GET /api/me/notification-prefs: `{events, push_available}` (push_available is false when the server has no FCM). */
+  prefs(): Promise<NotificationPrefsResponse> {
+    return this.request<NotificationPrefsResponse>("GET", "/api/me/notification-prefs");
   }
 
-  async putPrefs(events: Partial<Record<EventName, boolean>> | NotificationPrefs): Promise<NotificationPrefs> {
-    return (await this.request<{ events: NotificationPrefs }>("PUT", "/api/me/notification-prefs", { body: { events } })).events;
+  /** PUT /api/me/notification-prefs: takes a partial `events` map, answers with the full response. */
+  putPrefs(events: Partial<Record<EventName, boolean>>): Promise<NotificationPrefsResponse> {
+    return this.request<NotificationPrefsResponse>("PUT", "/api/me/notification-prefs", { body: { events } });
   }
 
   async devices(): Promise<Device[]> {
@@ -468,13 +471,13 @@ export class HosbahClient {
     return this.request<void>("DELETE", `/api/me/devices/${enc(id)}`);
   }
 
-  /** Registers the FCM token for this device; "" clears it. Defaults to the device registered by this client. */
-  setPushToken(token: string, deviceId: string | null = this.deviceId): Promise<void> {
+  /** PUT /api/me/devices/{id}/push (204): registers the FCM token; "" clears it. Defaults to this client's device. */
+  setPushToken(token: string, reg: PushRegistration = {}, deviceId: string | null = this.deviceId): Promise<void> {
     if (!deviceId) return Promise.reject(new ApiError(0, "this device is not registered", { code: "no_device" }));
-    return this.request<void>("PUT", `/api/me/devices/${enc(deviceId)}/push`, { body: { token } });
+    return this.request<void>("PUT", `/api/me/devices/${enc(deviceId)}/push`, { body: { token, ...reg } });
   }
 
-  /** 202 {sent}; ApiError 503 with code "push_disabled" when the server has no FCM configured. */
+  /** POST /api/me/devices/{id}/test: `{sent}`. ApiError 503 when the server has no FCM, 409 when the device has no push token. */
   testPush(deviceId: string | null = this.deviceId): Promise<{ sent: number }> {
     if (!deviceId) return Promise.reject(new ApiError(0, "this device is not registered", { code: "no_device" }));
     return this.request<{ sent: number }>("POST", `/api/me/devices/${enc(deviceId)}/test`);
