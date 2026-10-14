@@ -90,7 +90,14 @@ module.exports = () => {
       },
       predictiveBackGestureEnabled: false,
       permissions: ["android.permission.POST_NOTIFICATIONS", "android.permission.USE_BIOMETRIC", "android.permission.USE_FINGERPRINT"],
-      blockedPermissions: ["com.google.android.gms.permission.AD_ID", "android.permission.RECORD_AUDIO", "android.permission.SYSTEM_ALERT_WINDOW"],
+      blockedPermissions: [
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        // Pulled in by expo-file-system; the app reads and writes no shared storage, and Play flags them.
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+      ],
       ...(android ? { googleServicesFile: ANDROID_FIREBASE } : {}),
     },
     plugins: [
