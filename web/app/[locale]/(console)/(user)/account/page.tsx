@@ -10,6 +10,7 @@ import { useErrorText } from "@/components/form-error"
 import { AIConnections } from "@/components/account/ai-connections"
 import { ChangePassword } from "@/components/account/change-password"
 import { ConnectedAccounts } from "@/components/account/connected-accounts"
+import { DeleteAccount } from "@/components/account/delete-account"
 import { TwoFactor } from "@/components/account/two-factor"
 import { ErrorBand, LoadingRows, Notice, SectionTitle, TableBand } from "@/components/states"
 
@@ -32,6 +33,7 @@ export default function AccountPage() {
       </Suspense>
       <AIConnections />
       <MyReports />
+      <DeleteAccount />
     </PageBody>
   )
 }

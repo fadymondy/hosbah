@@ -12,6 +12,9 @@
 #   hosbah_app_env          EXPO_PUBLIC_HOSBAH_API_URL (optional override of the default server)
 #                           GOOGLE_SERVICES_JSON       base64 of secrets/google-services.json
 #                           GOOGLE_SERVICE_INFO_PLIST  base64 of secrets/GoogleService-Info.plist
+#                           EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID  the iOS OAuth client id for Google Sign-In
+#                                                      (its reversed id becomes the URL scheme; unset =
+#                                                      no Google button on iOS). Not secret.
 #   hosbah_android_keystore CM_KEYSTORE (base64 .jks), CM_KEYSTORE_PASSWORD, CM_KEY_ALIAS, CM_KEY_PASSWORD
 #   hosbah_google_play      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
 #   integration hosbah_asc  App Store Connect API key (Team -> Integrations), team JW9HJH86GC

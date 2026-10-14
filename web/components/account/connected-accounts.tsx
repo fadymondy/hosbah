@@ -14,13 +14,13 @@ import { ApiError, apiFetch } from "@/lib/api"
 import { useFormatDate, useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-type Identity = { id: string; provider: string; email: string; created_at: string; last_used_at: string | null }
+type Identity = { id: string; provider: string; email: string; name?: string; created_at: string; last_used_at: string | null }
 type Identities = { identities: Identity[]; has_password: boolean; providers: string[] }
 
-const NAMES: Record<string, string> = { google: "Google", github: "GitHub" }
+const NAMES: Record<string, string> = { google: "Google", apple: "Apple", github: "GitHub" }
 
 /**
- * Connected accounts: the Google / GitHub identities that sign into this account. Connecting is a
+ * Connected accounts: the Google / Apple / GitHub identities that sign into this account. Connecting is a
  * round trip through the provider (…/oauth/{provider}?link=1), which comes back here with
  * ?linked=<provider> or ?oauth_error=<code>. The last way into an account cannot be disconnected.
  */
@@ -104,6 +104,11 @@ export function ConnectedAccounts() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">
                         {name}{" "}
+                        {ident.name ? (
+                          <span dir="auto" className="font-normal text-foreground">
+                            {ident.name}{" "}
+                          </span>
+                        ) : null}
                         <span dir="ltr" className="font-normal text-muted-foreground">
                           {ident.email}
                         </span>
