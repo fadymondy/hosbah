@@ -40,10 +40,11 @@ jobs:
         env:
           DB_DRIVER: pgx
           TEST_DATABASE_URL: postgres://cloudy_app:cloudy_app_dev@localhost:5432/cloudy_test?sslmode=disable
-        # The agent tests write its state directory, as the agent does on a server.
+        # The agent tests write its state directory, as the agent does on a server. The server
+        # refuses to boot without a KEK, so each run gets a throwaway one.
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" /var/lib/hosbah
-          go test -count=1 ./...
+          HOSBAH_KEK="$(openssl rand -base64 32)" go test -count=1 ./...
 
   web:
     runs-on: ubuntu-latest
