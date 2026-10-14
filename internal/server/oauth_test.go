@@ -1008,7 +1008,7 @@ func TestDeleteOwnAccount(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, _ = tx.Exec(`SELECT set_config('app.platform_admin', 'on', true)`)
+		_, _ = tx.Exec(`SELECT set_config('app.platform_admin', 'on', true), set_config('app.team_id', $1, true)`, team.ID)
 		if _, err := tx.Exec(q, args...); err != nil {
 			_ = tx.Rollback()
 			t.Fatal(err)
@@ -1030,13 +1030,20 @@ func TestDeleteOwnAccount(t *testing.T) {
 	c.expectCode("DELETE", "/api/me", map[string]any{"password": c.pw}, 409, "team_has_servers")
 	exec(`DELETE FROM servers WHERE team_id = $1`, team.ID)
 
+
 	// Now it goes, with the empty team; the session stops working.
 	c.mustJSON("DELETE", "/api/me", map[string]any{"password": c.pw}, 200, nil)
 	if !userGone(me.ID) {
 		t.Fatal("the account is still there")
 	}
 	var teams int
-	_ = sqlDB.QueryRow(`SELECT count(*) FROM teams WHERE id = $1`, team.ID).Scan(&teams) // RLS hides it either way; the API says more:
+	tx, _ := sqlDB.Begin()
+	_, _ = tx.Exec(`SELECT set_config('app.platform_admin', 'on', true)`)
+	_ = tx.QueryRow(`SELECT count(*) FROM teams WHERE id = $1`, team.ID).Scan(&teams)
+	_ = tx.Rollback()
+	if teams != 0 {
+		t.Fatal("the team only the deleted account was in is still there")
+	}
 	if status, _ := whoami(t, c); status == 200 {
 		t.Fatal("the deleted account's session still works")
 	}
