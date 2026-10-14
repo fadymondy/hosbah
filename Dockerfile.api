@@ -1,5 +1,5 @@
 # Hosbah control-plane Go API — production image. Static binary (pgx is pure Go).
-# Built on the workstation and docker-load'ed into Proxmox LXC 117.
+# Built once and `docker load`-ed onto the production host (see deploy/lxc).
 FROM golang:1.26 AS build
 WORKDIR /src
 COPY go.mod go.sum ./

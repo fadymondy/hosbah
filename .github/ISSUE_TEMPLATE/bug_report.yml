@@ -1,0 +1,79 @@
+name: Bug report
+description: Something in Hosbah is broken or behaves unexpectedly.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Search [existing issues](https://github.com/fadymondy/hosbah/issues) first.
+        **Security problems go to [SECURITY.md](https://github.com/fadymondy/hosbah/blob/main/SECURITY.md), not here.**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Area
+      options:
+        - Servers and agent
+        - Proxmox
+        - Apps and deploys
+        - Databases and backups
+        - Tunnels
+        - Teams, auth and billing
+        - MCP and AI connectors
+        - SDKs and CLI
+        - Web app
+        - Mobile and desktop apps
+        - Self-hosting
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where are you running it?
+      options:
+        - Hosted (https://hosbah.com)
+        - Self-hosted (docker compose)
+        - Local development
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: e.g. v1.2.0 or a commit SHA
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser or device, and anything else relevant.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove tokens, passwords and personal data before pasting.
+      render: shell
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true

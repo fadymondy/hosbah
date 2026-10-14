@@ -1,8 +1,7 @@
-# Hosbah control plane on Proxmox LXC 117 (10.10.10.117). Images built on the
-# workstation and loaded via `docker load`. NPM host 61 forwards
-# app.hosbah.com -> 10.10.10.117:3710 (web). web proxies /api -> api.
-# The managed server "target-1" (its agent in the hosbah-target container) stays on the workstation
-# and connects out to wss://app.hosbah.com/agent/ws (same pinned key via HOSBAH_KEK).
+# Hosbah control plane on a single container host. Images are built elsewhere and loaded via
+# `docker load`. A reverse proxy in front forwards the public host (e.g. app.hosbah.com) ->
+# <host>:3710 (web). web proxies /api -> api. Managed servers connect out to
+# wss://<public host>/agent/ws (same pinned key via HOSBAH_KEK).
 #
 # Before the rename this stack was the project cloudy-prod (containers cloudy-api, cloudy-web, images
 # cloudy-api, cloudy-web). To switch a running box to these names, tag the images as hosbah-api and

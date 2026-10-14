@@ -107,7 +107,7 @@ for Arabic, Inter for English, the three stacked layers mark. Name: **حوسبة
 - **iOS archiving and macOS signing/notarizing happen on the Mac** (`apps/desktop/RELEASING.md`).
 - Bundle IDs: `com.fadymondy.hosbah` (phone), `com.fadymondy.hosbah.desktop`.
 
-## PRs (stacked, none merged until Fady reviews)
+## PRs (stacked, merged after review)
 
 1. `feat/apps-push-api` → `main`: devices, refresh, prefs, push sender, event hooks, tests.
 2. `feat/apps-mobile` → PR 1: `apps/shared`, `apps/mobile`, `codemagic.yaml`.
@@ -116,9 +116,7 @@ for Arabic, Inter for English, the three stacked layers mark. Name: **حوسبة
 ## Testing rules
 
 Local stack only (Postgres :55491, API :8710) with a seeded test team and **mock** data; no real
-restart / stop / redeploy against production apps. Private demos (dr / elbasha / elbash / rtx)
-never appear in fixtures or screenshots. Screenshots go to
-`E:\Sites\me\.assistant\apps\hosbah\2026-10-13\`.
+restart / stop / redeploy against production apps. Fixtures and screenshots use example data only.
 
 ## Shared with the Moharrik apps (sibling thread)
 
@@ -128,8 +126,8 @@ only) and the same Go FCM sender port. Candidates to extract later into one pack
 v1 sender, the device-session refresh flow, the tray status-icon renderer and the
 SecureStore/`safeStorage` session store.
 
-## Left for Fady
+## Remaining owner setup
 
 Firebase project + `google-services.json` / `GoogleService-Info.plist` and the FCM service account
-(set `HOSBAH_FCM_*` on LXC 117), Play Console app + first manual AAB upload, App Store Connect
+(set `HOSBAH_FCM_*` on the control plane), Play Console app + first manual AAB upload, App Store Connect
 app, Codemagic env groups, Mac archive/notarize, review + merge order 1 → 2 → 3.

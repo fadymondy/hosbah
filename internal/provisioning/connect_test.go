@@ -3,8 +3,8 @@ package provisioning
 import "testing"
 
 func TestParseProbe(t *testing.T) {
-	p := parseProbe("os=debian\nver=12\nuid=0\ndocker=1\npve=8.2.4\nnode=pve-3x1\n")
-	if p.osID != "debian" || p.osVersion != "12" || p.uid != 0 || !p.docker || !p.proxmox || p.pveVersion != "8.2.4" || p.node != "pve-3x1" || p.sudo {
+	p := parseProbe("os=debian\nver=12\nuid=0\ndocker=1\npve=8.2.4\nnode=pve-node\n")
+	if p.osID != "debian" || p.osVersion != "12" || p.uid != 0 || !p.docker || !p.proxmox || p.pveVersion != "8.2.4" || p.node != "pve-node" || p.sudo {
 		t.Fatalf("probe = %+v", p)
 	}
 	p = parseProbe("os=rocky\nver=9.4\nuid=1000\nsudo=1\n")

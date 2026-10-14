@@ -1,0 +1,99 @@
+# Self-host the Hosbah control plane with one command:
+#
+#   cp .env.selfhost.example .env.selfhost   # fill in the four secrets
+#   docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build
+#
+# Then open http://localhost:3710 and sign up. For anything public, put a TLS-terminating reverse
+# proxy in front, set APP_URL to the public origin, HOSBAH_AGENT_URL to the origin your servers can
+# reach (they dial out to <origin>/agent/ws) and COOKIE_SECURE=1.
+name: hosbah
+
+x-api-env: &api-env
+  APP_ENV: production
+  APP_URL: ${APP_URL:-http://localhost:3710}
+  ADDR: ":8710"
+  DB_DRIVER: pgx
+  # The non-superuser role created by deploy/selfhost/init-db.sh: RLS does not bind a superuser.
+  DATABASE_URL: postgres://hosbah_app:${HOSBAH_APP_DB_PASSWORD:?set HOSBAH_APP_DB_PASSWORD}@db:5432/hosbah?sslmode=disable
+  LOG_LEVEL: info
+  LOG_FORMAT: text
+  LOCALE: en
+  LOCALE_DIR: lang
+  CACHE_DRIVER: memory
+  STORAGE_DIR: storage
+  AUTH_DRIVER: base
+  AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET}
+  AUTH_TTL_HOURS: "24"
+  AUTH_MIN_PASSWORD: "8"
+  SESSION_DRIVER: cookie
+  COOKIE_SECURE: ${COOKIE_SECURE:-0}
+  CORS_ORIGINS: ${APP_URL:-http://localhost:3710}
+  HOSBAH_KEK: ${HOSBAH_KEK:?set HOSBAH_KEK}
+  HOSBAH_WEB_ORIGIN: ${APP_URL:-http://localhost:3710}
+  HOSBAH_AGENT_URL: ${HOSBAH_AGENT_URL:-http://localhost:8710}
+  HOSBAH_AGENT_DIST: bin/agent
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: hosbah
+      HOSBAH_APP_DB_PASSWORD: ${HOSBAH_APP_DB_PASSWORD:?set HOSBAH_APP_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/selfhost/init-db.sh:/docker-entrypoint-initdb.d/10-hosbah.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hosbah"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Applies db/atlas/migrations through the ledger. Idempotent; runs on every `up`.
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/selfhost/Dockerfile.api
+    image: hosbah-api
+    command: ["/app/migrate"]
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: hosbah-api
+    environment: *api-env
+    ports:
+      - "${API_PORT:-8710}:8710"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8710/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: web
+      args:
+        NEXT_PUBLIC_MCP_ORIGIN: ${APP_URL:-http://localhost:3710}
+    image: hosbah-web
+    environment:
+      NODE_ENV: production
+      API_ORIGIN: http://api:8710
+    ports:
+      - "${WEB_PORT:-3710}:3710"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

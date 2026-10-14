@@ -11,3 +11,4 @@
 
 # LXC deploy env holds real DB creds/secrets/KEK — keep out of git
 deploy/lxc/.env.prod
+.env.selfhost

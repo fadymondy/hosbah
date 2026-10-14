@@ -34,11 +34,4 @@ describe("mock server", () => {
     await expect(c.restart(MOCK_TEAM_ID, "app-shop-api")).resolves.toBeTruthy();
     await expect(c.restart(MOCK_TEAM_2_ID, "app-shop-api")).rejects.toMatchObject({ status: 403 });
   });
-  it("keeps private demo names out of the fixtures", async () => {
-    const c = make();
-    await c.login("me@example.com", "pw");
-    await c.registerDevice(reg);
-    const dump = JSON.stringify([await c.apps(MOCK_TEAM_ID), await c.me()]);
-    expect(dump).not.toMatch(/elbash|elbasha|\brtx\b/i);
-  });
 });
