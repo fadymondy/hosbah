@@ -23,6 +23,12 @@ const googleIosUrlScheme = GOOGLE_IOS_CLIENT_ID
   ? "com.googleusercontent.apps." + GOOGLE_IOS_CLIENT_ID.replace(/\.apps\.googleusercontent\.com$/, "")
   : null;
 const asset = (f) => `./assets/brand/hosbah-${f}.png`;
+const collected = (type, linked) => ({
+  NSPrivacyCollectedDataType: type,
+  NSPrivacyCollectedDataTypeLinked: linked,
+  NSPrivacyCollectedDataTypeTracking: false,
+  NSPrivacyCollectedDataTypePurposes: ["NSPrivacyCollectedDataTypePurposeAppFunctionality"],
+});
 
 module.exports = () => {
   const ios = has(IOS_FIREBASE);
@@ -35,6 +41,9 @@ module.exports = () => {
     icon: asset("icon"),
     // hosbah://t/<team>/apps/<id> ... (see src/lib/links.ts and src/app/+native-intent.ts)
     scheme: "hosbah",
+    // Per-language home-screen name (Hosbah / حوسبة) and permission texts. iOS falls back to English
+    // (CFBundleDevelopmentRegion) for any other device language.
+    locales: { en: "./locales/en.json", ar: "./locales/ar.json" },
     userInterfaceStyle: "automatic",
     // expo-updates stays installed for the language switch's one controlled reload (RTL), but is off:
     // with an updates URL it would own bundle loading.
@@ -48,6 +57,26 @@ module.exports = () => {
       usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        // The app ships English and Arabic; the home-screen name and the Face ID text come from locales/.
+        CFBundleLocalizations: ["en", "ar"],
+        CFBundleDevelopmentRegion: "en",
+      },
+      // Matches the App Store privacy label (no tracking; everything is for app functionality).
+      // Expo merges this with the required-reason API entries the pods declare.
+      privacyManifests: {
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: [],
+        NSPrivacyCollectedDataTypes: [
+          collected("NSPrivacyCollectedDataTypeEmailAddress", true),
+          // Name from Sign in with Apple / Google / GitHub.
+          collected("NSPrivacyCollectedDataTypeName", true),
+          collected("NSPrivacyCollectedDataTypeUserID", true),
+          // Device session + push token.
+          collected("NSPrivacyCollectedDataTypeDeviceID", true),
+          // Firebase Crashlytics (no user id set).
+          collected("NSPrivacyCollectedDataTypeCrashData", false),
+          collected("NSPrivacyCollectedDataTypeOtherDiagnosticData", false),
+        ],
       },
       ...(ios ? { googleServicesFile: IOS_FIREBASE } : {}),
     },

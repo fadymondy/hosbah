@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Hosbah",
+    "NSFaceIDUsageDescription": "Confirm deploys, restarts and stops with Face ID. Your face data never leaves this device."
+  },
+  "android": {
+    "app_name": "Hosbah"
+  }
+}

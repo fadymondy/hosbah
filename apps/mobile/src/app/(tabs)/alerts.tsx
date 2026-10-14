@@ -7,6 +7,7 @@ import { useCurrentTeam, useMarkAllRead, useMarkRead, useNotifications } from "@
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Screen } from "@/ui/screen";
+import { NoTeam } from "@/ui/no-team";
 import { QueryBoundary } from "@/ui/states";
 import { TeamPicker } from "@/ui/team-picker";
 import { AppText } from "@/ui/text";
@@ -64,11 +65,12 @@ export default function Alerts() {
       onRefresh={() => void q.refetch()}
       testID="screen-alerts"
     >
+      {!loading && !error && !team ? <NoTeam /> : null}
       <QueryBoundary
         loading={loading || q.isLoading}
         error={error ?? q.error}
         hasData={!!q.data}
-        empty={list.length === 0}
+        empty={!!team && list.length === 0}
         emptyText={t("alerts.empty")}
         onRetry={() => void q.refetch()}
       >

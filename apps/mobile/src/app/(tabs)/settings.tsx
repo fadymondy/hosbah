@@ -5,6 +5,7 @@ import { Alert, Switch, View } from "react-native";
 
 import { useApi } from "@/lib/api";
 import { APP_VERSION } from "@/lib/config";
+import { openLegal } from "@/lib/legal";
 import { errorKey, testPushErrorKey } from "@/lib/errors";
 import { useColors, usePrefs } from "@/lib/prefs";
 import { enablePush, pushStatus, type PushState } from "@/lib/push";
@@ -198,6 +199,10 @@ export default function SettingsScreen() {
       <Section title={t("settings.account")}>
         <Button kind="danger" label={t("settings.signOut")} onPress={() => void signOut()} testID="sign-out" />
         <Button kind="ghost" label={t("settings.deleteAccount")} onPress={() => router.push("/delete-account")} testID="delete-account" />
+      </Section>
+      <Section title={t("legal.title")}>
+        <Button kind="secondary" label={t("legal.privacy")} onPress={() => openLegal("privacy", locale)} testID="open-privacy" />
+        <Button kind="secondary" label={t("legal.terms")} onPress={() => openLegal("terms", locale)} testID="open-terms" />
       </Section>
       <AppText variant="caption" style={{ textAlign: "center" }}>
         {t("settings.version", { version: APP_VERSION })}

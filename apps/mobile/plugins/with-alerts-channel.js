@@ -10,11 +10,17 @@
 const { withAndroidManifest, withMainApplication, AndroidConfig } = require("expo/config-plugins");
 
 const MARK = "// hosbah: alerts channel";
+const CHANNEL_META = "com.google.firebase.messaging.default_notification_channel_id";
 
 module.exports = function withAlertsChannel(config, { channelId = "alerts", channelName = "Alerts" } = {}) {
   config = withAndroidManifest(config, (cfg) => {
+    // React Native Firebase messaging declares the same meta-data (value ""), so with google-services.json
+    // the manifest merger fails at :app:processReleaseMainManifest unless ours wins explicitly.
+    cfg.modResults = AndroidConfig.Manifest.ensureToolsAvailable(cfg.modResults);
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults);
-    AndroidConfig.Manifest.addMetaDataItemToMainApplication(app, "com.google.firebase.messaging.default_notification_channel_id", channelId);
+    AndroidConfig.Manifest.addMetaDataItemToMainApplication(app, CHANNEL_META, channelId);
+    const item = (app["meta-data"] ?? []).find((m) => m.$["android:name"] === CHANNEL_META);
+    if (item) item.$["tools:replace"] = "android:value";
     return cfg;
   });
 
