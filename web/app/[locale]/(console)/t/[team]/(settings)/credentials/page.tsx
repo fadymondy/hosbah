@@ -213,7 +213,7 @@ const CLOUDFLARE_FIELDS = [
 const FIELDS = [
   { key: "api_url", label: "credentials.apiUrl", required: true, placeholder: "https://pve.example:8006" },
   { key: "token_id", label: "credentials.tokenId", required: true, placeholder: "hosbah@pve!ctl" },
-  { key: "node", label: "credentials.node", required: true, placeholder: "pve-3x1" },
+  { key: "node", label: "credentials.node", required: true, placeholder: "pve1" },
   { key: "storage", label: "credentials.storage", required: true, placeholder: "local" },
   { key: "bridge", label: "credentials.bridge", required: false, placeholder: "vmbr1" },
   { key: "pool", label: "credentials.pool", required: false, placeholder: "hosbah" },

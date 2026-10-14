@@ -1,0 +1,85 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cloudy
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test databases (the non-superuser cloudy_app role, as in docker-compose.yml)
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d cloudy -v ON_ERROR_STOP=1 -f db/docker/init.sql
+      - name: Codegen (sqlc + gqlgen)
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          sqlc generate
+          go run github.com/99designs/gqlgen generate
+      - name: OpenAPI export (integration gate — compiles everything)
+        run: go run ./cmd/api openapi > /dev/null
+      - name: Vet
+        run: go vet ./...
+      - name: Tests (unit, isolation sweep and RLS)
+        env:
+          DB_DRIVER: pgx
+          TEST_DATABASE_URL: postgres://cloudy_app:cloudy_app_dev@localhost:5432/cloudy_test?sslmode=disable
+        # The agent tests write its state directory, as the agent does on a server. The server
+        # refuses to boot without a KEK, so each run gets a throwaway one.
+        run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /var/lib/hosbah
+          HOSBAH_KEK="$(openssl rand -base64 32)" go test -count=1 ./...
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+      # grid:check and feedback:check compare against a sibling checkout of the shared packages;
+      # run them locally until those are published.
+
+  selfhost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Throwaway secrets
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "HOSBAH_APP_DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "AUTH_SECRET=$(openssl rand -hex 32)"
+            echo "HOSBAH_KEK=$(openssl rand -base64 32)"
+          } > .env.selfhost
+      - name: Build and start the stack
+        run: docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build --wait --wait-timeout 300
+      - name: Smoke test
+        run: |
+          curl -fsS http://localhost:8710/api/health
+          curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:3710/
+      - name: Logs
+        if: failure()
+        run: docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost logs --no-color | tail -200

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Hosbah is server management and app hosting (Proxmox, Docker, clouds) built on the **togo** framework: Go API (chi + Huma REST/OpenAPI, gqlgen, sqlc, Atlas, pgx/Postgres) with a Next.js frontend in `web/`. README.md is the detailed spec for each phase (P0 tenancy, P1 servers and agent, P2 deploys, P3 databases and backups). HOW-TO-TEST.md has the manual click-paths. Clean-room project: never copy code or templates from Eddy (AGPL).
+Hosbah is server management and app hosting (Proxmox, Docker, clouds) built on the **togo** framework: Go API (chi + Huma REST/OpenAPI, gqlgen, sqlc, Atlas, pgx/Postgres) with a Next.js frontend in `web/`. docs/architecture.md is the detailed spec for each phase (P0 tenancy, P1 servers and agent, P2 deploys, P3 databases and backups). Clean-room project: never copy code or templates from other hosting panels.
 
 ## Commands
 
@@ -21,7 +21,7 @@ cd web && npm run typecheck && npm run grid:check && npm run feedback:check && n
 go run ./cmd/admin promote you@example.com           # platform admin (sign up in the web app first)
 ```
 
-Proxmox live tests only run with `HOSBAH_PROXMOX_LIVE=1` plus `PVE_*` env vars (see README). By default they run against an in-process fake PVE API.
+Proxmox live tests only run with `HOSBAH_PROXMOX_LIVE=1` plus `PVE_*` env vars (see docs/architecture.md). By default they run against an in-process fake PVE API.
 
 ## togo conventions (from .claude/rules/conventions.md)
 

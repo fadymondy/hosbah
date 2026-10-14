@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an idea or improvement for Hosbah.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Big or open-ended ideas are often better started in [Discussions → Ideas](https://github.com/fadymondy/hosbah/discussions/categories/ideas).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation and why the current behaviour falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: component
+    attributes:
+      label: Area
+      options:
+        - Servers and agent
+        - Proxmox
+        - Apps and deploys
+        - Databases and backups
+        - Tunnels
+        - Teams, auth and billing
+        - MCP and AI connectors
+        - SDKs and CLI
+        - Web app
+        - Mobile and desktop apps
+        - Self-hosting
+        - Other
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd be willing to open a pull request for this.

@@ -1,0 +1,36 @@
+# Hosbah control plane for self-hosting: builds from a clean git checkout (codegen included) and
+# ships the API, the migrator, the admin CLI and the agent binaries the API serves to servers.
+FROM golang:1.26 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+# Module downloads inside BuildKit sometimes hit HTTP/2 stream resets from the Go proxy: retry over HTTP/1.1.
+RUN for i in 1 2 3; do GODEBUG=http2client=0 go mod download && exit 0; sleep 10; done; exit 1
+COPY . .
+# internal/db/gen and internal/graph/gen are gitignored: generate them first.
+COPY --from=sqlc/sqlc:1.31.1 /workspace/sqlc /usr/local/bin/sqlc
+RUN sqlc generate && go run github.com/99designs/gqlgen generate
+ARG VERSION=selfhost
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /out/api ./cmd/api \
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /out/migrate ./cmd/migrate \
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o /out/hosbah-admin ./cmd/admin \
+ && mkdir -p /out/agent \
+ && for arch in amd64 arm64; do \
+      CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
+        -o /out/agent/hosbah-agent-linux-$arch ./cmd/agent || exit 1; \
+    done \
+ && echo "$VERSION" > /out/agent/VERSION
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 app
+WORKDIR /app
+COPY --from=build /out/api /app/api
+COPY --from=build /out/migrate /app/migrate
+COPY --from=build /out/hosbah-admin /app/hosbah-admin
+COPY --from=build /out/agent ./bin/agent
+COPY db/atlas/migrations ./db/atlas/migrations
+COPY lang ./lang
+COPY togo.yaml ./togo.yaml
+RUN mkdir -p storage && chown -R app:app /app
+USER app
+EXPOSE 8710
+CMD ["/app/api"]
