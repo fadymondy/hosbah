@@ -56,7 +56,12 @@ type Record struct {
 	InvitationHash string
 	UserID         string
 	TeamID         string
-	ExpiresAt      time.Time
+	// AppChallenge: the phone app's PKCE S256 challenge when the app started the trip (?app=1).
+	AppChallenge string
+	// ProviderCode / ProviderUser: what a form_post provider (Apple) POSTed, kept by Stash.
+	ProviderCode string
+	ProviderUser string
+	ExpiresAt    time.Time
 }
 
 // Random returns n random bytes, base64url without padding.
@@ -115,7 +120,7 @@ func Begin(ctx context.Context, sqlDB *sql.DB, rec Record, now time.Time) (state
 	if err := q.CreateOAuthState(ctx, db.CreateOAuthStateParams{
 		ID: hash(state), BrowserHash: hash(browser), Purpose: rec.Purpose, Provider: rec.Provider,
 		CodeVerifier: rec.CodeVerifier, Nonce: rec.Nonce, Next: rec.Next, Locale: rec.Locale, InvitationHash: rec.InvitationHash,
-		UserID: nilIfEmpty(rec.UserID), TeamID: nilIfEmpty(rec.TeamID), ExpiresAt: now.UTC().Add(TTL),
+		UserID: nilIfEmpty(rec.UserID), TeamID: nilIfEmpty(rec.TeamID), AppChallenge: rec.AppChallenge, ExpiresAt: now.UTC().Add(TTL),
 	}); err != nil {
 		return "", "", err
 	}
@@ -148,7 +153,8 @@ func Finish(ctx context.Context, sqlDB *sql.DB, state, browser string, now time.
 		return Record{}, ErrInvalid
 	}
 	rec := Record{Purpose: row.Purpose, Provider: row.Provider, CodeVerifier: row.CodeVerifier, Nonce: row.Nonce, Next: row.Next,
-		Locale: row.Locale, InvitationHash: row.InvitationHash, ExpiresAt: row.ExpiresAt}
+		Locale: row.Locale, InvitationHash: row.InvitationHash, AppChallenge: row.AppChallenge, ProviderCode: row.ProviderCode,
+		ProviderUser: row.ProviderUser, ExpiresAt: row.ExpiresAt}
 	if row.UserID != nil {
 		rec.UserID = *row.UserID
 	}
@@ -156,6 +162,21 @@ func Finish(ctx context.Context, sqlDB *sql.DB, state, browser string, now time.
 		rec.TeamID = *row.TeamID
 	}
 	return rec, nil
+}
+
+// Stash keeps what a provider POSTed to the callback (Apple's response_mode=form_post) on the state's
+// row, for the GET the callback then redirects the browser to. That cross-site POST carries no
+// SameSite=Lax cookie, so it cannot be checked against the browser here; the GET, a top-level
+// navigation, does carry it and goes through Finish like every other provider's callback. Stash
+// never consumes the state and works once per state; false when there is no live state for provider.
+func Stash(ctx context.Context, sqlDB *sql.DB, state, provider, code, user string) bool {
+	state = strings.TrimSpace(state)
+	if state == "" || len(state) > 200 || code == "" || len(code) > 2048 || len(user) > 4096 {
+		return false
+	}
+	n, err := db.New(sqlDB).StashOAuthProviderAnswer(ctx, db.StashOAuthProviderAnswerParams{
+		ProviderCode: code, ProviderUser: user, ID: hash(state), Provider: provider})
+	return err == nil && n == 1
 }
 
 // SafeNext returns next when it is a same-origin relative path — "/" then not "/" or "\", no

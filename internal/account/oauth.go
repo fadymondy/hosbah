@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -34,7 +35,7 @@ import (
 )
 
 /*
-Sign in with Google and GitHub, built here rather than with the togo auth-oauth plugin: that plugin
+Sign in with Google, Apple and GitHub, built here rather than with the togo auth-oauth plugin: that plugin
 finds or creates an account by whatever email the provider returns, verified or not, and hands out
 a session directly — around Hosbah's two-factor, disabled-account and email-verification rules.
 
@@ -44,6 +45,10 @@ a session directly — around Hosbah's two-factor, disabled-account and email-ve
                                              ?locale=, ?invitation= (invite-only sign-up)
   GET /api/auth/oauth/{provider}?link=1      signed in (member tier): link that provider to you
   GET /api/auth/oauth/{provider}/callback    public: the provider sends the browser back here
+  POST /api/auth/oauth/apple/callback        public: Apple's response_mode=form_post (apple.go)
+  GET /api/auth/oauth/{provider}?app=1       public: the phone app's browser round trip (native.go)
+  POST /api/auth/oauth/{provider}/native     public: the phone app's native SDK token (native.go)
+  POST /api/auth/app/token                   public: the phone app redeems its one-time code
   GET /api/me/identities                     your linked accounts, and whether you have a password
   DELETE /api/me/identities/{id}             unlink (never the last way to sign in)
 
@@ -64,7 +69,11 @@ and everyone else gets the auth plugin's session. The answers are redirects to t
 const (
 	ProviderGoogle = "google"
 	ProviderGitHub = "github"
+	ProviderApple  = "apple"
 )
+
+// providerOrder is the order the providers are listed in.
+var providerOrder = []string{ProviderGoogle, ProviderApple, ProviderGitHub}
 
 // OAuth error codes, carried to the web app as ?oauth_error=.
 const (
@@ -93,9 +102,17 @@ type Provider struct {
 	ClientSecret string
 	AuthURL      string
 	TokenURL     string
-	// Google: the id_token's signing keys and accepted issuers.
+	// Google and Apple: the id_token's signing keys and accepted issuers.
 	JWKSURL string
 	Issuers []string
+	// NativeAudiences: the id_token audiences accepted from the phone app's native SDK — Google's
+	// iOS, Android and web client ids, Apple's bundle ids. Empty: no native sign-in.
+	NativeAudiences []string
+	// Apple: the client secret is an ES256 JWT this key signs (apple.go); RevokeURL ends a token.
+	TeamID     string
+	KeyID      string
+	SigningKey *ecdsa.PrivateKey
+	RevokeURL  string
 	// GitHub: the REST API (for /user and /user/emails).
 	APIURL string
 	HTTP   *http.Client
@@ -103,15 +120,32 @@ type Provider struct {
 	jwks jwksCache
 }
 
-// ProvidersFromEnv reads HOSBAH_GOOGLE_CLIENT_ID/_SECRET and HOSBAH_GITHUB_CLIENT_ID/_SECRET (each
-// also as CLOUDY_…). A provider without both is not offered.
+// ProvidersFromEnv reads the providers' settings (each HOSBAH_… also as CLOUDY_…):
+//
+//   - Google: HOSBAH_GOOGLE_CLIENT_ID/_SECRET (the web client: the browser round trip), and for the
+//     phone app HOSBAH_GOOGLE_IOS_CLIENT_ID / HOSBAH_GOOGLE_ANDROID_CLIENT_ID (the web client id is
+//     accepted from the app too: the Android SDK mints id_tokens for it).
+//   - GitHub: HOSBAH_GITHUB_CLIENT_ID/_SECRET (the phone app goes through the same browser trip).
+//   - Apple: HOSBAH_APPLE_TEAM_ID, HOSBAH_APPLE_KEY_ID and HOSBAH_APPLE_PRIVATE_KEY(_FILE) (the .p8
+//     key that signs the client secret), plus HOSBAH_APPLE_SERVICES_ID for the web and
+//     HOSBAH_APPLE_BUNDLE_IDS (comma-separated) for the iOS app. See apple.go.
+//
+// A provider with neither a complete web client nor a native audience is not offered.
 func ProvidersFromEnv() map[string]*Provider {
 	out := map[string]*Provider{}
 	client := &http.Client{Timeout: 15 * time.Second}
-	if id, secret := strings.TrimSpace(brand.Getenv("GOOGLE_CLIENT_ID")), strings.TrimSpace(brand.Getenv("GOOGLE_CLIENT_SECRET")); id != "" && secret != "" {
-		out[ProviderGoogle] = &Provider{ID: ProviderGoogle, Name: "Google", ClientID: id, ClientSecret: secret,
+	gID, gSecret := strings.TrimSpace(brand.Getenv("GOOGLE_CLIENT_ID")), strings.TrimSpace(brand.Getenv("GOOGLE_CLIENT_SECRET"))
+	gNative := nonEmpty(brand.Getenv("GOOGLE_IOS_CLIENT_ID"), brand.Getenv("GOOGLE_ANDROID_CLIENT_ID"))
+	if len(gNative) > 0 && gID != "" {
+		gNative = append(gNative, gID)
+	}
+	if (gID != "" && gSecret != "") || len(gNative) > 0 {
+		out[ProviderGoogle] = &Provider{ID: ProviderGoogle, Name: "Google", ClientID: gID, ClientSecret: gSecret, NativeAudiences: gNative,
 			AuthURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token",
 			JWKSURL: "https://www.googleapis.com/oauth2/v3/certs", Issuers: []string{"https://accounts.google.com", "accounts.google.com"}, HTTP: client}
+	}
+	if p := appleFromEnv(client); p != nil {
+		out[ProviderApple] = p
 	}
 	if id, secret := strings.TrimSpace(brand.Getenv("GITHUB_CLIENT_ID")), strings.TrimSpace(brand.Getenv("GITHUB_CLIENT_SECRET")); id != "" && secret != "" {
 		out[ProviderGitHub] = &Provider{ID: ProviderGitHub, Name: "GitHub", ClientID: id, ClientSecret: secret,
@@ -119,6 +153,33 @@ func ProvidersFromEnv() map[string]*Provider {
 			APIURL: "https://api.github.com", HTTP: client}
 	}
 	return out
+}
+
+func nonEmpty(vals ...string) []string {
+	out := []string{}
+	for _, v := range vals {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// web reports whether the browser round trip is configured: a client id and its secret (Google,
+// GitHub), or a Services ID and the key that signs Apple's client secret.
+func (p *Provider) web() bool {
+	if p.ID == ProviderApple {
+		return p.ClientID != "" && p.SigningKey != nil
+	}
+	return p.ClientID != "" && p.ClientSecret != ""
+}
+
+// native reports whether the phone app can sign in with the provider's own SDK.
+func (p *Provider) native() bool {
+	if p.ID == ProviderApple {
+		return len(p.NativeAudiences) > 0 && p.SigningKey != nil
+	}
+	return len(p.NativeAudiences) > 0
 }
 
 // PublicOrigin is where the web app (and, through its proxy, /api) is reached: HOSBAH_WEB_ORIGIN,
@@ -151,16 +212,26 @@ func (s *Service) redirectURI(provider string) string {
 
 /* ------------------------------------------------------------ routes */
 
-// GET /api/auth/providers → {providers:[{id, name}]}.
+// GET /api/auth/providers → {providers:[{id, name, web, native, client_id?}]}. web: the browser
+// round trip works (the web app's buttons, and the phone app's GitHub, and Apple on Android);
+// native: the phone app's own SDK works (Google, and Apple on iOS). client_id is Google's web client
+// id, which the phone app's Google SDK needs to mint id_tokens the server accepts (public anyway).
 func (s *Service) handleProviders(w http.ResponseWriter, _ *http.Request) {
 	type item struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Web      bool   `json:"web"`
+		Native   bool   `json:"native"`
+		ClientID string `json:"client_id,omitempty"`
 	}
 	out := []item{}
-	for _, id := range []string{ProviderGoogle, ProviderGitHub} {
+	for _, id := range providerOrder {
 		if p := s.provider(id); p != nil {
-			out = append(out, item{ID: p.ID, Name: p.Name})
+			it := item{ID: p.ID, Name: p.Name, Web: p.web(), Native: p.native()}
+			if p.ID == ProviderGoogle && p.native() {
+				it.ClientID = p.ClientID
+			}
+			out = append(out, it)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"providers": out})
@@ -182,6 +253,17 @@ func failTo(w http.ResponseWriter, r *http.Request, locale, purpose, next, code 
 		q.Set("next", next)
 	}
 	oauthRedirect(w, r, page+"?"+q.Encode())
+}
+
+// failRec is failTo for a round trip whose state was read: one the phone app started goes back to
+// the app's deep link with ?error=<code>, so the in-app browser closes instead of showing the web
+// sign-in page.
+func (s *Service) failRec(w http.ResponseWriter, r *http.Request, rec oauthstate.Record, code string) {
+	if rec.AppChallenge != "" {
+		appRedirect(w, r, url.Values{"error": {code}})
+		return
+	}
+	failTo(w, r, rec.Locale, rec.Purpose, rec.Next, code)
 }
 
 func pkcePair() (verifier, challenge string, err error) {
@@ -208,12 +290,30 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		failTo(w, r, locale, purpose, next, OAuthRateLimited)
 		return
 	}
+	app := qs.Get("app") == "1"
+	appChallenge := ""
+	if app {
+		// The phone app (native.go): its own PKCE challenge, redeemed with the verifier at
+		// POST /api/auth/app/token. Sign-in only: linking happens in the web app's settings.
+		appChallenge = qs.Get("code_challenge")
+		if link || qs.Get("code_challenge_method") != "S256" || !validChallenge(appChallenge) {
+			appRedirect(w, r, url.Values{"error": {OAuthStateInvalid}})
+			return
+		}
+	}
 	p := s.provider(chi.URLParam(r, "provider"))
-	if p == nil {
+	if p == nil || !p.web() {
+		if app {
+			appRedirect(w, r, url.Values{"error": {OAuthUnavailable}})
+			return
+		}
 		failTo(w, r, locale, purpose, next, OAuthUnavailable)
 		return
 	}
-	rec := oauthstate.Record{Purpose: purpose, Provider: p.ID, Next: next, Locale: locale}
+	rec := oauthstate.Record{Purpose: purpose, Provider: p.ID, Next: next, Locale: locale, AppChallenge: appChallenge}
+	if app {
+		rec.Next = ""
+	}
 	if link {
 		// The member tier (internal/server) already required a live session for ?link=1.
 		id, ok := auth.IdentityFrom(ctx)
@@ -231,7 +331,7 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rec.CodeVerifier = verifier
-	if p.ID == ProviderGoogle {
+	if p.ID == ProviderGoogle || p.ID == ProviderApple {
 		if rec.Nonce, err = oauthstate.Random(24); err != nil {
 			failTo(w, r, locale, purpose, next, OAuthInternal)
 			return
@@ -252,6 +352,15 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		"code_challenge_method": {"S256"},
 	}
 	switch p.ID {
+	case ProviderApple:
+		// Apple documents no PKCE; the code is redeemed with the signed client secret instead. Asking
+		// for the name or the address requires form_post: Apple POSTs the answer (apple.go).
+		v.Del("code_challenge")
+		v.Del("code_challenge_method")
+		v.Set("response_type", "code")
+		v.Set("response_mode", "form_post")
+		v.Set("scope", "name email")
+		v.Set("nonce", rec.Nonce)
 	case ProviderGoogle:
 		v.Set("response_type", "code")
 		v.Set("scope", "openid email profile")
@@ -298,22 +407,31 @@ func (s *Service) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	p := s.provider(chi.URLParam(r, "provider"))
 	if p == nil || p.ID != rec.Provider {
-		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, OAuthStateInvalid)
-		return
-	}
-	if qs.Get("error") != "" {
-		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, OAuthDenied)
+		s.failRec(w, r, rec, OAuthStateInvalid)
 		return
 	}
 	code := qs.Get("code")
+	if p.ID == ProviderApple {
+		// Apple POSTed the code (handleAppleFormPost); it never travels in this URL, and a code put
+		// there by somebody else is ignored.
+		code = rec.ProviderCode
+	}
+	if qs.Get("error") != "" {
+		s.failRec(w, r, rec, OAuthDenied)
+		return
+	}
 	if code == "" || len(code) > 2048 {
-		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, OAuthProviderError)
+		s.failRec(w, r, rec, OAuthProviderError)
 		return
 	}
 	prof, err := s.exchange(ctx, p, code, rec)
 	if err != nil {
 		s.Log.Warn("account: OAuth exchange failed", "provider", p.ID, "error", err)
-		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, OAuthProviderError)
+		s.failRec(w, r, rec, OAuthProviderError)
+		return
+	}
+	if rec.AppChallenge != "" {
+		s.finishApp(w, r, p, rec, prof)
 		return
 	}
 	if rec.Purpose == oauthstate.PurposeLink {
@@ -330,6 +448,12 @@ type profile struct {
 	Subject       string
 	Email         string // lower-cased
 	EmailVerified bool
+	// Name: what the provider shared, if anything (Apple: on the first consent only).
+	Name string
+	// PrivateRelay: an Apple "Hide My Email" address (…@privaterelay.appleid.com).
+	PrivateRelay bool
+	// Apple: the refresh token Hosbah keeps to revoke at deletion, and the client it belongs to.
+	RefreshToken, TokenClient string
 }
 
 type oauthError struct{ code string }
@@ -412,9 +536,15 @@ func (s *Service) resolveOAuthUser(ctx context.Context, p *Provider, rec oauthst
 	}
 	if ident != nil {
 		u, err := s.userByID(ctx, ident.UserID)
+		if err == nil {
+			s.saveIdentityExtras(ctx, p, u.ID, prof)
+		}
 		return u, false, err
 	}
 	// From here the address is what finds or makes the account, so the provider must vouch for it.
+	// Matching is by the exact (lower-cased) address and nothing looser. That matters for Apple's
+	// "Hide My Email": a relay address (…@privaterelay.appleid.com) only ever finds the account
+	// registered with that very relay address, never one with the person's real address.
 	if !prof.EmailVerified || !validEmail(prof.Email) {
 		return nil, false, oauthFail(OAuthEmailUnverified)
 	}
@@ -453,13 +583,58 @@ func (s *Service) resolveOAuthUser(ctx context.Context, p *Provider, rec oauthst
 		return nil, false, err
 	}
 	err = s.sys(ctx, func(q *db.Queries) error {
-		_, err := q.InsertUserIdentity(ctx, db.InsertUserIdentityParams{UserID: u.ID, Provider: p.ID, Subject: prof.Subject, EmailAtLink: prof.Email})
+		_, err := q.InsertUserIdentity(ctx, db.InsertUserIdentityParams{UserID: u.ID, Provider: p.ID, Subject: prof.Subject, EmailAtLink: prof.Email, DisplayName: clip(prof.Name, 200)})
 		return err
 	})
 	if err != nil {
 		return nil, false, err
 	}
+	s.saveIdentityExtras(ctx, p, u.ID, prof)
 	return u, true, nil
+}
+
+// saveIdentityExtras keeps a name the provider shared (when the identity has none yet) and a new
+// provider token (Apple's refresh token, sealed for this user). Best effort: a sign-in does not fail
+// over it.
+func (s *Service) saveIdentityExtras(ctx context.Context, p *Provider, userID string, prof profile) {
+	sealed := ""
+	if prof.RefreshToken != "" && s.Keys != nil {
+		body, _ := json.Marshal(providerToken{Client: prof.TokenClient, RefreshToken: prof.RefreshToken})
+		var err error
+		if sealed, err = s.Keys.SealPlatform(tokenContext(userID), body); err != nil {
+			s.Log.Warn("account: could not seal a provider token", "provider", p.ID, "error", err)
+			sealed = ""
+		}
+	}
+	if sealed == "" && prof.Name == "" {
+		return
+	}
+	err := s.sys(ctx, func(q *db.Queries) error {
+		return q.UpdateIdentityExtras(ctx, db.UpdateIdentityExtrasParams{DisplayName: clip(prof.Name, 200), ProviderToken: sealed, Provider: p.ID, Subject: prof.Subject})
+	})
+	if err != nil {
+		s.Log.Warn("account: could not save the identity's name or token", "provider", p.ID, "error", err)
+	}
+}
+
+// providerToken is what provider_token seals.
+type providerToken struct {
+	Client       string `json:"client"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+func tokenContext(userID string) string { return "oauth-token:" + userID }
+
+func clip(v string, n int) string {
+	v = strings.TrimSpace(v)
+	if len(v) <= n {
+		return v
+	}
+	// Do not cut a UTF-8 sequence in half.
+	for n > 0 && n < len(v) && v[n]&0xC0 == 0x80 {
+		n--
+	}
+	return v[:n]
 }
 
 func newUserID() string {
@@ -500,9 +675,12 @@ func (s *Service) finishLink(w http.ResponseWriter, r *http.Request, p *Provider
 		case !isNoRows(err):
 			return err
 		}
-		_, err = q.InsertUserIdentity(ctx, db.InsertUserIdentityParams{UserID: u.ID, Provider: p.ID, Subject: prof.Subject, EmailAtLink: prof.Email})
+		_, err = q.InsertUserIdentity(ctx, db.InsertUserIdentityParams{UserID: u.ID, Provider: p.ID, Subject: prof.Subject, EmailAtLink: prof.Email, DisplayName: clip(prof.Name, 200)})
 		return err
 	})
+	if err == nil && code != OAuthIdentityTaken {
+		s.saveIdentityExtras(ctx, p, u.ID, prof)
+	}
 	switch {
 	case err != nil:
 		s.Log.Error("account: could not link an identity", "provider", p.ID, "error", err)
@@ -530,6 +708,9 @@ func (s *Service) audit(ctx context.Context, userID, action string, changes map[
 /* ------------------------------------------------------------ provider exchanges */
 
 func (s *Service) exchange(ctx context.Context, p *Provider, code string, rec oauthstate.Record) (profile, error) {
+	if p.ID == ProviderApple {
+		return s.appleWebProfile(ctx, p, code, rec)
+	}
 	form := url.Values{
 		"client_id":     {p.ClientID},
 		"client_secret": {p.ClientSecret},
@@ -583,20 +764,42 @@ func doJSON(client *http.Client, req *http.Request, out any) error {
 	return json.Unmarshal(body, out)
 }
 
-// googleProfile verifies the id_token: RS256 by one of Google's published keys, issued by Google,
-// for our client id, unexpired, carrying the nonce this round trip stored.
+// googleProfile verifies the id_token of the browser round trip: RS256 by one of Google's published
+// keys, issued by Google, for our web client id, unexpired, carrying the nonce this trip stored.
 func (s *Service) googleProfile(ctx context.Context, p *Provider, idToken, nonce string) (profile, error) {
-	if idToken == "" {
-		return profile{}, errors.New("no id_token")
+	if nonce == "" {
+		return profile{}, errors.New("id_token: no nonce stored")
+	}
+	claims, err := s.verifyIDToken(ctx, p, idToken, []string{p.ClientID}, nonce, 0)
+	if err != nil {
+		return profile{}, err
+	}
+	return claimsProfile(claims), nil
+}
+
+/*
+verifyIDToken checks an OpenID Connect id_token from Google or Apple: RS256 by one of the provider's
+published keys (JWKS, cached), an accepted issuer, an audience in audiences, unexpired (a minute of
+leeway), a subject, and the nonce:
+
+  - nonce "" → the token must carry none or the caller does not care (the phone app's Google SDK
+    may not support one); otherwise the token's nonce must equal it, or equal its SHA-256 in hex
+    (Sign in with Apple on iOS takes the SHA-256 of the app's raw nonce, as Apple recommends).
+
+maxAge > 0 also requires an iat no older than that: a native token is minted for this sign-in, so
+an old one replayed from somewhere else is refused even before it expires.
+*/
+func (s *Service) verifyIDToken(ctx context.Context, p *Provider, idToken string, audiences []string, nonce string, maxAge time.Duration) (jwt.MapClaims, error) {
+	if idToken == "" || len(idToken) > 8192 {
+		return nil, errors.New("no id_token")
 	}
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(idToken, claims, func(t *jwt.Token) (any, error) {
 		kid, _ := t.Header["kid"].(string)
 		return p.jwks.key(ctx, p.HTTP, p.JWKSURL, kid)
-	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithAudience(p.ClientID), jwt.WithExpirationRequired(),
-		jwt.WithTimeFunc(s.Now), jwt.WithLeeway(time.Minute))
+	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithExpirationRequired(), jwt.WithTimeFunc(s.Now), jwt.WithLeeway(time.Minute))
 	if err != nil {
-		return profile{}, fmt.Errorf("id_token: %w", err)
+		return nil, fmt.Errorf("id_token: %w", err)
 	}
 	iss, _ := claims["iss"].(string)
 	okIss := false
@@ -604,24 +807,57 @@ func (s *Service) googleProfile(ctx context.Context, p *Provider, idToken, nonce
 		okIss = okIss || iss == want
 	}
 	if !okIss {
-		return profile{}, fmt.Errorf("id_token: issuer %q", iss)
+		return nil, fmt.Errorf("id_token: issuer %q", iss)
 	}
-	if got, _ := claims["nonce"].(string); nonce == "" || got != nonce {
-		return profile{}, errors.New("id_token: nonce mismatch")
+	aud, _ := claims.GetAudience()
+	okAud := false
+	for _, a := range aud {
+		for _, want := range audiences {
+			okAud = okAud || (want != "" && a == want)
+		}
+	}
+	if !okAud {
+		return nil, fmt.Errorf("id_token: audience %v", aud)
+	}
+	if nonce != "" {
+		got, _ := claims["nonce"].(string)
+		sum := sha256.Sum256([]byte(nonce))
+		if got == "" || (got != nonce && got != hex.EncodeToString(sum[:])) {
+			return nil, errors.New("id_token: nonce mismatch")
+		}
+	}
+	if maxAge > 0 {
+		iat, err := claims.GetIssuedAt()
+		if err != nil || iat == nil || s.Now().Sub(iat.Time) > maxAge {
+			return nil, errors.New("id_token: too old")
+		}
 	}
 	sub, _ := claims["sub"].(string)
 	if sub == "" || len(sub) > 255 {
-		return profile{}, errors.New("id_token: no subject")
+		return nil, errors.New("id_token: no subject")
 	}
-	email, _ := claims["email"].(string)
-	verified := false
-	switch v := claims["email_verified"].(type) {
+	return claims, nil
+}
+
+// claimTrue reads a boolean claim Google sends as a bool and Apple sometimes as the string "true".
+func claimTrue(v any) bool {
+	switch b := v.(type) {
 	case bool:
-		verified = v
+		return b
 	case string:
-		verified = v == "true"
+		return b == "true"
 	}
-	return profile{Subject: sub, Email: normEmail(email), EmailVerified: verified && email != ""}, nil
+	return false
+}
+
+// claimsProfile is the profile in a verified id_token.
+func claimsProfile(claims jwt.MapClaims) profile {
+	sub, _ := claims["sub"].(string)
+	email, _ := claims["email"].(string)
+	email = normEmail(email)
+	name, _ := claims["name"].(string)
+	return profile{Subject: sub, Email: email, EmailVerified: claimTrue(claims["email_verified"]) && email != "",
+		Name: name, PrivateRelay: claimTrue(claims["is_private_email"]) || strings.HasSuffix(email, "@privaterelay.appleid.com")}
 }
 
 // githubProfile reads the account (its numeric id is the subject) and its primary, verified address.
@@ -665,7 +901,7 @@ func githubProfile(ctx context.Context, p *Provider, token string) (profile, err
 	return prof, nil
 }
 
-/* ------------------------------------------------------------ Google's keys */
+/* ------------------------------------------------------------ the providers' keys (Google, Apple) */
 
 type jwksCache struct {
 	mu      sync.Mutex
@@ -673,8 +909,8 @@ type jwksCache struct {
 	fetched time.Time
 }
 
-// key returns Google's key kid, fetching the set when it is older than an hour or does not have
-// it (at most once a minute, so a stream of bogus kids cannot make us hammer Google).
+// key returns the provider's key kid, fetching the set when it is older than an hour or does not have
+// it (at most once a minute, so a stream of bogus kids cannot make us hammer the provider).
 func (c *jwksCache) key(ctx context.Context, client *http.Client, jwksURL, kid string) (*rsa.PublicKey, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -738,6 +974,7 @@ type identityOut struct {
 	ID         string     `json:"id"`
 	Provider   string     `json:"provider"`
 	Email      string     `json:"email"`
+	Name       string     `json:"name"`
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at"`
 }
@@ -767,12 +1004,12 @@ func (s *Service) handleIdentities(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]identityOut, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, identityOut{ID: row.ID, Provider: row.Provider, Email: row.EmailAtLink, CreatedAt: row.CreatedAt, LastUsedAt: row.LastUsedAt})
+		out = append(out, identityOut{ID: row.ID, Provider: row.Provider, Email: row.EmailAtLink, Name: row.DisplayName, CreatedAt: row.CreatedAt, LastUsedAt: row.LastUsedAt})
 	}
 	providers := []string{}
-	for _, p := range []string{ProviderGoogle, ProviderGitHub} {
-		if s.provider(p) != nil {
-			providers = append(providers, p)
+	for _, id := range providerOrder {
+		if p := s.provider(id); p != nil && p.web() {
+			providers = append(providers, id)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"identities": out, "has_password": pw, "providers": providers})
@@ -788,7 +1025,7 @@ func (s *Service) handleUnlink(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identID := chi.URLParam(r, "id")
 	status, code := http.StatusOK, ""
-	var provider string
+	var provider, token string
 	err := tenancy.Tx(ctx, s.DB, tenancy.Scope{UserID: id.ID}, func(q *db.Queries, _ *sql.Tx) error {
 		row, err := q.UserIdentityOfUser(ctx, db.UserIdentityOfUserParams{ID: identID, UserID: id.ID})
 		if isNoRows(err) {
@@ -798,7 +1035,7 @@ func (s *Service) handleUnlink(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		provider = row.Provider
+		provider, token = row.Provider, row.ProviderToken
 		all, err := q.ListUserIdentities(ctx, id.ID)
 		if err != nil {
 			return err
@@ -823,6 +1060,8 @@ func (s *Service) handleUnlink(w http.ResponseWriter, r *http.Request) {
 		fail(w, status, code, "this is the only way into your account — set a password (Forgot password) or connect another account first")
 	default:
 		s.audit(ctx, id.ID, "auth.oauth_unlinked", map[string]any{"provider": provider})
+		// Disconnecting Apple also ends Hosbah's grant at Apple ("Apps using Apple ID" forgets it).
+		s.revokeProviderTokens(ctx, id.ID, []sealedToken{{Provider: provider, Sealed: token}})
 		writeJSON(w, http.StatusOK, map[string]string{"status": "unlinked"})
 	}
 }

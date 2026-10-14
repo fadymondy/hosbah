@@ -2,6 +2,8 @@ package platform
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -241,4 +243,118 @@ func DeleteUser(ctx context.Context, q *db.Queries, actorID, ref string) error {
 		return internal("delete the account")
 	}
 	return Record(ctx, q, actorID, "user.deleted", "user", u.ID, map[string]any{"email": u.Email})
+}
+
+// Refusal codes of DeleteOwnAccount.
+const (
+	CodeSoleOwner     = "sole_owner"      // a team with other members has nobody else able to manage it
+	CodeTeamHasServer = "team_has_servers" // a team only you are in still manages servers
+	CodeLastAdmin     = "last_admin"
+)
+
+/*
+DeleteOwnAccount is self-service account deletion (DELETE /api/me; App Store guideline 5.1.1(v)).
+The caller has re-authenticated the user and opened tx with tenancy.Scope{UserID: userID,
+PlatformAdmin: true} (the same scope the admin deletion runs in: the statements below name the user,
+or a team only they are in, and nothing else).
+
+The teams the account is the only owner of decide what happens:
+
+  - A team with other members is refused (sole_owner): deleting it would take their servers and apps
+    away from them, and leaving it would leave nobody able to manage it. Make another member an owner
+    (or remove them) first.
+  - A team only this account is in, still managing servers, is refused (team_has_servers): those
+    machines keep running whatever happens here, and deleting the team would leave them running with
+    an agent nobody controls. Remove the servers first (Servers → Remove), which also uninstalls the
+    agent.
+  - A team only this account is in, with no servers left, is deleted with the account; everything in
+    it (apps go with their servers, so what is left is settings, tokens, domains and the like) cascades.
+
+Then exactly the admin deletion's steps: the last platform admin cannot go, co-owned teams pass
+teams.owner_id to another owner, memberships, MCP tokens and two-factor go, and the user row (its
+identities, devices, sessions' anchor) is deleted.
+*/
+func DeleteOwnAccount(ctx context.Context, q *db.Queries, tx *sql.Tx, userID string) error {
+	u, err := q.UserByID(ctx, userID)
+	if err != nil {
+		return ErrNotFound
+	}
+	sole, err := q.SoleOwnedTeamsForDeletion(ctx, userID)
+	if err != nil {
+		return internal("check your teams")
+	}
+	var shared, busy []string
+	for _, t := range sole {
+		switch {
+		case t.OtherMembers > 0:
+			shared = append(shared, t.Name)
+		case t.Servers > 0:
+			busy = append(busy, t.Name)
+		}
+	}
+	if len(shared) > 0 {
+		return &Error{Status: http.StatusConflict, Code: CodeSoleOwner, Msg: fmt.Sprintf(
+			"you are the only owner of %s — make another member an owner, or remove the other members, first", strings.Join(shared, ", "))}
+	}
+	if len(busy) > 0 {
+		return &Error{Status: http.StatusConflict, Code: CodeTeamHasServer, Msg: fmt.Sprintf(
+			"%s still manages servers — remove them from the team first, so none is left running unmanaged", strings.Join(busy, ", "))}
+	}
+	if IsAdminRoles(u.Roles) {
+		admins, err := q.LockPlatformAdmins(ctx)
+		if err != nil {
+			return internal("check the platform admins")
+		}
+		others := 0
+		for _, a := range admins {
+			if a.ID != u.ID && a.DisabledAt == nil {
+				others++
+			}
+		}
+		if others == 0 {
+			return &Error{Status: http.StatusConflict, Code: CodeLastAdmin, Msg: "you are the last platform admin — make someone else an admin first"}
+		}
+	}
+	for _, t := range sole {
+		// A savepoint, so a team that cannot go (something still restricts it) is a clear refusal
+		// rather than an aborted transaction.
+		if _, err := tx.ExecContext(ctx, "SAVEPOINT delete_team"); err != nil {
+			return internal("delete your teams")
+		}
+		if n, err := q.DeleteTeamRow(ctx, t.ID); err != nil || n != 1 {
+			_, _ = tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT delete_team")
+			return &Error{Status: http.StatusConflict, Code: CodeTeamHasServer, Msg: fmt.Sprintf(
+				"%s still has resources that must be removed first", t.Name)}
+		}
+		if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT delete_team"); err != nil {
+			return internal("delete your teams")
+		}
+	}
+	steps := []struct {
+		what string
+		fn   func(context.Context, string) error
+	}{
+		{"reassign team ownership", q.ReassignTeamOwnership},
+		{"remove memberships", q.DeleteMembershipsOfUser},
+		{"remove MCP tokens", q.DeleteMcpTokensOfUser},
+		{"remove admin MCP tokens", q.DeleteAdminMcpTokensOfUser},
+		{"remove 2FA", q.DeleteTotp},
+	}
+	for _, s := range steps {
+		if err := s.fn(ctx, u.ID); err != nil {
+			return internal(s.what)
+		}
+	}
+	teams := make([]string, 0, len(sole))
+	for _, t := range sole {
+		teams = append(teams, t.Slug)
+	}
+	// Recorded before the row goes (the audit entry names the actor, who is about to disappear).
+	if err := Record(ctx, q, u.ID, "user.self_deleted", "user", u.ID, map[string]any{"email": u.Email, "teams_deleted": teams}); err != nil {
+		return internal("write the audit entry")
+	}
+	if n, err := q.DeleteUserAccount(ctx, u.ID); err != nil || n == 0 {
+		return internal("delete the account")
+	}
+	return nil
 }

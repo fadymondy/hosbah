@@ -14,7 +14,7 @@ CREATE TABLE account_codes (
     sent_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (email, purpose)
 );
-ALTER TABLE account_codes ADD CONSTRAINT account_codes_purpose_check CHECK (purpose IN ('verify', 'reset', 'login'));
+ALTER TABLE account_codes ADD CONSTRAINT account_codes_purpose_check CHECK (purpose IN ('verify', 'reset', 'login', 'delete'));
 
 -- The authenticator secret, sealed with the deployment KEK (crypto.Keyring.SealPlatform). enabled
 -- stays false until the first code is confirmed; last_step only moves forward, so a code is never

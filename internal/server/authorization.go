@@ -124,6 +124,9 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/code/verify",
 		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
 		"/api/auth/device/refresh", // the apps' rotating refresh token (internal/account/devices.go)
+		// The phone app redeems the one-time code of a social sign-in it started, with the PKCE
+		// verifier only it holds (internal/account/native.go).
+		"/api/auth/app/token",
 		"/api/auth/logout",
 		// The CircleXO hub integration (internal/circlexo): the sign-in button flag, and the signed
 		// webhook / provision endpoints, each authenticated by its Standard Webhooks signature.
@@ -132,7 +135,7 @@ func isPublic(r *http.Request) bool {
 		"/api/circlexo/provision",
 		"/api/circlexo/deprovision",
 		"/api/settings/public", // sign-up mode, announcement, support email — shown before sign-in
-		"/api/auth/providers":  // which "Continue with Google / GitHub" buttons to show
+		"/api/auth/providers":  // which "Continue with Google / Apple / GitHub" buttons to show
 		return true
 	}
 	// The public status page (internal/api/public.go): a published page by its slug, filtered so
@@ -178,17 +181,19 @@ func isPublic(r *http.Request) bool {
 	if p == "/api/browsers/auth" {
 		return true
 	}
-	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
-	// a single-use state bound to this browser) and the callback (accepts only that state). The
-	// start with ?link=1 attaches the provider to the signed-in account: member tier.
+	// Google / Apple / GitHub sign-in (internal/account/oauth.go, apple.go, native.go): the start
+	// (redirects to the provider with a single-use state bound to this browser), the callback (GET,
+	// and Apple's form_post POST; both accept only that state), and the phone app's native sign-in
+	// (POST …/native, authenticated by the provider's signed id_token). The start with ?link=1
+	// attaches the provider to the signed-in account: member tier.
 	if provider, rest, ok := oauthPath(p); ok && provider != "" {
-		return rest == "/callback" || (rest == "" && !r.URL.Query().Has("link"))
+		return rest == "/callback" || rest == "/native" || (rest == "" && !r.URL.Query().Has("link"))
 	}
 	return false
 }
 
-// oauthPath splits /api/auth/oauth/{provider}[/callback]. Only the known providers match, so no
-// other path under it is ever public.
+// oauthPath splits /api/auth/oauth/{provider}[/callback|/native]. Only the known providers match,
+// so no other path under it is ever public.
 func oauthPath(p string) (provider, rest string, ok bool) {
 	tail, ok := strings.CutPrefix(p, "/api/auth/oauth/")
 	if !ok {
@@ -199,11 +204,11 @@ func oauthPath(p string) (provider, rest string, ok bool) {
 		rest = "/" + rest
 	}
 	switch provider {
-	case "google", "github":
+	case "google", "github", "apple":
 	default:
 		return "", "", false
 	}
-	if rest != "" && rest != "/callback" {
+	if rest != "" && rest != "/callback" && rest != "/native" {
 		return "", "", false
 	}
 	return provider, rest, true
@@ -218,7 +223,7 @@ func isTokenAuthed(r *http.Request) bool {
 // memberPrefixes are reachable by any signed-in account. Each entry's handlers take identity
 // from the session only and scope every row by team membership (handlers + RLS).
 var memberPrefixes = []string{
-	"/api/me",                   // your own account, teams, two-factor (/api/me/2fa/*), reports
+	"/api/me",                   // your own account (DELETE: re-authenticated self-deletion), teams, two-factor (/api/me/2fa/*), reports
 	"/api/teams",                // create a team; /api/teams/{team}/... is membership-checked
 	"/api/invitations",          // view / accept an invitation by its token
 	"/api/feedback",             // "Report a problem" — files as you

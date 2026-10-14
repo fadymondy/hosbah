@@ -1,11 +1,15 @@
--- Hosbah: sign-in with Google and GitHub (internal/account/oauth.go), and the one-time states of
--- every browser round trip through a third party (OAuth sign-in, linking, the GitHub App install).
+-- Hosbah: sign-in with Google, Apple and GitHub (internal/account/oauth.go, apple.go, native.go), and
+-- the one-time states of every browser round trip through a third party (OAuth sign-in, linking, the
+-- GitHub App install).
 -- Hand-written like the rest of the account cycle: platform data, never exposed through generated CRUD.
 
 -- An external account linked to a Hosbah user. subject is the provider's stable user id (Google's
--- "sub", GitHub's numeric id), never the email: an identity keeps working after the address changes
--- at the provider. email_at_link is the provider-verified address when it was linked (shown in the
--- account settings). FORCE row-level security: a signed-in user reads and deletes only their own;
+-- and Apple's "sub", GitHub's numeric id), never the email: an identity keeps working after the
+-- address changes at the provider. email_at_link is the provider-verified address when it was linked
+-- (shown in the account settings). display_name is the name the provider shared, if any (Apple sends
+-- it once, on the first consent, and never again). provider_token is a token Hosbah must keep to
+-- undo the link later, sealed under HOSBAH_KEK (crypto.Keyring.SealPlatform): Apple's refresh token,
+-- revoked when the account is deleted (App Store guideline 5.1.1(v)). FORCE row-level security: a signed-in user reads and deletes only their own;
 -- the sign-in callback, before anyone is signed in, looks identities up in system scope.
 CREATE TABLE user_identities (
     id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -13,10 +17,12 @@ CREATE TABLE user_identities (
     provider text NOT NULL,
     subject text NOT NULL,
     email_at_link text NOT NULL,
+    display_name text NOT NULL DEFAULT '',
+    provider_token text NOT NULL DEFAULT '',
     created_at timestamptz NOT NULL DEFAULT now(),
     last_used_at timestamptz
 );
-ALTER TABLE user_identities ADD CONSTRAINT user_identities_provider_check CHECK (provider IN ('google', 'github'));
+ALTER TABLE user_identities ADD CONSTRAINT user_identities_provider_check CHECK (provider IN ('google', 'github', 'apple'));
 ALTER TABLE user_identities ADD CONSTRAINT user_identities_subject_check CHECK (length(subject) BETWEEN 1 AND 255);
 CREATE UNIQUE INDEX user_identities_provider_subject_key ON user_identities (provider, subject);
 CREATE INDEX user_identities_user_idx ON user_identities (user_id);
@@ -30,6 +36,11 @@ CREATE INDEX user_identities_user_idx ON user_identities (user_id);
 -- SHA-256 of an invitation token a sign-up carried (invite-only mode). user_id: the signed-in
 -- user for purpose 'link' and 'github_install'; team_id: the team for 'github_install'. Like
 -- account_challenges it has no row-level security: it is read before anyone is signed in.
+-- app_challenge: the PKCE S256 challenge of the phone app that started the trip (?app=1); the callback
+-- then answers the app's deep link with a one-time code (oauth_app_codes) instead of a web session.
+-- provider_code / provider_user: what Apple POSTed to the callback (response_mode=form_post), kept
+-- here for the GET the callback redirects to — that GET carries the SameSite=Lax browser cookie the
+-- cross-site POST could not (internal/account/apple.go).
 CREATE TABLE oauth_states (
     id text PRIMARY KEY,
     browser_hash text NOT NULL,
@@ -42,8 +53,27 @@ CREATE TABLE oauth_states (
     invitation_hash text NOT NULL DEFAULT '',
     user_id text REFERENCES users (id) ON DELETE CASCADE,
     team_id text,
+    app_challenge text NOT NULL DEFAULT '',
+    provider_code text NOT NULL DEFAULT '',
+    provider_user text NOT NULL DEFAULT '',
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_purpose_check CHECK (purpose IN ('login', 'link', 'github_install'));
 CREATE INDEX oauth_states_expires_idx ON oauth_states (expires_at);
+
+-- The phone app's half of a browser round trip (GitHub, and Apple on Android): the callback signed
+-- nobody in; it stored who the provider vouched for under the SHA-256 of a one-time code and sent
+-- the app hosbah://auth/callback?code=…. The app redeems the code with the PKCE verifier whose S256
+-- challenge it sent at the start (POST /api/auth/app/token), so a code read off the deep link by
+-- another app is useless. Single use (deleted by the redemption), two minutes. No row-level
+-- security, like oauth_states: it is redeemed before anyone is signed in.
+CREATE TABLE oauth_app_codes (
+    id text PRIMARY KEY,
+    user_id text NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    provider text NOT NULL,
+    code_challenge text NOT NULL,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX oauth_app_codes_expires_idx ON oauth_app_codes (expires_at);
