@@ -6,6 +6,7 @@ import { useCertificates, useCurrentTeam, useDataServices, useDomains } from "@/
 import { BackupRow, CertRow, joinDomains } from "@/ui/infra-bits";
 import { Screen } from "@/ui/screen";
 import { Segmented } from "@/ui/segmented";
+import { NoTeam } from "@/ui/no-team";
 import { QueryBoundary } from "@/ui/states";
 import { TeamPicker } from "@/ui/team-picker";
 
@@ -20,7 +21,7 @@ export default function Infra() {
     if (params.tab === "domains" || params.tab === "backups") setTab(params.tab);
   }, [params.tab]);
 
-  const { loading, error } = useCurrentTeam();
+  const { team, loading, error } = useCurrentTeam();
   const domains = useDomains();
   const certs = useCertificates();
   const services = useDataServices();
@@ -49,12 +50,13 @@ export default function Infra() {
       }
       testID="screen-infra"
     >
+      {!loading && !error && !team ? <NoTeam /> : null}
       {tab === "domains" ? (
         <QueryBoundary
           loading={loading || domains.isLoading}
           error={error ?? domains.error}
           hasData={!!domains.data}
-          empty={rows.length === 0}
+          empty={!!team && rows.length === 0}
           emptyText={t("domain.empty")}
           onRetry={refresh}
         >
@@ -67,7 +69,7 @@ export default function Infra() {
           loading={loading || services.isLoading}
           error={error ?? services.error}
           hasData={!!services.data}
-          empty={services.data?.length === 0}
+          empty={!!team && services.data?.length === 0}
           emptyText={t("backup.empty")}
           onRetry={refresh}
         >

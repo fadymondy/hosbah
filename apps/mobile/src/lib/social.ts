@@ -56,9 +56,13 @@ export function methodFor(p: AuthProvider, os: string = Platform.OS, appleAvaila
  */
 export function socialButtons(providers: AuthProvider[], os: string = Platform.OS, appleAvailable = true): AuthProvider[] {
   const order: AuthProviderId[] = ["apple", "google", "github"];
-  return order
+  const shown = order
     .map((id) => providers.find((p) => p.id === id))
     .filter((p): p is AuthProvider => !!p && methodFor(p, os, appleAvailable) !== null);
+  // Guideline 4.8: on iOS a third-party login (Google, GitHub) may only appear next to Sign in with Apple.
+  // A server without the Apple keys (or a device without the Apple sheet) gets no social buttons on iOS.
+  if (os === "ios" && !shown.some((p) => p.id === "apple")) return [];
+  return shown;
 }
 
 export function base64url(b64: string): string {

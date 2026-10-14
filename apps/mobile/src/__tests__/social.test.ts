@@ -30,6 +30,14 @@ describe("social sign-in", () => {
     expect(socialButtons([], "ios")).toEqual([]);
   });
 
+  it("never shows Google or GitHub on iOS without Sign in with Apple (guideline 4.8)", () => {
+    const noApple = all.filter((p) => p.id !== "apple");
+    expect(socialButtons(noApple, "ios")).toEqual([]);
+    expect(socialButtons(all, "ios", false)).toEqual([]);
+    expect(socialButtons(all, "ios").map((p) => p.id)).toEqual(["apple", "github"]);
+    expect(socialButtons(noApple, "android").map((p) => p.id)).toEqual(["google", "github"]);
+  });
+
   it("uses the iOS sheet for Apple on iOS and the browser on Android", () => {
     const apple = all[2]!;
     expect(methodFor(apple, "ios", true)).toBe("native");

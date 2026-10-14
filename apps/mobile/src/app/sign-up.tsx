@@ -5,7 +5,8 @@ import { View } from "react-native";
 
 import { useApi } from "@/lib/api";
 import { passwordErrorKey } from "@/lib/errors";
-import { useT } from "@/lib/prefs";
+import { openLegal } from "@/lib/legal";
+import { usePrefs } from "@/lib/prefs";
 import { AuthScreen, FormError } from "@/ui/auth-screen";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
@@ -13,7 +14,7 @@ import { AppText } from "@/ui/text";
 import { space } from "@/ui/theme";
 
 export default function SignUp() {
-  const t = useT();
+  const { t, locale } = usePrefs();
   const router = useRouter();
   const { client, signUp } = useApi();
   // Closed / invite-only servers say so up front instead of failing the form.
@@ -59,8 +60,16 @@ export default function SignUp() {
         <AppText variant="caption">{t("signup.passwordHint")}</AppText>
         <FormError message={error} testID="sign-up-error" />
         <Button label={t("signup.submit")} onPress={() => void submit()} loading={busy} disabled={closed || !email.trim() || password.length < 8} testID="sign-up-submit" />
-        <AppText variant="caption" style={{ textAlign: "center" }}>
-          {t("signup.agree")}
+        <AppText variant="caption" style={{ textAlign: "center" }} testID="sign-up-agree">
+          {t("signup.agreeBefore")}
+          <AppText variant="caption" tone="brand" accessibilityRole="link" onPress={() => openLegal("terms", locale)} style={{ textDecorationLine: "underline" }} testID="sign-up-terms">
+            {t("legal.terms")}
+          </AppText>
+          {t("signup.agreeAnd")}
+          <AppText variant="caption" tone="brand" accessibilityRole="link" onPress={() => openLegal("privacy", locale)} style={{ textDecorationLine: "underline" }} testID="sign-up-privacy">
+            {t("legal.privacy")}
+          </AppText>
+          {t("signup.agreeAfter")}
         </AppText>
         <Button kind="ghost" label={t("login.haveAccount")} onPress={() => (router.canGoBack() ? router.back() : router.replace("/sign-in"))} testID="sign-up-sign-in" />
       </View>

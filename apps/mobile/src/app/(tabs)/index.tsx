@@ -11,6 +11,7 @@ import { QueryBoundary } from "@/ui/states";
 import { AppText } from "@/ui/text";
 import { space } from "@/ui/theme";
 import { TeamPicker } from "@/ui/team-picker";
+import { NoTeam, useConsoleHost } from "@/ui/no-team";
 
 function Stat({ value, label, tone, testID }: { value: number; label: string; tone?: "okText" | "warnText" | "dangerText"; testID?: string }) {
   return (
@@ -33,6 +34,7 @@ export default function Overview() {
   const apps = useApps();
   const certs = useCertificates();
   const services = useDataServices();
+  const host = useConsoleHost();
 
   const refresh = () => {
     void servers.refetch();
@@ -61,6 +63,7 @@ export default function Overview() {
       onRefresh={refresh}
       testID="screen-overview"
     >
+      {!teamLoading && !teamError && !team ? <NoTeam /> : null}
       <QueryBoundary
         loading={teamLoading || servers.isLoading}
         error={teamError ?? servers.error}
@@ -81,7 +84,9 @@ export default function Overview() {
             </View>
             <AppText variant="heading">{t("overview.servers")}</AppText>
             {servers.data.servers.length === 0 ? (
-              <AppText tone="muted">{t("overview.noServers")}</AppText>
+              <AppText tone="muted" testID="no-servers">
+                {`${t("overview.noServers")}. ${t("overview.noServersHint", { console: host })}`}
+              </AppText>
             ) : (
               servers.data.servers.map((s) => <ServerCard key={s.id} server={s} onPress={() => router.push({ pathname: "/servers/[id]", params: { id: s.id } })} />)
             )}

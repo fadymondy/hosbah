@@ -215,6 +215,15 @@ describe("data methods", () => {
     expect(h.calls[0]!.url.pathname).toBe("/api/teams/t/apps/a/restart");
   });
 
+  it("createTeam posts the trimmed name", async () => {
+    const h = harness(() => json(201, { id: "t1", name: "Mine", slug: "mine" }));
+    const { client } = make(h, { token: fresh() });
+    expect(await client.createTeam("  Mine ")).toEqual({ id: "t1", name: "Mine", slug: "mine" });
+    expect(h.calls[0]!.init.method).toBe("POST");
+    expect(h.calls[0]!.url.pathname).toBe("/api/teams");
+    expect(JSON.parse(String(h.calls[0]!.init.body))).toEqual({ name: "Mine" });
+  });
+
   it("markAllRead tolerates 204", async () => {
     const h = harness(() => json(204));
     const { client } = make(h, { token: fresh() });

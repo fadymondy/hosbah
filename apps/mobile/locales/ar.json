@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "حوسبة",
+    "NSFaceIDUsageDescription": "أكّد النشر وإعادة التشغيل والإيقاف باستخدام Face ID. بيانات وجهك لا تغادر هذا الجهاز أبدًا."
+  },
+  "android": {
+    "app_name": "حوسبة"
+  }
+}

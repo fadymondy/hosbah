@@ -480,6 +480,11 @@ export class HosbahClient {
     return this.request<Me>("GET", "/api/me");
   }
 
+  /** Create a team; you become its owner. 201. The platform may refuse past its per-user team limit (403). */
+  createTeam(name: string): Promise<{ id: string; name: string; slug: string }> {
+    return this.request("POST", "/api/teams", { body: { name: name.trim() } });
+  }
+
   // ── servers ─────────────────────────────────────────────────────────────
 
   servers(team: string): Promise<ServersResponse> {
