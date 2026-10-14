@@ -11,7 +11,7 @@ import en from "@/lang/en.json"
 import ar from "@/lang/ar.json"
 import { dirFor, isLocale, LOCALES } from "@/lib/i18n-config"
 
-// The English UI font; Arabic keeps Lusail from the grid. next/font self-hosts it at build time,
+// The English UI font; Arabic uses IBM Plex Sans Arabic from the grid. next/font self-hosts it at build time,
 // so no request goes to Google when a page loads.
 const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap", variable: "--font-inter" })
 

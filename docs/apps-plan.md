@@ -94,7 +94,7 @@ failed), with a menu of the latest alerts.
 
 ## Brand
 
-`web/app/grid/brand-cloudy.css`: brand `#2e6f9e` (dark `#7fb0d6`), gold accent `#c9a227`, Lusail
+`web/app/grid/brand-cloudy.css`: brand `#2e6f9e` (dark `#7fb0d6`), gold accent `#c9a227`, IBM Plex Sans Arabic
 for Arabic, Inter for English, the three stacked layers mark. Name: **حوسبة** / Hosbah.
 
 ## Build / CI
