@@ -158,15 +158,17 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Sponsor
 
-Hosbah is free and open source, built and maintained by [Fady Mondy](https://github.com/fadymondy).
-If it saves you time or powers your business, please consider supporting its development:
+Hosbah is built on **[ToGO](https://github.com/togo-framework/togo)**, the open-source Go + React
+framework that powers this whole family of apps. The best way to support Hosbah is to **sponsor ToGO**:
+every sponsorship goes into the framework and the apps built on it.
+
+**[Sponsor ToGO →](https://to-go.dev/sponsor)**
 
 <p>
+  <a href="https://to-go.dev/sponsor"><img src="https://img.shields.io/badge/Sponsor-ToGO-00ADD8?logo=go&logoColor=white" alt="Sponsor ToGO" /></a>
   <a href="https://github.com/sponsors/fadymondy"><img src="https://img.shields.io/badge/GitHub%20Sponsors-fadymondy-ea4aaa?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
   <a href="https://buymeacoffee.com/fadymondy"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-fadymondy-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>
 </p>
-
-Every sponsorship goes into maintenance, docs, translations and new features.
 
 ## License
 
