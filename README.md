@@ -6,6 +6,8 @@
 
 **Open-source server management and app hosting: connect your servers or Proxmox, deploy Go, Python, Node and PHP apps with zero downtime, and run databases, backups and tunnels from one control plane that you, your team and your AI agents share.**
 
+[![Built with ToGO](https://img.shields.io/badge/built%20with-ToGO-00ADD8?logo=go&logoColor=white)](https://to-go.dev)
+[![ToGO on GitHub](https://img.shields.io/github/stars/togo-framework/togo?label=ToGO&logo=github&style=social)](https://github.com/togo-framework/togo)
 [![CI](https://github.com/fadymondy/hosbah/actions/workflows/ci.yml/badge.svg)](https://github.com/fadymondy/hosbah/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/fadymondy/hosbah?style=social)](https://github.com/fadymondy/hosbah/stargazers)
@@ -107,9 +109,30 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#local-setup) and the "Run it" section of
 | `apps/`, `sdk/`, `cmd/hosbah` | Desktop and mobile apps, SDKs, CLI |
 | `catalog/recipes` | One-click app recipes |
 
-Built on [ToGO](https://github.com/togo-framework), an API-first Go + React framework. The full
-engineering notebook — the agent protocol, the deploy pipeline, tenancy, MCP and migrations — is in
-**[docs/architecture.md](docs/architecture.md)**.
+The full engineering notebook — the agent protocol, the deploy pipeline, tenancy, MCP and migrations — is in **[docs/architecture.md](docs/architecture.md)**.
+
+### Built on ToGO
+
+Hosbah is built on **[ToGO](https://to-go.dev)** ([GitHub](https://github.com/togo-framework/togo)), the
+open-source, API-first framework for Go + sqlc + Atlas + GraphQL/OpenAPI + Next.js with a
+Laravel-style CLI. The kernel is small and everything else is a plugin; these are the pieces
+Hosbah uses:
+
+| ToGO piece | What it does in Hosbah |
+|---|---|
+| [Kernel](https://github.com/togo-framework/togo) | Config, the hook/event bus, the plugin registry and server bootstrap |
+| [CLI](https://github.com/togo-framework/cli) | `togo generate` (sqlc → OpenAPI), Atlas migrations, `togo serve` |
+| [auth](https://github.com/togo-framework/auth) | Sign-in, JWT sessions, roles and API tokens |
+| [authz](https://github.com/togo-framework/authz) | Policies and abilities on top of roles |
+| [audit](https://github.com/togo-framework/audit) | The activity log |
+| [orm](https://github.com/togo-framework/orm) | Query building in the control-plane services |
+| [validation](https://github.com/togo-framework/validation) | Laravel-style request validation |
+| [queue · cache · storage · realtime · i18n](https://github.com/togo-framework) | Background jobs, caching, file storage, live updates and EN/AR |
+| [db-postgres](https://github.com/togo-framework/db-postgres) | The Postgres driver |
+| [faker](https://github.com/togo-framework/faker) | Factories and seed data for tests |
+
+Want the same foundation for your own app? Run `go install github.com/togo-framework/cli@latest && togo new myapp`,
+then read the [ToGO docs](https://to-go.dev/en/docs) and browse the [plugin marketplace](https://to-go.dev/marketplace).
 
 ## Documentation
 
