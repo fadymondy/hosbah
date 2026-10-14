@@ -3,18 +3,22 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Device from "expo-device";
-import { ApiError, HosbahClient, normalizeApiUrl, twoFactorChallenge, type RegisterDeviceInput } from "@hosbah/client";
+import { ApiError, HosbahClient, normalizeApiUrl, twoFactorChallenge, type LoginResult, type RegisterDeviceInput } from "@hosbah/client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
 
 import { APP_VERSION, DEFAULT_SERVER, IS_MOCK } from "@/lib/config";
 import { usePrefs } from "@/lib/prefs";
+import { signInWithAppleNative, signInWithBrowser } from "@/lib/oauth";
 import { loadSession, saveSession } from "@/lib/session";
 import { getStored, KEYS, removeStored, setStored } from "@/lib/storage";
 
 export type AuthStatus = "loading" | "out" | "in";
 
 export type SignInResult = { twoFactor: string } | { twoFactor?: undefined };
+
+/** A sign-up either needs the emailed code (`verify`, the address) or is signed in (maybe pending 2FA). */
+export type SignUpResult = { verify: string } | (SignInResult & { verify?: undefined });
 
 interface Api {
   client: HosbahClient;
@@ -25,6 +29,14 @@ interface Api {
   signIn: (email: string, password: string) => Promise<SignInResult>;
   completeTwoFactor: (challenge: string, answer: { code?: string; recovery_code?: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  signUp: (email: string, password: string) => Promise<SignUpResult>;
+  verifyEmail: (email: string, code: string) => Promise<SignInResult>;
+  /** Google, GitHub (or Apple off iOS) through the system browser. Null when the person backed out. */
+  signInWithProvider: (provider: string) => Promise<SignInResult | null>;
+  /** Native Sign in with Apple (iOS). Null when the person cancelled. */
+  signInWithApple: () => Promise<SignInResult | null>;
+  /** Deletes the account for good (App Store 5.1.1(v)), then lands on sign-in like a sign-out. */
+  deleteAccount: (proof: { password?: string; confirm?: string }) => Promise<void>;
 }
 
 const Ctx = createContext<Api | null>(null);
@@ -151,12 +163,66 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     [finishSignIn],
   );
 
+  /** Runs a credential call, then registers the device; a 2fa_required answer is handed back instead. */
+  const complete = useCallback(
+    async (fn: (c: HosbahClient) => Promise<LoginResult | null>): Promise<SignInResult | null> => {
+      const client = clientRef.current;
+      if (!client) throw new Error("not ready");
+      try {
+        if ((await fn(client)) === null) return null;
+      } catch (e) {
+        const challenge = twoFactorChallenge(e);
+        if (challenge) return { twoFactor: challenge };
+        throw e;
+      }
+      await finishSignIn(client);
+      return {};
+    },
+    [finishSignIn],
+  );
+
+  const signUp = useCallback<Api["signUp"]>(
+    async (email, password) => {
+      const client = clientRef.current;
+      if (!client) throw new Error("not ready");
+      const r = await client.register({ email: email.trim(), password, locale: localeRef.current });
+      if (r.verify !== undefined) return { verify: r.verify };
+      // Signed in straight away (an invitation proved the address).
+      return (await complete(async () => r.session)) ?? {};
+    },
+    [complete],
+  );
+
+  const verifyEmail = useCallback<Api["verifyEmail"]>(
+    async (email, code) => (await complete((c) => c.verifyEmail(email.trim(), code.trim()))) ?? {},
+    [complete],
+  );
+
+  const signInWithProvider = useCallback<Api["signInWithProvider"]>(
+    (provider) => complete((c) => signInWithBrowser(c, provider, localeRef.current)),
+    [complete],
+  );
+
+  const signInWithApple = useCallback<Api["signInWithApple"]>(() => complete((c) => signInWithAppleNative(c, localeRef.current)), [complete]);
+
   const signOut = useCallback(async () => {
     if (client) await client.signOut();
     await dropCache();
     await removeStored(KEYS.pushToken);
     setStatus("out");
   }, [client, dropCache]);
+
+  const deleteAccount = useCallback<Api["deleteAccount"]>(
+    async (proof) => {
+      const client = clientRef.current;
+      if (!client) throw new Error("not ready");
+      await client.deleteAccount(proof);
+      await dropCache();
+      await removeStored(KEYS.pushToken);
+      setStatus("out");
+    },
+    [dropCache],
+  );
 
   const setServerUrl = useCallback(
     async (input: string) => {
@@ -173,8 +239,11 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<Api | null>(
-    () => (client ? { client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut } : null),
-    [client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut],
+    () =>
+      client
+        ? { client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut, signUp, verifyEmail, signInWithProvider, signInWithApple, deleteAccount }
+        : null,
+    [client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut, signUp, verifyEmail, signInWithProvider, signInWithApple, deleteAccount],
   );
 
   return (

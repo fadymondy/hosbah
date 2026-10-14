@@ -294,6 +294,10 @@ func (s *Service) Mount(post, get, del func(pattern string, h http.HandlerFunc))
 	get("/api/auth/providers", s.handleProviders)
 	get("/api/auth/oauth/{provider}", s.handleOAuthStart)
 	get("/api/auth/oauth/{provider}/callback", s.handleOAuthCallback)
+	post("/api/auth/oauth/{provider}/callback", s.handleOAuthFormPost) // Apple's form_post
+	post("/api/auth/oauth/exchange", s.handleOAuthExchange)            // the phone app's one-time code
+	post("/api/auth/apple/native", s.handleAppleNative)                // iOS: Sign in with Apple
+	post("/api/me/delete", s.handleDeleteAccount)
 	get("/api/me/identities", s.handleIdentities)
 	del("/api/me/identities/{id}", s.handleUnlink)
 

@@ -31,6 +31,42 @@ export interface LoginResult {
   user: User;
 }
 
+export interface RegisterInput {
+  email: string;
+  password: string;
+  locale?: string;
+  invitation_token?: string;
+}
+
+/** A sign-up either needs the emailed code first (`verify`, the address) or signed in straight away (`session`). */
+export type RegisterResult = { verify: string; session?: undefined } | { session: LoginResult; verify?: undefined };
+
+/** GET /api/auth/providers: configured sign-in providers. web = browser round trip, native = in-app (Apple on iOS). */
+export interface AuthProvider {
+  id: "apple" | "google" | "github" | (string & {});
+  name: string;
+  web: boolean;
+  native: boolean;
+}
+
+export type SignupMode = "open" | "invite_only" | "closed";
+
+export interface PublicSettings {
+  signup_mode: SignupMode;
+  announcement: string;
+  announcement_level: "info" | "warning";
+  support_email: string;
+}
+
+export interface AppleNativeInput {
+  id_token: string;
+  /** The raw nonce; Apple was given its SHA-256 hex. */
+  nonce: string;
+  authorization_code: string;
+  locale?: string;
+  invitation_token?: string;
+}
+
 /** What the client hands to onSession whenever the credentials change. Persist all three. */
 export interface Session {
   token: string;
@@ -87,6 +123,22 @@ export interface TeamSummary {
   role: Role;
   created_at: string;
   suspended: boolean;
+}
+
+/** A provider account linked to the signed-in user (GET /api/me/identities). */
+export interface LinkedIdentity {
+  id: string;
+  provider: string;
+  email: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface SignInMethods {
+  identities: LinkedIdentity[];
+  /** False for an account made with Google, GitHub or Apple that never set a password. */
+  has_password: boolean;
+  providers: string[];
 }
 
 export interface Me {

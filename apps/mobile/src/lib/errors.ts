@@ -14,6 +14,29 @@ export function errorKey(err: unknown): MessageKey {
       return "error.account_disabled";
     case "email_unverified":
       return "error.email_unverified";
+    case "invalid_password":
+      return "error.invalid_password";
+    case "rate_limited":
+      return "error.rate_limited";
+    case "signup_closed":
+      return "error.signup_closed";
+    case "invite_only":
+      return "error.invite_only";
+    case "oauth_email_unverified":
+      return "error.oauth_email_unverified";
+    case "identity_taken":
+      return "error.identity_taken";
+    case "provider_unavailable":
+      return "error.provider_unavailable";
+    case "provider_error":
+    case "state_invalid":
+    case "internal":
+      return "error.oauth";
+    case "confirm_mismatch":
+      return "error.confirm_mismatch";
+    case "invalid_credentials":
+      // Account deletion answers 422 for a wrong password; a rejected login is a 401.
+      return err.status === 422 ? "error.wrong_password" : "error.invalid_credentials";
   }
   switch (err.status) {
     case 0:
@@ -25,6 +48,8 @@ export function errorKey(err: unknown): MessageKey {
       return "error.forbidden";
     case 404:
       return "error.not_found";
+    case 429:
+      return "error.rate_limited";
     case 503:
       return "error.push_disabled";
     default:

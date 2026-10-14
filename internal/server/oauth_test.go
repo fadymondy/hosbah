@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -47,6 +48,9 @@ type fakeIdP struct {
 	mu     sync.Mutex
 	codes  map[string]fakeCode
 	tokens map[string]fakeUser // GitHub access token → user
+	// Apple (apple_test.go): the key signing Hosbah's client secrets, and the refresh tokens revoked.
+	appleKey *ecdsa.PrivateKey
+	revoked  []string
 }
 
 type fakeCode struct {
@@ -134,6 +138,7 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 			{"email": u.Email, "primary": true, "verified": u.Verified},
 		})
 	})
+	f.appleRoutes(mux)
 	f.srv = httptest.NewServer(mux)
 	t.Cleanup(f.srv.Close)
 	return f
@@ -167,6 +172,7 @@ func (f *fakeIdP) providers() map[string]*account.Provider {
 		"github": {ID: "github", Name: "GitHub", ClientID: fakeGitHubClient, ClientSecret: "github-secret",
 			AuthURL: "https://github.test/login/oauth/authorize", TokenURL: f.srv.URL + "/github/login/oauth/access_token",
 			APIURL: f.srv.URL + "/github/api", HTTP: f.srv.Client()},
+		"apple": f.appleProvider(),
 	}
 }
 
@@ -289,11 +295,14 @@ func TestOAuthProvidersAndNewUser(t *testing.T) {
 	defer cleanup()
 
 	var prov struct {
-		Providers []struct{ ID, Name string } `json:"providers"`
+		Providers []struct {
+			ID, Name    string
+			Web, Native bool
+		} `json:"providers"`
 	}
 	newClient(t, ts.URL).mustJSON("GET", "/api/auth/providers", nil, 200, &prov)
-	if len(prov.Providers) != 2 || prov.Providers[0].ID != "google" || prov.Providers[1].ID != "github" {
-		t.Fatalf("providers: %+v", prov)
+	if got := fmt.Sprintf("%+v", prov.Providers); got != "[{ID:apple Name:Apple Web:true Native:true} {ID:google Name:Google Web:true Native:false} {ID:github Name:GitHub Web:true Native:false}]" {
+		t.Fatalf("providers: %s", got)
 	}
 
 	// A new account from a verified Google address: signed in, verified, no password.

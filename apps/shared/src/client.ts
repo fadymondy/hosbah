@@ -2,6 +2,8 @@ import { readSse, SseParser } from "./sse";
 import type {
   App,
   AppDetail,
+  AppleNativeInput,
+  AuthProvider,
   Backup,
   Certificate,
   DataService,
@@ -19,10 +21,14 @@ import type {
   PushRegistration,
   NotificationsResponse,
   PowerAction,
+  PublicSettings,
   RefreshResult,
   RegisterDeviceInput,
+  RegisterInput,
+  RegisterResult,
   Server,
   ServersResponse,
+  SignInMethods,
   Session,
   TeamDomain,
 } from "./types";
@@ -250,6 +256,104 @@ export class HosbahClient {
     return this.credentialPost("/api/auth/2fa/challenge", { challenge, ...answer });
   }
 
+  /**
+   * POST /api/auth/register. A new account must prove its address first: the server mails a 6-digit code
+   * and answers 403 email_unverified, returned here as `{ verify: email }` (then verifyEmail). A sign-up
+   * carrying an invitation for that same address signs in straight away (`{ session }`). Other refusals
+   * throw: signup_closed / invite_only (403), invalid_password (422), and the address already taken.
+   */
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    try {
+      return { session: await this.credentialPost("/api/auth/register", input) };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "email_unverified") return { verify: input.email };
+      throw e;
+    }
+  }
+
+  /** POST /api/auth/verify-email: the emailed code signs the new account in (or throws 2fa_required). */
+  verifyEmail(email: string, code: string): Promise<LoginResult> {
+    return this.credentialPost("/api/auth/verify-email", { email, code });
+  }
+
+  /** POST /api/auth/verify-email/resend. Always `{status:"sent"}`: it never says whether the address exists. */
+  resendVerification(email: string, locale: string = "ar"): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/verify-email/resend", { email, locale });
+  }
+
+  /** POST /api/auth/password/forgot. Always `{status:"sent"}`; a code goes to the address if it has an account. */
+  forgotPassword(email: string, locale: string = "ar"): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/password/forgot", { email, locale });
+  }
+
+  /** POST /api/auth/password/reset. Signs every existing session out; sign in with the new password afterwards. */
+  resetPassword(email: string, code: string, password: string): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/password/reset", { email, code, password });
+  }
+
+  /** GET /api/auth/providers: only the providers this server has configured (web = browser round trip, native = in-app Apple). */
+  async providers(): Promise<AuthProvider[]> {
+    return (await this.publicGet<{ providers: AuthProvider[] }>("/api/auth/providers")).providers ?? [];
+  }
+
+  /** GET /api/settings/public: sign-up mode (open | invite_only | closed), announcement, support email. */
+  publicSettings(): Promise<PublicSettings> {
+    return this.publicGet<PublicSettings>("/api/settings/public");
+  }
+
+  /**
+   * Where the phone app opens the system browser for a provider round trip. It ends at hosbah://oauth with
+   * `?code=` (trade it with oauthExchange and the verifier whose SHA-256 hex is `challenge`) or `?error=`.
+   */
+  oauthStartUrl(provider: string, challenge: string, locale: string = "ar"): string {
+    return this.url(`/api/auth/oauth/${enc(provider)}`, { app: 1, app_challenge: challenge, locale });
+  }
+
+  /** POST /api/auth/oauth/exchange: the one-time code from hosbah://oauth for a session (or 2fa_required). */
+  oauthExchange(code: string, codeVerifier: string): Promise<LoginResult> {
+    return this.credentialPost("/api/auth/oauth/exchange", { code, code_verifier: codeVerifier });
+  }
+
+  /**
+   * POST /api/auth/apple/native: Sign in with Apple on iOS. `nonce` is the raw nonce; Apple was given its
+   * SHA-256 hex. Throws 401 provider_error, 404 provider_unavailable, 422 oauth_email_unverified,
+   * 403 signup_closed / invite_only / account_disabled, or 2fa_required.
+   */
+  appleNative(input: AppleNativeInput): Promise<LoginResult> {
+    return this.credentialPost("/api/auth/apple/native", input);
+  }
+
+  /**
+   * POST /api/me/delete: deletes the account for good. Proof is the password, or (an account without one)
+   * the account's email typed into `confirm`. Throws 422 invalid_credentials / confirm_mismatch, or 409
+   * team_has_resources (body.teams) while a team only this user owns still has servers or apps.
+   * On success the local session is forgotten (the server already dropped the devices).
+   */
+  async deleteAccount(proof: { password?: string; confirm?: string }): Promise<void> {
+    await this.request("POST", "/api/me/delete", { body: proof });
+    await this.setSession(null);
+  }
+
+  private async publicPost<T>(path: string, body: unknown): Promise<T> {
+    const c = await this.csrfHeaders();
+    const res = await this.fetchRaw(this.baseUrl + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...c.headers },
+      body: JSON.stringify(body),
+      ...(c.credentials ? { credentials: c.credentials } : {}),
+    });
+    const data = await this.readBody(res);
+    if (!res.ok) throw this.errorOf(res, data);
+    return data as T;
+  }
+
+  private async publicGet<T>(path: string): Promise<T> {
+    const res = await this.fetchRaw(this.baseUrl + path, { headers: { Accept: "application/json" } });
+    const data = await this.readBody(res);
+    if (!res.ok) throw this.errorOf(res, data);
+    return data as T;
+  }
+
   /** POST /api/me/devices: call once after the first sign-in; stores the device id and refresh token. */
   async registerDevice(input: RegisterDeviceInput): Promise<Device> {
     const r = await this.request<{ device: Device; refresh_token: string }>("POST", "/api/me/devices", { body: input });
@@ -367,6 +471,11 @@ export class HosbahClient {
 
   me(): Promise<Me> {
     return this.request<Me>("GET", "/api/me");
+  }
+
+  /** GET /api/me/identities: linked providers and whether the account has a password (account deletion asks for it). */
+  signInMethods(): Promise<SignInMethods> {
+    return this.request<SignInMethods>("GET", "/api/me/identities");
   }
 
   // ── servers ─────────────────────────────────────────────────────────────

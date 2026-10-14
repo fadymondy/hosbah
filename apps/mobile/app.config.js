@@ -36,6 +36,8 @@ module.exports = () => {
       buildNumber: process.env.BUILD_NUMBER || "1",
       appleTeamId: APPLE_TEAM_ID,
       supportsTablet: false,
+      // Sign in with Apple (the entitlement; the provisioning profile must include the capability).
+      usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
@@ -57,6 +59,8 @@ module.exports = () => {
     plugins: [
       "expo-router",
       "expo-secure-store",
+      "expo-apple-authentication",
+      "expo-web-browser",
       ["expo-local-authentication", { faceIDPermission: "Confirm deploys, restarts and stops with Face ID. Your face data never leaves this device." }],
       "expo-localization",
       "expo-font",

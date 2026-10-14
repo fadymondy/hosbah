@@ -14,9 +14,13 @@ CREATE TABLE user_identities (
     subject text NOT NULL,
     email_at_link text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    last_used_at timestamptz
+    last_used_at timestamptz,
+    -- Apple only: the refresh token Apple issued at sign-in, with the client id it was issued to,
+    -- sealed with the platform key (crypto.SealPlatform). Deleting the account revokes it at
+    -- Apple, as App Store review requires. Empty for every other provider.
+    provider_token_sealed text NOT NULL DEFAULT ''
 );
-ALTER TABLE user_identities ADD CONSTRAINT user_identities_provider_check CHECK (provider IN ('google', 'github'));
+ALTER TABLE user_identities ADD CONSTRAINT user_identities_provider_check CHECK (provider IN ('google', 'github', 'apple'));
 ALTER TABLE user_identities ADD CONSTRAINT user_identities_subject_check CHECK (length(subject) BETWEEN 1 AND 255);
 CREATE UNIQUE INDEX user_identities_provider_subject_key ON user_identities (provider, subject);
 CREATE INDEX user_identities_user_idx ON user_identities (user_id);
@@ -42,8 +46,13 @@ CREATE TABLE oauth_states (
     invitation_hash text NOT NULL DEFAULT '',
     user_id text REFERENCES users (id) ON DELETE CASCADE,
     team_id text,
+    -- The phone app's round trip (?app=1): the SHA-256 (hex) of a verifier only the app holds. The
+    -- callback then hands the app a one-time code (purpose 'app_handoff': id = SHA-256 of the code,
+    -- browser_hash = this challenge, user_id = the account) instead of a web session, and only the
+    -- app can trade it for one (POST /api/auth/oauth/exchange with the verifier).
+    app_challenge text NOT NULL DEFAULT '',
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_purpose_check CHECK (purpose IN ('login', 'link', 'github_install'));
+ALTER TABLE oauth_states ADD CONSTRAINT oauth_states_purpose_check CHECK (purpose IN ('login', 'link', 'github_install', 'app_handoff'));
 CREATE INDEX oauth_states_expires_idx ON oauth_states (expires_at);

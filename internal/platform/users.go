@@ -195,6 +195,23 @@ func DeleteUser(ctx context.Context, q *db.Queries, actorID, ref string) error {
 	if u.ID == actorID {
 		return refuse(http.StatusConflict, "you cannot delete your own account")
 	}
+	return deleteAccount(ctx, q, actorID, u.ID, u.Email, u.Roles)
+}
+
+// DeleteOwnAccount is the self-service deletion (internal/account, App Store guideline 5.1.1(v)):
+// the same rules and steps as an administrator's DeleteUser — never the sole owner of a team (the
+// caller deletes or hands over those first), never the last platform admin. Run it in
+// Scope{UserID: userID, PlatformAdmin: true}, like the admin path.
+func DeleteOwnAccount(ctx context.Context, q *db.Queries, userID string) error {
+	u, err := q.UserByID(ctx, userID)
+	if err != nil {
+		return refuse(http.StatusNotFound, "no such account")
+	}
+	return deleteAccount(ctx, q, userID, u.ID, u.Email, u.Roles)
+}
+
+func deleteAccount(ctx context.Context, q *db.Queries, actorID, userID, email, roles string) error {
+	u := struct{ ID, Email, Roles string }{userID, email, roles}
 	sole, err := q.SoleOwnedTeams(ctx, u.ID)
 	if err != nil {
 		return internal("check the user's teams")

@@ -40,7 +40,13 @@ const (
 	PurposeLogin         = "login"
 	PurposeLink          = "link"
 	PurposeGitHubInstall = "github_install"
+	// PurposeAppHandoff: the phone app's one-time code (Handoff), traded for a session by
+	// POST /api/auth/oauth/exchange.
+	PurposeAppHandoff = "app_handoff"
 )
+
+// HandoffTTL is how long the phone app has to trade its one-time code.
+const HandoffTTL = 2 * time.Minute
 
 // ErrInvalid: no such state, already used, expired, another browser's, or for something else.
 var ErrInvalid = errors.New("this sign-in link has expired or was already used — start again")
@@ -56,7 +62,9 @@ type Record struct {
 	InvitationHash string
 	UserID         string
 	TeamID         string
-	ExpiresAt      time.Time
+	// AppChallenge: the phone app's round trip (hex SHA-256 of a verifier only the app holds).
+	AppChallenge string
+	ExpiresAt    time.Time
 }
 
 // Random returns n random bytes, base64url without padding.
@@ -115,11 +123,42 @@ func Begin(ctx context.Context, sqlDB *sql.DB, rec Record, now time.Time) (state
 	if err := q.CreateOAuthState(ctx, db.CreateOAuthStateParams{
 		ID: hash(state), BrowserHash: hash(browser), Purpose: rec.Purpose, Provider: rec.Provider,
 		CodeVerifier: rec.CodeVerifier, Nonce: rec.Nonce, Next: rec.Next, Locale: rec.Locale, InvitationHash: rec.InvitationHash,
-		UserID: nilIfEmpty(rec.UserID), TeamID: nilIfEmpty(rec.TeamID), ExpiresAt: now.UTC().Add(TTL),
+		UserID: nilIfEmpty(rec.UserID), TeamID: nilIfEmpty(rec.TeamID), AppChallenge: rec.AppChallenge, ExpiresAt: now.UTC().Add(TTL),
 	}); err != nil {
 		return "", "", err
 	}
 	return state, browser, nil
+}
+
+// ValidChallenge reports whether c is a hex SHA-256 (what the phone app sends as app_challenge).
+func ValidChallenge(c string) bool {
+	if len(c) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(c)
+	return err == nil && strings.ToLower(c) == c
+}
+
+// Handoff stores the phone app's one-time code for userID and returns it. The row is bound to the
+// app's challenge the way a round trip is bound to its browser: Finish(code, verifier, …,
+// PurposeAppHandoff) succeeds only with the verifier whose SHA-256 is challenge, once, within
+// HandoffTTL. The code travels in a custom-scheme redirect that another app could register too; the
+// verifier never leaves the app, so an intercepted code is worthless.
+func Handoff(ctx context.Context, sqlDB *sql.DB, userID, provider, challenge, locale string, now time.Time) (string, error) {
+	if userID == "" || !ValidChallenge(challenge) {
+		return "", ErrInvalid
+	}
+	code, err := Random(32)
+	if err != nil {
+		return "", err
+	}
+	if err := db.New(sqlDB).CreateOAuthState(ctx, db.CreateOAuthStateParams{
+		ID: hash(code), BrowserHash: challenge, Purpose: PurposeAppHandoff, Provider: provider, Locale: locale,
+		UserID: &userID, ExpiresAt: now.UTC().Add(HandoffTTL),
+	}); err != nil {
+		return "", err
+	}
+	return code, nil
 }
 
 // Finish consumes state. It is deleted whatever happens next, so it can never be tried twice.
@@ -148,7 +187,7 @@ func Finish(ctx context.Context, sqlDB *sql.DB, state, browser string, now time.
 		return Record{}, ErrInvalid
 	}
 	rec := Record{Purpose: row.Purpose, Provider: row.Provider, CodeVerifier: row.CodeVerifier, Nonce: row.Nonce, Next: row.Next,
-		Locale: row.Locale, InvitationHash: row.InvitationHash, ExpiresAt: row.ExpiresAt}
+		Locale: row.Locale, InvitationHash: row.InvitationHash, AppChallenge: row.AppChallenge, ExpiresAt: row.ExpiresAt}
 	if row.UserID != nil {
 		rec.UserID = *row.UserID
 	}

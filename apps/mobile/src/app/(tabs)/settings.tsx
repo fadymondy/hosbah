@@ -1,4 +1,4 @@
-import { EVENT_NAMES, relativeTime, type Device } from "@hosbah/client";
+import { ApiError, EVENT_NAMES, relativeTime, type Device } from "@hosbah/client";
 import { useEffect, useState } from "react";
 import { Alert, Switch, View } from "react-native";
 
@@ -47,6 +47,87 @@ function DeviceRow({ d, current, onRemove }: { d: Device; current: boolean; onRe
           <Button kind="ghost" label={t("settings.removeDevice")} onPress={onRemove} testID={`remove-${d.id}`} />
         )}
       </View>
+    </Card>
+  );
+}
+
+/**
+ * Account deletion, in the app (App Store guideline 5.1.1(v)). Proof is the password, or for an account
+ * made with Google, GitHub or Apple, the account's email typed in. A team only this person owns that
+ * still runs servers or apps blocks it (409), named in the message.
+ */
+function DeleteAccount() {
+  const { t, locale } = usePrefs();
+  const toast = useToast();
+  const { client, deleteAccount } = useApi();
+  const [open, setOpen] = useState(false);
+  const [hasPassword, setHasPassword] = useState(true);
+  const [proof, setProof] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void client
+      .signInMethods()
+      .then((m) => setHasPassword(m.has_password))
+      .catch(() => {});
+  }, [client, open]);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAccount(hasPassword ? { password: proof } : { confirm: proof.trim() });
+      toast(t("settings.deleted"));
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "team_has_resources") {
+        const teams = ((e.body as { teams?: { name: string }[] } | undefined)?.teams ?? []).map((x) => x.name).join(locale === "ar" ? "، " : ", ");
+        setError(t("error.team_has_resources", { teams }));
+      } else {
+        setError(t(errorKey(e)));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = () =>
+    Alert.alert(t("settings.deleteAccount"), t("settings.deleteAccountBody"), [
+      { text: t("confirm.cancel"), style: "cancel" },
+      { text: t("settings.deleteConfirm"), style: "destructive", onPress: () => void run() },
+    ]);
+
+  if (!open) return <Button kind="secondary" label={t("settings.deleteAccount")} onPress={() => setOpen(true)} testID="delete-account" />;
+  return (
+    <Card style={{ padding: space.md, gap: space.md }} testID="delete-account-form">
+      <AppText>{t("settings.deleteAccountBody")}</AppText>
+      <Field
+        label={hasPassword ? t("settings.deletePassword") : t("settings.deleteConfirmEmail")}
+        ltr
+        value={proof}
+        onChangeText={setProof}
+        secureTextEntry={hasPassword}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType={hasPassword ? "default" : "email-address"}
+        testID="delete-account-proof"
+      />
+      {error ? (
+        <AppText tone="dangerText" testID="delete-account-error" accessibilityLiveRegion="polite">
+          {error}
+        </AppText>
+      ) : null}
+      <Button kind="danger" label={t("settings.deleteConfirm")} onPress={confirm} loading={busy} disabled={!proof.trim()} testID="delete-account-confirm" />
+      <Button
+        kind="ghost"
+        label={t("confirm.cancel")}
+        onPress={() => {
+          setOpen(false);
+          setProof("");
+          setError(null);
+        }}
+      />
     </Card>
   );
 }
@@ -193,7 +274,10 @@ export default function SettingsScreen() {
         ))}
       </Section>
 
-      <Button kind="danger" label={t("settings.signOut")} onPress={() => void signOut()} testID="sign-out" />
+      <Section title={t("settings.account")}>
+        <Button kind="danger" label={t("settings.signOut")} onPress={() => void signOut()} testID="sign-out" />
+        <DeleteAccount />
+      </Section>
       <AppText variant="caption" style={{ textAlign: "center" }}>
         {t("settings.version", { version: APP_VERSION })}
       </AppText>

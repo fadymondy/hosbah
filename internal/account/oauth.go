@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/togo-framework/auth"
 
 	"github.com/fadymondy/hosbah/internal/brand"
@@ -66,6 +65,9 @@ const (
 	ProviderGitHub = "github"
 )
 
+// providerOrder is the order the buttons are listed in.
+var providerOrder = []string{ProviderApple, ProviderGoogle, ProviderGitHub}
+
 // OAuth error codes, carried to the web app as ?oauth_error=.
 const (
 	OAuthUnavailable     = "provider_unavailable"
@@ -84,6 +86,16 @@ const (
 
 const oauthCookie = "hosbah_oauth"
 
+// appCookie marks a round trip the phone app started (?app=1), so that even a failure before the
+// state is read (an expired or replayed one) goes back to the app rather than to a web page. Not a
+// credential: it only picks where the error lands.
+const appCookie = "hosbah_oauth_app"
+
+// AppRedirect is where the phone app's round trips end: the system browser sheet
+// (expo-web-browser's openAuthSessionAsync) closes on this scheme and hands the URL to the app.
+// ?code=<one-time code> on success, ?error=<code> on failure.
+const AppRedirect = "hosbah://oauth"
+
 // Provider is one sign-in provider's client and endpoints. The endpoints are fields so tests point
 // them at a fake.
 type Provider struct {
@@ -99,6 +111,8 @@ type Provider struct {
 	// GitHub: the REST API (for /user and /user/emails).
 	APIURL string
 	HTTP   *http.Client
+	// Apple: the key that signs its client secrets, and the native app ids (apple.go).
+	Apple *AppleConfig
 
 	jwks jwksCache
 }
@@ -117,6 +131,9 @@ func ProvidersFromEnv() map[string]*Provider {
 		out[ProviderGitHub] = &Provider{ID: ProviderGitHub, Name: "GitHub", ClientID: id, ClientSecret: secret,
 			AuthURL: "https://github.com/login/oauth/authorize", TokenURL: "https://github.com/login/oauth/access_token",
 			APIURL: "https://api.github.com", HTTP: client}
+	}
+	if p := appleFromEnv(client); p != nil {
+		out[ProviderApple] = p
 	}
 	return out
 }
@@ -151,17 +168,23 @@ func (s *Service) redirectURI(provider string) string {
 
 /* ------------------------------------------------------------ routes */
 
-// GET /api/auth/providers → {providers:[{id, name}]}.
+// GET /api/auth/providers → {providers:[{id, name, web, native}]}. web: the browser round trip
+// works (the web app, and the phone app through the system browser); native: the iOS app's own
+// sheet (Apple only). A provider that is not configured is not listed, so its button never shows.
 func (s *Service) handleProviders(w http.ResponseWriter, _ *http.Request) {
 	type item struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Web    bool   `json:"web"`
+		Native bool   `json:"native"`
 	}
 	out := []item{}
-	for _, id := range []string{ProviderGoogle, ProviderGitHub} {
-		if p := s.provider(id); p != nil {
-			out = append(out, item{ID: p.ID, Name: p.Name})
+	for _, id := range providerOrder {
+		p := s.provider(id)
+		if p == nil || (!p.webReady() && !p.nativeReady()) {
+			continue
 		}
+		out = append(out, item{ID: p.ID, Name: p.Name, Web: p.webReady(), Native: p.nativeReady()})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"providers": out})
 }
@@ -172,8 +195,13 @@ func oauthRedirect(w http.ResponseWriter, r *http.Request, target string) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-// failTo is where a failed round trip lands: the sign-in page, or the account settings for a link.
+// failTo is where a failed round trip lands: the sign-in page, or the account settings for a link
+// — or the phone app, when it started the round trip.
 func failTo(w http.ResponseWriter, r *http.Request, locale, purpose, next, code string) {
+	if c, err := r.Cookie(appCookie); err == nil && c.Value == "1" && purpose != oauthstate.PurposeLink {
+		appFail(w, r, code)
+		return
+	}
 	q := url.Values{"oauth_error": {code}}
 	page := "/" + locale + "/login"
 	if purpose == oauthstate.PurposeLink {
@@ -182,6 +210,20 @@ func failTo(w http.ResponseWriter, r *http.Request, locale, purpose, next, code 
 		q.Set("next", next)
 	}
 	oauthRedirect(w, r, page+"?"+q.Encode())
+}
+
+func appCookieOf(r *http.Request, on bool) *http.Cookie {
+	c := &http.Cookie{Name: appCookie, Path: "/api/", HttpOnly: true, Secure: oauthstate.Secure(r.TLS != nil), SameSite: http.SameSiteLaxMode, MaxAge: -1}
+	if on {
+		c.Value, c.MaxAge = "1", int(oauthstate.TTL/time.Second)
+	}
+	return c
+}
+
+// appFail ends a phone-app round trip with an error code.
+func appFail(w http.ResponseWriter, r *http.Request, code string) {
+	http.SetCookie(w, appCookieOf(r, false)) //#nosec G124 -- clearing
+	oauthRedirect(w, r, AppRedirect+"?"+url.Values{"error": {code}}.Encode())
 }
 
 func pkcePair() (verifier, challenge string, err error) {
@@ -204,16 +246,30 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 	if link {
 		purpose = oauthstate.PurposeLink
 	}
+	// The phone app's round trip: it ends at AppRedirect with a one-time code only the app (holding
+	// the verifier behind app_challenge) can trade for a session. Never for linking.
+	app := qs.Get("app") != "" && !link
+	http.SetCookie(w, appCookieOf(r, app)) //#nosec G124 -- HttpOnly+SameSite, not a credential
+	if app {
+		next = ""
+		if !oauthstate.ValidChallenge(qs.Get("app_challenge")) {
+			appFail(w, r, OAuthStateInvalid)
+			return
+		}
+	}
 	if !s.oauthTries.allow("oauth:" + s.clientIP(r)) {
-		failTo(w, r, locale, purpose, next, OAuthRateLimited)
+		s.startFail(w, r, app, locale, purpose, next, OAuthRateLimited)
 		return
 	}
 	p := s.provider(chi.URLParam(r, "provider"))
-	if p == nil {
-		failTo(w, r, locale, purpose, next, OAuthUnavailable)
+	if !p.webReady() {
+		s.startFail(w, r, app, locale, purpose, next, OAuthUnavailable)
 		return
 	}
 	rec := oauthstate.Record{Purpose: purpose, Provider: p.ID, Next: next, Locale: locale}
+	if app {
+		rec.AppChallenge = qs.Get("app_challenge")
+	}
 	if link {
 		// The member tier (internal/server) already required a live session for ?link=1.
 		id, ok := auth.IdentityFrom(ctx)
@@ -231,7 +287,7 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rec.CodeVerifier = verifier
-	if p.ID == ProviderGoogle {
+	if p.ID == ProviderGoogle || p.ID == ProviderApple {
 		if rec.Nonce, err = oauthstate.Random(24); err != nil {
 			failTo(w, r, locale, purpose, next, OAuthInternal)
 			return
@@ -259,8 +315,27 @@ func (s *Service) handleOAuthStart(w http.ResponseWriter, r *http.Request) {
 		v.Set("prompt", "select_account")
 	case ProviderGitHub:
 		v.Set("scope", "read:user user:email")
+	case ProviderApple:
+		// Apple returns the address only with form_post, and does not document PKCE: the state,
+		// the nonce in its id_token and the signed client secret carry the round trip.
+		v.Del("code_challenge")
+		v.Del("code_challenge_method")
+		v.Set("response_type", "code")
+		v.Set("response_mode", "form_post")
+		v.Set("scope", "name email")
+		v.Set("nonce", rec.Nonce)
 	}
 	oauthRedirect(w, r, p.AuthURL+"?"+v.Encode())
+}
+
+// startFail: this request does not carry the app marker cookie yet, so an app start fails here
+// explicitly.
+func (s *Service) startFail(w http.ResponseWriter, r *http.Request, app bool, locale, purpose, next, code string) {
+	if app {
+		appFail(w, r, code)
+		return
+	}
+	failTo(w, r, locale, purpose, next, code)
 }
 
 // GET /api/auth/oauth/{provider}/callback
@@ -316,11 +391,80 @@ func (s *Service) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, OAuthProviderError)
 		return
 	}
-	if rec.Purpose == oauthstate.PurposeLink {
+	switch {
+	case rec.Purpose == oauthstate.PurposeLink:
 		s.finishLink(w, r, p, rec, prof)
+	case rec.AppChallenge != "":
+		s.finishApp(w, r, p, rec, prof)
+	default:
+		s.finishLogin(w, r, p, rec, prof)
+	}
+}
+
+// finishApp ends the phone app's round trip: the account is resolved exactly as for the web, then
+// the app gets a one-time code (oauthstate.Handoff) instead of a session. Two-factor and a disabled
+// account are handled again when the app trades the code (complete()).
+func (s *Service) finishApp(w http.ResponseWriter, r *http.Request, p *Provider, rec oauthstate.Record, prof profile) {
+	ctx := r.Context()
+	u, linked, err := s.resolveOAuthUser(ctx, p, rec, prof)
+	if err != nil {
+		var oe *oauthError
+		code := OAuthInternal
+		if errors.As(err, &oe) {
+			code = oe.code
+		} else {
+			s.Log.Error("account: OAuth sign-in failed", "provider", p.ID, "error", err)
+		}
+		appFail(w, r, code)
 		return
 	}
-	s.finishLogin(w, r, p, rec, prof)
+	s.keepProviderToken(ctx, p, prof)
+	if linked {
+		s.audit(ctx, u.ID, "auth.oauth_linked", map[string]any{"provider": p.ID, "email": prof.Email})
+	}
+	if u.Disabled {
+		appFail(w, r, CodeAccountDisabled)
+		return
+	}
+	code, err := oauthstate.Handoff(ctx, s.DB, u.ID, p.ID, rec.AppChallenge, rec.Locale, s.Now())
+	if err != nil {
+		appFail(w, r, OAuthInternal)
+		return
+	}
+	http.SetCookie(w, appCookieOf(r, false)) //#nosec G124 -- clearing
+	oauthRedirect(w, r, AppRedirect+"?"+url.Values{"code": {code}}.Encode())
+}
+
+// POST /api/auth/oauth/exchange {code, code_verifier} → the phone app's session ({token, user}),
+// or 2fa_required / account_disabled exactly like a password sign-in. The code is single use, good
+// for two minutes, and only with the verifier whose SHA-256 the app sent when it started.
+func (s *Service) handleOAuthExchange(w http.ResponseWriter, r *http.Request) {
+	if !s.oauthTries.allow("oauth:" + s.clientIP(r)) {
+		tooMany(w)
+		return
+	}
+	var in struct {
+		Code         string `json:"code"`
+		CodeVerifier string `json:"code_verifier"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in); err != nil || in.Code == "" || len(in.CodeVerifier) < 32 {
+		fail(w, http.StatusBadRequest, CodeInvalidRequest, "code and code_verifier are required")
+		return
+	}
+	ctx := r.Context()
+	rec, err := oauthstate.Finish(ctx, s.DB, in.Code, in.CodeVerifier, s.Now(), oauthstate.PurposeAppHandoff)
+	var u *user
+	if err == nil && rec.UserID != "" {
+		u, err = s.userByID(ctx, rec.UserID)
+	}
+	if err != nil || u == nil {
+		fail(w, http.StatusBadRequest, OAuthStateInvalid, "this sign-in has expired — start again")
+		return
+	}
+	if !u.Disabled {
+		s.audit(ctx, u.ID, "auth.oauth_login", map[string]any{"provider": rec.Provider, "app": true})
+	}
+	s.complete(w, r, u, nil)
 }
 
 /* ------------------------------------------------------------ resolving the account */
@@ -330,6 +474,8 @@ type profile struct {
 	Subject       string
 	Email         string // lower-cased
 	EmailVerified bool
+	// Apple: the refresh token it issued and the client id it was issued to (keepProviderToken).
+	Token, TokenClient string
 }
 
 type oauthError struct{ code string }
@@ -356,6 +502,7 @@ func (s *Service) finishLogin(w http.ResponseWriter, r *http.Request, p *Provide
 		failTo(w, r, rec.Locale, rec.Purpose, rec.Next, code)
 		return
 	}
+	s.keepProviderToken(ctx, p, prof)
 	if linked {
 		s.audit(ctx, u.ID, "auth.oauth_linked", map[string]any{"provider": p.ID, "email": prof.Email})
 	}
@@ -514,6 +661,7 @@ func (s *Service) finishLink(w http.ResponseWriter, r *http.Request, p *Provider
 	case code == "":
 		s.audit(ctx, u.ID, "auth.oauth_linked", map[string]any{"provider": p.ID, "email": prof.Email})
 	}
+	s.keepProviderToken(ctx, p, prof)
 	oauthRedirect(w, r, "/"+rec.Locale+"/account?"+url.Values{"linked": {p.ID}}.Encode())
 }
 
@@ -530,6 +678,9 @@ func (s *Service) audit(ctx context.Context, userID, action string, changes map[
 /* ------------------------------------------------------------ provider exchanges */
 
 func (s *Service) exchange(ctx context.Context, p *Provider, code string, rec oauthstate.Record) (profile, error) {
+	if p.ID == ProviderApple {
+		return s.appleWebProfile(ctx, p, code, rec)
+	}
 	form := url.Values{
 		"client_id":     {p.ClientID},
 		"client_secret": {p.ClientSecret},
@@ -586,42 +737,14 @@ func doJSON(client *http.Client, req *http.Request, out any) error {
 // googleProfile verifies the id_token: RS256 by one of Google's published keys, issued by Google,
 // for our client id, unexpired, carrying the nonce this round trip stored.
 func (s *Service) googleProfile(ctx context.Context, p *Provider, idToken, nonce string) (profile, error) {
-	if idToken == "" {
-		return profile{}, errors.New("no id_token")
-	}
-	claims := jwt.MapClaims{}
-	_, err := jwt.ParseWithClaims(idToken, claims, func(t *jwt.Token) (any, error) {
-		kid, _ := t.Header["kid"].(string)
-		return p.jwks.key(ctx, p.HTTP, p.JWKSURL, kid)
-	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithAudience(p.ClientID), jwt.WithExpirationRequired(),
-		jwt.WithTimeFunc(s.Now), jwt.WithLeeway(time.Minute))
+	claims, err := s.idTokenClaims(ctx, p, idToken, []string{p.ClientID})
 	if err != nil {
-		return profile{}, fmt.Errorf("id_token: %w", err)
-	}
-	iss, _ := claims["iss"].(string)
-	okIss := false
-	for _, want := range p.Issuers {
-		okIss = okIss || iss == want
-	}
-	if !okIss {
-		return profile{}, fmt.Errorf("id_token: issuer %q", iss)
+		return profile{}, err
 	}
 	if got, _ := claims["nonce"].(string); nonce == "" || got != nonce {
 		return profile{}, errors.New("id_token: nonce mismatch")
 	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" || len(sub) > 255 {
-		return profile{}, errors.New("id_token: no subject")
-	}
-	email, _ := claims["email"].(string)
-	verified := false
-	switch v := claims["email_verified"].(type) {
-	case bool:
-		verified = v
-	case string:
-		verified = v == "true"
-	}
-	return profile{Subject: sub, Email: normEmail(email), EmailVerified: verified && email != ""}, nil
+	return profileOf(claims)
 }
 
 // githubProfile reads the account (its numeric id is the subject) and its primary, verified address.
@@ -665,7 +788,7 @@ func githubProfile(ctx context.Context, p *Provider, token string) (profile, err
 	return prof, nil
 }
 
-/* ------------------------------------------------------------ Google's keys */
+/* ------------------------------------------------------------ the providers' signing keys */
 
 type jwksCache struct {
 	mu      sync.Mutex
@@ -770,8 +893,8 @@ func (s *Service) handleIdentities(w http.ResponseWriter, r *http.Request) {
 		out = append(out, identityOut{ID: row.ID, Provider: row.Provider, Email: row.EmailAtLink, CreatedAt: row.CreatedAt, LastUsedAt: row.LastUsedAt})
 	}
 	providers := []string{}
-	for _, p := range []string{ProviderGoogle, ProviderGitHub} {
-		if s.provider(p) != nil {
+	for _, p := range providerOrder {
+		if s.provider(p).webReady() {
 			providers = append(providers, p)
 		}
 	}

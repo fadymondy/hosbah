@@ -4,9 +4,9 @@
 -- user's own scope in the account settings).
 
 -- name: CreateOAuthState :exec
-INSERT INTO oauth_states (id, browser_hash, purpose, provider, code_verifier, nonce, next, locale, invitation_hash, user_id, team_id, expires_at)
+INSERT INTO oauth_states (id, browser_hash, purpose, provider, code_verifier, nonce, next, locale, invitation_hash, user_id, team_id, app_challenge, expires_at)
 VALUES (sqlc.arg('id'), sqlc.arg('browser_hash'), sqlc.arg('purpose'), sqlc.arg('provider'), sqlc.arg('code_verifier'), sqlc.arg('nonce'),
-    sqlc.arg('next'), sqlc.arg('locale'), sqlc.arg('invitation_hash'), sqlc.narg('user_id'), sqlc.narg('team_id'), sqlc.arg('expires_at'));
+    sqlc.arg('next'), sqlc.arg('locale'), sqlc.arg('invitation_hash'), sqlc.narg('user_id'), sqlc.narg('team_id'), sqlc.arg('app_challenge'), sqlc.arg('expires_at'));
 
 -- name: ConsumeOAuthState :one
 -- Single use: whoever deletes the row owns it; a second callback with the same state finds nothing.
@@ -52,3 +52,15 @@ VALUES (sqlc.arg('id'), sqlc.arg('email'), '!oauth', '', '', sqlc.arg('created_a
 UPDATE users SET email_unverified_at = NULL, password_hash = '!oauth',
     sessions_revoked_at = GREATEST(coalesce(sessions_revoked_at, sqlc.arg(revoked_at)::timestamptz), sqlc.arg(revoked_at)::timestamptz)
 WHERE id = sqlc.arg('id') AND email_unverified_at IS NOT NULL;
+
+-- name: SetIdentityProviderToken :exec
+-- Apple's refresh token (sealed), kept so deleting the account can revoke it.
+UPDATE user_identities SET provider_token_sealed = sqlc.arg('sealed') WHERE provider = sqlc.arg('provider') AND subject = sqlc.arg('subject');
+
+-- name: UserPasswordHash :one
+SELECT password_hash FROM users WHERE id = $1;
+
+-- name: TeamResourceCounts :one
+-- What a sole-owned team still runs when its owner deletes their account (run in the team's scope).
+SELECT (SELECT count(*) FROM servers s WHERE s.team_id = sqlc.arg('team_id')::text)::bigint AS servers,
+       (SELECT count(*) FROM apps a WHERE a.team_id = sqlc.arg('team_id')::text)::bigint AS apps;

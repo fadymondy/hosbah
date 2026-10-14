@@ -124,6 +124,11 @@ func isPublic(r *http.Request) bool {
 		"/api/auth/code/verify",
 		"/api/auth/2fa/challenge", // needs the challenge a correct first factor returned
 		"/api/auth/device/refresh", // the apps' rotating refresh token (internal/account/devices.go)
+		// The phone app's sign-in with a provider (internal/account): trading the one-time code
+		// its own round trip ended with (useless without the verifier only the app holds), and
+		// iOS's native Sign in with Apple (an Apple-signed id_token plus a fresh authorization code).
+		"/api/auth/oauth/exchange",
+		"/api/auth/apple/native",
 		"/api/auth/logout",
 		// The CircleXO hub integration (internal/circlexo): the sign-in button flag, and the signed
 		// webhook / provision endpoints, each authenticated by its Standard Webhooks signature.
@@ -178,9 +183,10 @@ func isPublic(r *http.Request) bool {
 	if p == "/api/browsers/auth" {
 		return true
 	}
-	// Google / GitHub sign-in (internal/account/oauth.go): the start (redirects to the provider with
-	// a single-use state bound to this browser) and the callback (accepts only that state). The
-	// start with ?link=1 attaches the provider to the signed-in account: member tier.
+	// Google / GitHub / Apple sign-in (internal/account/oauth.go): the start (redirects to the
+	// provider with a single-use state bound to this browser) and the callback (accepts only that
+	// state; Apple POSTs it, and the POST only re-issues it as a GET). The start with ?link=1
+	// attaches the provider to the signed-in account: member tier.
 	if provider, rest, ok := oauthPath(p); ok && provider != "" {
 		return rest == "/callback" || (rest == "" && !r.URL.Query().Has("link"))
 	}
@@ -199,7 +205,7 @@ func oauthPath(p string) (provider, rest string, ok bool) {
 		rest = "/" + rest
 	}
 	switch provider {
-	case "google", "github":
+	case "google", "github", "apple":
 	default:
 		return "", "", false
 	}
