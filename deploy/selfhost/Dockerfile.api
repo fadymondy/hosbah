@@ -3,7 +3,8 @@
 FROM golang:1.26 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+# Module downloads inside BuildKit sometimes hit HTTP/2 stream resets from the Go proxy: retry over HTTP/1.1.
+RUN for i in 1 2 3; do GODEBUG=http2client=0 go mod download && exit 0; sleep 10; done; exit 1
 COPY . .
 # internal/db/gen and internal/graph/gen are gitignored: generate them first.
 COPY --from=sqlc/sqlc:1.31.1 /workspace/sqlc /usr/local/bin/sqlc
