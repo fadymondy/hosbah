@@ -1,6 +1,8 @@
 import type { Palette } from "@hosbah/client/brand";
+import { isRTL } from "@hosbah/client/i18n";
 import { Text, type TextProps, type TextStyle } from "react-native";
 
+import { startAlign, writingDirection } from "@/lib/direction";
 import { fontFor, usePrefs } from "@/lib/prefs";
 
 export type TextVariant = "title" | "heading" | "body" | "label" | "caption" | "mono";
@@ -21,9 +23,17 @@ const SIZES: Record<TextVariant, { size: number; weight: "regular" | "medium" | 
 };
 
 export function AppText({ variant = "body", tone, style, ...rest }: Props) {
-  const { locale, colors } = usePrefs();
+  const { locale, colors, rtl } = usePrefs();
   const s = SIZES[variant];
   const toneName: TextTone = tone ?? (variant === "caption" ? "muted" : variant === "title" || variant === "heading" ? "fg" : "body");
-  const base: TextStyle = { fontFamily: fontFor(locale, s.weight), fontSize: s.size, lineHeight: s.line, color: colors[toneName] };
+  const languageRTL = isRTL(locale);
+  const base: TextStyle = {
+    fontFamily: fontFor(locale, s.weight),
+    fontSize: s.size,
+    lineHeight: s.line,
+    color: colors[toneName],
+    textAlign: startAlign(languageRTL, rtl),
+    writingDirection: writingDirection(languageRTL),
+  };
   return <Text {...rest} style={[base, style]} />;
 }
