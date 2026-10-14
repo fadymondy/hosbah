@@ -14,6 +14,14 @@ const ANDROID_FIREBASE = "./secrets/google-services.json";
 const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || "JW9HJH86GC";
 const BRAND = "#2e6f9e";
 const has = (rel) => fs.existsSync(path.join(__dirname, rel));
+
+// Google Sign-In on iOS needs the iOS OAuth client's reversed id as a URL scheme. It comes from the build
+// environment (never hard-coded); without it the plugin is left out and the app hides the Google button
+// on iOS (src/lib/social.ts). Android needs nothing here: its client is matched by package + SHA-1.
+const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "";
+const googleIosUrlScheme = GOOGLE_IOS_CLIENT_ID
+  ? "com.googleusercontent.apps." + GOOGLE_IOS_CLIENT_ID.replace(/\.apps\.googleusercontent\.com$/, "")
+  : null;
 const asset = (f) => `./assets/brand/hosbah-${f}.png`;
 
 module.exports = () => {
@@ -36,6 +44,8 @@ module.exports = () => {
       buildNumber: process.env.BUILD_NUMBER || "1",
       appleTeamId: APPLE_TEAM_ID,
       supportsTablet: false,
+      // Sign in with Apple (com.apple.developer.applesignin entitlement); the App ID needs the capability.
+      usesAppleSignIn: true,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
@@ -60,6 +70,9 @@ module.exports = () => {
       ["expo-local-authentication", { faceIDPermission: "Confirm deploys, restarts and stops with Face ID. Your face data never leaves this device." }],
       "expo-localization",
       "expo-font",
+      "expo-apple-authentication",
+      "expo-web-browser",
+      ...(googleIosUrlScheme ? [["@react-native-google-signin/google-signin", { iosUrlScheme: googleIosUrlScheme }]] : []),
       [
         "expo-splash-screen",
         {

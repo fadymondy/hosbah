@@ -1,6 +1,10 @@
 import { readSse, SseParser } from "./sse";
 import type {
   App,
+  AuthProvider,
+  AuthProviderId,
+  DeleteAccountProof,
+  NativeSignIn,
   AppDetail,
   Backup,
   Certificate,
@@ -248,6 +252,54 @@ export class HosbahClient {
   /** POST /api/auth/2fa/challenge: answer with a TOTP `code` or a `recovery_code`. */
   completeTwoFactor(challenge: string, answer: { code?: string; recovery_code?: string }): Promise<LoginResult> {
     return this.credentialPost("/api/auth/2fa/challenge", { challenge, ...answer });
+  }
+
+  /** GET /api/auth/providers: the social sign-in buttons this server offers ([] when unreachable). */
+  async authProviders(): Promise<AuthProvider[]> {
+    try {
+      const res = await this.fetchRaw(this.baseUrl + "/api/auth/providers", { headers: { Accept: "application/json" } });
+      if (!res.ok) return [];
+      const data = (await this.readBody(res)) as { providers?: AuthProvider[] } | undefined;
+      return Array.isArray(data?.providers) ? data.providers : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * POST /api/auth/oauth/{provider}/native with what Google's or Apple's SDK returned. Answers like login():
+   * the token, or ApiError 2fa_required / account_disabled / oauth_email_unverified / signup_closed / provider_error.
+   */
+  nativeSignIn(provider: "google" | "apple", body: NativeSignIn): Promise<LoginResult> {
+    return this.credentialPost(`/api/auth/oauth/${provider}/native`, body);
+  }
+
+  /**
+   * Where to open the system browser for a provider without a native SDK in the app (GitHub, Apple on
+   * Android). The trip ends at hosbah://auth/callback?code=… (or ?error=…); redeem with exchangeAppCode.
+   */
+  oauthBrowserUrl(provider: AuthProviderId, codeChallenge: string, locale: string = "ar"): string {
+    return this.url(`/api/auth/oauth/${enc(provider)}`, { app: "1", code_challenge: codeChallenge, code_challenge_method: "S256", locale });
+  }
+
+  /** POST /api/auth/app/token: the one-time code from the deep link plus the PKCE verifier. Answers like login(). */
+  exchangeAppCode(code: string, codeVerifier: string): Promise<LoginResult> {
+    return this.credentialPost("/api/auth/app/token", { code, code_verifier: codeVerifier });
+  }
+
+  /** POST /api/me/delete/code: mails a 6-digit code that confirms deleting the account. */
+  async requestDeleteCode(locale: string = "ar"): Promise<void> {
+    await this.request("POST", "/api/me/delete/code", { body: { locale } });
+  }
+
+  /**
+   * DELETE /api/me with one proof (password, mailed code, or a fresh native sign-in). On success the
+   * account is gone, so the local session is dropped. Throws ApiError reauth_required / invalid_password /
+   * invalid_code / sole_owner / team_has_servers / last_admin.
+   */
+  async deleteAccount(proof: DeleteAccountProof): Promise<void> {
+    await this.request("DELETE", "/api/me", { body: proof, noRefresh: false });
+    await this.setSession(null);
   }
 
   /** POST /api/me/devices: call once after the first sign-in; stores the device id and refresh token. */

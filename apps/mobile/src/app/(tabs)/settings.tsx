@@ -1,5 +1,6 @@
 import { EVENT_NAMES, relativeTime, type Device } from "@hosbah/client";
 import { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import { Alert, Switch, View } from "react-native";
 
 import { useApi } from "@/lib/api";
@@ -56,6 +57,7 @@ export default function SettingsScreen() {
   const c = useColors();
   const toast = useToast();
   const { client, serverUrl, setServerUrl, signOut } = useApi();
+  const router = useRouter();
   const { team } = useCurrentTeam();
   const prefs = useNotificationPrefs();
   const putPref = usePutPref();
@@ -193,7 +195,10 @@ export default function SettingsScreen() {
         ))}
       </Section>
 
-      <Button kind="danger" label={t("settings.signOut")} onPress={() => void signOut()} testID="sign-out" />
+      <Section title={t("settings.account")}>
+        <Button kind="danger" label={t("settings.signOut")} onPress={() => void signOut()} testID="sign-out" />
+        <Button kind="ghost" label={t("settings.deleteAccount")} onPress={() => router.push("/delete-account")} testID="delete-account" />
+      </Section>
       <AppText variant="caption" style={{ textAlign: "center" }}>
         {t("settings.version", { version: APP_VERSION })}
       </AppText>

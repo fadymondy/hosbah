@@ -59,6 +59,7 @@ function Gate() {
           <Stack.Screen name="apps/[id]/index" />
           <Stack.Screen name="apps/[id]/deployments/[did]" />
           <Stack.Screen name="servers/[id]" />
+          <Stack.Screen name="delete-account" />
         </Stack.Protected>
         <Stack.Protected guard={status === "out"}>
           <Stack.Screen name="sign-in" />

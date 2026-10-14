@@ -275,3 +275,62 @@ describe("notification prefs and push registration", () => {
     await expect(client.testPush()).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe("social sign-in and account deletion", () => {
+  it("lists providers, and [] when the server is unreachable", async () => {
+    const providers = [{ id: "google", name: "Google", web: true, native: true, client_id: "web.apps" }];
+    expect(await make(harness(() => json(200, { providers }))).client.authProviders()).toEqual(providers);
+    expect(await make(harness(() => { throw new TypeError("offline"); })).client.authProviders()).toEqual([]);
+  });
+
+  it("signs in with a native token like a login, CSRF pair included", async () => {
+    const tok = fresh();
+    const h = harness(() => json(200, { token: tok, user: { id: "u", email: "e" } }));
+    const { client } = make(h);
+    await client.nativeSignIn("apple", { id_token: "idt", authorization_code: "ac", nonce: "n", full_name: { given_name: "A" } });
+    const c = h.calls[0]!;
+    expect(c.url.pathname).toBe("/api/auth/oauth/apple/native");
+    expect(JSON.parse(String(c.init.body))).toEqual({ id_token: "idt", authorization_code: "ac", nonce: "n", full_name: { given_name: "A" } });
+    expect(c.headers["X-CSRF-Token"]).toBeTruthy();
+    expect(client.token).toBe(tok);
+  });
+
+  it("surfaces a native 2FA challenge", async () => {
+    const h = harness(() => json(401, { code: "2fa_required", challenge: "ch", error: "x" }));
+    const err = await make(h).client.nativeSignIn("google", { id_token: "t" }).catch((e) => e);
+    expect(twoFactorChallenge(err)).toBe("ch");
+  });
+
+  it("builds the browser URL and redeems the app code", async () => {
+    const tok = fresh();
+    const h = harness(() => json(200, { token: tok, user: { id: "u", email: "e" } }));
+    const { client } = make(h);
+    const u = new URL(client.oauthBrowserUrl("github", "chal", "en"));
+    expect(u.origin + u.pathname).toBe("https://h.test/api/auth/oauth/github");
+    expect(Object.fromEntries(u.searchParams)).toEqual({ app: "1", code_challenge: "chal", code_challenge_method: "S256", locale: "en" });
+    await client.exchangeAppCode("code1", "verifier");
+    expect(h.calls[0]!.url.pathname).toBe("/api/auth/app/token");
+    expect(JSON.parse(String(h.calls[0]!.init.body))).toEqual({ code: "code1", code_verifier: "verifier" });
+    expect(client.token).toBe(tok);
+  });
+
+  it("deletes the account with a proof and forgets the session", async () => {
+    const h = harness(() => json(200, { status: "deleted" }));
+    const { client, sessions } = make(h, { token: fresh(), refreshToken: "hbr_x", deviceId: "d1" });
+    await client.deleteAccount({ password: "pw" });
+    expect(h.calls[0]!.init.method).toBe("DELETE");
+    expect(h.calls[0]!.url.pathname).toBe("/api/me");
+    expect(JSON.parse(String(h.calls[0]!.init.body))).toEqual({ password: "pw" });
+    expect(client.signedIn).toBe(false);
+    expect(sessions.at(-1)).toBeNull();
+  });
+
+  it("keeps the session when deletion is refused", async () => {
+    const h = harness(() => json(409, { code: "sole_owner", error: "only owner" }));
+    const { client } = make(h, { token: fresh(), refreshToken: "hbr_x", deviceId: "d1" });
+    const err = await client.deleteAccount({ code: "123456" }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("sole_owner");
+    expect(client.signedIn).toBe(true);
+  });
+});

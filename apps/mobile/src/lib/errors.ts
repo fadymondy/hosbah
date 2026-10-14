@@ -14,6 +14,20 @@ export function errorKey(err: unknown): MessageKey {
       return "error.account_disabled";
     case "email_unverified":
       return "error.email_unverified";
+    case "provider_error":
+    case "provider_unavailable":
+    case "oauth_email_unverified":
+    case "signup_closed":
+    case "invite_only":
+    case "state_invalid":
+    case "rate_limited":
+    case "invalid_password":
+    case "sole_owner":
+    case "team_has_servers":
+    case "last_admin":
+      return `error.${err.code}`;
+    case "denied":
+      return "login.socialCancelled";
   }
   switch (err.status) {
     case 0:

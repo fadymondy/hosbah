@@ -3,13 +3,14 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Device from "expo-device";
-import { ApiError, HosbahClient, normalizeApiUrl, twoFactorChallenge, type RegisterDeviceInput } from "@hosbah/client";
+import { ApiError, HosbahClient, normalizeApiUrl, twoFactorChallenge, type AuthProvider, type DeleteAccountProof, type LoginResult, type RegisterDeviceInput } from "@hosbah/client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Platform } from "react-native";
 
 import { APP_VERSION, DEFAULT_SERVER, IS_MOCK } from "@/lib/config";
 import { usePrefs } from "@/lib/prefs";
 import { loadSession, saveSession } from "@/lib/session";
+import { socialSignIn } from "@/lib/social";
 import { getStored, KEYS, removeStored, setStored } from "@/lib/storage";
 
 export type AuthStatus = "loading" | "out" | "in";
@@ -23,8 +24,12 @@ interface Api {
   /** Switching servers signs this device out of the old one first. */
   setServerUrl: (url: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<SignInResult>;
+  /** Google / Apple / GitHub (src/lib/social.ts); throws SocialCancelled when the person backs out. */
+  signInWith: (provider: AuthProvider) => Promise<SignInResult>;
   completeTwoFactor: (challenge: string, answer: { code?: string; recovery_code?: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  /** DELETE /api/me with one proof; on success the device is signed out (the account is gone). */
+  deleteAccount: (proof: DeleteAccountProof) => Promise<void>;
 }
 
 const Ctx = createContext<Api | null>(null);
@@ -124,12 +129,14 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signIn = useCallback<Api["signIn"]>(
-    async (email, password) => {
+  // Any first factor (password, a provider): a 2FA challenge comes back to the screen, anything else
+  // registers the device.
+  const firstFactor = useCallback(
+    async (fn: (c: HosbahClient) => Promise<LoginResult>): Promise<SignInResult> => {
       const client = clientRef.current;
       if (!client) throw new Error("not ready");
       try {
-        await client.login(email.trim(), password, localeRef.current);
+        await fn(client);
       } catch (e) {
         const challenge = twoFactorChallenge(e);
         if (challenge) return { twoFactor: challenge };
@@ -139,6 +146,16 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       return {};
     },
     [finishSignIn],
+  );
+
+  const signIn = useCallback<Api["signIn"]>(
+    (email, password) => firstFactor((c) => c.login(email.trim(), password, localeRef.current)),
+    [firstFactor],
+  );
+
+  const signInWith = useCallback<Api["signInWith"]>(
+    (provider) => firstFactor((c) => socialSignIn(c, provider, localeRef.current)),
+    [firstFactor],
   );
 
   const completeTwoFactor = useCallback<Api["completeTwoFactor"]>(
@@ -158,6 +175,17 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     setStatus("out");
   }, [client, dropCache]);
 
+  const deleteAccount = useCallback<Api["deleteAccount"]>(
+    async (proof) => {
+      if (!client) throw new Error("not ready");
+      await client.deleteAccount(proof);
+      await dropCache();
+      await removeStored(KEYS.pushToken);
+      setStatus("out");
+    },
+    [client, dropCache],
+  );
+
   const setServerUrl = useCallback(
     async (input: string) => {
       const url = normalizeApiUrl(input);
@@ -173,8 +201,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<Api | null>(
-    () => (client ? { client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut } : null),
-    [client, status, serverUrl, setServerUrl, signIn, completeTwoFactor, signOut],
+    () => (client ? { client, status, serverUrl, setServerUrl, signIn, signInWith, completeTwoFactor, signOut, deleteAccount } : null),
+    [client, status, serverUrl, setServerUrl, signIn, signInWith, completeTwoFactor, signOut, deleteAccount],
   );
 
   return (
