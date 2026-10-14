@@ -133,6 +133,18 @@ agents should start with [AGENTS.md](AGENTS.md).
 
 Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+## Sponsor
+
+Hosbah is free and open source, built and maintained by [Fady Mondy](https://github.com/fadymondy).
+If it saves you time or powers your business, please consider supporting its development:
+
+<p>
+  <a href="https://github.com/sponsors/fadymondy"><img src="https://img.shields.io/badge/GitHub%20Sponsors-fadymondy-ea4aaa?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
+  <a href="https://buymeacoffee.com/fadymondy"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-fadymondy-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+</p>
+
+Every sponsorship goes into maintenance, docs, translations and new features.
+
 ## License
 
 Copyright (C) 2026 Fady Mondy. Hosbah is free software licensed under the
