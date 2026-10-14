@@ -63,6 +63,26 @@ export interface LoginResult {
 }
 
 /** What the client hands to onSession whenever the credentials change. Persist all three. */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  locale?: string;
+  invitation_token?: string;
+}
+
+/** A sign-up either needs the emailed code first (`verify`, the address) or signed in straight away (`session`). */
+export type RegisterResult = { verify: string; session?: undefined } | { session: LoginResult; verify?: undefined };
+
+export type SignupMode = "open" | "invite_only" | "closed";
+
+/** GET /api/settings/public: what a signed-out screen may know about the server. */
+export interface PublicSettings {
+  signup_mode: SignupMode;
+  announcement?: string;
+  announcement_level?: string;
+  support_email?: string;
+}
+
 export interface Session {
   token: string;
   refreshToken: string | null;

@@ -17,6 +17,9 @@ export type AuthStatus = "loading" | "out" | "in";
 
 export type SignInResult = { twoFactor: string } | { twoFactor?: undefined };
 
+/** A new account has to confirm its address first ({verify}); an invitation signs straight in. */
+export type SignUpResult = { verify: string; twoFactor?: undefined } | (SignInResult & { verify?: undefined });
+
 interface Api {
   client: HosbahClient;
   status: AuthStatus;
@@ -26,6 +29,10 @@ interface Api {
   signIn: (email: string, password: string) => Promise<SignInResult>;
   /** Google / Apple / GitHub (src/lib/social.ts); throws SocialCancelled when the person backs out. */
   signInWith: (provider: AuthProvider) => Promise<SignInResult>;
+  /** POST /api/auth/register. */
+  signUp: (email: string, password: string) => Promise<SignUpResult>;
+  /** The 6-digit code from the sign-up email; activates the account and signs in. */
+  verifyEmail: (email: string, code: string) => Promise<SignInResult>;
   completeTwoFactor: (challenge: string, answer: { code?: string; recovery_code?: string }) => Promise<void>;
   signOut: () => Promise<void>;
   /** DELETE /api/me with one proof; on success the device is signed out (the account is gone). */
@@ -158,6 +165,23 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     [firstFactor],
   );
 
+  const signUp = useCallback<Api["signUp"]>(
+    async (email, password) => {
+      const client = clientRef.current;
+      if (!client) throw new Error("not ready");
+      const r = await client.register({ email: email.trim(), password, locale: localeRef.current });
+      if (r.verify !== undefined) return { verify: r.verify };
+      const session = r.session;
+      return firstFactor(async () => session);
+    },
+    [firstFactor],
+  );
+
+  const verifyEmail = useCallback<Api["verifyEmail"]>(
+    (email, code) => firstFactor((c) => c.verifyEmail(email.trim(), code.trim())),
+    [firstFactor],
+  );
+
   const completeTwoFactor = useCallback<Api["completeTwoFactor"]>(
     async (challenge, answer) => {
       const client = clientRef.current;
@@ -201,8 +225,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<Api | null>(
-    () => (client ? { client, status, serverUrl, setServerUrl, signIn, signInWith, completeTwoFactor, signOut, deleteAccount } : null),
-    [client, status, serverUrl, setServerUrl, signIn, signInWith, completeTwoFactor, signOut, deleteAccount],
+    () => (client ? { client, status, serverUrl, setServerUrl, signIn, signInWith, signUp, verifyEmail, completeTwoFactor, signOut, deleteAccount } : null),
+    [client, status, serverUrl, setServerUrl, signIn, signInWith, signUp, verifyEmail, completeTwoFactor, signOut, deleteAccount],
   );
 
   return (

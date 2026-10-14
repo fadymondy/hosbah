@@ -1,4 +1,5 @@
-import { normalizeApiUrl, type AuthProvider } from "@hosbah/client";
+import { ApiError, normalizeApiUrl, type AuthProvider, type SignupMode } from "@hosbah/client";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +19,7 @@ export default function SignIn() {
   const c = useColors();
   const { locale, setLocale } = usePrefs();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { client, signIn, signInWith, completeTwoFactor, serverUrl, setServerUrl } = useApi();
 
   const [email, setEmail] = useState("");
@@ -32,6 +34,8 @@ export default function SignIn() {
   // without the credentials shows none.
   const [providers, setProviders] = useState<AuthProvider[]>([]);
   const [socialBusy, setSocialBusy] = useState<string | null>(null);
+  // "Create an account" is hidden on a server that does not take sign-ups.
+  const [signupMode, setSignupMode] = useState<SignupMode | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -39,6 +43,7 @@ export default function SignIn() {
       const [list, apple] = await Promise.all([client.authProviders(), appleAvailable()]);
       if (live) setProviders(socialButtons(list, Platform.OS, apple));
     })();
+    void client.publicSettings().then((s) => live && setSignupMode(s.signup_mode), () => undefined);
     return () => {
       live = false;
     };
@@ -88,8 +93,17 @@ export default function SignIn() {
         throw new Error("bad url");
       }
       if (url !== serverUrl) await setServerUrl(url);
-      const r = await signIn(email, password);
-      if (r.twoFactor) setChallenge(r.twoFactor);
+      try {
+        const r = await signIn(email, password);
+        if (r.twoFactor) setChallenge(r.twoFactor);
+      } catch (e) {
+        // The account exists but its address was never confirmed: send a fresh code and ask for it.
+        if (e instanceof ApiError && e.code === "email_unverified") {
+          router.push({ pathname: "/verify-email", params: { email: email.trim(), resend: "1" } });
+          return;
+        }
+        throw e;
+      }
     });
 
   const verify = () => run(() => completeTwoFactor(challenge ?? "", recovery ? { recovery_code: code.trim() } : { code: code.trim() }));
@@ -124,6 +138,8 @@ export default function SignIn() {
               </AppText>
             ) : null}
             <Button label={t("login.submit")} onPress={submit} loading={busy} disabled={!email.trim() || !password || !!socialBusy} testID="sign-in-submit" />
+            <Button kind="ghost" label={t("login.forgot")} onPress={() => router.push({ pathname: "/forgot-password", params: { email: email.trim() } })} testID="sign-in-forgot" />
+            {signupMode !== "closed" ? <Button kind="secondary" label={t("login.noAccount")} onPress={() => router.push("/sign-up")} testID="sign-in-sign-up" /> : null}
           </View>
         ) : (
           <View style={{ gap: space.md }}>

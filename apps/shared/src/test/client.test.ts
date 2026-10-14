@@ -334,3 +334,73 @@ describe("social sign-in and account deletion", () => {
     expect(client.signedIn).toBe(true);
   });
 });
+
+describe("email/password account cycle", () => {
+  it("register: an unconfirmed account comes back as {verify}", async () => {
+    const h = harness(() => json(403, { error: "email not verified", code: "email_unverified", email: "a@b.c" }));
+    const { client, sessions } = make(h);
+    expect(await client.register({ email: "a@b.c", password: "longenough", locale: "en" })).toEqual({ verify: "a@b.c" });
+    const c = h.calls[0]!;
+    expect(c.url.pathname).toBe("/api/auth/register");
+    expect(JSON.parse(String(c.init.body))).toEqual({ email: "a@b.c", password: "longenough", locale: "en" });
+    expect(c.headers["X-CSRF-Token"]).toBeTruthy();
+    expect(client.token).toBeNull();
+    expect(sessions).toEqual([]);
+  });
+
+  it("register: an invitation signs straight in; other refusals throw", async () => {
+    const tok = fresh();
+    const { client } = make(harness(() => json(200, { token: tok, user: { id: "u", email: "a@b.c" } })));
+    const r = await client.register({ email: "a@b.c", password: "longenough", invitation_token: "inv" });
+    expect(r.session?.token).toBe(tok);
+    expect(client.token).toBe(tok);
+
+    const weak = make(harness(() => json(422, { error: "bad", code: "invalid_password" }))).client;
+    const err = await weak.register({ email: "a@b.c", password: "x" }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("invalid_password");
+  });
+
+  it("verifyEmail stores the session the code unlocks", async () => {
+    const tok = fresh();
+    const h = harness(() => json(200, { token: tok, user: { id: "u", email: "a@b.c" } }));
+    const { client, sessions } = make(h);
+    await client.verifyEmail("a@b.c", "123456");
+    expect(h.calls[0]!.url.pathname).toBe("/api/auth/verify-email");
+    expect(JSON.parse(String(h.calls[0]!.init.body))).toEqual({ email: "a@b.c", code: "123456" });
+    expect(sessions.at(-1)?.token).toBe(tok);
+  });
+
+  it("resend, forgot and reset are public CSRF posts that never sign in", async () => {
+    const h = harness((c) => json(200, { status: c.url.pathname.endsWith("/reset") ? "reset" : "sent" }));
+    const { client, sessions } = make(h);
+    expect(await client.resendVerification("a@b.c", "en")).toEqual({ status: "sent" });
+    expect(await client.forgotPassword("a@b.c")).toEqual({ status: "sent" });
+    expect(await client.resetPassword("a@b.c", "654321", "newpassword")).toEqual({ status: "reset" });
+    expect(h.calls.map((c) => c.url.pathname)).toEqual(["/api/auth/verify-email/resend", "/api/auth/password/forgot", "/api/auth/password/reset"]);
+    expect(JSON.parse(String(h.calls[1]!.init.body))).toEqual({ email: "a@b.c", locale: "ar" });
+    expect(JSON.parse(String(h.calls[2]!.init.body))).toEqual({ email: "a@b.c", code: "654321", password: "newpassword" });
+    for (const c of h.calls) {
+      expect(c.init.method).toBe("POST");
+      expect(c.headers.Cookie).toBe(`togo_csrf=${c.headers["X-CSRF-Token"]}`);
+      expect(c.headers.Authorization).toBeUndefined();
+    }
+    expect(sessions).toEqual([]);
+  });
+
+  it("reset surfaces a bad code as an ApiError", async () => {
+    const { client } = make(harness(() => json(400, { error: "bad code", code: "invalid_code" })));
+    const err = await client.resetPassword("a@b.c", "000000", "newpassword").catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("invalid_code");
+  });
+
+  it("publicSettings reads the sign-up mode", async () => {
+    const h = harness(() => json(200, { signup_mode: "invite_only" }));
+    const { client } = make(h);
+    expect((await client.publicSettings()).signup_mode).toBe("invite_only");
+    expect(h.calls[0]!.url.pathname).toBe("/api/settings/public");
+    const down = make(harness(() => json(500, { error: "x" }))).client;
+    await expect(down.publicSettings()).rejects.toBeInstanceOf(ApiError);
+  });
+});

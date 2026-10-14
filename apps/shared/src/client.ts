@@ -5,6 +5,9 @@ import type {
   AuthProviderId,
   DeleteAccountProof,
   NativeSignIn,
+  PublicSettings,
+  RegisterInput,
+  RegisterResult,
   AppDetail,
   Backup,
   Certificate,
@@ -252,6 +255,62 @@ export class HosbahClient {
   /** POST /api/auth/2fa/challenge: answer with a TOTP `code` or a `recovery_code`. */
   completeTwoFactor(challenge: string, answer: { code?: string; recovery_code?: string }): Promise<LoginResult> {
     return this.credentialPost("/api/auth/2fa/challenge", { challenge, ...answer });
+  }
+
+  /**
+   * POST /api/auth/register. A new account must prove its address first: the server mails a 6-digit code
+   * and answers 403 email_unverified, returned here as `{ verify: email }` (then verifyEmail). A sign-up
+   * carrying an invitation for that same address signs in straight away (`{ session }`). Other refusals
+   * throw: signup_closed / invite_only (403), invalid_password (422, too short or long), 409 address taken.
+   */
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    try {
+      return { session: await this.credentialPost("/api/auth/register", input) };
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "email_unverified") return { verify: input.email };
+      throw e;
+    }
+  }
+
+  /** POST /api/auth/verify-email: the emailed code signs the new account in (or throws 2fa_required). */
+  verifyEmail(email: string, code: string): Promise<LoginResult> {
+    return this.credentialPost("/api/auth/verify-email", { email, code });
+  }
+
+  /** POST /api/auth/verify-email/resend. Always `{status:"sent"}`: it never says whether the address exists. */
+  resendVerification(email: string, locale: string = "ar"): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/verify-email/resend", { email, locale });
+  }
+
+  /** POST /api/auth/password/forgot. Always `{status:"sent"}`; a code goes to the address if it has an account. */
+  forgotPassword(email: string, locale: string = "ar"): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/password/forgot", { email, locale });
+  }
+
+  /** POST /api/auth/password/reset. Signs every existing session out; sign in with the new password afterwards. */
+  resetPassword(email: string, code: string, password: string): Promise<{ status: string }> {
+    return this.publicPost("/api/auth/password/reset", { email, code, password });
+  }
+
+  /** GET /api/settings/public: sign-up mode (open | invite_only | closed), announcement, support email. */
+  async publicSettings(): Promise<PublicSettings> {
+    const res = await this.fetchRaw(this.baseUrl + "/api/settings/public", { headers: { Accept: "application/json" } });
+    const data = await this.readBody(res);
+    if (!res.ok) throw this.errorOf(res, data);
+    return data as PublicSettings;
+  }
+
+  private async publicPost<T>(path: string, body: unknown): Promise<T> {
+    const c = await this.csrfHeaders();
+    const res = await this.fetchRaw(this.baseUrl + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...c.headers },
+      body: JSON.stringify(body),
+      ...(c.credentials ? { credentials: c.credentials } : {}),
+    });
+    const data = await this.readBody(res);
+    if (!res.ok) throw this.errorOf(res, data);
+    return data as T;
   }
 
   /** GET /api/auth/providers: the social sign-in buttons this server offers ([] when unreachable). */

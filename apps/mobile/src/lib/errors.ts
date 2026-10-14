@@ -46,6 +46,12 @@ export function errorKey(err: unknown): MessageKey {
   }
 }
 
+/** Same, on the screens that set a password, where invalid_password means it breaks the length rule (elsewhere: it is wrong). */
+export function passwordErrorKey(err: unknown): MessageKey {
+  if (err instanceof ApiError && err.code === "invalid_password") return "signup.passwordRule";
+  return errorKey(err);
+}
+
 /** Same, for the test-notification call, where 409 (no push token yet) and 503 (server has no FCM) mean something specific. */
 export function testPushErrorKey(err: unknown): MessageKey {
   if (err instanceof ApiError && err.status === 409) return "settings.testPushNoToken";
