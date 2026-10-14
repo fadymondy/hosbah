@@ -30,6 +30,8 @@ import (
 type Error struct {
 	Status int
 	Msg    string
+	// Code is a machine code for callers that branch on the refusal (empty for most).
+	Code string
 }
 
 func (e *Error) Error() string { return e.Msg }

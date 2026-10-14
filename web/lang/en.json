@@ -1625,7 +1625,7 @@
     "verifyTitle": "Verify your email",
     "identities": {
       "title": "Connected accounts",
-      "hint": "Sign in with Google or GitHub instead of a password. Only an address the provider has verified is used.",
+      "hint": "Sign in with Google, Apple or GitHub instead of a password. Only an address the provider has verified is used.",
       "connect": "Connect {provider}",
       "disconnect": "Disconnect",
       "disconnectTitle": "Disconnect {provider}?",
@@ -1633,7 +1633,7 @@
       "since": "Connected {date}",
       "lastUsed": "last used {date}",
       "none": "No accounts connected yet.",
-      "noProviders": "Sign-in with Google or GitHub is not set up on this platform.",
+      "noProviders": "Sign-in with Google, Apple or GitHub is not set up on this platform.",
       "noPassword": "This account has no password; it signs in with the accounts below. Use “Forgot password” on the sign-in page to set one.",
       "lastMethod": "This is the only way into your account. Set a password first (“Forgot password” on the sign-in page) or connect another account.",
       "linkedToast": "{provider} is connected.",
@@ -1649,6 +1649,27 @@
       "emptyTitle": "No AI connections",
       "emptyHint": "Connect claude.ai, ChatGPT or Claude Code to Hosbah’s MCP server and the connection shows up here.",
       "revokeHint": "“{name}” loses access to {team} right away. Connect it again to restore it."
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "hint": "Permanently delete your Hosbah account, your sign-in methods, devices and tokens. Teams only you are in are deleted with it; they must have no servers left. This cannot be undone.",
+      "proofPassword": "Confirm with your password",
+      "proofCode": "Confirm with a code sent to {email}",
+      "sendCode": "Email me a code",
+      "codeSent": "We sent a code to {email}. It works for 15 minutes.",
+      "code": "Code",
+      "button": "Delete account",
+      "dialogTitle": "Delete your account?",
+      "dialogBody": "Your account, its sign-in methods, devices and tokens, and teams only you are in will be deleted for good. Apple sign-in is revoked at Apple. Teams you share keep running for their other members.",
+      "confirm": "Delete for good",
+      "errors": {
+        "reauth_required": "Confirm it is you first: your password or the emailed code.",
+        "invalid_password": "That password is not right.",
+        "invalid_code": "That code is not right or has expired.",
+        "sole_owner": "You are the only owner of a team that has other members. Make another member an owner (Team settings → Members) first.",
+        "team_has_servers": "A team only you are in still manages servers. Remove them from the team first, so none is left running unmanaged.",
+        "last_admin": "You are the last platform admin. Make someone else an admin first."
+      }
     }
   },
   "admin": {

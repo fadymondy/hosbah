@@ -14,6 +14,20 @@ export function errorKey(err: unknown): MessageKey {
       return "error.account_disabled";
     case "email_unverified":
       return "error.email_unverified";
+    case "provider_error":
+    case "provider_unavailable":
+    case "oauth_email_unverified":
+    case "signup_closed":
+    case "invite_only":
+    case "state_invalid":
+    case "rate_limited":
+    case "invalid_password":
+    case "sole_owner":
+    case "team_has_servers":
+    case "last_admin":
+      return `error.${err.code}`;
+    case "denied":
+      return "login.socialCancelled";
   }
   switch (err.status) {
     case 0:
@@ -30,6 +44,12 @@ export function errorKey(err: unknown): MessageKey {
     default:
       return "error.generic";
   }
+}
+
+/** Same, on the screens that set a password, where invalid_password means it breaks the length rule (elsewhere: it is wrong). */
+export function passwordErrorKey(err: unknown): MessageKey {
+  if (err instanceof ApiError && err.code === "invalid_password") return "signup.passwordRule";
+  return errorKey(err);
 }
 
 /** Same, for the test-notification call, where 409 (no push token yet) and 503 (server has no FCM) mean something specific. */

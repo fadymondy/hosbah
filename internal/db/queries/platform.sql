@@ -113,6 +113,22 @@ JOIN team_members m ON m.team_id = t.id AND m.user_id = sqlc.arg('user_id')::tex
 WHERE NOT EXISTS (SELECT 1 FROM team_members o WHERE o.team_id = t.id AND o.role = 'owner' AND o.user_id <> sqlc.arg('user_id')::text)
 ORDER BY t.created_at;
 
+-- name: SoleOwnedTeamsForDeletion :many
+-- Self-service deletion (platform.DeleteOwnAccount): the teams this user is the only owner of, with
+-- how many other members and servers each still has.
+SELECT t.id, t.slug, t.name,
+    (SELECT count(*) FROM team_members o WHERE o.team_id = t.id AND o.user_id <> sqlc.arg('user_id')::text)::bigint AS other_members,
+    (SELECT count(*) FROM servers s WHERE s.team_id = t.id)::bigint AS servers
+FROM teams t
+JOIN team_members m ON m.team_id = t.id AND m.user_id = sqlc.arg('user_id')::text AND m.role = 'owner'
+WHERE NOT EXISTS (SELECT 1 FROM team_members o WHERE o.team_id = t.id AND o.role = 'owner' AND o.user_id <> sqlc.arg('user_id')::text)
+ORDER BY t.created_at;
+
+-- name: DeleteTeamRow :execrows
+-- Only for a team whose one member is deleting their account and which has no servers left; every
+-- team table cascades from it.
+DELETE FROM teams WHERE id = $1;
+
 -- name: ReassignTeamOwnership :exec
 -- teams.owner_id of the teams this user created moves to another owner of the same team.
 UPDATE teams t SET owner_id = (

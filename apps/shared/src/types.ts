@@ -26,12 +26,63 @@ export interface User {
   platform_admin?: boolean;
 }
 
+// ── social sign-in (internal/account/oauth.go, native.go) ────────────────
+
+export type AuthProviderId = "google" | "apple" | "github";
+
+/** GET /api/auth/providers. web: the browser round trip works; native: the provider's own SDK works. */
+export interface AuthProvider {
+  id: AuthProviderId;
+  name: string;
+  web: boolean;
+  native: boolean;
+  /** Google: the web client id the native SDK must mint id_tokens for. */
+  client_id?: string;
+}
+
+/** What a native SDK returned, for POST /api/auth/oauth/{provider}/native (and as a deletion proof). */
+export interface NativeSignIn {
+  id_token: string;
+  /** Apple: the authorization code that comes with the identity token. */
+  authorization_code?: string;
+  /** The raw nonce the app generated (Apple: the SDK was given its SHA-256). */
+  nonce?: string;
+  /** Apple: only on the first consent. */
+  full_name?: { given_name?: string; family_name?: string };
+}
+
+/** One proof of identity for DELETE /api/me. */
+export type DeleteAccountProof =
+  | { password: string }
+  | { code: string }
+  | ({ provider: "google" | "apple" } & NativeSignIn);
+
 export interface LoginResult {
   token: string;
   user: User;
 }
 
 /** What the client hands to onSession whenever the credentials change. Persist all three. */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  locale?: string;
+  invitation_token?: string;
+}
+
+/** A sign-up either needs the emailed code first (`verify`, the address) or signed in straight away (`session`). */
+export type RegisterResult = { verify: string; session?: undefined } | { session: LoginResult; verify?: undefined };
+
+export type SignupMode = "open" | "invite_only" | "closed";
+
+/** GET /api/settings/public: what a signed-out screen may know about the server. */
+export interface PublicSettings {
+  signup_mode: SignupMode;
+  announcement?: string;
+  announcement_level?: string;
+  support_email?: string;
+}
+
 export interface Session {
   token: string;
   refreshToken: string | null;
