@@ -68,7 +68,7 @@ export const palettes = { light, dark } as const;
 export const statusColors = { green: "#4e9a3e", amber: "#c9a227", red: "#d9455f" } as const;
 
 export const fonts = {
-  ar: "Lusail",
+  ar: "IBM Plex Sans Arabic",
   en: "Inter",
 } as const;
 
@@ -77,9 +77,9 @@ export const assets = {
   icon192: "assets/icon-192.png",
   icon512: "assets/icon-512.png",
   iconMaskable512: "assets/icon-maskable-512.png",
-  lusailLight: "assets/Lusail-Light.woff2",
-  lusailRegular: "assets/Lusail-Regular.woff2",
-  lusailMedium: "assets/Lusail-Medium.woff2",
+  plexArabicLight: "assets/IBMPlexSansArabic-300.woff2",
+  plexArabicRegular: "assets/IBMPlexSansArabic-400.woff2",
+  plexArabicMedium: "assets/IBMPlexSansArabic-500.woff2",
 } as const;
 
 export const brandName = { ar: "حوسبة", en: "Hosbah" } as const;

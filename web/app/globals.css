@@ -12,13 +12,13 @@
 @import "@fadymondy/nasaq/theme.css";
 @import "@fadymondy/nasaq/web/styles.css";
 
-/* Fonts only (Lusail for Arabic, JetBrains Mono). GENERATED copy: never edit; npm run grid:sync. */
+/* Fonts only (Inter, IBM Plex Sans Arabic, JetBrains Mono). GENERATED copy: never edit; npm run grid:sync. */
 @import "./grid/grid-fonts.css";
 
-/* English uses Inter (next/font self-hosts it as --font-inter); Arabic keeps Lusail through Nasaq's
-   Arabic stack. Lusail stays in the English stack so Arabic text inside an English page still renders. */
+/* English uses Inter (next/font self-hosts it as --font-inter); Arabic is set in IBM Plex Sans Arabic through Nasaq's
+   Arabic stack. Plex stays in the English stack so Arabic text inside an English page still renders. */
 html[lang="en"] {
-  --nq-font-sans: var(--font-inter), Inter, Lusail, Alexandria, system-ui, sans-serif;
+  --nq-font-sans: var(--font-inter), Inter, "IBM Plex Sans Arabic", Alexandria, system-ui, sans-serif;
 }
 
 @layer base {

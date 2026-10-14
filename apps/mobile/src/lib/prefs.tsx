@@ -74,9 +74,9 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   const [themeSetting, setThemeSetting] = useState<ThemeSetting>("system");
   const [loaded, setLoaded] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
-    "Lusail-Light": require("../../assets/fonts/Lusail-Light.ttf"),
-    "Lusail-Regular": require("../../assets/fonts/Lusail-Regular.ttf"),
-    "Lusail-Medium": require("../../assets/fonts/Lusail-Medium.ttf"),
+    "IBMPlexSansArabic-Light": require("../../assets/fonts/IBMPlexSansArabic-Light.ttf"),
+    "IBMPlexSansArabic-Regular": require("../../assets/fonts/IBMPlexSansArabic-Regular.ttf"),
+    "IBMPlexSansArabic-Medium": require("../../assets/fonts/IBMPlexSansArabic-Medium.ttf"),
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -135,9 +135,9 @@ export function usePrefs(): Prefs {
 export const useT = (): TFn => usePrefs().t;
 export const useColors = (): Palette => usePrefs().colors;
 
-/** Font family for a weight, by language: Lusail for Arabic, Inter for English. */
+/** Font family for a weight, by language: IBM Plex Sans Arabic for Arabic, Inter for English. */
 export function fontFor(locale: Locale, weight: "regular" | "medium" | "strong" | "mono"): string {
   if (weight === "mono") return "JetBrainsMono_400Regular";
-  if (locale === "ar") return weight === "regular" ? "Lusail-Regular" : "Lusail-Medium";
+  if (locale === "ar") return weight === "regular" ? "IBMPlexSansArabic-Regular" : "IBMPlexSansArabic-Medium";
   return weight === "regular" ? "Inter_400Regular" : weight === "medium" ? "Inter_500Medium" : "Inter_600SemiBold";
 }

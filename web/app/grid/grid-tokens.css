@@ -56,12 +56,13 @@
   --grid-on-action: #0e1a3c;
   --grid-ring: var(--grid-action);
 
-  /* Lusail carries Arabic and Latin. JetBrains Mono is for meta, counts, dates, paths and Latin
+  /* Inter sets Latin, IBM Plex Sans Arabic sets Arabic: Inter has no Arabic, so an Arabic glyph
+     falls through to Plex. JetBrains Mono is for meta, counts, dates, paths and Latin
      micro-labels only — never Arabic. Weight 700 is not used. */
-  --grid-font-sans: "Lusail", "Alexandria", system-ui, sans-serif;
-  /* Lusail before the generic monospace: JetBrains Mono has no Arabic, so an Arabic glyph in a
+  --grid-font-sans: "Inter", "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Plex before the generic monospace: JetBrains Mono has no Arabic, so an Arabic glyph in a
      mono run (a label next to a number) falls through to the brand face, not a system font. */
-  --grid-font-mono: "JetBrains Mono", "JetBrains Mono Variable", "Lusail", ui-monospace, monospace;
+  --grid-font-mono: "JetBrains Mono", "JetBrains Mono Variable", "IBM Plex Sans Arabic", ui-monospace, monospace;
 
   --grid-column: 860px;
   --grid-gap: 16px;
