@@ -38,8 +38,12 @@ jobs:
         run: go vet ./...
       - name: Tests (unit, isolation sweep and RLS)
         env:
+          DB_DRIVER: pgx
           TEST_DATABASE_URL: postgres://cloudy_app:cloudy_app_dev@localhost:5432/cloudy_test?sslmode=disable
-        run: go test -count=1 ./...
+        # The agent tests write its state directory, as the agent does on a server.
+        run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" /var/lib/hosbah
+          go test -count=1 ./...
 
   web:
     runs-on: ubuntu-latest
