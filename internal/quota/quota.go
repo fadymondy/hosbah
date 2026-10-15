@@ -25,10 +25,6 @@ type Error struct {
 func (e *Error) Error() string { return e.Msg }
 
 func refuse(q Quota, what string, limit, have int64) error {
-	if q.Hub {
-		return &Error{Status: http.StatusPaymentRequired, Msg: fmt.Sprintf(
-			"this team's CircleXO plan allows at most %d %s (it has %d) — upgrade the plan in CircleXO", limit, what, have)}
-	}
 	return &Error{Status: http.StatusForbidden, Msg: fmt.Sprintf(
 		"this team's quota allows at most %d %s (it has %d) — ask a platform admin to raise it", limit, what, have)}
 }

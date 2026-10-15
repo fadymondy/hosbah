@@ -1,13 +1,12 @@
 # CircleXO hub integration
 
 Hosbah can run as an app on the CircleXO hub: hub sign-in next to Hosbah's own login, hub orgs
-mapped to teams, hub-governed plan limits for those teams, and hub-issued tokens on the team MCP
-endpoint. **All of it is off unless `CIRCLEXO_ISSUER` is set.** With it unset nothing changes: the
-routes below (except the config probe) do not exist, no `circlexo_*` table is read and the quota
-overlay is not installed.
+mapped to teams, and hub-issued tokens on the team MCP endpoint. Hosbah is free and open source:
+the hub's plan limits nothing. **All of it is off unless `CIRCLEXO_ISSUER` is set.** With it unset nothing changes: the
+routes below (except the config probe) do not exist, and no `circlexo_*` table is read.
 
-Code: `internal/circlexo` (service, SSO, sync, webhooks, entitlements overlay), `internal/mcp/hub.go`
-(federated MCP), the overlay hook in `internal/quota`, wiring in `internal/server/circlexo.go`.
+Code: `internal/circlexo` (service, SSO, sync, webhooks), `internal/mcp/hub.go`
+(federated MCP), wiring in `internal/server/circlexo.go`.
 Tests: `internal/server/circlexo_test.go`, against the SDK's `circlexotest` fake hub.
 
 ## Configuration
@@ -82,19 +81,16 @@ team, reactivating an inactive link. It reads the org and members from the hub, 
 **Roles.** Hub `owner` maps to `owner`, `admin` to `admin`, `billing` to `viewer`, anything else
 to `deployer`. The last owner is never demoted or removed by the hub. `member.removed` deletes the
 membership (Hosbah has no suspended membership state). Removing the app marks the link inactive and
-deletes nothing: the team, members and data stay and its limits go back to what a platform admin
-set. Hub-side member sync is not gated by the member cap; only inviting and accepting are.
+deletes nothing: the team, members and data stay.
 
-## Entitlements
+## Free and open source: no plan limits
 
-For a team with an **active** link, `servers`, `apps`, `data_services` and `members` (counted
-limits, always hard caps: Hosbah has no overage billing) come from the hub through the SDK cache.
-An absent or disabled feature is a limit of 0; a feature with no limit is unlimited. Fail closed
-with a read-only grace: if the hub is unreachable, the last known answer is used for the SDK's grace
-window with adds refused (402, reads and deletes still work); past the window, or when the hub has
-no entitlements for the org, the limits are 0 and the team is read-only. `entitlement.changed` and
-`subscription.*` drop the cache. Unlinked teams are never touched. `quota.Quota` carries `Hub`,
-`ReadOnly` and `MaxMembers` so the API and the UI can say why something was refused.
+Since 2026-10-15 Hosbah (and CircleXO) are free and open source. Nothing is sold and no feature is
+behind a plan. The hub's entitlements no longer decide a linked team's limits: no quota overlay is
+installed, so a hub-linked team has the same quotas as any other team, the ones a platform admin
+sets (unlimited by default). Those quotas are abuse protection, not a plan. A hub outage or an org
+with no entitlements changes nothing. People who want to support the work can sponsor ToGO at
+https://to-go.dev/sponsor.
 
 Usage reporting is not wired: Hosbah meters nothing pay-as-you-go.
 
@@ -139,4 +135,4 @@ current team role. The `act` chain is recorded on audit entries as `via_actors`.
 3. Set the `CIRCLEXO_*` variables in the environment (not the repo).
 4. Run the migration (`togo migrate` / `go run ./cmd/migrate`): it creates the four tables.
 5. Set `CIRCLEXO_ISSUER` last and restart: the login button appears and the routes mount. Look for "circlexo: hub integration enabled" in the boot log.
-6. Install the app on a test org and confirm: a team appears, members sync, the hub shows the tenant active, and the limits follow the hub plan.
+6. Install the app on a test org and confirm: a team appears, members sync, and the hub shows the tenant active.
