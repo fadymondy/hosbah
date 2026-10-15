@@ -169,16 +169,15 @@ func redirectURL() string {
 	return baseURL() + CallbackPath
 }
 
-// Install makes s the running integration and wires the hook other packages consult (the quota
-// overlay). Passing nil (the integration is off) clears it, which matters to a test process that
-// boots more than once.
+// Install makes s the running integration. Passing nil (the integration is off) clears it, which
+// matters to a test process that boots more than once.
+//
+// Hosbah is free and open source (2026-10-15): the hub's plan no longer decides a team's limits, so
+// no quota overlay is installed. A hub-linked team keeps the quotas a platform admin set (unlimited
+// by default), which are abuse protection, not a plan.
 func Install(s *Service) {
 	current.Store(s)
-	if s == nil {
-		quota.SetOverlay(nil)
-		return
-	}
-	quota.SetOverlay(s.overlay)
+	quota.SetOverlay(nil)
 }
 
 // ConfigHandler answers GET /api/circlexo/config (PUBLIC, no secrets): whether the sign-in button
