@@ -164,6 +164,8 @@ every sponsorship goes into the framework and the apps built on it.
 
 **[Sponsor ToGO →](https://to-go.dev/sponsor)**
 
+Or back Hosbah directly on Open Collective: **[opencollective.com/hosbah →](https://opencollective.com/hosbah)**
+
 <p>
   <a href="https://to-go.dev/sponsor"><img src="https://img.shields.io/badge/Sponsor-ToGO-00ADD8?logo=go&logoColor=white" alt="Sponsor ToGO" /></a>
   <a href="https://github.com/sponsors/fadymondy"><img src="https://img.shields.io/badge/GitHub%20Sponsors-fadymondy-ea4aaa?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
