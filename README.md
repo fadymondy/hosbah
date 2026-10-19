@@ -131,6 +131,8 @@ Hosbah uses:
 | [db-postgres](https://github.com/togo-framework/db-postgres) | The Postgres driver |
 | [faker](https://github.com/togo-framework/faker) | Factories and seed data for tests |
 
+Read the case study: **[Hosbah on ToGO](https://to-go.dev/en/blog/hosbah-togo-case-study)**.
+
 Want the same foundation for your own app? Run `go install github.com/togo-framework/cli@latest && togo new myapp`,
 then read the [ToGO docs](https://to-go.dev/en/docs) and browse the [plugin marketplace](https://to-go.dev/marketplace).
 
