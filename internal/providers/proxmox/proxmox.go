@@ -287,6 +287,7 @@ func (d *Driver) createVM(ctx context.Context, node string, vmid int, name, temp
 		"memory":    {strconv.Itoa(size.MemoryMB)},
 		"ciuser":    {providers.GuestUser},
 		"ipconfig0": {netCfg},
+		"onboot":    {"1"}, // back after a host reboot
 	}
 	if keys := joinKeys(s.SSHPublicKeys); keys != "" {
 		// qemu-server declares sshkeys as "urlencoded" and runs uri_unescape over it, which decodes
@@ -350,6 +351,8 @@ func (d *Driver) createLXC(ctx context.Context, node string, vmid int, name, tem
 		"features":     {features},
 		"net0":         {"name=eth0,bridge=" + d.bridge + "," + netCfg},
 		"start":        {"1"},
+		// Back after a host reboot: a server Hosbah runs apps on must not wait for a hand start.
+		"onboot": {"1"},
 	}
 	if keys := joinKeys(s.SSHPublicKeys); keys != "" {
 		p.Set("ssh-public-keys", keys) // plain text here, unlike qemu's sshkeys

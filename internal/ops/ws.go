@@ -98,6 +98,8 @@ func (s *Service) handleWS(w http.ResponseWriter, r *http.Request) {
 			}
 		case agentproto.TypeTermData, agentproto.TypeTermClose:
 			s.routeTerminalFrame(ac, f)
+		case agentproto.TypeRoutes:
+			s.routesFrame(sctx, ac, f)
 		}
 	}
 }

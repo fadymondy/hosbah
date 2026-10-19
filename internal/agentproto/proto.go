@@ -61,6 +61,11 @@ const (
 	// it, or the agent reporting the process exited or the session was refused/timed out. TermReason
 	// is a short, human phrase — never anything the process printed.
 	TypeTermClose = "term_close"
+	// TypeRoutes (agent -> server, Routes only) reports upstreams the agent re-pointed on its own
+	// after the published host ports moved under it (a host, LXC or Docker restart; see
+	// internal/agent/reconcile.go), and WARNs about upstreams that stay unreachable. Control planes
+	// that predate it ignore it.
+	TypeRoutes = "routes"
 )
 
 // Operation kinds. Typed only: there is no free-form shell.
@@ -134,6 +139,7 @@ type Frame struct {
 	Metrics      *Metrics        `json:"metrics,omitempty"`
 	Traffic      []TrafficMinute `json:"traffic,omitempty"`
 	Resume       []ResumeEntry   `json:"resume,omitempty"`
+	Routes       []RouteReport   `json:"routes,omitempty"`
 	Error        string          `json:"error,omitempty"`
 	// SessionID, TermCols/TermRows, TermData (base64) and TermReason carry TypeTermData /
 	// TypeTermResize / TypeTermClose. Kept on Frame, not a sub-struct, so relaying one costs no
