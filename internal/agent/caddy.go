@@ -216,6 +216,13 @@ type proxyEntry struct {
 	// this host on that URL before the real upstream (Dial) is ever reached — see
 	// forwardAuthHandler. Used for a desktop browser's own hostname.
 	ForwardAuth string `json:"forward_auth,omitempty"`
+	// Container/ContainerPort: the container (and its port) that published Dial when reconcile last
+	// saw it answer, so the route follows it when a restart moves its host port (reconcile.go).
+	Container     string `json:"container,omitempty"`
+	ContainerPort int    `json:"container_port,omitempty"`
+	// Requested is the dial proxy.set asked for, when reconcile has since moved Dial: the control
+	// plane re-sending it means "the same upstream", not "back to the old port".
+	Requested string `json:"requested,omitempty"`
 }
 
 // forwardAuthHandler builds the reverse_proxy handler that gates a route on an auth URL (Hosbah's

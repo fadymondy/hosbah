@@ -26,7 +26,9 @@ func proxySet(oc *OpContext) (any, int, error) {
 			delete(t.Proxies, p.ProxyID)
 			return
 		}
-		t.Proxies[p.ProxyID] = proxyEntry{Host: agentproto.Route{Hostname: p.Hostname, TLS: p.TLS}, Dial: up.Dial, TLS: up.TLS, SkipVerify: p.SkipVerify, ForwardAuth: p.ForwardAuth}
+		e := proxyEntry{Host: agentproto.Route{Hostname: p.Hostname, TLS: p.TLS}, Dial: up.Dial, TLS: up.TLS, SkipVerify: p.SkipVerify, ForwardAuth: p.ForwardAuth}
+		keepFollowed(&e, t.Proxies[p.ProxyID])
+		t.Proxies[p.ProxyID] = e
 	})
 	if err != nil {
 		return nil, 1, err
@@ -37,4 +39,25 @@ func proxySet(oc *OpContext) (any, int, error) {
 	}
 	oc.Info("%s → %s (%s TLS at the edge)", p.Hostname, p.Upstream, p.TLS)
 	return map[string]any{"hostname": p.Hostname, "dial": up.Dial, "upstream_tls": up.TLS}, 0, nil
+}
+
+// keepFollowed keeps the container a proxy host follows (reconcile.go) when proxy.set re-sends the
+// dial it was created with: the control plane still knows the port from before a restart moved it.
+func keepFollowed(e *proxyEntry, prev proxyEntry) {
+	if prev.Container == "" {
+		return
+	}
+	asked := prev.Requested
+	if asked == "" {
+		asked = prev.Dial
+	}
+	if e.Dial != asked && e.Dial != prev.Dial {
+		return // a different upstream: learn it afresh
+	}
+	e.Container, e.ContainerPort = prev.Container, prev.ContainerPort
+	if e.Dial == prev.Dial {
+		e.Requested = prev.Requested
+	} else {
+		e.Requested, e.Dial = e.Dial, prev.Dial
+	}
 }

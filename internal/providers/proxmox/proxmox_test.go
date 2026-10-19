@@ -444,7 +444,7 @@ func TestCreateVMWireEncodingWithoutSnippets(t *testing.T) {
 		t.Fatal("no config call")
 	}
 	c := conf[0]
-	for k, v := range map[string]string{"cores": "2", "memory": "2048", "ciuser": "hosbah", "ipconfig0": "ip=dhcp", "net0": "virtio,bridge=vmbr1", "tags": "team-a;badtag"} {
+	for k, v := range map[string]string{"cores": "2", "memory": "2048", "ciuser": "hosbah", "ipconfig0": "ip=dhcp", "net0": "virtio,bridge=vmbr1", "tags": "team-a;badtag", "onboot": "1"} {
 		if got := c.Form.Get(k); got != v {
 			t.Errorf("config %s = %q, want %q", k, got, v)
 		}
@@ -554,6 +554,7 @@ func TestCreateLXC(t *testing.T) {
 		"rootfs": "local-lvm:40", "cores": "4", "memory": "3000", "swap": "512", "unprivileged": "1",
 		"features": "nesting=1,keyctl=1", "net0": "name=eth0,bridge=vmbr0,ip=10.10.10.61/24,gw=10.10.10.1",
 		"ssh-public-keys": "ssh-ed25519 AAAA+/= one\nssh-ed25519 BBBB two", "pool": "hosbah", "start": "1",
+		"onboot": "1",
 	}
 	for k, v := range want {
 		if got := cr[0].Form.Get(k); got != v {

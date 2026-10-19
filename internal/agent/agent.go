@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -41,6 +42,11 @@ type Agent struct {
 	// termOut carries terminal.open sessions' term.data/term.close frames straight to the wire —
 	// never journalled, never replayed: a session a reconnect interrupts is simply over.
 	termOut chan agentproto.Frame
+	// routes queues route reports (reconcile.go) for whichever connection is up; routesKick wakes
+	// the writer. A report a disconnect drops is covered by the next session's snapshot.
+	routesMu   sync.Mutex
+	routes     []agentproto.RouteReport
+	routesKick chan struct{}
 }
 
 // New builds an agent from its enrolled state.
@@ -56,13 +62,14 @@ func New(st *State, version string, log *slog.Logger) (*Agent, error) {
 		State: st, Version: version, Log: log, HeartbeatEvery: 15 * time.Second, MetricsEvery: 5 * time.Second,
 		TrafficPollEvery: 20 * time.Second,
 		priv:             priv, sampler: NewSampler(), traffic: newTrafficCollector(), live: make(chan agentproto.Event, 4096),
-		termOut: make(chan agentproto.Frame, 256),
+		termOut: make(chan agentproto.Frame, 256), routesKick: make(chan struct{}, 1),
 	}
 	a.Exec = NewExecutor(st.ServerID, cpPub, version, st.ControlPlane)
 	a.Exec.SetKey(priv)
 	a.Exec.emit = a.enqueue
 	a.Exec.termSend = a.enqueueTerm
 	a.Exec.Restart = a.restart
+	reportRoutes = a.enqueueRoutes
 	return a, nil
 }
 
@@ -73,6 +80,44 @@ func (a *Agent) enqueue(ev agentproto.Event) {
 		// Full (a long disconnect with a chatty operation): the journal still holds the event and
 		// the next resume replays it.
 	}
+}
+
+// enqueueRoutes queues route reports for the control plane, keeping the newest MaxRouteReports.
+func (a *Agent) enqueueRoutes(rs []agentproto.RouteReport) {
+	a.routesMu.Lock()
+	a.routes = append(a.routes, rs...)
+	if n := len(a.routes) - agentproto.MaxRouteReports; n > 0 {
+		a.routes = append([]agentproto.RouteReport(nil), a.routes[n:]...)
+	}
+	a.routesMu.Unlock()
+	select {
+	case a.routesKick <- struct{}{}:
+	default:
+	}
+}
+
+func (a *Agent) takeRoutes() []agentproto.RouteReport {
+	a.routesMu.Lock()
+	defer a.routesMu.Unlock()
+	rs := a.routes
+	a.routes = nil
+	return rs
+}
+
+// routeSnapshotReports is the current table as reports (nil when Docker or routes.json cannot be
+// read), so the control plane converges on the ports in use after any report it missed.
+func routeSnapshotReports(ctx context.Context) []agentproto.RouteReport {
+	cs, err := listRunning(ctx, appDocker)
+	if err != nil {
+		return nil
+	}
+	routesMu.Lock()
+	t, err := loadRoutes()
+	routesMu.Unlock()
+	if err != nil {
+		return nil
+	}
+	return routeSnapshot(t, indexRunning(cs))
 }
 
 // enqueueTerm hands a term.* frame to whichever connection is up. Unlike enqueue, there is no
@@ -90,6 +135,8 @@ func (a *Agent) enqueueTerm(f agentproto.Frame) {
 // running while disconnected; their events are replayed on reconnect.
 func (a *Agent) Run(ctx context.Context) error {
 	go a.Exec.Work(ctx)
+	// Routes follow containers whose published port a restart moved (MH-1331).
+	go newReconciler(a.Log, a.enqueueRoutes).Run(ctx)
 	go func() { // the token gateways of this server's browsers come back with the agent
 		for _, err := range a.Exec.browsers.Restore(ctx) {
 			a.Log.Warn("a browser's gateway did not come back", "error", err)
@@ -229,6 +276,20 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 	if err := heartbeat(); err != nil {
 		return err
 	}
+	sendRoutes := func(rs []agentproto.RouteReport) error {
+		for len(rs) > 0 {
+			n := min(len(rs), agentproto.MaxRouteReports)
+			if err := send(agentproto.Frame{Type: agentproto.TypeRoutes, Routes: rs[:n]}); err != nil {
+				a.enqueueRoutes(rs) // the next session sends them
+				return err
+			}
+			rs = rs[n:]
+		}
+		return nil
+	}
+	if err := sendRoutes(append(routeSnapshotReports(ctx), a.takeRoutes()...)); err != nil {
+		return err
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -253,6 +314,10 @@ func (a *Agent) writer(ctx context.Context, conn *websocket.Conn) error {
 		case ev := <-a.live:
 			if err := send(agentproto.Frame{Type: agentproto.TypeEvent, Event: &ev}); err != nil {
 				return err // the event is in the journal; the resume after reconnecting replays it
+			}
+		case <-a.routesKick:
+			if err := sendRoutes(a.takeRoutes()); err != nil {
+				return err
 			}
 		case f := <-a.termOut:
 			if err := send(f); err != nil {

@@ -1033,6 +1033,8 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 			return 2, err
 		}
 	}
+	// The control plane's host_port can be from before a restart moved the port (MH-1331).
+	moved := correctUpstream(oc, &p)
 	err := applyRoutes(oc, func(t *routeTable) {
 		if p.Upstream == "" {
 			delete(t.Apps, p.AppID)
@@ -1044,6 +1046,9 @@ func setRoute(oc *OpContext, p agentproto.RouteParams, probePath string) (int, e
 	})
 	if err != nil {
 		return 1, err
+	}
+	if moved != nil {
+		sendRouteReports([]agentproto.RouteReport{*moved})
 	}
 	if p.Upstream == "" {
 		oc.Info("route removed")
