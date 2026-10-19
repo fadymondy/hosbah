@@ -512,7 +512,7 @@ func (r *reconciler) watchDocker(ctx context.Context) {
 		if r.now().Sub(started) > time.Minute {
 			backoff = reconcileRetry
 		}
-		r.log.Debug("docker event stream ended", "err", err)
+		r.log.Warn("docker event stream ended; reconnecting", "err", err, "retry_in", backoff)
 		if !sleepCtx(ctx, backoff) {
 			return
 		}
@@ -525,7 +525,11 @@ func (r *reconciler) watchDocker(ctx context.Context) {
 
 // dockerStartEvents follows `docker events` for container starts until it ends.
 func dockerStartEvents(ctx context.Context, onStart func()) error {
-	cmd := exec.CommandContext(ctx, "docker", "events", "--filter", "type=container", "--filter", "event=start", "--format", "{{.ID}}") //#nosec G204 -- constant args
+	// No --format: the default output is one line per event, and the fields a template may name
+	// differ between Docker versions (Docker 29 has no .ID: the stream would end at once).
+	cmd := exec.CommandContext(ctx, "docker", "events", "--filter", "type=container", "--filter", "event=start") //#nosec G204 -- constant args
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -537,7 +541,10 @@ func dockerStartEvents(ctx context.Context, onStart func()) error {
 	for sc.Scan() {
 		onStart()
 	}
-	return errors.Join(sc.Err(), cmd.Wait())
+	if err := errors.Join(sc.Err(), cmd.Wait()); err != nil {
+		return fmt.Errorf("docker events: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return nil
 }
 
 // healthTarget is one loopback upstream the health loop dials.
