@@ -581,6 +581,9 @@ func TestCircleXOLandingTeam(t *testing.T) {
 	}
 }
 
+// Hosbah is free and open source (2026-10-15): the hub's plan no longer decides a team's limits. A
+// linked team keeps the platform admin's quotas (unlimited by default) whatever the hub says: a tight
+// plan, a hub outage, or no entitlements at all.
 func TestCircleXOEntitlements(t *testing.T) {
 	s := bootHub(t)
 	org := hubOrg()
@@ -591,17 +594,6 @@ func TestCircleXOEntitlements(t *testing.T) {
 	team, _ := s.teamOf(org)
 	ctx := context.Background()
 	lim := func(n int64) *int64 { return &n }
-	setEnts := func(servers *int64, members *int64) {
-		s.hub.Lock()
-		s.hub.Entitlements[org] = circlexo.Entitlements{OrgID: org, AppID: testHubApp, Active: true, Plan: "pro", Status: "active", Version: 2, Features: []circlexo.Entitlement{
-			{Key: "servers", Kind: "limit", Enabled: true, Limit: servers},
-			{Key: "apps", Kind: "limit", Enabled: true},
-			{Key: "data_services", Kind: "limit", Enabled: true},
-			{Key: "members", Kind: "limit", Enabled: true, Limit: members},
-		}}
-		s.hub.Unlock()
-		s.svc.Ents.Invalidate(org, 0)
-	}
 	get := func(id string) quota.Quota {
 		t.Helper()
 		var q quota.Quota
@@ -612,82 +604,39 @@ func TestCircleXOEntitlements(t *testing.T) {
 		})
 		return q
 	}
-	checkMembers := func() error {
+	free := func(what string) {
+		t.Helper()
+		q := get(team)
+		if q.Hub || q.ReadOnly || q.MaxServers != nil || q.MaxApps != nil || q.MaxDataServices != nil || q.MaxMembers != nil {
+			t.Fatalf("%s: the hub must not limit the team: %+v", what, q)
+		}
 		var err error
 		s.inTeam(team, func(qq *db.Queries, _ *sql.Tx) error { err = quota.CheckMembers(ctx, qq, team); return nil })
-		return err
+		if err != nil {
+			t.Fatalf("%s: adding a member was refused: %v", what, err)
+		}
 	}
 
-	// A team with no link is untouched.
-	_, email := s.signup("plain")
-	c := newClient(t, s.base)
-	c.login(email)
-	var created struct{ ID string }
-	c.mustJSON("POST", "/api/teams", map[string]any{"name": "Plain " + rnd()}, 201, &created)
-	if q := get(created.ID); q.Hub || q.ReadOnly || q.MaxMembers != nil {
-		t.Fatalf("an unlinked team must not be hub governed: %+v", q)
-	}
-
-	setEnts(lim(3), lim(1))
-	q := get(team)
-	if !q.Hub || q.ReadOnly || q.MaxServers == nil || *q.MaxServers != 3 || q.MaxApps != nil {
-		t.Fatalf("expected hub limits: %+v", q)
-	}
-	if err := checkMembers(); err == nil {
-		t.Fatal("a member cap of 1 with one member must refuse another")
-	}
-	setEnts(lim(3), lim(5))
-	if err := checkMembers(); err != nil {
-		t.Fatalf("a cap of 5 refused: %v", err)
-	}
-
-	// entitlement.changed invalidates the cache.
 	s.hub.Lock()
-	ent := s.hub.Entitlements[org]
-	ent.Features[0].Limit = lim(7)
-	ent.Version = 3
-	s.hub.Entitlements[org] = ent
+	s.hub.Entitlements[org] = circlexo.Entitlements{OrgID: org, AppID: testHubApp, Active: true, Plan: "pro", Status: "active", Version: 2, Features: []circlexo.Entitlement{
+		{Key: "servers", Kind: "limit", Enabled: true, Limit: lim(0)},
+		{Key: "members", Kind: "limit", Enabled: true, Limit: lim(1)},
+	}}
 	s.hub.Unlock()
-	if q := get(team); *q.MaxServers != 3 {
-		t.Fatal("expected the cached answer before the event")
-	}
-	s.event(webhooks.EntitlementChanged, org, map[string]any{"version": 3, "reason": "plan_changed"}, "en-"+rnd())
-	if q := get(team); *q.MaxServers != 7 {
-		t.Fatalf("entitlement.changed did not invalidate: %d", *q.MaxServers)
-	}
-
-	// Hub down, inside the grace window: the last answer stands but the team is read-only.
-	if _, err := s.svc.Ents.Get(ctx, org, 0); err != nil {
-		t.Fatal(err)
-	}
 	s.svc.Ents.Invalidate(org, 0)
+	free("a plan with 0 servers and 1 member")
+
 	s.hub.Lock()
 	s.hub.Fail = http.StatusInternalServerError
 	s.hub.Unlock()
-	if q := get(team); !q.Hub || !q.ReadOnly {
-		t.Fatalf("expected read-only after a hub outage: %+v", q)
-	}
-	if err := checkMembers(); err == nil {
-		t.Fatal("read-only must refuse adding members")
-	}
+	s.svc.Ents.Invalidate(org, 0)
+	free("hub down")
 	s.hub.Lock()
 	s.hub.Fail = 0
-	s.hub.Unlock()
-
-	// An org the hub has no entitlements for fails closed.
-	s.hub.Lock()
 	delete(s.hub.Entitlements, org)
 	s.hub.Unlock()
 	s.svc.Ents.Invalidate(org, 0)
-	if q := get(team); !q.ReadOnly || q.MaxServers == nil || *q.MaxServers != 0 {
-		t.Fatalf("no entitlements must fail closed: %+v", q)
-	}
-
-	// Deprovisioned: back to the platform admin's own limits.
-	s.event(webhooks.AppRemoved, org, map[string]any{}, "rm-"+rnd())
-	if q := get(team); q.Hub || q.ReadOnly {
-		t.Fatalf("after deprovision the team must be a plain one: %+v", q)
-	}
+	free("no entitlements")
 }
 
 func TestCircleXOSessionRevoked(t *testing.T) {
