@@ -82,7 +82,7 @@ type DeploymentOut struct {
 	CommitMessage   *string    `json:"commit_message"`
 	Trigger         string     `json:"trigger" enum:"manual,hook,mcp,github"`
 	Kind            string     `json:"kind" enum:"deploy,rollback,restart"`
-	Status          string     `json:"status" enum:"queued,running,succeeded,failed,cancelled"`
+	Status          string     `json:"status" enum:"queued,running,succeeded,failed,cancelled,skipped" doc:"skipped: a push whose changed paths the app's [build] rules say do not change the image; error says why."`
 	Track           *string    `json:"track" enum:"fast,full" doc:"Whether this run took the fast (in-place) or full (rebuild) path. Null for rollback and restart."`
 	TrackReason     *string    `json:"track_reason" doc:"Why this track was chosen."`
 	Step            *string    `json:"step"`
@@ -95,6 +95,9 @@ type DeploymentOut struct {
 	CreatedAt       time.Time  `json:"created_at"`
 	StartedAt       *time.Time `json:"started_at"`
 	FinishedAt      *time.Time `json:"finished_at"`
+	NotBefore       *time.Time `json:"not_before" doc:"A queued deploy from a push waits until then for more pushes (build debounce); null = it starts as soon as the app is free."`
+	QueuedSince     *time.Time `json:"queued_since" doc:"When the first of the pushes this deploy coalesces arrived."`
+	Coalesced       int32      `json:"coalesced" doc:"How many earlier waiting requests this deploy replaced: they all build as this one, at the newest commit."`
 }
 
 // ReleaseOut is an image that took traffic.
@@ -198,7 +201,7 @@ func toDeploymentOut(d db.Deployment) DeploymentOut {
 	return DeploymentOut{ID: d.ID, AppID: d.AppID, Number: d.Number, Ref: d.Ref, CommitSHA: d.CommitSha, CommitMessage: d.CommitMessage,
 		Trigger: d.Trigger, Kind: d.Kind, Status: d.Status, Track: d.Track, TrackReason: d.TrackReason, Step: d.Step, Image: d.Image, Runtime: d.Runtime, Error: d.Error,
 		ReleaseID: d.ReleaseID, TargetReleaseID: d.TargetReleaseID, CancelRequested: d.CancelRequested, CreatedAt: d.CreatedAt,
-		StartedAt: d.StartedAt, FinishedAt: d.FinishedAt}
+		StartedAt: d.StartedAt, FinishedAt: d.FinishedAt, NotBefore: d.NotBefore, QueuedSince: d.QueuedSince, Coalesced: d.Coalesced}
 }
 
 func toReleaseOut(r db.Release) ReleaseOut {

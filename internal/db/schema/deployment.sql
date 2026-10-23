@@ -25,18 +25,25 @@ CREATE TABLE deployments (
     finished_at timestamptz,
     last_seq bigint NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    not_before timestamptz,
+    queued_since timestamptz,
+    coalesced integer NOT NULL DEFAULT 0
 );
 
 -- Hosbah: one run of the pipeline. At most one runs and at most one waits per app (a newer
 -- request supersedes the waiting one). last_seq allocates deployment_logs.seq under the row lock.
 -- kind rollback/restart skip the build and start target_release_id / the live release's image.
-ALTER TABLE deployments ADD CONSTRAINT deployments_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'));
+ALTER TABLE deployments ADD CONSTRAINT deployments_status_check CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'skipped'));
 -- kind adopt: an imported app taken over in place, pointing release #0 at the already-running
 -- image (a container) or, for a guest/unit, recorded with no release at all — see internal/deploy/adopt.go.
 ALTER TABLE deployments ADD CONSTRAINT deployments_kind_check CHECK (kind IN ('deploy', 'rollback', 'restart', 'adopt'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_trigger_check CHECK (trigger IN ('manual', 'hook', 'mcp', 'github'));
 ALTER TABLE deployments ADD CONSTRAINT deployments_track_check CHECK (track IS NULL OR track IN ('fast', 'full'));
+-- Build debounce (internal/deploy/buildrules.go): an automatic deploy is not claimed before
+-- not_before (NULL = at once); queued_since is when the first push it coalesces arrived (the max-wait
+-- clock) and coalesced how many waiting requests it replaced. A push that touched only paths the
+-- app's [build] rules ignore is recorded 'skipped', already finished, with the reason in error.
 CREATE UNIQUE INDEX deployments_app_number_key ON deployments (app_id, number);
 CREATE UNIQUE INDEX deployments_id_team_key ON deployments (id, team_id);
 CREATE UNIQUE INDEX deployments_one_running ON deployments (app_id) WHERE status = 'running';

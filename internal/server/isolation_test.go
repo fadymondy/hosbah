@@ -957,6 +957,8 @@ func bootTestServer(t *testing.T) (*httptest.Server, func()) {
 	}
 	t.Setenv("DATABASE_URL", os.Getenv("TEST_DATABASE_URL"))
 	t.Setenv("APP_ENV", "development")
+	// Pushes in these tests deploy at once; the build debounce has its own test (internal/deploy).
+	t.Setenv("HOSBAH_BUILD_DEBOUNCE", "0")
 	mailSender = mailbox.send
 	a := Boot()
 	if err := a.Kernel.Boot(context.Background()); err != nil {

@@ -34,6 +34,11 @@ hosbah.toml — optional, at the repository root. Everything in it is optional t
 	memory = "256M"
 	cpus = 0.1
 
+	[build]                             # which pushes build, and how long they wait (buildrules.go)
+	watch = ["src/**", "package.json"]  # only these paths build (unset = every path)
+	ignore = ["docs/**", "*.md"]        # never these
+	debounce = 90                       # seconds a pushed deploy waits for more pushes (default 75)
+
 Precedence: what the repository says wins (config as code); the app's settings in Hosbah are the
 defaults when it says nothing. Unknown keys are an error, so a typo does not silently do nothing.
 [resources] itself follows the same rule: any key it sets (memory, cpus, or a process override)
@@ -71,6 +76,7 @@ type AppConfig struct {
 	} `toml:"healthcheck"`
 	Processes map[string]string `toml:"processes"`
 	Resources ResourcesConfig   `toml:"resources"`
+	Build     BuildRules        `toml:"build"`
 }
 
 // ResourcesConfig is hosbah.toml's [resources] (and each [resources.processes."<name>"]): memory and
@@ -145,6 +151,9 @@ func ParseConfigFile(raw, file string) (AppConfig, error) {
 	}
 	if len(c.Release) > 4096 {
 		return c, errors.New(file + ": the release command is too long")
+	}
+	if err := c.Build.Check(file); err != nil {
+		return c, err
 	}
 	if err := checkResources(file, "resources", c.Resources); err != nil {
 		return c, err

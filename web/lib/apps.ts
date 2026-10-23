@@ -5,7 +5,7 @@ import type { LogLine as OpLogLine } from "@/lib/servers"
 /** Contract types for apps, deployments, releases, env, domains (internal/api apps.go). */
 
 export type AppStatus = "new" | "deploying" | "running" | "failed" | "stopped"
-export type DeploymentStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled"
+export type DeploymentStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "skipped"
 export type DeploymentKind = "deploy" | "rollback" | "restart"
 export type DeploymentTrigger = "manual" | "hook" | "mcp" | "github"
 export type DeploymentStep = "provision" | "build" | "release" | "start" | "switch" | "drain" | "rollback" | "restart"
@@ -28,6 +28,11 @@ export type Deployment = {
   image: string | null
   runtime: string | null
   error: string | null
+  /** A queued deploy from a push waits until then for more pushes (build debounce). */
+  not_before?: string | null
+  queued_since?: string | null
+  /** How many earlier waiting requests this deploy replaced (they all build as this one). */
+  coalesced?: number
   release_id: string | null
   target_release_id: string | null
   cancel_requested: boolean

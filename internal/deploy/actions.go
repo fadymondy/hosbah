@@ -317,7 +317,10 @@ func (s *Service) DeleteApp(ctx context.Context, q *db.Queries, teamID string, a
 // ---- deployments -------------------------------------------------------------------------------------
 
 // QueueDeployment asks for a deploy, rollback or restart. A deployment still waiting for the same
-// app is superseded (the newest request wins); a running one finishes first.
+// app is superseded (the newest request wins, and counts the ones it replaced); a running one
+// finishes first. A deploy from a push (github, hook) is held until not_before — the build debounce,
+// buildrules.go — so a burst of pushes coalesces into one build of the newest commit; one a person
+// starts runs as soon as the app is free.
 //
 // trackOverride is the caller's explicit choice for a "deploy" kind — "", "auto", "fast" or
 // "full". "" and "auto" defer to the app's saved deploy configuration (app_deploy_configs.mode)
@@ -337,9 +340,30 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 	if kind == "deploy" && !agentproto.ValidRef(ref) {
 		return db.Deployment{}, invalid("that is not a valid branch, tag or commit")
 	}
+	// Coalescing: this request takes the waiting one's place, keeping when the first of them arrived
+	// (the max-wait clock) and how many it now stands for.
+	var since time.Time
+	coalesced := int32(0)
+	if w, err := q.QueuedDeploymentOfApp(ctx, db.QueuedDeploymentOfAppParams{AppID: a.ID, TeamID: teamID}); err == nil {
+		since, coalesced = w.CreatedAt, w.Coalesced+1
+		if w.QueuedSince != nil {
+			since = *w.QueuedSince
+		}
+	}
 	superseded, err := q.SupersedeQueuedDeployments(ctx, db.SupersedeQueuedDeploymentsParams{AppID: a.ID, TeamID: teamID})
 	if err != nil {
 		return db.Deployment{}, err
+	}
+	var notBefore, queuedSince *time.Time
+	if kind == "deploy" && automatic(actor) {
+		now := time.Now().UTC()
+		if at := NotBefore(now, since, s.debounce.For(ParseBuildRules(a.BuildRules)), s.debounce.MaxWait); !at.IsZero() {
+			notBefore = &at
+			if since.IsZero() {
+				since = now
+			}
+			queuedSince = &since
+		}
 	}
 	createdBy := actor.UserID
 	if createdBy == "" {
@@ -351,7 +375,8 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 		track, trackReason = &t, &reason
 	}
 	d, err := q.InsertDeployment(ctx, db.InsertDeploymentParams{ID: newUUID(), TeamID: teamID, AppID: a.ID, ServerID: a.ServerID,
-		Ref: ref, Trigger: actor.trigger(), Kind: kind, TargetReleaseID: target, CreatedBy: createdBy, Track: track, TrackReason: trackReason})
+		Ref: ref, Trigger: actor.trigger(), Kind: kind, TargetReleaseID: target, CreatedBy: createdBy, Track: track, TrackReason: trackReason,
+		NotBefore: notBefore, QueuedSince: queuedSince, Coalesced: coalesced})
 	if err != nil {
 		return db.Deployment{}, err
 	}
@@ -362,6 +387,9 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 	if track != nil {
 		extra["track"] = *track
 	}
+	if notBefore != nil {
+		extra["not_before"] = notBefore.Format(time.RFC3339)
+	}
 	if err := tenancy.Record(ctx, q, teamID, createdBy, "deployment.queued", "deployment", d.ID, actor.audit(extra)); err != nil {
 		return db.Deployment{}, err
 	}
@@ -369,6 +397,50 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 	s.ops.Broker().Publish(ops.AppTopic(a.ID))
 	return d, nil
 }
+
+// SkipPush decides whether an automatic deploy of a push can be skipped: the app's [build] rules
+// find no path that changes the image, and the app is not behind a failed or cancelled build (that
+// one is retried with the newest commit). The reason is what the skipped deployment records.
+func SkipPush(ctx context.Context, q *db.Queries, teamID string, a db.App, push PushPayload) (bool, string) {
+	changed, known := push.Changed()
+	build, reason := ParseBuildRules(a.BuildRules).Decide(changed, known)
+	if build {
+		return false, reason
+	}
+	switch st, err := q.LatestDeployStatus(ctx, db.LatestDeployStatusParams{AppID: a.ID, TeamID: teamID}); {
+	case err != nil:
+		return false, "no previous deployment"
+	case st == "failed" || st == "cancelled":
+		return false, "the last deployment " + st
+	}
+	return true, reason
+}
+
+// RecordSkipped records a push that needed no build as a finished, skipped deployment, so the app's
+// history shows it and why ("no image changes (docs/x.md)").
+func (s *Service) RecordSkipped(ctx context.Context, q *db.Queries, teamID string, actor Actor, a db.App, push PushPayload, reason string) (db.Deployment, error) {
+	sha, msg := push.Head()
+	createdBy := actor.UserID
+	if createdBy == "" {
+		createdBy = actor.Via
+	}
+	d, err := q.InsertSkippedDeployment(ctx, db.InsertSkippedDeploymentParams{ID: newUUID(), TeamID: teamID, AppID: a.ID, ServerID: a.ServerID,
+		Ref: BranchOf(a), CommitSha: nonEmpty(sha), CommitMessage: nonEmpty(clip(msg, 500)), Trigger: actor.trigger(),
+		Reason: ptr("skipped: " + reason), CreatedBy: createdBy})
+	if err != nil {
+		return db.Deployment{}, err
+	}
+	if err := tenancy.Record(ctx, q, teamID, createdBy, "deployment.skipped", "deployment", d.ID,
+		actor.audit(map[string]any{"app": a.Name, "number": d.Number, "reason": reason})); err != nil {
+		return db.Deployment{}, err
+	}
+	s.ops.Broker().Publish(ops.AppTopic(a.ID))
+	return d, nil
+}
+
+// automatic reports whether a deploy came from a push (the GitHub App or an app's deploy hook) and
+// so waits out the debounce; one a person asked for starts at once.
+func automatic(actor Actor) bool { return actor.Via == "github" || actor.Via == "hook" }
 
 // chooseTrack resolves a "deploy" kind's track: an explicit fast/full override is stored as
 // asked; "" and "auto" fall back to the app's saved deploy configuration mode (default "auto")

@@ -91,8 +91,8 @@ HOSBAH_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='hosbah@pve!ctl' PVE
   `hosbah/<app>:<deployment_id>`; the newest 5 are kept, so a rollback needs no rebuild (images built before
   the rename, `cloudy/<app>`, count among them and roll back like any other).
 - **`hosbah.toml`** (optional, repository root; a repository that still has the pre-rename `cloudy.toml` is read the
-  same way when it has no `hosbah.toml`) sets `port`, `release`, `[healthcheck]` and
-  `[processes]`, and wins over the app's settings in Hosbah. Examples: `deploy/samples/*`.
+  same way when it has no `hosbah.toml`) sets `port`, `release`, `[healthcheck]`,
+  `[processes]`, `[resources]` and `[build]`, and wins over the app's settings in Hosbah. Examples: `deploy/samples/*`.
 - **Zero-downtime pipeline**: provision → build → release (a one-off container) → start `web` on an
   ephemeral `127.0.0.1` port → **health gate** (2xx within N seconds) → start workers → switch the
   Caddy upstream → drain the old containers. Any failure before the switch leaves the previous
@@ -112,6 +112,17 @@ HOSBAH_PROXMOX_LIVE=1 PVE_URL=https://pve:8006 PVE_TOKEN_ID='hosbah@pve!ctl' PVE
 - **Logs**: an agent's events for a deployment are sealed into `deployment_logs` and streamed to the
   browser over team-scoped SSE. Runtime logs are relayed on demand (`docker logs --follow`, bounded
   in lines and time).
+- **Build queue** (`internal/deploy/buildrules.go`): one deployment runs per app and one waits (a
+  newer request supersedes the waiting one and builds the branch head when it starts), and the agent
+  builds one image per server at a time. Pushes (GitHub App, deploy hook) also wait out a **debounce**
+  (`HOSBAH_BUILD_DEBOUNCE`, default 75 s, or `[build] debounce` in `hosbah.toml`) so a burst of
+  merges builds once; a steady stream still builds every `HOSBAH_BUILD_MAX_WAIT` (default 600 s). A
+  deploy someone starts by hand never waits. `[build] watch` / `ignore` (gitignore-like patterns) skip
+  a push whose changed paths cannot change the image: it is recorded as a `skipped` deployment, unless
+  the app is behind a failed build. The rules come from the last build's `hosbah.toml`, so an edit to
+  them builds and applies from the next push. Builds run with low CPU and IO weight and at most
+  `HOSBAH_BUILD_CPU_SHARE` (default 0.5) of the server's CPUs, so the apps it serves keep headroom
+  (`internal/agent/buildcap.go`); `1` turns the cap off.
 - **Deploy hook**: `POST /hooks/deploy/<token>` — only the token's SHA-256 is stored, and it is shown
   once (rotate it in Settings). A push payload for another branch is acknowledged and skipped; an app
   with auto-deploy paused answers 409.

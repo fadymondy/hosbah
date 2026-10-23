@@ -31,7 +31,8 @@ CREATE TABLE apps (
     connected_server_id text,
     created_by text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    build_rules jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
 -- Hosbah: an app runs on one server of its team. name is a DNS-label-like slug because it becomes
@@ -82,3 +83,8 @@ ALTER TABLE apps ADD CONSTRAINT apps_resources_cpus_check CHECK (resources_cpus 
 -- its own agent — so the UI can show "Connected as server X". Only ever set on a guest; cleared
 -- (SET NULL) if that server is later removed. Never set on a git app.
 CREATE INDEX apps_connected_server_idx ON apps (connected_server_id) WHERE connected_server_id IS NOT NULL;
+
+-- build_rules: hosbah.toml's [build] (watch / ignore path patterns, debounce seconds) as the last
+-- build read it, so a push can be skipped or debounced before anything is checked out
+-- (internal/deploy/buildrules.go). '{}' = build every push with the platform debounce.
+ALTER TABLE apps ADD CONSTRAINT apps_build_rules_check CHECK (jsonb_typeof(build_rules) = 'object' AND octet_length(build_rules::text) <= 65536);

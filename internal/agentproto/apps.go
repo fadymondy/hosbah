@@ -139,6 +139,10 @@ type BuildParams struct {
 	// passes each name as `--build-arg NAME`, the value only ever reaching docker through its own
 	// process environment — never an argv, never a log. "" when the app exposes none at build time.
 	Env string `json:"env,omitempty"`
+	// CPUShare is the part of the server's CPUs this build may use (0.1 .. 1; 0 = the agent's
+	// default, 1 = no cap): the build's containers run in a CPU- and IO-capped cgroup so the apps the
+	// server is serving keep the rest (internal/agent/buildcap.go). An older agent ignores it.
+	CPUShare float64 `json:"cpu_share,omitempty"`
 }
 
 type BuildResult struct {
@@ -232,6 +236,10 @@ type FastBuildParams struct {
 	// exported to every step (install, build, migrate) — not the release env, which app.release
 	// still seals and opens on its own.
 	Env string `json:"env,omitempty"`
+	// CPUShare is the part of the server's CPUs this build may use (0.1 .. 1; 0 = the agent's
+	// default, 1 = no cap): the build's containers run in a CPU- and IO-capped cgroup so the apps the
+	// server is serving keep the rest (internal/agent/buildcap.go). An older agent ignores it.
+	CPUShare float64 `json:"cpu_share,omitempty"`
 }
 
 // FastBuildResult reports what changed since the cached checkout's previous build, and either the

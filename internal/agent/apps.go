@@ -479,6 +479,8 @@ func appBuild(oc *OpContext) (any, int, error) {
 		return nil, 1, err
 	}
 	defer release()
+	bc := startBuildCap(oc, p.CPUShare)
+	defer bc.Stop(oc)
 	work := filepath.Join(workRoot, "builds", p.DeploymentID)
 	defer os.RemoveAll(work)
 	src := filepath.Join(work, "src")

@@ -81,6 +81,10 @@ SELECT * FROM apps WHERE deploy_hook_hash = $1;
 -- name: AppByID :one
 SELECT * FROM apps WHERE id = $1;
 
+-- name: SetAppBuildRules :exec
+-- hosbah.toml's [build] as the deploy that just built read it (internal/deploy/buildrules.go).
+UPDATE apps SET build_rules = sqlc.arg('build_rules')::jsonb WHERE id = sqlc.arg('id') AND build_rules <> sqlc.arg('build_rules')::jsonb;
+
 -- name: SetAppState :exec
 UPDATE apps SET status = sqlc.arg('status'), runtime = coalesce(sqlc.narg('runtime'), runtime),
     current_release_id = coalesce(sqlc.narg('current_release_id'), current_release_id), updated_at = now()

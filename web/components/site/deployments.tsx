@@ -267,6 +267,7 @@ export function SiteDeployments() {
                             <span>{t(`apps.deploy.triggers.${d.trigger}`, undefined, d.trigger)}</span>
                             <span title={new Date(d.created_at).toLocaleString(locale)}>{ago(d.created_at)}</span>
                           </span>
+                          <QueueNote d={d} />
                         </span>
                         <ChevronDownIcon aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
                       </button>
@@ -324,5 +325,21 @@ function CancelButton({ path, onError }: { path: string; onError: (m: string | n
       <SquareIcon />
       {t("apps.deploy.cancel")}
     </Button>
+  )
+}
+
+/** Build-queue state: a push waiting out the debounce, the pushes it coalesces, or why one was skipped. */
+function QueueNote({ d }: { d: Deployment }) {
+  const { t, locale } = useI18n()
+  const notes: string[] = []
+  if (d.status === "queued" && d.not_before && new Date(d.not_before).getTime() > Date.now())
+    notes.push(t("apps.deploy.waiting", { time: new Date(d.not_before).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }) }))
+  if ((d.coalesced ?? 0) > 0) notes.push(t("apps.deploy.coalesced", { count: d.coalesced ?? 0 }))
+  if (d.status === "skipped") notes.push(t("apps.deploy.skippedWhy", { reason: (d.error ?? "").replace(/^skipped: /, "") }))
+  if (!notes.length) return null
+  return (
+    <span dir="auto" className="text-caption text-muted-foreground">
+      {notes.join(" · ")}
+    </span>
   )
 }

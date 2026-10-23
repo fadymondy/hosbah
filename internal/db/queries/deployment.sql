@@ -15,12 +15,32 @@ DELETE FROM deployments WHERE id = $1;
 
 -- Hosbah tenant queries.
 -- name: InsertDeployment :one
-INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, target_release_id, created_by, track, track_reason)
+INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, trigger, kind, status, target_release_id, created_by, track, track_reason,
+    not_before, queued_since, coalesced)
 VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('server_id'),
     (SELECT coalesce(max(d.number), 0) + 1 FROM deployments d WHERE d.app_id = sqlc.arg('app_id')),
     sqlc.arg('ref'), sqlc.arg('trigger'), sqlc.arg('kind'), 'queued', sqlc.narg('target_release_id'), sqlc.arg('created_by'),
-    sqlc.narg('track'), sqlc.narg('track_reason'))
+    sqlc.narg('track'), sqlc.narg('track_reason'), sqlc.narg('not_before'), sqlc.narg('queued_since'), sqlc.arg('coalesced'))
 RETURNING *;
+
+-- name: InsertSkippedDeployment :one
+-- A push the app's [build] rules say needs no build: recorded, already finished, nothing runs.
+INSERT INTO deployments (id, team_id, app_id, server_id, number, ref, commit_sha, commit_message, trigger, kind, status, error, created_by, started_at, finished_at)
+VALUES (sqlc.arg('id'), sqlc.arg('team_id'), sqlc.arg('app_id'), sqlc.arg('server_id'),
+    (SELECT coalesce(max(d.number), 0) + 1 FROM deployments d WHERE d.app_id = sqlc.arg('app_id')),
+    sqlc.arg('ref'), sqlc.narg('commit_sha'), sqlc.narg('commit_message'), sqlc.arg('trigger'), 'deploy', 'skipped', sqlc.arg('reason'),
+    sqlc.arg('created_by'), now(), now())
+RETURNING *;
+
+-- name: QueuedDeploymentOfApp :one
+-- The deployment waiting for an app, if any: a new request coalesces it (its queued_since and count).
+SELECT * FROM deployments WHERE app_id = $1 AND team_id = $2 AND status = 'queued' LIMIT 1;
+
+-- name: LatestDeployStatus :one
+-- The newest build-or-not outcome of an app, skipped pushes aside: a push is only skipped while the
+-- app is not behind a failed or cancelled build (that one is retried with the newest commit).
+SELECT status FROM deployments WHERE app_id = $1 AND team_id = $2 AND kind = 'deploy' AND status <> 'skipped'
+ORDER BY number DESC LIMIT 1;
 
 -- name: InsertAdoptDeployment :one
 -- Adopting an imported app: no build ran, so the deployment is recorded already finished. For a
@@ -58,6 +78,7 @@ UPDATE deployments SET cancel_requested = true, updated_at = now() WHERE id = $1
 -- name: ClaimQueuedDeployment :one
 SELECT d.* FROM deployments d
 WHERE d.status = 'queued'
+  AND (d.not_before IS NULL OR d.not_before <= now())
   AND NOT EXISTS (SELECT 1 FROM deployments r WHERE r.app_id = d.app_id AND r.status = 'running')
 ORDER BY d.created_at
 LIMIT 1
