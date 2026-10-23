@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { CheckCircle2Icon, CircleDashedIcon, GitCommitHorizontalIcon, XCircleIcon } from "lucide-react"
+import { CheckCircle2Icon, CircleDashedIcon, GitCommitHorizontalIcon, SkipForwardIcon, XCircleIcon } from "lucide-react"
 
 import { useTimeAgo } from "@/components/home/sparkline"
 import type { DeploymentKind, DeploymentStatus, DeploymentStep } from "@/lib/apps"
@@ -32,6 +32,7 @@ export function StatusIcon({ status }: { status: DeploymentStatus }) {
   const label = t(`apps.deploy.statuses.${status}`, undefined, status)
   if (status === "succeeded")
     return <CheckCircle2Icon className="size-4 shrink-0 text-nq-success" aria-label={label} />
+  if (status === "skipped") return <SkipForwardIcon className="size-4 shrink-0 text-muted-foreground" aria-label={label} />
   if (status === "failed" || status === "cancelled")
     return <XCircleIcon className="size-4 shrink-0 text-nq-danger-text" aria-label={label} />
   return <CircleDashedIcon className="size-4 shrink-0 animate-spin text-nq-brand [animation-duration:3s]" aria-label={label} />

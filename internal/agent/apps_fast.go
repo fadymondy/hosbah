@@ -63,6 +63,8 @@ func appFastBuild(oc *OpContext) (any, int, error) {
 		return nil, 1, err
 	}
 	defer release()
+	bc := startBuildCap(oc, p.CPUShare)
+	defer bc.Stop(oc)
 
 	dir := fastCheckoutDir(p.App)
 	oc.Progress(1, 5)
@@ -148,9 +150,10 @@ func fastBuildWithBuilder(oc *OpContext, p agentproto.FastBuildParams, dir strin
 	if err != nil {
 		return "", "", 2, err
 	}
-	runArgs := []string{"run", "--rm", "-v", dir + ":/app", "-w", "/app", "-v", cache + ":/cache",
+	runArgs := append([]string{"run", "--rm"}, buildRunFlags(p.CPUShare)...)
+	runArgs = append(runArgs, "-v", dir+":/app", "-w", "/app", "-v", cache+":/cache",
 		"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
-		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer"}
+		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer")
 	for k, v := range env {
 		runArgs = append(runArgs, "-e", k+"="+v)
 	}
@@ -224,7 +227,8 @@ func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string)
 	for k, v := range env {
 		execEnv = append(execEnv, "-e", k+"="+v)
 	}
-	createArgs := []string{"create", "--name", ctr, "-v", cache + ":/cache", "--entrypoint", "tail", p.BaseImage, "-f", "/dev/null"}
+	createArgs := append([]string{"create"}, buildRunFlags(p.CPUShare)...)
+	createArgs = append(createArgs, "--name", ctr, "-v", cache+":/cache", "--entrypoint", "tail", p.BaseImage, "-f", "/dev/null")
 	if code, err := dockerStep(oc, createArgs...); err != nil {
 		return "", "", code, fmt.Errorf("could not create the build container from %s", p.BaseImage)
 	}

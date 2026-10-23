@@ -930,12 +930,16 @@
       "following": "The newest deployment is followed live.",
       "cancel": "Cancel",
       "cancelRequested": "Cancelling…",
+      "waiting": "Waiting for more pushes — starts by {time}",
+      "coalesced": "{count} earlier pushes combined into this one",
+      "skippedWhy": "Skipped: {reason}",
       "statuses": {
         "queued": "Queued",
         "running": "Running",
         "succeeded": "Succeeded",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "skipped": "Skipped"
       },
       "kinds": {
         "deploy": "Deploy",

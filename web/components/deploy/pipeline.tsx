@@ -49,7 +49,7 @@ export function Pipeline({ d }: { d: PipelineItem }) {
                   ? "todo"
                   : d.status === "failed"
                     ? "failed"
-                    : d.status === "cancelled"
+                    : d.status === "cancelled" || d.status === "skipped"
                       ? "cancelled"
                       : "current"
         return (

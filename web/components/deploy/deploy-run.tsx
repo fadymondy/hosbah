@@ -10,7 +10,7 @@ import type { DeployLogLine } from "@/lib/apps"
 import { useI18n } from "@/lib/i18n"
 import { useEventStream } from "@/lib/servers"
 
-export const RUN_STATUS = { queued: "pending", running: "running", succeeded: "success", failed: "failed", cancelled: "cancelled" } as const
+export const RUN_STATUS = { queued: "pending", running: "running", succeeded: "success", failed: "failed", cancelled: "cancelled", skipped: "cancelled" } as const
 
 /** Which pipeline step an agent operation's lines belong to. */
 const STEP_OF_OP: Record<string, string> = {

@@ -930,12 +930,16 @@
       "following": "تُتابَع أحدث عملية نشر مباشرةً.",
       "cancel": "إلغاء",
       "cancelRequested": "جارٍ الإلغاء…",
+      "waiting": "بانتظار دفعات أخرى — يبدأ بحلول {time}",
+      "coalesced": "دُمجت {count} دفعات سابقة في هذا النشر",
+      "skippedWhy": "تم التخطي: {reason}",
       "statuses": {
         "queued": "في الانتظار",
         "running": "قيد التنفيذ",
         "succeeded": "نجح",
         "failed": "فشل",
-        "cancelled": "أُلغي"
+        "cancelled": "أُلغي",
+        "skipped": "تم التخطي"
       },
       "kinds": {
         "deploy": "نشر",

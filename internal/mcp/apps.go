@@ -891,6 +891,12 @@ func deploymentLine(d db.Deployment) string {
 	if d.Track != nil {
 		line += fmt.Sprintf("  track %s (%s)", *d.Track, orDash(d.TrackReason))
 	}
+	if d.Status == "queued" && d.NotBefore != nil {
+		line += "  waiting for more pushes until " + d.NotBefore.UTC().Format("15:04:05") + " UTC"
+	}
+	if d.Coalesced > 0 {
+		line += fmt.Sprintf("  (coalesces %d earlier requests)", d.Coalesced)
+	}
 	if d.Error != nil {
 		line += "  — " + *d.Error
 	}

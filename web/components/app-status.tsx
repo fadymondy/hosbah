@@ -34,6 +34,7 @@ const depVariant: Record<DeploymentStatus, Variant> = {
   succeeded: "success",
   failed: "danger",
   cancelled: "neutral",
+  skipped: "outline",
 }
 
 export function DeploymentStatusBadge({ status }: { status: DeploymentStatus }) {

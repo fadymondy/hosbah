@@ -44,12 +44,15 @@ func appScan(oc *OpContext) (any, int, error) {
 		return nil, 1, errors.New("could not create the Trivy cache volume")
 	}
 	oc.Info("scanning %s with Trivy %s (severity: %s)", p.Image, agentproto.TrivyImage, strings.Join(severities, ","))
-	args := []string{"run", "--rm",
+	// Trivy is as CPU-hungry as a build (145% of a 6-core server right after a deploy), so it gets
+	// the same limits a build's containers do.
+	args := append([]string{"run", "--rm"}, buildRunFlags(0)...)
+	args = append(args,
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
-		"-v", agentproto.TrivyCacheVolume + ":/root/.cache/",
+		"-v", agentproto.TrivyCacheVolume+":/root/.cache/",
 		agentproto.TrivyImage,
 		"image", "--format", "json", "--quiet", "--severity", strings.Join(severities, ","), p.Image,
-	}
+	)
 	cmd := exec.CommandContext(oc.Ctx, "docker", args...) //#nosec G204 -- fixed argv; Image is validated, everything else is a constant
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

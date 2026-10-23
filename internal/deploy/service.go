@@ -63,6 +63,10 @@ type Service struct {
 	// apmSvc is set by SetApm once internal/apm's Service exists (server.go wires it after both are
 	// constructed); nil until then, and in any test that does not need APM env injection.
 	apmSvc *apm.Service
+	// debounce holds automatic deploys back for more pushes (buildrules.go); buildCPUShare is the
+	// part of a server's CPUs its builds may use (sent to the agent with every build).
+	debounce      Debounce
+	buildCPUShare float64
 }
 
 // SetApm wires the APM service in, for env auto-injection (injectApmEnv). Call once, after both
@@ -76,7 +80,8 @@ func New(a *app.App, o *ops.Service) *Service {
 		log = slog.Default()
 	}
 	return &Service{a: a, ops: o, log: log.With("component", "deploy"), wake: make(chan struct{}, 1), active: map[string]bool{},
-		github: GitHubFromEnv(), repoCache: map[string]repoCacheEntry{}, apps: AppsDomainFromEnv()}
+		github: GitHubFromEnv(), repoCache: map[string]repoCacheEntry{}, apps: AppsDomainFromEnv(),
+		debounce: DebounceFromEnv(), buildCPUShare: BuildCPUShareFromEnv()}
 }
 
 // Start launches the worker. Deployments this control plane was running when it stopped are
@@ -103,6 +108,9 @@ func (s *Service) Wake() {
 	default:
 	}
 }
+
+// SetDebounce replaces the automatic-deploy debounce (tests).
+func (s *Service) SetDebounce(d Debounce) { s.debounce = d }
 
 // App is the application container.
 func (s *Service) App() *app.App { return s.a }
@@ -312,6 +320,22 @@ func (r *runner) refreshHosts(ctx context.Context) {
 	if err != nil {
 		r.logf("error", "could not re-read the app's domains before routing (%v) — using the list from the start of this deploy", err)
 	}
+}
+
+// saveBuildRules stores hosbah.toml's [build] on the app, for the pushes after this one: they are
+// filtered and debounced before anything is checked out. Best-effort: the deploy goes on without it.
+func (r *runner) saveBuildRules(ctx context.Context, b BuildRules) {
+	if b.JSON() == ParseBuildRules(r.app.BuildRules).JSON() {
+		return
+	}
+	if err := r.tx(ctx, func(q *db.Queries) error {
+		return q.SetAppBuildRules(ctx, db.SetAppBuildRulesParams{BuildRules: b.JSON(), ID: r.app.ID})
+	}); err != nil {
+		r.s.log.Warn("saving the build rules failed", "app", r.app.ID, "err", err)
+		return
+	}
+	r.logf("info", "build rules: %d watched and %d ignored path patterns, debounce %s — they apply from the next push",
+		len(b.Watch), len(b.Ignore), r.s.debounce.For(b))
 }
 
 // HostsOf turns an app's domains into Caddy routes.
@@ -744,7 +768,7 @@ func (r *runner) fastBuild(ctx context.Context, image string, src agentproto.Git
 	if err := r.op(ctx, "build", agentproto.KindAppFastBuild, agentproto.FastBuildParams{
 		AppID: r.app.ID, App: r.app.Name, DeploymentID: r.dep.ID, GitSource: src,
 		Image: image, BaseImage: r.live.Image, Mode: mode, Steps: fbSteps,
-		BuilderImage: cfg.BuilderImage, Outputs: outputs, Env: box,
+		BuilderImage: cfg.BuilderImage, Outputs: outputs, Env: box, CPUShare: r.s.buildCPUShare,
 	}, &res); err != nil {
 		return false, fmt.Errorf("fast build: %w", err)
 	}
@@ -927,7 +951,7 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 			Image:     image, Keep: agentproto.DefaultKeepImages, Protect: protect, RailpackFrontend: RailpackFrontend,
 			NoCache:    r.dep.TrackReason != nil && *r.dep.TrackReason == "full rebuild requested",
 			PHPVersion: phpVersion, PHPIni: phpIni,
-			DockerfilePath: dockerfilePath, BuildContext: buildContext, Env: buildEnvBox,
+			DockerfilePath: dockerfilePath, BuildContext: buildContext, Env: buildEnvBox, CPUShare: r.s.buildCPUShare,
 		}, &built); err != nil {
 			return nil, fmt.Errorf("build: %w", err)
 		}
@@ -958,6 +982,9 @@ func (r *runner) deploy(ctx context.Context) (*db.Release, error) {
 	cfg, err := ParseConfigFile(built.Toml(), ConfigFileOf(built.DetectResult))
 	if err != nil {
 		return nil, err
+	}
+	if !fast || built.Toml() != "" { // an old agent's fast build returns no hosbah.toml: keep the stored rules
+		r.saveBuildRules(ctx, cfg.Build)
 	}
 	appRes, appProcRes := appResources(r.app)
 	eff := Resolve(cfg, Defaults{Port: int(r.app.Port), HealthPath: r.app.HealthcheckPath, HealthTimeout: int(r.app.HealthcheckTimeout),

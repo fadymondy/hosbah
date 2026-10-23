@@ -39,8 +39,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // handleDeployHook queues a deploy of the app whose token this is. A git host's push payload is
-// understood: a push to another branch, or a tag, is acknowledged and skipped. A plain
-// {"ref": "<branch|tag|sha>"} deploys that ref; no body deploys the app's branch.
+// understood: a push to another branch, or a tag, is acknowledged and skipped, and so is a push the
+// app's [build] rules say changes nothing in the image (recorded as a skipped deployment). A plain
+// {"ref": "<branch|tag|sha>"} deploys that ref; no body deploys the app's branch. Both wait out
+// the build debounce (buildrules.go), coalescing a burst of pushes into one build.
 func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	if !tokens.HasPrefix(token, tokens.Hook) || len(token) > 100 {
@@ -48,9 +50,7 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
-	var payload struct {
-		Ref string `json:"ref"`
-	}
+	var payload PushPayload
 	_ = json.Unmarshal(body, &payload)
 
 	hash := tokens.Hash(token)
@@ -83,6 +83,16 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 		if err := tenancy.SetTeam(r.Context(), tx, a.TeamID); err != nil {
 			return err
 		}
+		if ref == BranchOf(a) {
+			if skip, reason := SkipPush(r.Context(), q, a.TeamID, a, payload); skip {
+				d, err := s.RecordSkipped(r.Context(), q, a.TeamID, Actor{Via: "hook"}, a, payload, reason)
+				if err != nil {
+					return err
+				}
+				status, out = http.StatusAccepted, map[string]any{"deployment_id": d.ID, "number": d.Number, "status": d.Status, "skipped": reason}
+				return nil
+			}
+		}
 		d, err := s.QueueDeployment(r.Context(), q, a.TeamID, Actor{Via: "hook"}, a, "deploy", ref, nil, "")
 		if err != nil {
 			if ae, ok := err.(*ActionError); ok {
@@ -91,7 +101,7 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
-		status, out = http.StatusAccepted, map[string]any{"deployment_id": d.ID, "number": d.Number, "ref": d.Ref, "status": d.Status}
+		status, out = http.StatusAccepted, map[string]any{"deployment_id": d.ID, "number": d.Number, "ref": d.Ref, "status": d.Status, "not_before": d.NotBefore}
 		return nil
 	})
 	if err != nil {
@@ -106,7 +116,8 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 //
 //	push                        the installation's team deploys its apps on that repository and
 //	                            branch (never another team's, whatever their repository URL says),
-//	                            except those with automatic deploys paused — once per X-GitHub-Delivery
+//	                            except those with automatic deploys paused — once per X-GitHub-Delivery;
+//	                            a push only [build]-ignored paths changed is recorded as skipped
 //	installation                deleted → the row goes; suspend / unsuspend → suspended_at
 //	installation_repositories   the repository selection follows; the team's listing is refreshed
 //
@@ -212,8 +223,7 @@ func (s *Service) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 // redelivery of a push that queued finds it and does nothing, and one that failed is retried.
 func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte) {
 	var push struct {
-		Ref          string `json:"ref"`
-		Deleted      bool   `json:"deleted"`
+		PushPayload
 		Installation *struct {
 			ID int64 `json:"id"`
 		} `json:"installation"`
@@ -258,7 +268,7 @@ func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte
 	}
 	repoURL := agentproto.NormalizeRepoURL(push.Repository.HTMLURL)
 	branch := strings.TrimPrefix(push.Ref, "refs/heads/")
-	queued, duplicate := 0, false
+	queued, skipped, duplicate := 0, 0, false
 	err := tenancy.Tx(ctx, s.a.SQLDB, tenancy.Scope{System: true, TeamID: inst.TeamID}, func(q *db.Queries, _ *sql.Tx) error {
 		n, err := q.RecordGitHubDelivery(ctx, db.RecordGitHubDeliveryParams{DeliveryID: delivery, Event: "push"})
 		if err != nil {
@@ -274,6 +284,13 @@ func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte
 			return err
 		}
 		for _, a := range apps {
+			if skip, reason := SkipPush(ctx, q, inst.TeamID, a, push.PushPayload); skip {
+				if _, err := s.RecordSkipped(ctx, q, inst.TeamID, Actor{Via: "github"}, a, push.PushPayload, reason); err != nil {
+					return err
+				}
+				skipped++
+				continue
+			}
 			if _, err := s.QueueDeployment(ctx, q, inst.TeamID, Actor{Via: "github"}, a, "deploy", BranchOf(a), nil, ""); err != nil {
 				var ae *ActionError
 				if errors.As(err, &ae) {
@@ -293,7 +310,7 @@ func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte
 		writeJSON(w, http.StatusAccepted, map[string]any{"queued": 0, "duplicate": true})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]int{"queued": queued})
+	writeJSON(w, http.StatusAccepted, map[string]int{"queued": queued, "skipped": skipped})
 }
 
 // handleTLSAllow is Caddy's `ask`: 200 only for a hostname that is routed to an app, set to auto
