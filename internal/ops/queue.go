@@ -39,6 +39,8 @@ func Timeout(kind string) time.Duration {
 		return 30 * time.Minute
 	case agentproto.KindAppBuild:
 		return 45 * time.Minute
+	case agentproto.KindAppFastBuild:
+		return 20 * time.Minute // a cached build, but a Go link of a large API under the build caps takes minutes
 	case agentproto.KindAppRelease:
 		return 20 * time.Minute
 	case agentproto.KindAppStart, agentproto.KindAppRollback:

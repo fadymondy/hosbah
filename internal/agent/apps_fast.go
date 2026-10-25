@@ -150,7 +150,7 @@ func fastBuildWithBuilder(oc *OpContext, p agentproto.FastBuildParams, dir strin
 	if err != nil {
 		return "", "", 2, err
 	}
-	runArgs := append([]string{"run", "--rm"}, buildRunFlags(p.CPUShare)...)
+	runArgs := append(append([]string{"run", "--rm"}, buildRunFlags(p.CPUShare)...), buildGoEnv(p.CPUShare)...)
 	runArgs = append(runArgs, "-v", dir+":/app", "-w", "/app", "-v", cache+":/cache",
 		"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
 		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer")
@@ -224,6 +224,7 @@ func fastBuildInRuntime(oc *OpContext, p agentproto.FastBuildParams, dir string)
 	}
 	execEnv := []string{"-e", "HOME=/cache", "-e", "XDG_CACHE_HOME=/cache", "-e", "GOCACHE=/cache/go-build",
 		"-e", "GOMODCACHE=/cache/go-mod", "-e", "npm_config_cache=/cache/npm", "-e", "COMPOSER_HOME=/cache/composer"}
+	execEnv = append(execEnv, buildGoEnv(p.CPUShare)...) // exec env, so the committed image does not keep it
 	for k, v := range env {
 		execEnv = append(execEnv, "-e", k+"="+v)
 	}
