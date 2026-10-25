@@ -3,6 +3,8 @@ package agent
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -43,6 +45,8 @@ func TestBuildRunFlags(t *testing.T) {
 	}
 }
 
+// memory.high leaves a build all of the server but what its apps need. At half of fadymondy-web's
+// 10 GiB, `go build ./cmd/api` thrashed past the 10-minute fast-build limit (#715-#718).
 func TestBuildMemHigh(t *testing.T) {
 	const gib = int64(1) << 30
 	for _, tc := range []struct {
@@ -50,15 +54,33 @@ func TestBuildMemHigh(t *testing.T) {
 		total int64
 		want  int64
 	}{
-		{0, 10 * gib, 5 * gib},   // default half of fadymondy-web's 10 GiB
-		{0.3, 10 * gib, 3 * gib}, // the app's own share
-		{0.5, gib, gib},          // never under 1 GiB
-		{1, 10 * gib, 0},         // share 1: uncapped
-		{0.5, 0, 0},              // memory unknown: no limit
+		{0, 10 * gib, 8 * gib},             // fadymondy-web: 2 GiB kept for its apps (they use ~2.4)
+		{0.3, 10 * gib, 8 * gib},           // a lower CPU share does not shrink the memory
+		{0.5, 6 * gib, 4 * gib},            // the control plane's 6 GiB
+		{0.5, 3 * gib, 3 * gib / 2},        // a small server: never under half
+		{0.5, 64 * gib, 64*gib - 64*gib/5}, // a big one: 20% kept
+		{1, 10 * gib, 0},                   // share 1: uncapped
+		{0.5, 0, 0},                        // memory unknown: no limit
 	} {
 		if got := buildMemHigh(tc.share, tc.total); got != tc.want {
 			t.Errorf("buildMemHigh(%v, %d) = %d, want %d", tc.share, tc.total, got, tc.want)
 		}
+	}
+	// The regression guard: any server of 10 GiB or more gives a build at least 8 GiB.
+	for total := 10 * gib; total <= 128*gib; total += gib {
+		if got := buildMemHigh(0, total); got < 8*gib {
+			t.Fatalf("buildMemHigh(0, %d GiB) = %.1f GiB, want >= 8", total/gib, float64(got)/float64(gib))
+		}
+	}
+}
+
+func TestBuildGoEnv(t *testing.T) {
+	if buildGoEnv(1) != nil {
+		t.Error("share 1 must set no GOMAXPROCS")
+	}
+	want := max(1, int(buildCPUs(0.5, runtime.NumCPU())))
+	if f := buildGoEnv(0.5); len(f) != 2 || f[0] != "-e" || f[1] != "GOMAXPROCS="+strconv.Itoa(want) {
+		t.Errorf("env %v, want GOMAXPROCS=%d", f, want)
 	}
 }
 

@@ -24,7 +24,8 @@ cgroups and caps them itself:
 
 	cpu.weight  10 (apps' containers keep the default 100: under contention they get ~10x the CPU)
 	cpu.max     the build's share of the server's CPUs (default half; agentproto CPUShare)
-	memory.high the same share of the server's memory, at least 1 GiB
+	memory.high the server's memory less what its apps need (buildMemHigh: total - max(2 GiB, 20%),
+	            never below half of it)
 	io.weight   10, where the io controller offers it
 
 The weight is the guarantee (it gives way the moment an app needs the CPU, and costs nothing when
@@ -37,8 +38,13 @@ mq-deadline), so it does nothing there. A big build's page cache (Go build cache
 filled that LXC up to its own memory.high 28 million times (memory.events), so every task in it,
 the site included, was throttled into reclaim and kept rereading its files from disk
 (workingset_refault_file 4.6 billion pages, io pressure avg300 28%; fadymondy.com #706, 2026-10-25).
-With memory.high on the step, the build reclaims its own cache first. It throttles, never kills. Go 1.25+ toolchains in the step read the
-quota for their GOMAXPROCS. Containers the agent starts itself for a build (the fast track's builder
+With memory.high on the step, the build reclaims its own cache first. It throttles, never kills.
+
+memory.high must leave the compiler its working set, though: at half the server (5 GiB of
+fadymondy-web's 10) `go build ./cmd/api` spent its time in reclaim and went from 6-8 minutes to 30+
+(fadymondy.com #715-#718, 2026-10-25). The apps there need ~2.5 GiB, so the build gets the rest less
+a margin, not a share. Go 1.25+ toolchains in the step read the quota for their GOMAXPROCS, and the
+containers the agent runs a build in get GOMAXPROCS set to the quota (buildGoEnv) for older ones. Containers the agent starts itself for a build (the fast track's builder
 and runtime modes, Trivy) take the same limits as `docker run` flags (buildRunFlags).
 */
 
@@ -70,20 +76,15 @@ func buildCPUs(share float64, ncpu int) float64 {
 	return cpus
 }
 
-// buildMemHigh is the memory.high of a build step for this share of total bytes (0 = unknown, no
-// limit): share of the memory, at least 1 GiB. share <= 0 is the default; share >= 1 means no cap.
+// buildMemHigh is the memory.high of a build step on a server with total bytes (0 = no limit): all of
+// it but what the server's apps need, i.e. less max(2 GiB, 20%), and never under half of it. A
+// share of 1 or more means no cap, as for the CPUs; total 0 (unknown) means no limit.
 func buildMemHigh(share float64, total int64) int64 {
-	if share <= 0 {
-		share = defaultBuildCPUShare
-	}
 	if share >= 1 || total <= 0 {
 		return 0
 	}
-	high := int64(share * float64(total))
-	if high < 1<<30 {
-		high = 1 << 30
-	}
-	return high
+	reserve := max(int64(2)<<30, total/5)
+	return max(total-reserve, total/2)
 }
 
 // serverMemory is the memory this server's processes may use: MemTotal, or the cgroup's own limit
@@ -112,6 +113,17 @@ func serverMemory() int64 {
 // cpuMax is the cgroup v2 cpu.max line for that many CPUs.
 func cpuMax(cpus float64) string {
 	return fmt.Sprintf("%d %d", int64(cpus*cgroupPeriodUS), cgroupPeriodUS)
+}
+
+// buildGoEnv is the `docker run`/`docker exec` environment that keeps a Go toolchain from older
+// than 1.25 (which ignores the CPU quota) to the build's CPUs. Never pass it to a container that
+// becomes the app's image (`docker create` + commit): the app would keep it.
+func buildGoEnv(share float64) []string {
+	cpus := buildCPUs(share, runtime.NumCPU())
+	if cpus == 0 {
+		return nil
+	}
+	return []string{"-e", "GOMAXPROCS=" + strconv.Itoa(max(1, int(cpus)))}
 }
 
 // buildRunFlags are the `docker run` / `docker create` limits for a container a build starts.
