@@ -43,7 +43,26 @@ func TestBuildRunFlags(t *testing.T) {
 	}
 }
 
-// The cap writes cpu.weight / cpu.max / io.weight into every BuildKit step cgroup it finds, once.
+func TestBuildMemHigh(t *testing.T) {
+	const gib = int64(1) << 30
+	for _, tc := range []struct {
+		share float64
+		total int64
+		want  int64
+	}{
+		{0, 10 * gib, 5 * gib},   // default half of fadymondy-web's 10 GiB
+		{0.3, 10 * gib, 3 * gib}, // the app's own share
+		{0.5, gib, gib},          // never under 1 GiB
+		{1, 10 * gib, 0},         // share 1: uncapped
+		{0.5, 0, 0},              // memory unknown: no limit
+	} {
+		if got := buildMemHigh(tc.share, tc.total); got != tc.want {
+			t.Errorf("buildMemHigh(%v, %d) = %d, want %d", tc.share, tc.total, got, tc.want)
+		}
+	}
+}
+
+// The cap writes cpu.weight / cpu.max / memory.high / io.weight into every BuildKit step cgroup it finds, once.
 func TestBuildCapSweep(t *testing.T) {
 	root := t.TempDir()
 	step := func(name string) string {
@@ -51,7 +70,7 @@ func TestBuildCapSweep(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		for _, f := range []string{"cpu.weight", "cpu.max", "io.weight"} {
+		for _, f := range []string{"cpu.weight", "cpu.max", "memory.high", "io.weight"} {
 			if err := os.WriteFile(filepath.Join(dir, f), []byte("x"), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +82,7 @@ func TestBuildCapSweep(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(app, "cpu.weight"), []byte("100"), 0o644)
 
 	a := step("one")
-	c := &buildCap{cpus: 3, globs: []string{filepath.Join(root, "system.slice", "system.slice:docker:*")}, every: 10 * time.Millisecond,
+	c := &buildCap{cpus: 3, memHigh: 5 << 30, globs: []string{filepath.Join(root, "system.slice", "system.slice:docker:*")}, every: 10 * time.Millisecond,
 		stop: make(chan struct{}), done: make(chan struct{}), seen: map[string]bool{}}
 	go c.loop()
 	time.Sleep(30 * time.Millisecond)
@@ -74,8 +93,8 @@ func TestBuildCapSweep(t *testing.T) {
 
 	for _, dir := range []string{a, b} {
 		read := func(f string) string { raw, _ := os.ReadFile(filepath.Join(dir, f)); return string(raw) }
-		if read("cpu.weight") != "10" || read("cpu.max") != "300000 100000" || read("io.weight") != "default 10" {
-			t.Errorf("%s: weight %q max %q io %q", dir, read("cpu.weight"), read("cpu.max"), read("io.weight"))
+		if read("cpu.weight") != "10" || read("cpu.max") != "300000 100000" || read("memory.high") != "5368709120" || read("io.weight") != "default 10" {
+			t.Errorf("%s: weight %q max %q mem %q io %q", dir, read("cpu.weight"), read("cpu.max"), read("memory.high"), read("io.weight"))
 		}
 	}
 	if raw, _ := os.ReadFile(filepath.Join(app, "cpu.weight")); string(raw) != "100" {

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fadymondy/hosbah/internal/agentproto"
 	"github.com/fadymondy/hosbah/internal/brand"
 )
 
@@ -61,7 +62,21 @@ type GitHubApp interface {
 	// installation token. readOnly deploy keys can only fetch; Hosbah's server deploy keys are
 	// always read-only. Returns GitHub's numeric key id.
 	AddDeployKey(ctx context.Context, installationID int64, owner, repo, title, publicKey string, readOnly bool) (int64, error)
+	// Compare is GET /repos/{owner}/{repo}/compare/{base}...{head} with a fresh installation token:
+	// the files head changed since its merge base with base (the build rules' changed paths).
+	Compare(ctx context.Context, installationID int64, owner, repo, base, head string) (GitHubComparison, error)
 }
+
+// GitHubComparison is GitHub's answer to base...head. Status is ahead (head descends from base),
+// identical, behind or diverged; Files is complete unless Truncated (GitHub lists at most 300).
+type GitHubComparison struct {
+	Status    string
+	Files     []string
+	Truncated bool
+}
+
+// maxCompareFiles is GitHub's cap on a comparison's file list: an answer that long may have more.
+const maxCompareFiles = 300
 
 // ErrInstallationNotFound: GitHub does not know that installation (for this App).
 var ErrInstallationNotFound = errors.New("GitHub does not know that installation of the App")
@@ -126,6 +141,9 @@ func (unconfiguredGitHub) AddDeployKey(context.Context, int64, string, string, s
 }
 func (unconfiguredGitHub) InstallationRepos(context.Context, int64, int) ([]GitHubAppRepo, error) {
 	return nil, ErrGitHubNotConfigured
+}
+func (unconfiguredGitHub) Compare(context.Context, int64, string, string, string, string) (GitHubComparison, error) {
+	return GitHubComparison{}, ErrGitHubNotConfigured
 }
 
 // NewGitHubApp builds the integration from its parts; apiBase is https://api.github.com in
@@ -326,6 +344,36 @@ func (g *githubApp) InstallationRepos(ctx context.Context, installationID int64,
 		repos = repos[:max]
 	}
 	return repos, nil
+}
+
+// Compare: per_page=1 keeps the commit list short; the file list is the whole comparison's anyway
+// (GitHub sends it on the first page, up to 300 files).
+func (g *githubApp) Compare(ctx context.Context, installationID int64, owner, repo, base, head string) (GitHubComparison, error) {
+	if !agentproto.ValidGitHubRev(owner+"/"+repo) || strings.Count(owner+"/"+repo, "/") != 1 || !agentproto.ValidGitHubRev(base) || !agentproto.ValidGitHubRev(head) {
+		return GitHubComparison{}, errors.New("not a comparable repository or commit")
+	}
+	token, _, err := g.InstallationToken(ctx, installationID)
+	if err != nil {
+		return GitHubComparison{}, err
+	}
+	var out struct {
+		Status string `json:"status"`
+		Files  []struct {
+			Filename         string `json:"filename"`
+			PreviousFilename string `json:"previous_filename"`
+		} `json:"files"`
+	}
+	if _, err := g.apiGet(ctx, token, fmt.Sprintf("/repos/%s/%s/compare/%s...%s?per_page=1", owner, repo, base, head), &out); err != nil {
+		return GitHubComparison{}, err
+	}
+	c := GitHubComparison{Status: out.Status, Truncated: len(out.Files) >= maxCompareFiles}
+	for _, f := range out.Files {
+		c.Files = append(c.Files, f.Filename)
+		if f.PreviousFilename != "" { // a rename changes its old path too
+			c.Files = append(c.Files, f.PreviousFilename)
+		}
+	}
+	return c, nil
 }
 
 // AddDeployKey: POST /repos/{owner}/{repo}/keys with a fresh installation token. 422 (GitHub's

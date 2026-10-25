@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -98,7 +99,7 @@ func (b BuildRules) Decide(changed []string, known bool) (build bool, reason str
 		return true, "the changed files are not known"
 	}
 	for _, p := range changed {
-		p = strings.TrimPrefix(strings.TrimSpace(p), "./")
+		p = NormalizePath(p)
 		if p == "" {
 			continue
 		}
@@ -114,9 +115,25 @@ func (b BuildRules) Decide(changed []string, known bool) (build bool, reason str
 		return true, p + " changed"
 	}
 	if len(changed) == 1 {
-		return false, "no image changes (" + changed[0] + ")"
+		return false, "no image changes (" + NormalizePath(changed[0]) + ")"
 	}
 	return false, fmt.Sprintf("no image changes (%d files, none watched)", len(changed))
+}
+
+// NormalizePath makes a changed path repository-relative: "/x", "./x" and "x" are the same file.
+// Git hosts send "x", but a hand-written hook body or a tool may not.
+func NormalizePath(p string) string {
+	p = strings.TrimSpace(p)
+	for {
+		switch {
+		case strings.HasPrefix(p, "./"):
+			p = p[2:]
+		case strings.HasPrefix(p, "/"):
+			p = p[1:]
+		default:
+			return p
+		}
+	}
 }
 
 func matchAny(patterns []string, p string) bool {
@@ -290,8 +307,16 @@ type PushCommit struct {
 // maxPushCommits is GitHub's cap on a push payload's commits: a push that long may have more.
 const maxPushCommits = 2048
 
-// Changed is every path the push touched, and whether that list is complete: a new branch, a force
-// push, a push with no commit list or one the host truncated is not known (so it builds).
+// Changed is every path the push's commits touched, and whether that list is complete: a new
+// branch, a force push, a push with no commit list or one the host truncated is not known, and an
+// unknown or empty list always builds (Decide) — skipping is only safe on evidence.
+//
+// This is the union of each commit's own file list, and a merge commit's list is its diff against
+// its first parent. So when a pushed branch merged its base in ("Merge origin/master into feature"),
+// that commit lists everything the base gained since the branch forked — files the target branch
+// already had. The union is a superset of the push's real change (never a wrong skip, but a build
+// a docs-only PR did not need: fadymondy.com #467, 2026-10-25). Where the git host can compare
+// before...after (GitHub, NetChanges) that diff is used instead; this is the fallback.
 func (p PushPayload) Changed() (paths []string, known bool) {
 	zero := strings.Trim(p.Before, "0") == ""
 	if p.Created || p.Forced || zero || len(p.Commits) == 0 || len(p.Commits) >= maxPushCommits {
@@ -304,7 +329,7 @@ func (p PushPayload) Changed() (paths []string, known bool) {
 	for _, c := range p.Commits {
 		for _, set := range [][]string{c.Added, c.Removed, c.Modified} {
 			for _, f := range set {
-				if f != "" && !seen[f] {
+				if f = NormalizePath(f); f != "" && !seen[f] {
 					seen[f] = true
 					paths = append(paths, f)
 				}
@@ -312,6 +337,24 @@ func (p PushPayload) Changed() (paths []string, known bool) {
 		}
 	}
 	return paths, true
+}
+
+// Comparer lists the paths that differ between two commits of the pushed repository (base...head),
+// with ok false whenever it cannot say exactly: no API, head does not descend from base (a force
+// push), too many files, an error. The caller then falls back to the payload. See pushComparer.
+type Comparer func(ctx context.Context, base, head string) (paths []string, ok bool)
+
+// NetChanges is the push's changed paths. With a Comparer it is the host's before...after diff: the
+// push's net change, so a merge commit counts against its first parent (the branch's old head) and
+// the files a feature branch merged in from the base are not counted again. Otherwise it is the
+// payload's union (Changed), a superset.
+func (p PushPayload) NetChanges(ctx context.Context, cmp Comparer) (paths []string, known bool) {
+	if cmp != nil && !p.Created && !p.Deleted && strings.Trim(p.Before, "0") != "" && strings.Trim(p.After, "0") != "" {
+		if paths, ok := cmp(ctx, p.Before, p.After); ok {
+			return paths, true
+		}
+	}
+	return p.Changed()
 }
 
 // Head is the pushed commit and its message's first line ("" when the payload has none).
