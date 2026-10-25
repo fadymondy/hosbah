@@ -1,11 +1,13 @@
 package agent
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,13 +22,22 @@ driver (read off a live server), /sys/fs/cgroup/docker/buildkit/<id> with the cg
 `--cgroup-parent` is not reliably honoured there, so while a build runs the agent finds those step
 cgroups and caps them itself:
 
-	cpu.weight 10 (apps' containers keep the default 100: under contention they get ~10x the CPU)
-	cpu.max    the build's share of the server's CPUs (default half; agentproto CPUShare)
-	io.weight  10, where the io controller offers it
+	cpu.weight  10 (apps' containers keep the default 100: under contention they get ~10x the CPU)
+	cpu.max     the build's share of the server's CPUs (default half; agentproto CPUShare)
+	memory.high the same share of the server's memory, at least 1 GiB
+	io.weight   10, where the io controller offers it
 
 The weight is the guarantee (it gives way the moment an app needs the CPU, and costs nothing when
 the server is idle); the quota bounds a build even on an otherwise idle server, so a burst of
-requests never lands on a server that is already at 100%. Go 1.25+ toolchains in the step read the
+requests never lands on a server that is already at 100%.
+
+memory.high is what keeps the apps' disk reads fast. io.weight only works under the BFQ scheduler,
+and servers usually run mq-deadline or none (fadymondy-web, an LXC on a loop-mounted raw disk, runs
+mq-deadline), so it does nothing there. A big build's page cache (Go build cache, node_modules)
+filled that LXC up to its own memory.high 28 million times (memory.events), so every task in it,
+the site included, was throttled into reclaim and kept rereading its files from disk
+(workingset_refault_file 4.6 billion pages, io pressure avg300 28%; fadymondy.com #706, 2026-10-25).
+With memory.high on the step, the build reclaims its own cache first. It throttles, never kills. Go 1.25+ toolchains in the step read the
 quota for their GOMAXPROCS. Containers the agent starts itself for a build (the fast track's builder
 and runtime modes, Trivy) take the same limits as `docker run` flags (buildRunFlags).
 */
@@ -59,6 +70,45 @@ func buildCPUs(share float64, ncpu int) float64 {
 	return cpus
 }
 
+// buildMemHigh is the memory.high of a build step for this share of total bytes (0 = unknown, no
+// limit): share of the memory, at least 1 GiB. share <= 0 is the default; share >= 1 means no cap.
+func buildMemHigh(share float64, total int64) int64 {
+	if share <= 0 {
+		share = defaultBuildCPUShare
+	}
+	if share >= 1 || total <= 0 {
+		return 0
+	}
+	high := int64(share * float64(total))
+	if high < 1<<30 {
+		high = 1 << 30
+	}
+	return high
+}
+
+// serverMemory is the memory this server's processes may use: MemTotal, or the cgroup's own limit
+// when that is lower (a container's /proc/meminfo is not always virtualised). 0 when unknown.
+func serverMemory() int64 {
+	var total int64
+	if f, err := os.Open("/proc/meminfo"); err == nil {
+		sc := bufio.NewScanner(f)
+		for sc.Scan() {
+			if kb, ok := strings.CutPrefix(sc.Text(), "MemTotal:"); ok {
+				n, _ := strconv.ParseInt(strings.TrimSuffix(strings.TrimSpace(kb), " kB"), 10, 64)
+				total = n * 1024
+				break
+			}
+		}
+		_ = f.Close()
+	}
+	if raw, err := os.ReadFile("/sys/fs/cgroup/memory.max"); err == nil {
+		if n, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64); err == nil && n > 0 && (total == 0 || n < total) {
+			total = n
+		}
+	}
+	return total
+}
+
 // cpuMax is the cgroup v2 cpu.max line for that many CPUs.
 func cpuMax(cpus float64) string {
 	return fmt.Sprintf("%d %d", int64(cpus*cgroupPeriodUS), cgroupPeriodUS)
@@ -76,6 +126,7 @@ func buildRunFlags(share float64) []string {
 // buildCap caps BuildKit's step cgroups while a build runs.
 type buildCap struct {
 	cpus    float64
+	memHigh int64 // memory.high per step in bytes; 0 = none
 	globs   []string
 	every   time.Duration
 	stop    chan struct{}
@@ -90,14 +141,18 @@ type buildCap struct {
 // startBuildCap starts capping (a no-op cap when share is 1 or more); Stop ends it and logs what
 // it did.
 func startBuildCap(oc *OpContext, share float64) *buildCap {
-	c := &buildCap{cpus: buildCPUs(share, runtime.NumCPU()), globs: buildStepCgroups, every: time.Second,
+	c := &buildCap{cpus: buildCPUs(share, runtime.NumCPU()), memHigh: buildMemHigh(share, serverMemory()), globs: buildStepCgroups, every: time.Second,
 		stop: make(chan struct{}), done: make(chan struct{}), seen: map[string]bool{}}
 	if c.cpus == 0 {
 		close(c.done)
 		oc.Info("build CPU cap: off (this build may use every CPU)")
 		return c
 	}
-	oc.Info("build CPU cap: %.2g of %d CPUs, CPU weight %s (apps keep priority)", c.cpus, runtime.NumCPU(), buildCPUWeight)
+	mem := "memory uncapped"
+	if c.memHigh > 0 {
+		mem = fmt.Sprintf("memory high %.1f GiB", float64(c.memHigh)/(1<<30))
+	}
+	oc.Info("build CPU cap: %.2g of %d CPUs, CPU weight %s, %s (apps keep priority)", c.cpus, runtime.NumCPU(), buildCPUWeight, mem)
 	go c.loop()
 	return c
 }
@@ -128,7 +183,7 @@ func (c *buildCap) sweep() {
 			if seen {
 				continue
 			}
-			err := capCgroup(dir, c.cpus)
+			err := capCgroup(dir, c.cpus, c.memHigh)
 			c.mu.Lock()
 			if err != nil {
 				c.failed++
@@ -142,8 +197,9 @@ func (c *buildCap) sweep() {
 }
 
 // capCgroup writes the limits into one cgroup directory. The weight is what matters most, so it is
-// written first; io.weight is best-effort (not every kernel/io scheduler offers it).
-func capCgroup(dir string, cpus float64) error {
+// written first; memory.high (0 = skip) and io.weight are best-effort (the memory controller may
+// not be delegated to the step, and not every kernel/io scheduler offers io.weight).
+func capCgroup(dir string, cpus float64, memHigh int64) error {
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		return nil // the step finished before we got to it
 	}
@@ -155,6 +211,9 @@ func capCgroup(dir string, cpus float64) error {
 	}
 	if err := os.WriteFile(filepath.Join(dir, "cpu.max"), []byte(cpuMax(cpus)), 0o644); err != nil && !os.IsNotExist(err) { //#nosec G306 -- a cgroup file
 		return fmt.Errorf("cpu.max: %w", err)
+	}
+	if memHigh > 0 {
+		_ = os.WriteFile(filepath.Join(dir, "memory.high"), []byte(strconv.FormatInt(memHigh, 10)), 0o644) //#nosec G306 -- a cgroup file
 	}
 	_ = os.WriteFile(filepath.Join(dir, "io.weight"), []byte("default "+buildCPUWeight), 0o644) //#nosec G306 -- a cgroup file
 	return nil

@@ -399,11 +399,19 @@ func (s *Service) QueueDeployment(ctx context.Context, q *db.Queries, teamID str
 }
 
 // SkipPush decides whether an automatic deploy of a push can be skipped: the app's [build] rules
-// find no path that changes the image, and the app is not behind a failed or cancelled build (that
-// one is retried with the newest commit). The reason is what the skipped deployment records.
-func SkipPush(ctx context.Context, q *db.Queries, teamID string, a db.App, push PushPayload) (bool, string) {
-	changed, known := push.Changed()
-	build, reason := ParseBuildRules(a.BuildRules).Decide(changed, known)
+// find no path that changes the image, and the app is not behind a failed or cancelled build. The
+// reason is what the skipped deployment records.
+//
+// cmp (nil when the repository's host cannot compare commits) makes both checks exact: the push's
+// changed paths are its before...after diff (NetChanges), and behind a failed or cancelled build
+// the question becomes whether anything the image needs changed between the live release's commit
+// and the pushed head. Only then is the build retried with the newest commit: a desktop-only push
+// after a cancelled build has nothing to retry (fadymondy.com #470, 2026-10-25). Without cmp a push
+// behind a failed or cancelled build always builds.
+func SkipPush(ctx context.Context, q *db.Queries, teamID string, a db.App, push PushPayload, cmp Comparer) (bool, string) {
+	rules := ParseBuildRules(a.BuildRules)
+	changed, known := push.NetChanges(ctx, cmp)
+	build, reason := rules.Decide(changed, known)
 	if build {
 		return false, reason
 	}
@@ -411,7 +419,20 @@ func SkipPush(ctx context.Context, q *db.Queries, teamID string, a db.App, push 
 	case err != nil:
 		return false, "no previous deployment"
 	case st == "failed" || st == "cancelled":
-		return false, "the last deployment " + st
+		behind := "the last deployment " + st
+		live, err := q.LiveReleaseOfApp(ctx, a.ID)
+		if cmp == nil || err != nil || live.CommitSha == nil || strings.Trim(push.After, "0") == "" {
+			return false, behind
+		}
+		paths, ok := cmp(ctx, *live.CommitSha, push.After)
+		if !ok {
+			return false, behind
+		}
+		build, why := rules.Decide(paths, true)
+		if build {
+			return false, behind + " and " + why
+		}
+		return true, strings.Replace(why, "no image changes", "no image changes since the live release", 1)
 	}
 	return true, reason
 }

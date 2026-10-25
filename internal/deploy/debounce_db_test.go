@@ -186,7 +186,7 @@ func TestBuildQueueDebounce(t *testing.T) {
 		if ParseBuildRules(a.BuildRules).Debounce != 5 {
 			return fmt.Errorf("stored rules %q", a.BuildRules)
 		}
-		skip, reason := SkipPush(ctx, q, teamID, a, push)
+		skip, reason := SkipPush(ctx, q, teamID, a, push, nil)
 		if !skip {
 			return fmt.Errorf("not skipped: %s", reason)
 		}
@@ -198,7 +198,7 @@ func TestBuildQueueDebounce(t *testing.T) {
 			return fmt.Errorf("skipped row %+v", d)
 		}
 		code := PushPayload{Before: "b2", After: "c3", Commits: []PushCommit{{ID: "c3", Modified: []string{"docs/y.md", "web/page.tsx"}}}}
-		if skip, _ := SkipPush(ctx, q, teamID, a, code); skip {
+		if skip, _ := SkipPush(ctx, q, teamID, a, code, nil); skip {
 			return errors.New("a code change was skipped")
 		}
 		// The app's debounce comes from its rules now.
@@ -220,8 +220,43 @@ func TestBuildQueueDebounce(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if skip, reason := SkipPush(ctx, q, teamID, a, push); skip || reason != "the last deployment failed" {
+		if skip, reason := SkipPush(ctx, q, teamID, a, push, nil); skip || reason != "the last deployment failed" {
 			return fmt.Errorf("behind a failed build: skip %v (%s)", skip, reason)
+		}
+		return nil
+	})
+	// With a host that compares commits, behind a cancelled build only what changed since the live
+	// release counts (fadymondy.com #470 after the cancelled #706): ignored-only is skipped, code builds.
+	if err := tenancy.Tx(ctx, sqlDB, tenancy.Scope{System: true, TeamID: teamID}, func(_ *db.Queries, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, "UPDATE deployments SET status = 'cancelled' WHERE app_id = $1 AND status = 'failed'", appID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO releases (id, team_id, app_id, deployment_id, version, image, commit_sha, port, config, status, activated_at)
+			VALUES ($1, $2, $3, $4, 1, 'img', 'a0', 3000, '{}', 'live', now())`, newUUID(), teamID, appID, manual.ID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	inTeam(func(q *db.Queries) error {
+		a, err := q.AppInTeam(ctx, db.AppInTeamParams{ID: appID, TeamID: teamID})
+		if err != nil {
+			return err
+		}
+		host := &fakeComparer{answers: map[string][]string{
+			"a1...b2": {"docs/x.md"},
+			"a0...b2": {"docs/x.md", "docs/y.md"},
+			"b2...c3": {"docs/y.md"},
+			"a0...c3": {"docs/y.md", "web/page.tsx"},
+		}}
+		if skip, reason := SkipPush(ctx, q, teamID, a, push, host.cmp); !skip || reason != "no image changes since the live release (2 files, none watched)" {
+			return fmt.Errorf("behind a cancelled build, nothing new for the image: skip %v (%s)", skip, reason)
+		}
+		docs := PushPayload{Before: "b2", After: "c3", Commits: []PushCommit{{ID: "c3", Modified: []string{"docs/y.md"}}}}
+		if skip, reason := SkipPush(ctx, q, teamID, a, docs, host.cmp); skip || reason != "the last deployment cancelled and web/page.tsx changed" {
+			return fmt.Errorf("behind a cancelled code build: skip %v (%s)", skip, reason)
+		}
+		if skip, reason := SkipPush(ctx, q, teamID, a, PushPayload{Before: "x", After: "y", Commits: []PushCommit{{ID: "y", Modified: []string{"docs/z.md"}}}}, host.cmp); skip || reason != "the last deployment cancelled" {
+			return fmt.Errorf("no comparison behind a cancelled build: skip %v (%s)", skip, reason)
 		}
 		return nil
 	})

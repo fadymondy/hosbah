@@ -84,7 +84,11 @@ func (s *Service) handleDeployHook(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if ref == BranchOf(a) {
-			if skip, reason := SkipPush(r.Context(), q, a.TeamID, a, payload); skip {
+			var cmp Comparer
+			if in, ok := installationForRepo(r.Context(), q, a.TeamID, RepoOf(a)); ok {
+				cmp = s.pushComparer(in.InstallationID, RepoOf(a))
+			}
+			if skip, reason := SkipPush(r.Context(), q, a.TeamID, a, payload, cmp); skip {
 				d, err := s.RecordSkipped(r.Context(), q, a.TeamID, Actor{Via: "hook"}, a, payload, reason)
 				if err != nil {
 					return err
@@ -283,8 +287,9 @@ func (s *Service) githubPush(w http.ResponseWriter, r *http.Request, body []byte
 		if err != nil {
 			return err
 		}
+		cmp := s.pushComparer(inst.InstallationID, repoURL)
 		for _, a := range apps {
-			if skip, reason := SkipPush(ctx, q, inst.TeamID, a, push.PushPayload); skip {
+			if skip, reason := SkipPush(ctx, q, inst.TeamID, a, push.PushPayload, cmp); skip {
 				if _, err := s.RecordSkipped(ctx, q, inst.TeamID, Actor{Via: "github"}, a, push.PushPayload, reason); err != nil {
 					return err
 				}

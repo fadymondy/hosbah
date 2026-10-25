@@ -119,6 +119,43 @@ func installationForRepo(ctx context.Context, q *db.Queries, teamID, repoURL str
 	return db.GithubInstallation{}, false
 }
 
+// compareTimeout bounds one GitHub comparison while a push is being decided: GitHub gives a webhook
+// delivery 10 s, and a slow answer only costs the fallback (the payload's file list).
+const compareTimeout = 4 * time.Second
+
+// pushComparer compares commits of repoURL through a GitHub App installation, for the build rules
+// (SkipPush). nil when the App is not configured or repoURL is not on github.com. Only an exact
+// answer counts: head descends from base (ahead) and GitHub listed every file; anything else is
+// "cannot say" and the caller falls back to the payload. Answers are kept for the push, so several
+// apps on one repository ask once.
+func (s *Service) pushComparer(installationID int64, repoURL string) Comparer {
+	g := s.gh()
+	owner, name, ok := strings.Cut(agentproto.GitHubRepoOf(repoURL), "/")
+	if !g.Configured() || installationID <= 0 || !ok {
+		return nil
+	}
+	type answer struct {
+		paths []string
+		ok    bool
+	}
+	seen := map[string]answer{}
+	return func(ctx context.Context, base, head string) ([]string, bool) {
+		key := base + "..." + head
+		if a, hit := seen[key]; hit {
+			return a.paths, a.ok
+		}
+		cctx, cancel := context.WithTimeout(ctx, compareTimeout)
+		defer cancel()
+		c, err := g.Compare(cctx, installationID, owner, name, base, head)
+		a := answer{paths: c.Files, ok: err == nil && c.Status == "ahead" && !c.Truncated}
+		if err != nil {
+			s.log.Warn("comparing a push failed; deciding from its payload", "repo", owner+"/"+name, "err", err)
+		}
+		seen[key] = a
+		return a.paths, a.ok
+	}
+}
+
 // CloneToken returns a GitHub App installation token for repoURL sealed to the agent whose public
 // key is agentKey (agentproto.GitSource.Token), or "" when no installation of the team covers the
 // repository. The token is minted now (GitHub makes it valid for an hour) and exists in the clear
