@@ -1,0 +1,35 @@
+[mcp_servers.mautic]
+url = "https://marketing.fadymondy.com/mcp"
+
+[mcp_servers.mautic.http_headers]
+Authorization = "Bearer R_UwwkqnrPKEquxxAa4xJo-w4fVvxgDjCFJNztusflnmm80LO7XBVXTBxlPKWJuD"
+
+[mcp_servers.next-devtools]
+command = "npx"
+args = [
+    "-y",
+    "next-devtools-mcp@latest",
+]
+
+[mcp_servers.shadcn]
+command = "npx"
+args = [
+    "shadcn@latest",
+    "mcp",
+    "-c",
+    "E:/Sites/fadymondy.com-v2/web",
+]
+
+[mcp_servers.togo]
+command = "togo"
+args = [
+    "mcp:serve",
+    "--role",
+    "admin",
+]
+
+[mcp_servers.togo.env]
+TOGO_PROJECT = "cloudy"
+
+[mcp_servers.togo-web]
+url = "https://mcp.to-go.dev/mcp"
