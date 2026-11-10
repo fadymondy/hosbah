@@ -1,0 +1,13 @@
+[mcp_servers.togo]
+command = "togo"
+args = [
+    "mcp:serve",
+    "--role",
+    "admin",
+]
+
+[mcp_servers.togo.env]
+TOGO_PROJECT = "cloudy"
+
+[mcp_servers.togo-web]
+url = "https://mcp.to-go.dev/mcp"
