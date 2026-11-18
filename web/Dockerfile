@@ -2,7 +2,7 @@
 # Building inside the container sidesteps the host Turbopack out-of-root symlink
 # failure. Do NOT set NODE_ENV=production before `npm ci` — it drops devDependencies
 # (tailwind/postcss) and the build fails. `next build` is production regardless.
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # API_ORIGIN is where next's server-side rewrite sends /api.
